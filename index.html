@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GestInmo">
+<meta name="theme-color" content="#0e1520">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>GestInmo</title>
+<style>
+  body {
+    margin: 0;
+    background: #0e1520;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .splash {
+    text-align: center;
+    color: #c8d4e8;
+  }
+  .logo {
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, #161f38, #1a2440);
+    border: 1px solid #253050;
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 36px;
+  }
+  .name {
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #5a6d90;
+  }
+</style>
+</head>
+<body>
+<div class="splash">
+  <div class="logo">🏢</div>
+  <div class="name">GestInmo</div>
+</div>
+<script>
+  // Redirige inmediatamente al dashboard principal
+  window.location.replace('patrimer-app.html');
+</script>
+</body>
+</html>

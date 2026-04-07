@@ -1,0 +1,2179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Patrimer — Contratos</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --navy-deep:#111827; --navy-mid:#1a2347; --navy-card:#1e2a52;
+  --navy-hover:#243060; --silver-bright:#c8d4e8; --silver-mid:#a8b4c8;
+  --silver-dim:#6b7fa3; --border:#2d3d6e;
+  --gold:#c9a84c; --red:#e05555; --green:#4caf82; --amber:#e09c3a; --blue:#5b8dee;
+  --purple:#9b72e8; --text:#e8eef8; --text2:#8a9bbf;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+body{font-family:'Rajdhani',sans-serif;background:var(--navy-deep);color:var(--text);min-height:100dvh;overflow-x:hidden;overflow-y:auto;}
+.view{display:none;} .view.active{display:block;}
+.main{padding:16px 16px 100px;max-width:480px;margin:0 auto;}
+
+
+
+.btn-new{background:var(--navy-card);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:11px;font-weight:600;letter-spacing:1px;color:var(--silver-mid);cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all .2s;}
+.btn-new:active{transform:scale(.95);}
+.filter-row{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
+.filter-row::-webkit-scrollbar{display:none;}
+.ftab{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1px solid var(--border);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:600;color:var(--text2);cursor:pointer;background:var(--navy-card);font-family:'Rajdhani',sans-serif;transition:all .2s;}
+.ftab.active{background:var(--navy-hover);border-color:var(--silver-dim);color:var(--silver-bright);}
+.sort-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.slabel{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--silver-dim);}
+.sort-btns{display:flex;gap:6px;}
+.sort-btn{padding:4px 10px;border-radius:10px;border:1px solid var(--border);font-size:10px;letter-spacing:.5px;font-weight:600;color:var(--text2);cursor:pointer;background:var(--navy-card);font-family:'Rajdhani',sans-serif;transition:all .2s;}
+.sort-btn.active{border-color:var(--silver-dim);color:var(--silver-bright);}
+.ccard{background:var(--navy-card);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;cursor:pointer;transition:all .2s;animation:fu .4s ease both;position:relative;}
+.ccard:active{transform:scale(.98);}
+.ccard-stripe{position:absolute;left:0;top:0;bottom:0;width:4px;}
+.stripe-vigente{background:var(--green);}
+.stripe-renovacion{background:var(--blue);}
+.stripe-anexo{background:var(--amber);}
+.stripe-rescision{background:var(--red);}
+.ccard-body{padding:14px 14px 14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.ccard-left{flex:1;min-width:0;}
+.ccard-ref{font-size:10px;letter-spacing:1.5px;color:var(--silver-dim);margin-bottom:3px;text-transform:uppercase;}
+.ccard-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+.ccard-address{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px;}
+.ccard-tags{display:flex;gap:6px;flex-wrap:wrap;}
+.ctag{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+.ctag-type{background:rgba(91,141,238,.15);border:1px solid rgba(91,141,238,.3);color:var(--blue);}
+.ccard-right{text-align:right;flex-shrink:0;}
+.ccard-renta{font-size:16px;font-weight:700;color:var(--green);}
+.ccard-dates{font-size:10px;color:var(--text2);margin-top:4px;line-height:1.6;}
+.ccard-alert{font-size:10px;font-weight:700;letter-spacing:.5px;margin-top:6px;}
+.alert-warn{color:var(--amber);}
+.alert-ok{color:var(--green);}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;}
+.stat-pill{background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center;}
+.stat-pill-v{font-size:20px;font-weight:700;}
+.stat-pill-l{font-size:9px;color:var(--text2);letter-spacing:.3px;margin-top:2px;}
+
+/* WIZARD STEPS - 5 pasos */
+.wizard-steps{display:flex;align-items:center;padding:12px 16px 16px;overflow-x:auto;scrollbar-width:none;}
+.wizard-steps::-webkit-scrollbar{display:none;}
+.wstep{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;}
+.wsc{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid var(--border);background:var(--navy-card);color:var(--silver-dim);transition:all .3s;}
+.wstep.active .wsc{border-color:var(--silver-bright);background:var(--navy-hover);color:var(--silver-bright);}
+.wstep.done .wsc{border-color:var(--green);background:rgba(76,175,130,.15);color:var(--green);}
+.wsl{font-size:8px;letter-spacing:.3px;text-transform:uppercase;color:var(--text2);text-align:center;white-space:nowrap;}
+.wstep.active .wsl{color:var(--silver-bright);}
+.wline{flex:1;min-width:8px;height:1px;background:var(--border);margin-bottom:12px;}
+
+/* SELECTOR ARRENDADOR */
+.arr-intro{margin-bottom:20px;}
+.arr-intro-title{font-size:16px;font-weight:700;margin-bottom:4px;}
+.arr-intro-sub{font-size:12px;color:var(--text2);line-height:1.5;}
+.arr-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:24px;}
+.arr-card{background:var(--navy-card);border:2px solid var(--border);border-radius:16px;padding:16px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;}
+.arr-card:active{transform:scale(.98);}
+.arr-card.selected{border-color:var(--gold);}
+.arr-card.selected::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(201,168,76,.07),transparent 60%);pointer-events:none;}
+.arr-card-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.arr-logo{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.arr-logo-patrimer{background:linear-gradient(135deg,#1a3a6e,#0e2244);border:1px solid rgba(201,168,76,.4);}
+.arr-logo-patricio{background:linear-gradient(135deg,#2a2a3a,#1a1a2e);border:1px solid rgba(168,180,200,.3);}
+.arr-logo-industrias{background:linear-gradient(135deg,#2a1a4e,#1a0e3a);border:1px solid rgba(155,114,232,.4);}
+.arr-card-name{font-size:15px;font-weight:700;line-height:1.2;}
+.arr-card-subtipo{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.arr-subtipo-jur{color:var(--gold);}
+.arr-subtipo-fis{color:var(--silver-mid);}
+.arr-check{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);background:var(--navy-mid);display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .25s;color:transparent;}
+.arr-card.selected .arr-check{border-color:var(--gold);background:rgba(201,168,76,.2);color:var(--gold);}
+.arr-details{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.arr-detail{background:rgba(0,0,0,.2);border-radius:8px;padding:7px 10px;}
+.arr-detail-l{font-size:9px;color:var(--text2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px;}
+.arr-detail-v{font-size:11px;font-weight:600;color:var(--silver-bright);}
+.arr-lau{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px;margin-top:8px;}
+.arr-lau-jur{background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.3);color:var(--blue);}
+.arr-lau-fis{background:rgba(168,180,200,.08);border:1px solid rgba(168,180,200,.25);color:var(--silver-mid);}
+
+/* Badge arrendador activo (pasos 1-4) */
+.arr-badge{display:flex;align-items:center;gap:8px;background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.22);border-radius:10px;padding:8px 12px;margin-bottom:16px;}
+.arr-badge-icon{font-size:16px;}
+.arr-badge-name{font-size:12px;font-weight:700;color:var(--gold);}
+.arr-badge-tipo{font-size:10px;color:var(--text2);}
+.arr-badge-lau{margin-left:auto;font-size:10px;font-weight:700;color:var(--blue);background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.22);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0;}
+
+/* Form */
+.fsection{margin-bottom:22px;}
+.ftitle{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:10px;}
+.frow{display:flex;align-items:center;justify-content:space-between;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:7px;gap:10px;}
+.flabel{font-size:13px;color:var(--text2);flex-shrink:0;}
+.finput{background:transparent;border:none;outline:none;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:var(--silver-bright);text-align:right;flex:1;min-width:0;user-select:text;}
+.finput::placeholder{color:var(--silver-dim);font-weight:400;font-size:13px;}
+.frow-full{background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:7px;}
+.flabel-full{font-size:11px;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;}
+.finput-full{background:transparent;border:none;outline:none;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:var(--silver-bright);width:100%;user-select:text;}
+.finput-full::placeholder{color:var(--silver-dim);font-weight:400;font-size:13px;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:7px;}
+.toggle{width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:all .3s;flex-shrink:0;}
+.toggle.on{background:var(--green);}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:all .3s;}
+.toggle.on::after{left:23px;}
+.tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;}
+.tipo-card{background:var(--navy-card);border:2px solid var(--border);border-radius:14px;padding:16px 12px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;}
+.tipo-card:active{transform:scale(.97);}
+.tipo-card.selected{border-color:var(--silver-bright);background:var(--navy-hover);}
+.tipo-icon{font-size:24px;flex-shrink:0;}
+.tipo-label{font-size:13px;font-weight:700;line-height:1.3;}
+.tipo-sub{font-size:10px;color:var(--text2);margin-top:2px;}
+
+/* Padron */
+.padron-tabs{display:flex;gap:6px;margin-bottom:14px;}
+.ptab{flex:1;padding:8px 6px;border-radius:10px;border:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);cursor:pointer;text-align:center;background:var(--navy-card);transition:all .2s;font-family:'Rajdhani',sans-serif;}
+.ptab.active{background:var(--navy-hover);border-color:var(--silver-dim);color:var(--silver-bright);}
+.padron-person-card{background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;}
+.padron-person-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.padron-person-num{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--blue);}
+.padron-person-remove{font-size:16px;color:var(--red);cursor:pointer;padding:4px;}
+.padron-person-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.padron-input{background:var(--navy-card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;color:var(--silver-bright);outline:none;width:100%;user-select:text;}
+.padron-input::placeholder{color:var(--silver-dim);font-weight:400;font-size:12px;}
+.padron-input-full{grid-column:1/-1;}
+.dni-upload-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.dni-upload-btn{background:var(--navy-card);border:1px dashed var(--border);border-radius:8px;padding:10px 8px;text-align:center;cursor:pointer;}
+.dni-upload-icon{font-size:20px;margin-bottom:4px;}
+.dni-upload-label{font-size:10px;color:var(--text2);}
+.dni-preview{width:100%;height:70px;object-fit:cover;border-radius:6px;display:none;}
+.dni-upload-btn.has-img .dni-preview{display:block;}
+.dni-upload-btn.has-img .dni-upload-icon,.dni-upload-btn.has-img .dni-upload-label{display:none;}
+.historial-item{background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.hist-name{font-size:13px;font-weight:700;}
+.hist-dni{font-size:11px;color:var(--text2);margin-top:2px;}
+.hist-right{text-align:right;}
+.hist-status{font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:6px;}
+.hist-alta{background:rgba(76,175,130,.15);border:1px solid rgba(76,175,130,.3);color:var(--green);}
+.hist-baja{background:rgba(224,85,85,.15);border:1px solid rgba(224,85,85,.3);color:var(--red);}
+.hist-date{font-size:10px;color:var(--text2);margin-top:4px;}
+.btn-add-person{display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px dashed rgba(91,141,238,.4);border-radius:8px;padding:10px 14px;cursor:pointer;color:var(--blue);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:.5px;width:100%;}
+
+/* LAU box */
+.lau-box{background:rgba(91,141,238,.06);border:1px solid rgba(91,141,238,.25);border-radius:14px;padding:14px;margin-bottom:16px;}
+.lau-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:12px;}
+.lau-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(45,61,110,.4);}
+.lau-row:last-child{border-bottom:none;}
+.lau-l{font-size:12px;color:var(--text2);}
+.lau-v{font-size:12px;font-weight:700;color:var(--silver-bright);text-align:right;}
+.lau-v.warn{color:var(--amber);}
+.lau-v.ok{color:var(--green);}
+.lau-alert{display:flex;align-items:flex-start;gap:10px;background:rgba(224,156,58,.06);border:1px solid rgba(224,156,58,.25);border-radius:10px;padding:12px;margin-top:10px;}
+.lau-alert-text{font-size:12px;color:var(--text2);line-height:1.5;}
+.lau-alert-text strong{color:var(--amber);}
+.lau-plazos{background:rgba(76,175,130,.06);border:1px solid rgba(76,175,130,.2);border-radius:10px;padding:12px;margin-top:10px;}
+.lau-plazos-title{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin-bottom:8px;}
+.lau-plazo-item{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid rgba(45,61,110,.3);}
+.lau-plazo-item:last-child{border-bottom:none;}
+.lau-plazo-l{color:var(--text2);}
+.lau-plazo-v{font-weight:700;color:var(--silver-bright);}
+
+/* Preview */
+.preview-box{background:rgba(76,175,130,.06);border:1px solid rgba(76,175,130,.2);border-radius:14px;padding:16px;margin-bottom:20px;}
+.preview-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:14px;}
+.preview-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(45,61,110,.4);}
+.preview-row:last-child{border-bottom:none;}
+.preview-l{font-size:12px;color:var(--text2);}
+.preview-v{font-size:12px;font-weight:700;color:var(--silver-bright);text-align:right;}
+
+/* Action grid */
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.action-btn{background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:16px 10px;text-align:center;cursor:pointer;transition:all .2s;}
+.action-btn:active{transform:scale(.96);}
+.action-btn-icon{font-size:24px;margin-bottom:6px;}
+.action-btn-label{font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--silver-mid);}
+
+/* Buttons */
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--navy-hover),var(--navy-card));border:1px solid var(--silver-dim);border-radius:12px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--silver-bright);cursor:pointer;transition:all .2s;margin-bottom:10px;}
+.btn-primary:active{transform:scale(.98);}
+.btn-secondary{width:100%;padding:12px;background:transparent;border:1px solid var(--border);border-radius:12px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);cursor:pointer;margin-bottom:24px;}
+.btn-pdf-gen{width:100%;padding:15px;background:linear-gradient(135deg,#1a3a1a,#1e4a20);border:1px solid var(--green);border-radius:12px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--green);cursor:pointer;transition:all .2s;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-pdf-gen.generating{opacity:.6;}
+.pdf-progress{display:none;margin-bottom:16px;}
+.pdf-progress.show{display:block;}
+.pdf-progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.pdf-progress-fill{height:100%;background:var(--green);border-radius:2px;width:0%;transition:width .3s ease;}
+.pdf-progress-label{font-size:11px;color:var(--text2);margin-top:6px;text-align:center;}
+
+/* Detalle */
+.detalle-tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;scrollbar-width:none;}
+.dtab{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);cursor:pointer;background:var(--navy-card);font-family:'Rajdhani',sans-serif;transition:all .2s;}
+.dtab.active{background:var(--navy-hover);border-color:var(--silver-dim);color:var(--silver-bright);}
+.dtab-panel{display:none;}
+.dtab-panel.active{display:block;}
+
+/* Nav */
+
+
+
+
+
+
+
+
+
+.confirm-modal{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;display:none;pointer-events:none;align-items:center;justify-content:center;padding:20px;}
+.confirm-modal.open{display:flex;pointer-events:all;}
+.confirm-box{background:var(--navy-mid);border:1px solid var(--border);border-radius:20px;padding:22px 18px;width:100%;max-width:340px;animation:scaleIn .2s ease;}
+.confirm-title{font-size:16px;font-weight:700;margin-bottom:8px;}
+.confirm-msg{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;}
+.confirm-btns{display:flex;gap:10px;}
+.confirm-ok{flex:1;padding:12px;background:linear-gradient(135deg,var(--navy-hover),var(--navy-card));border:1px solid var(--silver-dim);border-radius:10px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);cursor:pointer;}
+.confirm-cancel{flex:1;padding:12px;background:transparent;border:1px solid var(--border);border-radius:10px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;color:var(--silver-dim);cursor:pointer;}
+@keyframes fu{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.88);}to{opacity:1;transform:scale(1);}}
+
+/* MODAL BAJA PADRÓN */
+.baja-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;display:none;pointer-events:none;align-items:flex-end;justify-content:center;padding:0;}
+.baja-modal.open{display:flex;pointer-events:all;}
+.baja-sheet{background:var(--navy-mid);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:22px 18px 36px;width:100%;max-width:480px;animation:slideUp .25s ease;}
+.baja-sheet-title{font-size:15px;font-weight:700;margin-bottom:4px;}
+.baja-sheet-sub{font-size:12px;color:var(--text2);margin-bottom:20px;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+
+/* ANEXOS LIBRES */
+.anexo-item{background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.anexo-icon{font-size:22px;flex-shrink:0;}
+.anexo-info{flex:1;min-width:0;}
+.anexo-nombre{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.anexo-meta{font-size:10px;color:var(--text2);margin-top:2px;}
+.anexo-del{font-size:16px;color:var(--red);cursor:pointer;padding:4px;flex-shrink:0;}
+.btn-add-anexo{display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px dashed rgba(155,114,232,.4);border-radius:8px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:.5px;width:100%;margin-bottom:8px;}
+
+/* DOCS TAB mejorado */
+.doc-row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);}
+.doc-row:last-child{border-bottom:none;}
+.doc-nombre{font-size:13px;font-weight:600;}
+.doc-meta{font-size:10px;color:var(--text2);margin-top:1px;}
+.doc-badge-ok{font-size:10px;padding:3px 10px;background:rgba(76,175,130,.15);border:1px solid rgba(76,175,130,.3);border-radius:6px;color:var(--green);font-weight:600;}
+.doc-badge-warn{font-size:10px;padding:3px 10px;background:rgba(224,156,58,.15);border:1px solid rgba(224,156,58,.3);border-radius:6px;color:var(--amber);font-weight:600;}
+.doc-badge-anexo{font-size:10px;padding:3px 10px;background:rgba(155,114,232,.15);border:1px solid rgba(155,114,232,.3);border-radius:6px;color:var(--purple);font-weight:600;}
+
+/* ─── HEADER UNIFICADO v5.2 ─── */
+.accent-line{position:fixed;top:0;left:0;right:0;height:2px;z-index:200;opacity:0;transition:background .5s,opacity .4s;pointer-events:none;}
+body.profiled .accent-line{opacity:1;}
+body[data-profile="empresa"] .accent-line,body[data-profile="patrimer"] .accent-line{background:linear-gradient(90deg,transparent,#5b8dee,transparent);}
+body[data-profile="patricio"] .accent-line{background:linear-gradient(90deg,transparent,#4caf82,transparent);}
+body[data-profile="industrias"] .accent-line{background:linear-gradient(90deg,transparent,#c9a84c,transparent);}
+.header{position:sticky!important;top:0!important;z-index:100!important;background:rgba(14,21,32,.96)!important;backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important;border-bottom:1px solid var(--border)!important;height:62px!important;display:grid!important;grid-template-columns:48px 1fr 48px!important;align-items:center!important;padding:0 12px!important;width:100%!important;}
+.header *{box-sizing:border-box;}
+.header-back{width:36px!important;height:36px!important;border-radius:10px!important;border:1px solid var(--border)!important;background:var(--navy-card,#1e2a52)!important;display:flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;color:var(--silver-dim,#6b7fa3)!important;font-size:18px!important;justify-self:start!important;transition:border-color .2s,background .2s!important;line-height:1!important;padding:0!important;}
+.header-back:active{background:var(--navy-hover,#243060)!important;}
+.header-identity{display:flex!important;align-items:center!important;justify-content:center!important;}
+.header-single-row{display:flex!important;align-items:center!important;gap:7px!important;white-space:nowrap!important;}
+.header-module-name{font-family:'Rajdhani',sans-serif!important;font-weight:700!important;font-size:15px!important;letter-spacing:2px!important;text-transform:uppercase!important;background:linear-gradient(135deg,#c8d4e8,#a8b4c8)!important;-webkit-background-clip:text!important;-webkit-text-fill-color:transparent!important;line-height:1!important;}
+.header-logo-badge{width:18px!important;height:18px!important;border-radius:5px!important;border:1px solid rgba(255,255,255,.2)!important;overflow:hidden!important;flex-shrink:0!important;display:inline-flex!important;}
+.header-logo-badge img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important;}
+.header-company-name{font-family:'Rajdhani',sans-serif!important;font-weight:600!important;font-size:12px!important;letter-spacing:.8px!important;text-transform:uppercase!important;line-height:1!important;}
+body[data-profile="empresa"] .header-company-name,body[data-profile="patrimer"] .header-company-name{color:#5b8dee!important;}
+body[data-profile="patricio"] .header-company-name{color:#4caf82!important;}
+body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
+.header-action{justify-self:end!important;display:flex!important;align-items:center!important;gap:6px!important;}
+/* ─── NAV INFERIOR UNIFICADO v5.2 ─── */
+.bottom-nav a.nav-item,.bottom-nav a.ni{text-decoration:none!important;color:inherit!important;}
+.bottom-nav,.bnav{position:fixed!important;bottom:0!important;left:0!important;right:0!important;z-index:9999!important;background:rgba(14,21,32,.98)!important;border-top:1px solid var(--border)!important;padding:8px 0 max(8px,env(safe-area-inset-bottom))!important;display:flex!important;justify-content:space-around!important;align-items:center!important;-webkit-transform:translateZ(0)!important;transform:translateZ(0)!important;}
+.nav-item,.ni{display:flex!important;flex-direction:column!important;align-items:center!important;gap:3px!important;padding:6px 10px!important;cursor:pointer!important;transition:transform .15s!important;border-radius:12px!important;min-width:50px!important;position:relative!important;}
+.nav-item:active,.ni:active{transform:scale(.91)!important;}
+.nav-icon,.nicon{font-size:19px!important;line-height:1!important;filter:grayscale(1) opacity(.45)!important;transition:filter .2s!important;}
+.nav-label,.nlabel{font-size:9px!important;letter-spacing:.8px!important;text-transform:uppercase!important;color:var(--silver-dim,#6b7fa3)!important;font-weight:600!important;transition:color .2s!important;}
+.nav-item.active .nav-icon,.ni.active .nicon{filter:none!important;}
+.nav-item.active .nav-label,.ni.active .nlabel{color:var(--silver-bright,#c8d4e8)!important;}
+.nav-item.active::before,.ni.active::before{content:''!important;position:absolute!important;top:0!important;left:50%!important;transform:translateX(-50%)!important;width:22px!important;height:2px!important;background:linear-gradient(90deg,transparent,var(--silver-bright,#c8d4e8),transparent)!important;border-radius:2px!important;}
+.nav-badge{position:absolute!important;top:4px!important;right:6px!important;width:14px!important;height:14px!important;background:#e05555!important;border-radius:50%!important;font-size:8px!important;display:flex!important;align-items:center!important;justify-content:center!important;font-weight:700!important;color:#fff!important;border:1.5px solid var(--navy-deep,#111827)!important;}
+
+
+
+</style>
+</head>
+<body>
+
+<!-- LISTA -->
+<div class="accent-line"></div>
+<header class="header" id="hdr-main">
+  <a class="header-back" href="patrimer-app.html">&#8249;</a>
+  <div class="header-identity">
+    <div class="header-single-row">
+      <span class="header-module-name">Contratos</span>
+      <div class="header-logo-badge" id="hdr-badge"></div>
+      <span class="header-company-name" id="hdr-name">Patrimer</span>
+    </div>
+  </div>
+  <div class="header-action">
+    <button class="btn-new" onclick="showWizard()">＋ Nuevo</button>
+  </div>
+</header>
+<div class="view active" id="view-lista">
+
+  <main class="main">
+    <div class="stats-row">
+      <div class="stat-pill"><div class="stat-pill-v">22</div><div class="stat-pill-l">Total</div></div>
+      <div class="stat-pill"><div class="stat-pill-v" style="color:var(--green)">18</div><div class="stat-pill-l">Vigentes</div></div>
+      <div class="stat-pill"><div class="stat-pill-v" style="color:var(--amber)">3</div><div class="stat-pill-l">Vencen</div></div>
+      <div class="stat-pill"><div class="stat-pill-v" style="color:var(--red)">1</div><div class="stat-pill-l">Vencidos</div></div>
+    </div>
+    <div class="filter-row">
+      <div class="ftab active" onclick="setFtab(this)">Todos</div>
+      <div class="ftab" onclick="setFtab(this)">Contratos</div>
+      <div class="ftab" onclick="setFtab(this)">Renovaciones</div>
+      <div class="ftab" onclick="setFtab(this)">Anexos</div>
+      <div class="ftab" onclick="setFtab(this)">Rescisiones</div>
+    </div>
+    <div class="sort-row">
+      <div class="slabel">22 contratos</div>
+      <div class="sort-btns">
+        <div class="sort-btn active" onclick="setSort(this)">A–Z</div>
+        <div class="sort-btn" onclick="setSort(this)">Fecha</div>
+        <div class="sort-btn" onclick="setSort(this)">Inmueble</div>
+      </div>
+    </div>
+    <div class="ccard" onclick="showDetalle()" style="animation-delay:0s">
+      <div class="ccard-stripe stripe-vigente"></div>
+      <div class="ccard-body">
+        <div class="ccard-left">
+          <div class="ccard-ref">VIV01 · Contrato</div>
+          <div class="ccard-name">Martínez Ruiz, Ana</div>
+          <div class="ccard-address">C/ Mayor 14, 3º B · Lorca</div>
+          <div class="ccard-tags"><span class="ctag ctag-type">Vivienda</span></div>
+        </div>
+        <div class="ccard-right"><div class="ccard-renta">750€/mes</div><div class="ccard-dates">01/03/2023<br>28/02/2026</div><div class="ccard-alert alert-warn">⚠ 18 días</div></div>
+      </div>
+    </div>
+    <div class="ccard" style="animation-delay:.06s">
+      <div class="ccard-stripe stripe-vigente"></div>
+      <div class="ccard-body">
+        <div class="ccard-left">
+          <div class="ccard-ref">VIV03 · Contrato</div>
+          <div class="ccard-name">Torres López, Javier</div>
+          <div class="ccard-address">C/ Colón 8, 4º A · Lorca</div>
+          <div class="ccard-tags"><span class="ctag ctag-type">Vivienda</span></div>
+        </div>
+        <div class="ccard-right"><div class="ccard-renta">820€/mes</div><div class="ccard-dates">01/06/2023<br>31/05/2026</div><div class="ccard-alert alert-ok">✓ Vigente</div></div>
+      </div>
+    </div>
+    <div class="ccard" style="animation-delay:.12s">
+      <div class="ccard-stripe stripe-renovacion"></div>
+      <div class="ccard-body">
+        <div class="ccard-left">
+          <div class="ccard-ref">BAJ01 · Renovación</div>
+          <div class="ccard-name">García Comercial SL</div>
+          <div class="ccard-address">Plaza Mayor 2, Local B · Lorca</div>
+          <div class="ccard-tags"><span class="ctag ctag-type">Local</span></div>
+        </div>
+        <div class="ccard-right"><div class="ccard-renta">1.200€/mes</div><div class="ccard-dates">01/01/2025<br>31/12/2027</div><div class="ccard-alert alert-ok">✓ Renovado</div></div>
+      </div>
+    </div>
+    <div class="ccard" style="animation-delay:.18s">
+      <div class="ccard-stripe stripe-anexo"></div>
+      <div class="ccard-body">
+        <div class="ccard-left">
+          <div class="ccard-ref">VIV05 · Anexo padrón</div>
+          <div class="ccard-name">Sánchez Flores, Marta</div>
+          <div class="ccard-address">Avda. Libertad 7, 2º B · Lorca</div>
+          <div class="ccard-tags"><span class="ctag ctag-type">Vivienda</span></div>
+        </div>
+        <div class="ccard-right"><div class="ccard-renta">680€/mes</div><div class="ccard-dates">15/09/2024<br>14/09/2027</div><div class="ccard-alert alert-ok">✓ Vigente</div></div>
+      </div>
+    </div>
+    <div class="ccard" style="animation-delay:.24s">
+      <div class="ccard-stripe" style="background:var(--silver-dim)"></div>
+      <div class="ccard-body">
+        <div class="ccard-left">
+          <div class="ccard-ref">VIV02 · Rescisión</div>
+          <div class="ccard-name">Fernández Gil, Carlos</div>
+          <div class="ccard-address">C/ Mayor 14, 1º A · Lorca</div>
+          <div class="ccard-tags"><span class="ctag ctag-type">Vivienda</span></div>
+        </div>
+        <div class="ccard-right"><div class="ccard-renta" style="color:var(--silver-dim)">680€/mes</div><div class="ccard-dates">01/06/2020<br>31/05/2023</div><div class="ccard-alert" style="color:var(--silver-dim)">Finalizado</div></div>
+      </div>
+    </div>
+    <!-- Leyenda de colores -->
+    <div style="margin-top:24px;padding:12px 14px;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">Leyenda</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:3px;background:var(--green);flex-shrink:0"></div><span style="font-size:10px;color:var(--text2);">Contrato vigente</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:3px;background:var(--blue);flex-shrink:0"></div><span style="font-size:10px;color:var(--text2);">Renovación / prórroga</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:3px;background:var(--amber);flex-shrink:0"></div><span style="font-size:10px;color:var(--text2);">Anexo / modificación</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:3px;background:var(--red);flex-shrink:0"></div><span style="font-size:10px;color:var(--text2);">Rescisión / finalizado</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:3px;background:var(--blue);opacity:.5;flex-shrink:0"></div><span style="font-size:10px;color:var(--text2);">Tipo de inmueble</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- GESTIÓN DE PLANTILLAS -->
+<div class="view" id="view-plantillas">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px 4px;">
+    <div onclick="showLista()" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--silver-dim);font-size:20px;flex-shrink:0;">&#8249;</div>
+    <div style="font-size:13px;font-weight:600;color:var(--silver-mid);letter-spacing:.5px;">Plantillas</div>
+  </div>
+  <main class="main">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
+      Gestiona los modelos de contrato. Puedes actualizar cualquier plantilla subiendo un nuevo archivo .rtf o .docx. La nueva versión sustituirá a la anterior.
+    </div>
+
+    <div id="plantillas-lista"></div>
+
+    <div style="background:rgba(91,141,238,.06);border:1px solid rgba(91,141,238,.2);border-radius:12px;padding:14px;margin-top:8px;">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:10px;">ℹ️ Cómo actualizar</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7;">
+        1. Pulsa <strong style="color:var(--silver-bright)">Actualizar</strong> en la plantilla a sustituir<br>
+        2. Selecciona el nuevo archivo .docx o .rtf<br>
+        3. La app usará el nuevo modelo en todos los contratos futuros
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- WIZARD (5 pasos) -->
+<div class="view" id="view-wizard">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px 4px;">
+    <div onclick="showLista()" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--silver-dim);font-size:20px;flex-shrink:0;">&#8249;</div>
+    <div style="font-size:13px;font-weight:600;color:var(--silver-mid);letter-spacing:.5px;">Nuevo documento</div>
+  </div>
+  <div class="wizard-steps">
+    <div class="wstep active" id="ws0"><div class="wsc">1</div><div class="wsl">Quién</div></div>
+    <div class="wline"></div>
+    <div class="wstep" id="ws1"><div class="wsc">2</div><div class="wsl">Tipo</div></div>
+    <div class="wline"></div>
+    <div class="wstep" id="ws2"><div class="wsc">3</div><div class="wsl">Datos</div></div>
+    <div class="wline"></div>
+    <div class="wstep" id="ws3"><div class="wsc">4</div><div class="wsl">Padrón</div></div>
+    <div class="wline"></div>
+    <div class="wstep" id="ws4"><div class="wsc">5</div><div class="wsl">PDF</div></div>
+  </div>
+
+  <!-- PASO 0: ARRENDADOR -->
+  <div class="main" id="wpaso0">
+    <div class="arr-intro">
+      <div class="arr-intro-title">¿Quién arrienda?</div>
+      <div class="arr-intro-sub">Selecciona el arrendador. Determina los plazos mínimos LAU y los datos del contrato.</div>
+    </div>
+    <div class="arr-cards">
+      <div class="arr-card selected" id="arrcard-patrimer" onclick="selectArrendador('patrimer')">
+        <div class="arr-check" id="arrcheck-patrimer">✓</div>
+        <div class="arr-card-header">
+          <div class="arr-logo arr-logo-patrimer">🏢</div>
+          <div>
+            <div class="arr-card-name">Patrimer Levante S.L.</div>
+            <div class="arr-card-subtipo arr-subtipo-jur">Persona jurídica · CIF B-73110009</div>
+          </div>
+        </div>
+        <div class="arr-details">
+          <div class="arr-detail"><div class="arr-detail-l">Representante</div><div class="arr-detail-v">Patricio Gómez García</div></div>
+          <div class="arr-detail"><div class="arr-detail-l">DNI representante</div><div class="arr-detail-v">23.257.330-Y</div></div>
+          <div class="arr-detail" style="grid-column:1/-1"><div class="arr-detail-l">Domicilio social</div><div class="arr-detail-v">Avda. Juan Carlos I 55 4º, 30800 Lorca</div></div>
+        </div>
+        
+      </div>
+
+      <div class="arr-card" id="arrcard-patricio" onclick="selectArrendador('patricio')">
+        <div class="arr-check" id="arrcheck-patricio"></div>
+        <div class="arr-card-header">
+          <div class="arr-logo arr-logo-patricio">👤</div>
+          <div>
+            <div class="arr-card-name">Patricio Gómez García</div>
+            <div class="arr-card-subtipo arr-subtipo-fis">Persona física · DNI 23.257.330-Y</div>
+          </div>
+        </div>
+        <div class="arr-details">
+          <div class="arr-detail" style="grid-column:1/-1"><div class="arr-detail-l">Domicilio</div><div class="arr-detail-v">Carretera de Caravaca s/n, 30800 Lorca (Murcia)</div></div>
+        </div>
+        
+      </div>
+
+      <div class="arr-card" id="arrcard-industrias" onclick="selectArrendador('industrias')">
+        <div class="arr-check" id="arrcheck-industrias"></div>
+        <div class="arr-card-header">
+          <div class="arr-logo arr-logo-industrias">🏭</div>
+          <div>
+            <div class="arr-card-name" style="font-size:13px">Industrias Gómez y Cayuela S.L.</div>
+            <div class="arr-card-subtipo arr-subtipo-jur">Persona jurídica · Adm. mancomunados</div>
+          </div>
+        </div>
+        <div class="arr-details">
+          <div class="arr-detail"><div class="arr-detail-l">Administrador 1</div><div class="arr-detail-v">Patricio Gómez García</div></div>
+          <div class="arr-detail"><div class="arr-detail-l">Administrador 2</div><div class="arr-detail-v">Mercedes Gómez García</div></div>
+        </div>
+        
+      </div>
+    </div>
+    <button class="btn-primary" onclick="wGoStep(1)">Siguiente →</button>
+  </div>
+
+  <!-- PASO 1: TIPO -->
+  <div class="main" id="wpaso1" style="display:none">
+    <div id="badge-arr-1"></div>
+    <div style="font-size:15px;font-weight:600;color:var(--text2);margin-bottom:8px;">¿Qué tipo de documento?</div>
+    <div style="font-size:11px;color:var(--silver-dim);margin-bottom:20px;">Selecciona el modelo a generar</div>
+    <div class="fsection">
+      <div class="ftitle">Nuevos contratos</div>
+      <div class="tipo-grid">
+        <div class="tipo-card selected" id="tipo-viv" onclick="selectTipo(this,'viv')"><div class="tipo-icon">🏠</div><div><div class="tipo-label">Vivienda habitual</div><div class="tipo-sub">Residencia permanente</div></div></div>
+        <div class="tipo-card" id="tipo-vac" onclick="selectTipo(this,'vac')"><div class="tipo-icon">🏖️</div><div><div class="tipo-label">Por temporada</div><div class="tipo-sub">Uso temporal</div></div></div>
+        <div class="tipo-card" id="tipo-local" onclick="selectTipo(this,'local')"><div class="tipo-icon">🏪</div><div><div class="tipo-label">Local / bajo</div><div class="tipo-sub">Uso comercial</div></div></div>
+        <div class="tipo-card" id="tipo-garaje" onclick="selectTipo(this,'garaje')"><div class="tipo-icon">🚗</div><div><div class="tipo-label">Plaza de garaje</div><div class="tipo-sub">Aparcamiento</div></div></div>
+        <div class="tipo-card" id="tipo-rustica" onclick="selectTipo(this,'rustica')"><div class="tipo-icon">🌾</div><div><div class="tipo-label">Finca rústica</div><div class="tipo-sub">Arrendamiento agrario</div></div></div>
+        <div class="tipo-card" id="tipo-rusticatemp" onclick="selectTipo(this,'rusticatemp')"><div class="tipo-icon">🌿</div><div><div class="tipo-label">Rústica temporada</div><div class="tipo-sub">Menos de 1 año agrícola</div></div></div>
+      </div>
+    </div>
+    <div class="fsection">
+      <div class="ftitle">Otros documentos</div>
+      <div class="tipo-grid">
+        <div class="tipo-card" id="tipo-renov" onclick="selectTipo(this,'renov')"><div class="tipo-icon">🔄</div><div><div class="tipo-label">Renovación</div><div class="tipo-sub">Prórroga</div></div></div>
+        <div class="tipo-card" id="tipo-anexo" onclick="selectTipo(this,'anexo')"><div class="tipo-icon">📎</div><div><div class="tipo-label">Anexo</div><div class="tipo-sub">Modificación</div></div></div>
+        <div class="tipo-card" id="tipo-rescision" onclick="selectTipo(this,'rescision')"><div class="tipo-icon">❌</div><div><div class="tipo-label">Rescisión</div><div class="tipo-sub">Resolución</div></div></div>
+        <div class="tipo-card" id="tipo-padron" onclick="selectTipo(this,'padron')"><div class="tipo-icon">📋</div><div><div class="tipo-label">Anexo padrón</div><div class="tipo-sub">Empadronamiento</div></div></div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="wGoStep(2)">Siguiente →</button>
+    <button class="btn-secondary" onclick="wGoStep(0)">← Cambiar arrendador</button>
+  </div>
+
+  <!-- PASO 2: DATOS -->
+  <div class="main" id="wpaso2" style="display:none">
+    <div id="badge-arr-2"></div>
+    <div class="fsection">
+      <div class="ftitle">Inmueble</div>
+      <!-- Selector de inmueble -->
+      <div id="inmueble-selector-wrap" style="margin-bottom:7px;">
+        <div class="frow" onclick="toggleInmuebleMenu()" style="cursor:pointer;">
+          <div class="flabel">Inmueble</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span id="f-ref-display" style="font-size:14px;font-weight:600;color:var(--silver-bright);">VIV01</span>
+            <span style="font-size:10px;color:var(--silver-dim);">▾</span>
+          </div>
+        </div>
+        <div id="inmueble-menu" style="display:none;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:4px;">
+          <div style="padding:8px 12px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid var(--border);">Selecciona un inmueble</div>
+          <div id="inmueble-lista"></div>
+          <div style="padding:8px 12px;border-top:1px solid var(--border);">
+            <input id="inmueble-search" class="finput" placeholder="Buscar referencia o dirección..." style="width:100%;text-align:left;font-size:12px;" oninput="filtrarInmuebles(this.value)">
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="f-ref" value="VIV01">
+      <div class="frow-full"><div class="flabel-full">Dirección completa</div><input class="finput-full" id="f-dir" placeholder="C/ Mayor 14, 3º B, Lorca..." value="C/ Mayor 14, 3º B, 30800 Lorca (Murcia)"></div>
+      <div class="frow-full"><div class="flabel-full">Descripción catastral</div><input class="finput-full" id="f-catastral" placeholder="Ref. catastral..."></div>
+    </div>
+    <div class="fsection">
+      <div class="ftitle">Inquilino / Arrendatario</div>
+      <div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre" placeholder="Nombre y apellidos" value="Ana Martínez Ruiz"></div>
+      <div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni" placeholder="00000000X" value="12345678A"></div>
+      <div class="frow-full"><div class="flabel-full">Domicilio del inquilino</div><input class="finput-full" id="f-inq-dom" placeholder="Domicilio actual..."></div>
+    </div>
+    <div class="fsection">
+      <div class="ftitle">Condiciones económicas</div>
+      <div class="frow"><div class="flabel">Renta mensual</div><input class="finput" id="f-renta" placeholder="0" value="750"><span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">€/mes</span></div>
+      <div class="frow">
+        <div class="flabel">Fianza</div>
+        <input class="finput" id="f-fianza" placeholder="0" value="750" oninput="fianzaEditadaManualmente=true">
+        <span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">€</span>
+      </div>
+      <div id="fianza-nota" style="font-size:10px;color:var(--text2);padding:4px 14px 6px;margin-top:-4px;">
+        1 mes (arrendatario persona física) · editable por acuerdo
+      </div>
+      <div class="frow"><div class="flabel">Duración</div><input class="finput" id="f-duracion" placeholder="0" value="1" oninput="calcFechaFin();fianzaEditadaManualmente||calcFianzaAuto()"><span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">años</span></div>
+    </div>
+    <div class="fsection">
+      <div class="ftitle">Fechas</div>
+      <div class="frow"><div class="flabel">Fecha de firma</div><input class="finput" id="f-firma" type="date" value="2026-03-25"></div>
+      <div class="frow"><div class="flabel">Inicio de vigencia</div><input class="finput" id="f-inicio" type="date" value="2026-04-01" onchange="calcFechaFin()"></div>
+      <div class="frow"><div class="flabel">Fin de contrato</div><input class="finput" id="f-fin" type="date" value="2029-03-31"></div>
+    </div>
+    <div class="fsection">
+      <div class="ftitle">Arrendador en el contrato</div>
+      <div id="arrendador-datos-box" style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:14px;">
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;" id="arr-empresa-label"></div>
+        <div style="font-size:12px;color:var(--silver-mid);line-height:2;" id="arr-datos"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:8px;padding:0 4px;">
+        ¿Incorrecto? <span style="color:var(--blue);cursor:pointer;font-weight:600;" onclick="wGoStep(0)">← Cambiar arrendador</span>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="wGoStep(3)">Siguiente →</button>
+    <button class="btn-secondary" onclick="wGoStep(1)">← Atrás</button>
+  </div>
+
+  <!-- PASO 3: PADRÓN -->
+  <div class="main" id="wpaso3" style="display:none">
+    <div id="badge-arr-3"></div>
+    <div class="toggle-row" style="margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Incluir Anexo de Padrón</div>
+      <div class="toggle" id="toggle-padron" onclick="togglePadron(this)"></div>
+    </div>
+    <div id="padron-section" style="display:none">
+      <div class="padron-tabs">
+        <div class="ptab active" id="ptab-alta" onclick="setPadronTab('alta')">Altas</div>
+        <div class="ptab" id="ptab-bajas" onclick="setPadronTab('bajas')">Bajas</div>
+        <div class="ptab" id="ptab-hist" onclick="setPadronTab('hist')">Historial</div>
+      </div>
+      <div id="padron-alta">
+        <div id="padron-persons"></div>
+        <div class="btn-add-person" id="btn-add-padron" onclick="addPadronPerson()">＋ Añadir persona (máx. 10)</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:10px;padding:4px;line-height:1.6;">Las personas quedarán registradas en el Anexo I del PDF. Adjunta el DNI para el expediente.</div>
+      </div>
+      <!-- Panel bajas -->
+      <div id="padron-bajas" style="display:none">
+        <div id="padron-bajas-lista"></div>
+        <div id="padron-bajas-empty" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:8px;">✓</div>
+          <div style="font-size:12px;color:var(--text2);">No hay bajas registradas en este contrato.</div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;padding:4px;line-height:1.6;">Para dar de baja a una persona, pulsa ✕ en su tarjeta en la pestaña Altas.</div>
+      </div>
+
+      <!-- Panel historial -->
+      <div id="padron-hist" style="display:none">
+        <div id="padron-hist-lista">
+          <div class="historial-item"><div><div class="hist-name">Martínez Ruiz, Ana</div><div class="hist-dni">DNI 12345678A</div></div><div class="hist-right"><div class="hist-status hist-alta">Alta</div><div class="hist-date">01/03/2023</div></div></div>
+          <div class="historial-item"><div><div class="hist-name">Martínez García, Luis</div><div class="hist-dni">DNI 87654321B</div></div><div class="hist-right"><div class="hist-status hist-alta">Alta</div><div class="hist-date">15/04/2023</div></div></div>
+          <div class="historial-item"><div><div class="hist-name">Gómez Pérez, Rosa</div><div class="hist-dni">DNI 11223344C</div></div><div class="hist-right"><div class="hist-status hist-baja">Baja</div><div class="hist-date">20/01/2025</div></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);padding:8px 4px;">2 empadronados activos · 1 baja registrada</div>
+      </div>
+    </div>
+    <div id="no-padron-msg" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">📋</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;">Activa el toggle para añadir un Anexo de Padrón con los ocupantes autorizados.</div>
+    </div>
+    <!-- ANEXOS LIBRES -->
+    <div style="margin-top:24px;margin-bottom:4px;">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:12px;">Anexos al expediente</div>
+      <div id="anexos-lista"></div>
+      <div class="btn-add-anexo" onclick="triggerAddAnexo()">
+        <span style="font-size:16px;">＋</span> Adjuntar documento o imagen
+      </div>
+      <input type="file" id="anexo-file-input" accept=".pdf,.jpg,.jpeg,.png,.heic" multiple style="display:none" onchange="handleAnexosUpload(this)">
+      <div style="font-size:11px;color:var(--text2);padding:4px;line-height:1.6;">PDF, JPG o PNG. Se incluirán en el expediente y aparecerán en la pestaña Docs.</div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <button class="btn-primary" onclick="wGoStep(4)">Revisar y generar PDF →</button>
+      <button class="btn-secondary" onclick="wGoStep(2)">← Atrás</button>
+    </div>
+  </div>
+
+  <!-- PASO 4: PDF -->
+  <div class="main" id="wpaso4" style="display:none">
+    <div id="badge-arr-4"></div>
+    <div class="preview-box">
+      <div class="preview-title">📋 Resumen del contrato</div>
+      <div class="preview-row"><div class="preview-l">Tipo</div><div class="preview-v" id="prev-tipo">—</div></div>
+      <div class="preview-row"><div class="preview-l">Arrendador</div><div class="preview-v" id="prev-arrendador">—</div></div>
+      <div class="preview-row"><div class="preview-l">Inmueble</div><div class="preview-v" id="prev-inm">—</div></div>
+      <div class="preview-row"><div class="preview-l">Inquilino</div><div class="preview-v" id="prev-inq">—</div></div>
+      <div class="preview-row"><div class="preview-l">Renta</div><div class="preview-v" id="prev-renta">—</div></div>
+      <div class="preview-row"><div class="preview-l">Vigencia</div><div class="preview-v" id="prev-vigencia">—</div></div>
+      <div class="preview-row"><div class="preview-l">Duración</div><div class="preview-v" id="prev-dur">—</div></div>
+      <div class="preview-row"><div class="preview-l">Anexo padrón</div><div class="preview-v" id="prev-padron">No</div></div>
+      <div class="preview-row"><div class="preview-l">Anexos adjuntos</div><div class="preview-v" id="prev-anexos">Ninguno</div></div>
+    </div>
+    <div id="lau-wizard-box" style="display:none"></div>
+    <div class="pdf-progress" id="pdf-progress">
+      <div class="pdf-progress-bar"><div class="pdf-progress-fill" id="pdf-bar"></div></div>
+      <div class="pdf-progress-label" id="pdf-progress-label">Generando contrato...</div>
+    </div>
+    <button class="btn-pdf-gen" id="btn-gen-pdf" onclick="generarPDF()"><span>📄</span> Generar PDF</button>
+    <div id="pdf-done" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="font-size:16px;font-weight:700;">✅ PDF listo</div>
+        <div id="pdf-filename" style="font-size:11px;color:var(--text2);"></div>
+      </div>
+      <div class="action-grid">
+        <div class="action-btn" onclick="descargarPDF()"><div class="action-btn-icon">💾</div><div class="action-btn-label">Descargar</div></div>
+        <div class="action-btn" onclick="compartirPDF()"><div class="action-btn-icon">📤</div><div class="action-btn-label">Compartir</div></div>
+        <div class="action-btn" onclick="emailPDF()"><div class="action-btn-icon">✉️</div><div class="action-btn-label">Mail</div></div>
+        <div class="action-btn" onclick="whatsappPDF()"><div class="action-btn-icon">💬</div><div class="action-btn-label">WhatsApp</div></div>
+      </div>
+      <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:16px;background:white;">
+        <iframe id="pdf-iframe" style="width:100%;height:480px;border:none;display:block;" src="about:blank"></iframe>
+      </div>
+      <div id="pdf-open-direct" style="display:none;margin-bottom:16px;">
+        <button onclick="abrirPDFDirecto()"
+          style="width:100%;padding:14px;background:var(--navy-card);border:1px solid var(--border);border-radius:12px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          👁️ Ver PDF en nueva pestaña
+        </button>
+      </div>
+      <button class="btn-primary" onclick="showLista()">Volver a Contratos</button>
+      <button class="btn-secondary" onclick="wGoStep(3)">← Atrás</button>
+    </div>
+    <div id="btns-pdf-footer">
+      <button class="btn-primary" onclick="showLista()" style="margin-top:8px;">Volver a Contratos</button>
+      <button class="btn-secondary" onclick="wGoStep(3)">← Atrás</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETALLE -->
+<div class="view" id="view-detalle">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px 4px;">
+    <div onclick="showLista()" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--silver-dim);font-size:20px;flex-shrink:0;">&#8249;</div>
+    <div style="font-size:13px;font-weight:600;color:var(--silver-mid);letter-spacing:.5px;">Contratos</div>
+  </div>
+  <main class="main">
+    <div style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:10px">Contrato · Vivienda habitual</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px">Martínez Ruiz, Ana</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">VIV01 · C/ Mayor 14, 3º B · Lorca (Murcia)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:var(--navy-mid);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:var(--text2)">Renta</div><div style="font-size:17px;font-weight:700;color:var(--green)">750€/mes</div></div>
+        <div style="background:var(--navy-mid);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:var(--text2)">Fianza</div><div style="font-size:17px;font-weight:700;color:var(--gold)">1.500€</div></div>
+        <div style="background:var(--navy-mid);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:var(--text2)">Inicio</div><div style="font-size:14px;font-weight:700">01/03/2023</div></div>
+        <div style="background:var(--navy-mid);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:var(--text2)">Fin pactado</div><div style="font-size:14px;font-weight:700;color:var(--amber)">28/02/2026</div></div>
+      </div>
+    </div>
+    <div style="background:rgba(224,156,58,.08);border:1px solid rgba(224,156,58,.3);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:24px">⚠️</div>
+      <div><div style="font-size:13px;font-weight:700;color:var(--amber)">Vence en 18 días</div><div style="font-size:12px;color:var(--text2);margin-top:2px">Avisar con 4 meses de antelación si no se renueva (LAU)</div></div>
+    </div>
+    <div class="detalle-tabs">
+      <div class="dtab active" onclick="setDetalleTab(this,'tab-lau')">LAU</div>
+      <div class="dtab" onclick="setDetalleTab(this,'tab-padron')">Padrón</div>
+      <div class="dtab" onclick="setDetalleTab(this,'tab-docs')">Docs</div>
+    </div>
+    <div class="dtab-panel active" id="tab-lau">
+      <div class="lau-box">
+        <div class="lau-title">⚖️ Plazos LAU — Análisis del contrato</div>
+        <div class="lau-row"><div class="lau-l">Tipo arrendador</div><div class="lau-v">Persona jurídica (Patrimer)</div></div>
+        <div class="lau-row"><div class="lau-l">Duración mínima legal</div><div class="lau-v warn">7 años</div></div>
+        <div class="lau-row"><div class="lau-l">Años transcurridos</div><div class="lau-v">2 años y 11 meses</div></div>
+        <div class="lau-row"><div class="lau-l">Años restantes hasta mínimo</div><div class="lau-v warn">4 años y 1 mes</div></div>
+        <div class="lau-row"><div class="lau-l">Prórroga obligatoria hasta</div><div class="lau-v ok">28/02/2030</div></div>
+        <div class="lau-row"><div class="lau-l">Prórroga tácita anual hasta</div><div class="lau-v">28/02/2031 (si no se avisa)</div></div>
+      </div>
+      <div class="lau-plazos">
+        <div class="lau-plazos-title">📅 Fechas límite de aviso</div>
+        <div class="lau-plazo-item"><div class="lau-plazo-l">Arrendador avisa no renovar</div><div class="lau-plazo-v" style="color:var(--red)">Antes del 28/10/2025 ⚠️</div></div>
+        <div class="lau-plazo-item"><div class="lau-plazo-l">Inquilino avisa no renovar</div><div class="lau-plazo-v" style="color:var(--amber)">Antes del 28/12/2025</div></div>
+        <div class="lau-plazo-item"><div class="lau-plazo-l">Actualización IPC (próxima)</div><div class="lau-plazo-v">01/03/2026</div></div>
+      </div>
+      <div class="lau-alert" style="margin-top:12px;">
+        <div style="font-size:18px;flex-shrink:0">⚖️</div>
+        <div class="lau-alert-text"><strong>Nota legal:</strong> El arrendador (persona jurídica) no puede recuperar el inmueble durante los primeros 7 años. El plazo de 4 meses ya ha vencido para este contrato.</div>
+      </div>
+      <button class="btn-primary" style="margin-top:16px;" onclick="showWizard()">Generar renovación / rescisión</button>
+      <button class="btn-secondary">Ver PDF del contrato</button>
+    </div>
+    <div class="dtab-panel" id="tab-padron">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:600;">Empadronados activos</div>
+        <div style="font-size:11px;color:var(--blue);font-weight:600;cursor:pointer;" onclick="showWizard()">＋ Modificar padrón</div>
+      </div>
+      <div class="historial-item"><div><div class="hist-name">Martínez Ruiz, Ana</div><div class="hist-dni">DNI 12345678A · Titular</div></div><div class="hist-right"><div class="hist-status hist-alta">Alta</div><div class="hist-date">01/03/2023</div></div></div>
+      <div class="historial-item"><div><div class="hist-name">Martínez García, Luis</div><div class="hist-dni">DNI 87654321B · Cónyuge</div></div><div class="hist-right"><div class="hist-status hist-alta">Alta</div><div class="hist-date">15/04/2023</div></div></div>
+    </div>
+    <div class="dtab-panel" id="tab-docs">
+      <!-- Docs fijos del contrato -->
+      <div style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px;">
+        <div class="doc-row"><div><div class="doc-nombre">Contrato original</div><div class="doc-meta">PDF generado</div></div><span class="doc-badge-ok">✓ PDF</span></div>
+        <div class="doc-row"><div><div class="doc-nombre">Anexo padrón I</div><div class="doc-meta">Control de ocupación</div></div><span class="doc-badge-ok">✓ PDF</span></div>
+        <div class="doc-row"><div><div class="doc-nombre">DNI Luis Martínez (frente)</div><div class="doc-meta">Pendiente de subir</div></div><span class="doc-badge-warn">⚠ Falta</span></div>
+      </div>
+      <!-- Anexos libres del expediente -->
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">Anexos del expediente</div>
+      <div id="docs-anexos-lista" style="margin-bottom:10px;"></div>
+      <div id="docs-anexos-empty" style="font-size:12px;color:var(--text2);padding:10px 0;margin-bottom:10px;">Ningún anexo adjunto todavía.</div>
+      <button class="btn-primary" onclick="showWizard()">＋ Añadir documentos</button>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL BAJA PADRÓN -->
+<div class="baja-modal" id="baja-modal">
+  <div class="baja-sheet">
+    <div class="baja-sheet-title">Dar de baja del padrón</div>
+    <div class="baja-sheet-sub" id="baja-nombre-display">—</div>
+    <div class="fsection" style="margin-bottom:16px;">
+      <div class="ftitle">Fecha de baja</div>
+      <div class="frow"><div class="flabel">Fecha</div><input class="finput" id="baja-fecha" type="date"></div>
+    </div>
+    <div class="fsection" style="margin-bottom:20px;">
+      <div class="ftitle">Motivo</div>
+      <div class="frow-full">
+        <select id="baja-motivo" style="background:transparent;border:none;outline:none;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:var(--silver-bright);width:100%;">
+          <option value="Fin de contrato" style="background:var(--navy-mid)">Fin de contrato</option>
+          <option value="Cambio de domicilio" style="background:var(--navy-mid)">Cambio de domicilio</option>
+          <option value="Salida voluntaria" style="background:var(--navy-mid)">Salida voluntaria</option>
+          <option value="Resolución anticipada" style="background:var(--navy-mid)">Resolución anticipada</option>
+          <option value="Otro" style="background:var(--navy-mid)">Otro</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-primary" style="background:linear-gradient(135deg,#3a1a1a,#4a1e1e);border-color:var(--red);color:var(--red);" onclick="confirmarBaja()">Registrar baja</button>
+    <button class="btn-secondary" onclick="closeBajaModal()">Cancelar</button>
+  </div>
+</div>
+
+<div class="confirm-modal" id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Confirmar</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <div class="confirm-cancel" id="confirm-cancel-btn" onclick="closeConfirm()">Cancelar</div>
+      <div class="confirm-ok" id="confirm-ok-btn">Confirmar</div>
+    </div>
+  </div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="patrimer-app.html"><div class="nav-icon">🏠</div><div class="nav-label">Inicio</div></a>
+  <a class="nav-item" href="patrimer-inmuebles.html"><div class="nav-icon">🏢</div><div class="nav-label">Inmuebles</div></a>
+  <a class="nav-item active" href="patrimer-contratos.html"><div class="nav-icon">📄</div><div class="nav-label">Contratos</div></a>
+  <a class="nav-item" href="patrimer-facturacion.html"><div class="nav-icon">💶</div><div class="nav-label">Cobros</div></a>
+  <a class="nav-item" href="patrimer-calculadora.html"><div class="nav-icon">📊</div><div class="nav-label">Análisis</div></a>
+</nav>
+
+<script>
+function navTo(url) { window.location.href = url; }
+
+/* ─── BADGE NAV CONTRATOS ─── */
+function actualizarBadgeContratos() {
+  try {
+    const lista = JSON.parse(localStorage.getItem('patrimer_plantillas') || '[]');
+    const activas = Array.isArray(lista) ? lista.filter(p => p.activa).length : 0;
+    const badge = document.getElementById('nav-badge-contratos');
+    if (!badge) return;
+    if (activas > 0) {
+      badge.textContent = activas;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e) {}
+}
+document.addEventListener('DOMContentLoaded', actualizarBadgeContratos);
+let tipoSelected = 'viv';
+let padronOn = false;
+let padronCount = 0;
+let pdfDoc = null;
+let arrendadorActivo = 'patrimer';
+
+const ARRENDADORES = {
+  patrimer: {
+    label: 'Patrimer Levante S.L.', labelCorto: 'Patrimer', emoji: '🏢',
+    datos: 'D. Patricio Gómez García · DNI 23.257.330-Y\nEn nombre de PATRIMER LEVANTE S.L.\nCIF B-73110009 · Avda. Juan Carlos I 55 4º, Lorca',
+    tipo: 'juridica', duracion_min: 7
+  },
+  patricio: {
+    label: 'Patricio Gómez García', labelCorto: 'Patricio', emoji: '👤',
+    datos: 'D. Patricio Gómez García · DNI 23.257.330-Y\nCarretera de Caravaca s/n, 30800 Lorca (Murcia)',
+    tipo: 'fisica', duracion_min: 5
+  },
+  industrias: {
+    label: 'Industrias Gómez y Cayuela S.L.', labelCorto: 'Industrias', emoji: '🏭',
+    datos: 'D. Patricio Gómez García y Dña. Mercedes Gómez García\n(Administradores mancomunados)\nINDUSTRIAS GÓMEZ Y CAYUELA S.L.',
+    tipo: 'juridica', duracion_min: 7
+  }
+};
+
+// =========== CATÁLOGO DE INMUEBLES (desde localStorage) ===========
+function cargarInmueblesDesdeStorage() {
+  // Lee los inmuebles reales dados de alta en el módulo Inmuebles
+  const empresaActiva = localStorage.getItem('patrimer:empresa') || 'empresa';
+  const rawLista = localStorage.getItem('inmuebles:lista');
+  if (!rawLista) return [];
+  try {
+    const todos = JSON.parse(rawLista);
+    // Filtra por empresa activa y mapea al formato que necesita el wizard
+    const tipoMap = { piso: 'viv', local: 'local', garaje: 'garaje', rustica: 'rustica', nave: 'local', solar: 'rustica', otro: 'viv' };
+    return todos
+      .filter(inm => !inm.empresa || inm.empresa === empresaActiva)
+      .map(inm => ({
+        ref: inm.ref || inm.id || '—',
+        dir: inm.direccion || inm.dir || '—',
+        tipo: tipoMap[inm.tipo] || 'viv',
+        tipoLabel: inm.tipo ? (inm.tipo.charAt(0).toUpperCase() + inm.tipo.slice(1)) : 'Inmueble'
+      }));
+  } catch(e) { return []; }
+}
+// INMUEBLES se carga dinámicamente cada vez que se abre el wizard
+let INMUEBLES = [];
+
+function toggleInmuebleMenu() {
+  const menu = document.getElementById('inmueble-menu');
+  const open = menu.style.display === 'none';
+  menu.style.display = open ? 'block' : 'none';
+  if (open) {
+    // Recarga siempre desde localStorage para tener datos actualizados
+    INMUEBLES = cargarInmueblesDesdeStorage();
+    filtrarInmueblesPorTipo();
+    const lista = window._inmueblesFiltrados || INMUEBLES;
+    if (lista.length === 0) {
+      document.getElementById('inmueble-lista').innerHTML =
+        '<div style="padding:14px;text-align:center;color:var(--silver-dim);font-size:12px;">No hay inmuebles dados de alta.<br>Añádelos primero en el módulo Inmuebles.</div>';
+    } else {
+      renderInmuebles(lista);
+    }
+    setTimeout(() => document.getElementById('inmueble-search').focus(), 100);
+  }
+}
+
+function renderInmuebles(lista) {
+  const cont = document.getElementById('inmueble-lista');
+  cont.innerHTML = lista.map(inm => `
+    <div onclick="seleccionarInmueble('${inm.ref}','${inm.dir.replace(/'/g,"\'")}',' ${inm.tipo}')"
+         style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px;"
+         onmouseover="this.style.background='var(--navy-hover)'" onmouseout="this.style.background=''">
+      <span style="font-size:11px;font-weight:700;color:var(--gold);min-width:44px;">${inm.ref}</span>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:12px;color:var(--text2);line-height:1.3;">${inm.dir}</span>
+        <span style="font-size:10px;color:var(--silver-dim);">${inm.tipoLabel || ''}</span>
+      </div>
+    </div>`).join('');
+}
+
+function filtrarInmuebles(q) {
+  const base = window._inmueblesFiltrados || INMUEBLES;
+  const lista = q ? base.filter(i =>
+    i.ref.toLowerCase().includes(q.toLowerCase()) ||
+    i.dir.toLowerCase().includes(q.toLowerCase())
+  ) : base;
+  renderInmuebles(lista);
+}
+
+function seleccionarInmueble(ref, dir, tipo) {
+  document.getElementById('f-ref').value = ref;
+  document.getElementById('f-ref-display').textContent = ref;
+  document.getElementById('f-dir').value = dir;
+  document.getElementById('inmueble-menu').style.display = 'none';
+  // Preseleccionar tipo si coincide
+  const tipoCard = document.getElementById('tipo-' + tipo);
+  if (tipoCard) { selectTipo(tipoCard, tipo); }
+  fianzaEditadaManualmente = false;
+  calcFianzaAuto();
+}
+
+function selectArrendador(key) {
+  arrendadorActivo = key;
+  ['patrimer','patricio','industrias'].forEach(k => {
+    document.getElementById('arrcard-' + k).classList.remove('selected');
+    document.getElementById('arrcheck-' + k).textContent = '';
+  });
+  document.getElementById('arrcard-' + key).classList.add('selected');
+  document.getElementById('arrcheck-' + key).textContent = '✓';
+}
+
+function renderBadge(containerId) {
+  const arr = ARRENDADORES[arrendadorActivo];
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = `<div class="arr-badge">
+    <div class="arr-badge-icon">${arr.emoji}</div>
+    <div>
+      <div class="arr-badge-name">${arr.label}</div>
+      <div class="arr-badge-tipo">${arr.tipo === 'juridica' ? 'Persona jurídica' : 'Persona física'}</div>
+    </div>
+  </div>`;
+}
+
+// =========== GESTIÓN DE PLANTILLAS ===========
+const PLANTILLAS_DEFAULT = [
+  { id: 'viv',        nombre: 'Vivienda habitual',        archivo: 'C. A. DE VIVIENDA HABITUAL.rtf',        activa: true,  fecha: '25/03/2026' },
+  { id: 'vac',        nombre: 'Por temporada',            archivo: 'C. A. DE VIVIENDA POR TEMPORADA.docx',  activa: true,  fecha: '25/03/2026' },
+  { id: 'rustica',    nombre: 'Finca rústica',            archivo: 'C. A. RÚSTICO.docx',                   activa: true,  fecha: '25/03/2026' },
+  { id: 'rusticatemp',nombre: 'Rústica de temporada',     archivo: 'C. A. RUSTICO DE TEMPORADA.docx',       activa: true,  fecha: '25/03/2026' },
+  { id: 'local',      nombre: 'Local / bajo comercial',   archivo: '— Pendiente de subir —',                activa: false, fecha: '—' },
+  { id: 'garaje',     nombre: 'Plaza de garaje',          archivo: '— Pendiente de subir —',                activa: false, fecha: '—' },
+  { id: 'renov',      nombre: 'Renovación / prórroga',    archivo: '— Pendiente de subir —',                activa: false, fecha: '—' },
+  { id: 'rescision',  nombre: 'Rescisión de contrato',    archivo: '— Pendiente de subir —',                activa: false, fecha: '—' },
+];
+
+let plantillas = JSON.parse(localStorage.getItem('patrimer_plantillas') || 'null') || PLANTILLAS_DEFAULT;
+
+function savePlantillas() {
+  try { localStorage.setItem('patrimer_plantillas', JSON.stringify(plantillas)); } catch(e) {}
+}
+
+function showPlantillas() {
+  ['view-lista','view-wizard','view-detalle','view-plantillas'].forEach(v => document.getElementById(v).classList.remove('active'));
+  document.getElementById('view-plantillas').classList.add('active');
+  renderPlantillas();
+  window.scrollTo(0,0);
+}
+
+function renderPlantillas() {
+  const cont = document.getElementById('plantillas-lista');
+  cont.innerHTML = plantillas.map((p, i) => `
+    <div style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:3px;">${p.nombre}</div>
+          <div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px;">${p.archivo}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;${p.activa
+              ? 'background:rgba(76,175,130,.15);border:1px solid rgba(76,175,130,.3);color:var(--green)'
+              : 'background:rgba(107,127,163,.12);border:1px solid var(--border);color:var(--silver-dim)'}">
+              ${p.activa ? '✓ Activa' : '— Pendiente'}
+            </span>
+            ${p.fecha !== '—' ? `<span style="font-size:10px;color:var(--text2);">Subida ${p.fecha}</span>` : ''}
+          </div>
+        </div>
+        <div>
+          <button onclick="triggerUploadPlantilla(${i})"
+            style="background:var(--navy-hover);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;color:var(--silver-mid);cursor:pointer;white-space:nowrap;">
+            ${p.activa ? '🔄 Actualizar' : '⬆️ Subir'}
+          </button>
+          <input type="file" accept=".docx,.rtf,.doc" id="upload-plantilla-${i}" style="display:none" onchange="handlePlantillaUpload(${i}, this)">
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function triggerUploadPlantilla(idx) {
+  document.getElementById('upload-plantilla-' + idx).click();
+}
+
+function handlePlantillaUpload(idx, input) {
+  if (!input.files[0]) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    // Guardamos referencia al contenido (en producción iría a IndexedDB)
+    plantillas[idx].archivo = file.name;
+    plantillas[idx].activa = true;
+    plantillas[idx].fecha = fmtDate(new Date().toISOString().split('T')[0]);
+    plantillas[idx].contenido = e.target.result; // base64 para uso futuro
+    savePlantillas();
+    renderPlantillas();
+    openConfirm(
+      '✅ Plantilla actualizada',
+      'El modelo "' + plantillas[idx].nombre + '" ha sido actualizado con el archivo "' + file.name + '". Los próximos contratos usarán esta versión.',
+      null, false
+    );
+  };
+  reader.readAsDataURL(file);
+}
+
+function showLista() {
+  ['view-lista','view-wizard','view-detalle','view-plantillas'].forEach(v => document.getElementById(v).classList.remove('active'));
+  document.getElementById('view-lista').classList.add('active');
+  window.scrollTo(0,0);
+}
+function showWizard() {
+  ['view-lista','view-wizard','view-detalle','view-plantillas'].forEach(v => document.getElementById(v).classList.remove('active'));
+  document.getElementById('view-wizard').classList.add('active');
+  wGoStep(0);
+  pdfDoc = null;
+  padronBajas = [];
+  anexosLibres = [];
+  padronCount = 0;
+  padronOn = false;
+  fianzaEditadaManualmente = false;
+  const tp = document.getElementById('toggle-padron');
+  if (tp) tp.classList.remove('on');
+  const pp = document.getElementById('padron-persons');
+  if (pp) pp.innerHTML = '';
+  document.getElementById('padron-section').style.display = 'none';
+  document.getElementById('no-padron-msg').style.display = 'block';
+  document.getElementById('pdf-done').style.display = 'none';
+  document.getElementById('btn-gen-pdf').style.display = 'flex';
+  document.getElementById('pdf-open-direct').style.display = 'none';
+  document.getElementById('pdf-iframe').style.display = 'block';
+  window._pdfDataUri = null;
+  document.getElementById('btns-pdf-footer').style.display = 'block';
+  window.scrollTo(0,0);
+}
+function showDetalle() {
+  ['view-lista','view-wizard','view-detalle','view-plantillas'].forEach(v => document.getElementById(v).classList.remove('active'));
+  document.getElementById('view-detalle').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function wGoStep(n) {
+  for (let i = 0; i <= 4; i++) {
+    const p = document.getElementById('wpaso' + i);
+    if (p) p.style.display = i === n ? 'block' : 'none';
+    const s = document.getElementById('ws' + i);
+    if (s) {
+      s.classList.remove('active','done');
+      if (i < n) s.classList.add('done');
+      else if (i === n) s.classList.add('active');
+      s.querySelector('.wsc').textContent = i < n ? '✓' : (i + 1);
+    }
+  }
+  if (n >= 1) renderBadge('badge-arr-' + n);
+  if (n === 2) actualizarDatosArrendador();
+  if (n === 4) actualizarPreview();
+  window.scrollTo(0,0);
+}
+
+function actualizarDatosArrendador() {
+  const arr = ARRENDADORES[arrendadorActivo];
+  document.getElementById('arr-empresa-label').textContent = arr.label;
+  document.getElementById('arr-datos').innerHTML = arr.datos.replace(/\n/g,'<br>');
+  // Filtrar catálogo de inmuebles según tipo de contrato seleccionado
+  filtrarInmueblesPorTipo();
+}
+
+function filtrarInmueblesPorTipo() {
+  // Mapa de qué tipos de inmueble son válidos para cada tipo de contrato
+  const compatibles = {
+    viv:        ['viv'],
+    vac:        ['viv'],
+    local:      ['local'],
+    garaje:     ['garaje'],
+    rustica:    ['rustica'],
+    rusticatemp:['rustica'],
+    renov:      null, // todos
+    anexo:      null,
+    rescision:  null,
+    padron:     ['viv'],
+  };
+  const permitidos = compatibles[tipoSelected] || null;
+  window._inmueblesFiltrados = permitidos
+    ? INMUEBLES.filter(i => permitidos.includes(i.tipo))
+    : INMUEBLES;
+
+  // Si solo hay un inmueble compatible, preseleccionarlo automáticamente
+  if (window._inmueblesFiltrados.length === 1) {
+    const inm = window._inmueblesFiltrados[0];
+    seleccionarInmueble(inm.ref, inm.dir, inm.tipo);
+  } else {
+    // Limpiar selección previa si no es compatible con el nuevo tipo
+    const refActual = document.getElementById('f-ref').value;
+    const esCompatible = window._inmueblesFiltrados.some(i => i.ref === refActual);
+    if (!esCompatible && window._inmueblesFiltrados.length > 0) {
+      const primero = window._inmueblesFiltrados[0];
+      seleccionarInmueble(primero.ref, primero.dir, primero.tipo);
+    }
+  }
+}
+
+function selectTipo(el, tipo) {
+  document.querySelectorAll('.tipo-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  tipoSelected = tipo;
+}
+function setFtab(el) {
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const label = el.textContent.trim().toLowerCase();
+  const map = { 'todos': null, 'contratos': 'stripe-vigente', 'renovaciones': 'stripe-renovacion', 'anexos': 'stripe-anexo', 'rescisiones': 'stripe-rescision' };
+  const claseActiva = map[label] !== undefined ? map[label] : null;
+  document.querySelectorAll('.ccard').forEach(card => {
+    if (claseActiva === null) {
+      card.style.display = '';
+    } else {
+      const stripe = card.querySelector('.ccard-stripe');
+      card.style.display = (stripe && stripe.classList.contains(claseActiva)) ? '' : 'none';
+    }
+  });
+}
+function setSort(el) { document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active')); el.classList.add('active'); }
+function setNav(el) { document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); el.classList.add('active'); }
+function setDetalleTab(el, tabId) {
+  document.querySelectorAll('.dtab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.dtab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active'); document.getElementById(tabId).classList.add('active');
+}
+
+function calcFechaFin() {
+  const inicio = document.getElementById('f-inicio').value;
+  const dur = parseInt(document.getElementById('f-duracion').value) || 1;
+  if (!inicio) return;
+  const d = new Date(inicio);
+  d.setFullYear(d.getFullYear() + dur);
+  d.setDate(d.getDate() - 1);
+  document.getElementById('f-fin').value = d.toISOString().split('T')[0];
+  if (!fianzaEditadaManualmente) calcFianzaAuto();
+}
+
+let fianzaEditadaManualmente = false;
+
+function calcFianzaAuto() {
+  const renta = parseFloat(document.getElementById('f-renta').value) || 0;
+  const dni = document.getElementById('f-inq-dni').value.trim();
+  // Heurística: si el DNI tiene letra CIF (A-H, J, N-W) → persona jurídica → 2 meses
+  // En la práctica el usuario sabrá; dejamos 1 mes por defecto (persona física)
+  const meses = 1;
+  document.getElementById('f-fianza').value = Math.round(renta * meses);
+  document.getElementById('fianza-nota').textContent =
+    meses === 2
+      ? '2 meses (arrendatario persona jurídica) · editable por acuerdo'
+      : '1 mes (arrendatario persona física) · editable por acuerdo';
+}
+
+function togglePadron(el) {
+  el.classList.toggle('on'); padronOn = el.classList.contains('on');
+  document.getElementById('padron-section').style.display = padronOn ? 'block' : 'none';
+  document.getElementById('no-padron-msg').style.display = padronOn ? 'none' : 'block';
+  if (padronOn && padronCount === 0) addPadronPerson();
+}
+function setPadronTab(tab) {
+  ['alta','bajas','hist'].forEach(t => {
+    const panel = document.getElementById('padron-' + t);
+    const btn = document.getElementById('ptab-' + t);
+    if (panel) panel.style.display = t === tab ? 'block' : 'none';
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'bajas') renderBajasPanel();
+}
+function addPadronPerson() {
+  if (padronCount >= 10) return;
+  padronCount++;
+  const idx = padronCount;
+  const div = document.createElement('div');
+  div.className = 'padron-person-card'; div.id = 'pp-' + idx;
+  div.innerHTML = `<div class="padron-person-header"><div class="padron-person-num">Persona ${idx}</div><div class="padron-person-remove" onclick="removePadronPerson(${idx})">✕</div></div>
+    <div class="padron-person-fields">
+      <input class="padron-input padron-input-full" placeholder="Nombre completo" id="pp-nombre-${idx}">
+      <input class="padron-input" placeholder="DNI / NIE" id="pp-dni-${idx}">
+      <input class="padron-input" placeholder="Parentesco" id="pp-rel-${idx}">
+    </div>
+    <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">DNI (frente / reverso)</div>
+    <div class="dni-upload-row">
+      <div class="dni-upload-btn" id="dni-front-${idx}" onclick="uploadDNI(${idx},'front')"><div class="dni-upload-icon">📷</div><div class="dni-upload-label">Frente</div><img class="dni-preview" id="dni-prev-front-${idx}"></div>
+      <div class="dni-upload-btn" id="dni-back-${idx}" onclick="uploadDNI(${idx},'back')"><div class="dni-upload-icon">📷</div><div class="dni-upload-label">Reverso</div><img class="dni-preview" id="dni-prev-back-${idx}"></div>
+    </div>
+    <input type="file" accept="image/*" capture="environment" id="file-front-${idx}" style="display:none" onchange="previewDNI(${idx},'front',this)">
+    <input type="file" accept="image/*" capture="environment" id="file-back-${idx}" style="display:none" onchange="previewDNI(${idx},'back',this)">`;
+  document.getElementById('padron-persons').appendChild(div);
+  if (padronCount >= 10) document.getElementById('btn-add-padron').style.display = 'none';
+}
+function removePadronPerson(idx) {
+  const nombre = document.getElementById('pp-nombre-' + idx)?.value || 'Persona ' + idx;
+  const dni = document.getElementById('pp-dni-' + idx)?.value || '';
+  // Abrir modal de baja en lugar de eliminar directamente
+  openBajaModal(idx, nombre, dni);
+}
+
+// =========== BAJAS DE PADRÓN ===========
+let padronBajas = []; // {idx, nombre, dni, fecha, motivo}
+let bajaPendienteIdx = null;
+
+function openBajaModal(idx, nombre, dni) {
+  bajaPendienteIdx = idx;
+  document.getElementById('baja-nombre-display').textContent = nombre + (dni ? ' · ' + dni : '');
+  // Fecha por defecto hoy
+  document.getElementById('baja-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('baja-modal').classList.add('open');
+}
+
+function closeBajaModal() {
+  document.getElementById('baja-modal').classList.remove('open');
+  bajaPendienteIdx = null;
+}
+
+function confirmarBaja() {
+  const idx = bajaPendienteIdx;
+  if (idx === null) return;
+  const nombre = document.getElementById('pp-nombre-' + idx)?.value || 'Persona ' + idx;
+  const dni = document.getElementById('pp-dni-' + idx)?.value || '';
+  const fecha = document.getElementById('baja-fecha').value;
+  const motivo = document.getElementById('baja-motivo').value;
+  // Registrar baja
+  padronBajas.push({ idx, nombre, dni, fecha: fmtDate(fecha), motivo });
+  // Eliminar del panel de altas
+  const el = document.getElementById('pp-' + idx);
+  if (el) { el.style.opacity='0'; el.style.transition='opacity .2s'; setTimeout(()=>{ el.remove(); padronCount--; document.getElementById('btn-add-padron').style.display='flex'; },200); }
+  closeBajaModal();
+  // Cambiar a pestaña bajas para confirmar visualmente
+  setPadronTab('bajas');
+}
+
+function renderBajasPanel() {
+  const lista = document.getElementById('padron-bajas-lista');
+  const empty = document.getElementById('padron-bajas-empty');
+  if (!padronBajas.length) {
+    if (lista) lista.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  if (lista) lista.innerHTML = padronBajas.map((b, i) => `
+    <div class="historial-item" style="flex-direction:column;align-items:flex-start;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+        <div>
+          <div class="hist-name">${b.nombre}</div>
+          <div class="hist-dni">${b.dni || '—'}</div>
+        </div>
+        <div class="hist-right">
+          <div class="hist-status hist-baja">Baja</div>
+          <div class="hist-date">${b.fecha}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);background:rgba(224,85,85,.06);border:1px solid rgba(224,85,85,.15);border-radius:6px;padding:4px 8px;width:100%;">
+        ${b.motivo}
+      </div>
+    </div>
+  `).join('');
+}
+function uploadDNI(idx, side) { document.getElementById('file-'+side+'-'+idx).click(); }
+
+// =========== ANEXOS LIBRES ===========
+let anexosLibres = []; // {nombre, tipo, size, dataUrl, icono}
+
+function triggerAddAnexo() {
+  document.getElementById('anexo-file-input').click();
+}
+
+function handleAnexosUpload(input) {
+  const files = Array.from(input.files);
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const icono = ext === 'pdf' ? '📄' : ['jpg','jpeg','png','heic'].includes(ext) ? '🖼️' : '📎';
+      // Pedir nombre personalizado
+      const nombreSugerido = file.name.replace(/\.[^.]+$/, ''); // sin extensión
+      const nombreFinal = prompt('Nombre del anexo:', nombreSugerido) || nombreSugerido;
+      const sizeKB = Math.round(file.size / 1024);
+      anexosLibres.push({
+        nombre: nombreFinal,
+        tipo: ext.toUpperCase(),
+        size: sizeKB > 1024 ? (sizeKB/1024).toFixed(1) + ' MB' : sizeKB + ' KB',
+        dataUrl: e.target.result,
+        icono,
+        fecha: fmtDate(new Date().toISOString().split('T')[0])
+      });
+      renderAnexosLista();
+      renderDocsTab();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = ''; // reset para permitir subir el mismo archivo otra vez
+}
+
+function renderAnexosLista() {
+  const lista = document.getElementById('anexos-lista');
+  if (!lista) return;
+  if (!anexosLibres.length) { lista.innerHTML = ''; return; }
+  lista.innerHTML = anexosLibres.map((a, i) => `
+    <div class="anexo-item">
+      <div class="anexo-icon">${a.icono}</div>
+      <div class="anexo-info">
+        <div class="anexo-nombre">${a.nombre}</div>
+        <div class="anexo-meta">${a.tipo} · ${a.size} · ${a.fecha}</div>
+      </div>
+      <div class="anexo-del" onclick="eliminarAnexo(${i})">✕</div>
+    </div>
+  `).join('');
+}
+
+function eliminarAnexo(i) {
+  anexosLibres.splice(i, 1);
+  renderAnexosLista();
+  renderDocsTab();
+}
+
+function renderDocsTab() {
+  const lista = document.getElementById('docs-anexos-lista');
+  const empty = document.getElementById('docs-anexos-empty');
+  if (!lista) return;
+
+  // Documentos vinculados desde módulo Documentos (por ref de inmueble)
+  let docsVinculados = [];
+  try {
+    const ref = (datos && datos.ref) ? datos.ref.toUpperCase() : '';
+    const todosLosDocs = JSON.parse(localStorage.getItem('documentos:lista') || '[]');
+    docsVinculados = ref ? todosLosDocs.filter(d => (d.inmueble || '').toUpperCase() === ref) : [];
+  } catch(e) {}
+
+  const tieneAnexos = anexosLibres.length > 0;
+  const tieneVinculados = docsVinculados.length > 0;
+
+  if (!tieneAnexos && !tieneVinculados) {
+    lista.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  let html = '';
+
+  // Sección: documentos del módulo Documentos
+  if (tieneVinculados) {
+    html += '<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;margin-top:4px;">📁 Desde Archivo Digital</div>';
+    html += '<div style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px;">' +
+      docsVinculados.map(d => {
+        const icono = {contrato:'📄',factura:'🧾',foto:'🖼️',dni:'🪪',otro:'📎'}[d.tipo] || '📎';
+        const fecha = d.fecha ? new Date(d.fecha).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+        return `<div class="doc-row">
+          <div>
+            <div class="doc-nombre">${icono} ${d.nombre}</div>
+            <div class="doc-meta">${d.tipo || 'doc'} · ${d.size || '—'} · ${fecha}</div>
+          </div>
+          <span class="doc-badge-ok">✓ Vinculado</span>
+        </div>`;
+      }).join('') + '</div>';
+  }
+
+  // Sección: anexos del wizard
+  if (tieneAnexos) {
+    html += '<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">📎 Anexos del contrato</div>';
+    html += '<div style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">' +
+      anexosLibres.map((a, i) => `
+        <div class="doc-row">
+          <div>
+            <div class="doc-nombre">${a.icono} ${a.nombre}</div>
+            <div class="doc-meta">${a.tipo} · ${a.size} · subido ${a.fecha}</div>
+          </div>
+          <span class="doc-badge-anexo">Anexo</span>
+        </div>
+      `).join('') + '</div>';
+  }
+
+  lista.innerHTML = html;
+}
+function previewDNI(idx, side, input) {
+  if (!input.files[0]) return;
+  const r = new FileReader(); r.onload = e => { document.getElementById('dni-prev-'+side+'-'+idx).src=e.target.result; document.getElementById('dni-'+side+'-'+idx).classList.add('has-img'); }; r.readAsDataURL(input.files[0]);
+}
+
+function actualizarPreview() {
+  const arr = ARRENDADORES[arrendadorActivo];
+  const ref = document.getElementById('f-ref').value || '';
+  const dir = document.getElementById('f-dir').value || '';
+  const inq = document.getElementById('f-inq-nombre').value || '';
+  const renta = document.getElementById('f-renta').value || '0';
+  const fianza = document.getElementById('f-fianza').value || '0';
+  const dur = document.getElementById('f-duracion').value || '3';
+  const inicio = document.getElementById('f-inicio').value || '';
+  const fin = document.getElementById('f-fin').value || '';
+  const tipoMap = {viv:'Contrato vivienda habitual',vac:'Contrato por temporada',local:'Contrato local / bajo comercial',garaje:'Contrato plaza de garaje',rustica:'Contrato finca rústica',rusticatemp:'Contrato rústico de temporada',renov:'Renovación / prórroga',anexo:'Anexo contractual',rescision:'Rescisión de contrato',padron:'Anexo de padrón'};
+  document.getElementById('prev-tipo').textContent = tipoMap[tipoSelected] || tipoSelected;
+  document.getElementById('prev-arrendador').textContent = arr.label;
+  document.getElementById('prev-inm').textContent = ref + (dir ? ' · ' + dir.substring(0,25) : '');
+  document.getElementById('prev-inq').textContent = inq;
+  document.getElementById('prev-renta').textContent = formatEur(renta) + '/mes · Fianza ' + formatEur(fianza);
+  document.getElementById('prev-dur').textContent = dur + ' año' + (dur != 1 ? 's' : '');
+  document.getElementById('prev-padron').textContent = padronOn ? (padronCount + ' persona' + (padronCount != 1 ? 's' : '')) : 'No';
+  // Mostrar count de anexos si los hay
+  const prevAnexos = document.getElementById('prev-anexos');
+  if (prevAnexos) prevAnexos.textContent = anexosLibres.length ? anexosLibres.length + ' documento' + (anexosLibres.length > 1 ? 's' : '') : 'Ninguno';
+  document.getElementById('prev-vigencia').textContent = (inicio ? fmtDate(inicio) : '—') + ' → ' + (fin ? fmtDate(fin) : '—');
+  updateLAU(arr, inicio, dur);
+  // Nombre calculado por getPdfFilename() para consistencia
+  document.getElementById('pdf-filename').textContent = getPdfFilename();
+}
+
+function updateLAU(arr, inicio, dur) {
+  // Calcula internamente fin real (duración pactada + 6 prórrogas obligatorias)
+  // Se usa solo para cálculos de vencimiento, no se muestra en pantalla
+  const prorrogas = arr.tipo === 'juridica' ? 6 : 4; // 6 para jurídica → 7 años total; 4 para física → 5 años total
+  window._lauData = {
+    durPactada: parseInt(dur) || 1,
+    prorrogas,
+    durTotal: (parseInt(dur) || 1) + prorrogas,
+    inicio,
+    arr
+  };
+}
+
+// =========== GENERADORES DE CONTRATO POR TIPO ===========
+
+function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma) {
+  let y_ref = { y: 45 };
+  const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
+  const fStr = datos.fin ? formatFechaLarga(datos.fin) : '—';
+  const durMin = arr.duracion_min;
+
+  // REUNIDOS
+  addTitle('REUNIDOS');
+  addBlock('De una parte:');
+  if (arr.tipo === 'juridica') {
+    if (arrendadorActivo === 'industrias') {
+      addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. 23.257.329-M y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
+    } else {
+      addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 55, 4º de Lorca (Murcia).');
+    }
+  } else {
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
+  }
+  addBlock('Y, de otra parte:');
+  addBlock('D./Dña. ' + (datos.inqNombre || '—') + ', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ' y con DNI/NIE ' + (datos.inqDNI || '—') + '.');
+
+  addTitle('INTERVIENEN');
+  if (arr.tipo === 'juridica') {
+    if (arrendadorActivo === 'industrias') {
+      addBlock('D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
+    } else {
+      addBlock('D. Patricio Gómez García interviene en nombre y representación, como Apoderado, de la mercantil PATRIMER LEVANTE, S.L., constituida el 14 de diciembre de 2.000, ante el Notario de Murcia, D. José Antonio Romá Riera, bajo el número de protocolo 2.524, e inscrita en el Registro Mercantil de Murcia, en la Hoja MU-34461, al Tomo 1.729, Libro 0, Folio 112, con Domicilio en Carretera de Caravaca s/n., y con CIF B-73110009, (en adelante el ARRENDADOR).');
+    }
+  } else {
+    addBlock('D. Patricio Gómez García actúa en su propio nombre y representación (en adelante el ARRENDADOR).');
+  }
+  addBlock('D./Dña. ' + (datos.inqNombre || '—') + ' en su propio nombre y representación (en adelante, el/la ARRENDATARIO/A).');
+  addBlock('Las partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+
+  addTitle('EXPONEN');
+  addBlock('I. – Que el ARRENDADOR es propietario en pleno dominio de la siguiente finca urbana, que manifiesta libre de cargas:\n' + (datos.dir || '—') + (datos.catastral ? '\nReferencia Catastral: ' + datos.catastral : '') + '\nReferencia del contrato: ' + (datos.ref || '—'));
+  addBlock('II. – Que D./Dña. ' + (datos.inqNombre || '—') + ' está interesado/a en arrendar la vivienda descrita para que constituya su vivienda habitual.');
+  addBlock('Ambas partes han convenido formalizar el presente contrato de arrendamiento con base en las siguientes,');
+  addLine();
+
+  addTitle('ESTIPULACIONES');
+
+  addBlock('PRIMERA. – RÉGIMEN LEGAL.', true);
+  addBlock('El presente contrato se regulará por lo aquí pactado, por lo establecido por la Ley 29/1994, de 24 de noviembre, de Arrendamientos Urbanos (LAU) y, en lo no previsto, por las disposiciones del Código Civil y demás normas del Ordenamiento Jurídico del Reino de España que le resulten aplicables.');
+  chk();
+
+  addBlock('SEGUNDA. – OBJETO DEL CONTRATO Y DESTINO DE LA VIVIENDA.', true);
+  addBlock('Constituye el objeto del contrato de arrendamiento el inmueble antes referido. La parte arrendataria manifiesta conocer el inmueble y las instalaciones objeto de alquiler, considerando y aceptando expresamente que su estado de conservación es bueno y correcto. El destino que se hará del inmueble es exclusivamente el de vivienda de la parte arrendataria, sin que pueda cambiarse el destino pactado.');
+  chk();
+
+  addBlock('TERCERA. – PLAZO.', true);
+  const durTexto = parseInt(datos.duracion) === 1 ? 'UN AÑO' : datos.duracion + ' AÑOS';
+  addBlock('El tiempo de duración del contrato será de ' + durTexto + ' desde el día ' + iStr + ', no obstante, llegado el día del vencimiento del contrato, este se prorrogará obligatoriamente por plazos anuales hasta que el arrendamiento alcance una duración mínima de ' + durMin.toString().toUpperCase().replace('7','SIETE').replace('5','CINCO') + ' AÑOS, salvo que la parte arrendataria manifieste a la arrendadora, con TREINTA DÍAS de antelación como mínimo a la fecha de terminación del contrato o cualquiera de sus prórrogas, su voluntad de no renovarlo.');
+  chk();
+
+  addBlock('CUARTA. – PRÓRROGA.', true);
+  addBlock('Si llegada la fecha de vencimiento del contrato, o de cualquiera de sus prórrogas, una vez transcurridos como mínimo ' + (durMin === 7 ? 'SIETE' : 'CINCO') + ' años de duración de aquel, ninguna de las partes hubiese notificado a la otra, al menos con cuatro meses de antelación a aquella fecha en el caso de la parte arrendadora y al menos con dos meses de antelación en el caso de la arrendataria, su voluntad de no renovarlo, el contrato se prorrogará obligatoriamente por plazos anuales hasta un máximo de tres años más, salvo que la arrendataria manifieste a la arrendadora con un mes de antelación a la fecha de terminación de cualquiera de las anualidades, su voluntad de no renovar el contrato.');
+  chk();
+
+  addBlock('QUINTA. – DESISTIMIENTO DEL CONTRATO POR EL ARRENDATARIO.', true);
+  addBlock('Conforme a lo establecido en el Art. 11 de la LAU, la parte arrendataria podrá desistir del contrato de arrendamiento una vez que hayan transcurrido al menos seis meses, siempre que medie un preaviso por escrito a la parte arrendadora con una antelación mínima de treinta días.\n\nLas partes acuerdan expresamente que, en caso de ejercer este derecho de desistimiento, la parte arrendataria NO deberá abonar indemnización alguna a la parte arrendadora por los años o periodos del contrato que resten por cumplir, renunciando la parte arrendadora de forma irrevocable al cobro de cualquier cantidad por este concepto.');
+  chk();
+
+  addBlock('SEXTA. – RENTA, FORMA DE PAGO Y ACTUALIZACIÓN DE LA RENTA.', true);
+  addBlock('El importe de la renta mensual que se fija como precio de este arrendamiento asciende a la suma de ' + formatEurLetras(datos.renta) + ' (' + formatEur(datos.renta) + '/mes). El pago de la renta será mensual y habrá de efectuarse en los cinco primeros días del mes mediante transferencia bancaria a la cuenta que el arrendador indique, sin perjuicio de la entrega de la correspondiente factura.\n\nA partir del segundo año la renta se revisará cada año de acuerdo con la variación experimentada por el Índice de Precios al Consumo o índice que legalmente lo sustituya.');
+  chk();
+
+  addBlock('SÉPTIMA. – GASTOS GENERALES Y SERVICIOS INDIVIDUALES.', true);
+  addBlock('La parte arrendataria se obliga a satisfacer, a su vencimiento, los siguientes gastos y servicios: consumos y servicios tales como luz, agua, gas y tasa de basura; y cualquier otro susceptible de ser individualmente asignado por contrato o por medio de contador.');
+  chk();
+
+  addBlock('OCTAVA. – DESTINO.', true);
+  addBlock('El destino que tiene que darse al inmueble objeto de arrendamiento es EXCLUSIVAMENTE el de la vivienda de la parte arrendataria y no puede cambiarse. La arrendataria no podrá realizar en la vivienda ninguna actividad de tipo industrial y/o profesional, molesta, insalubre, nociva o peligrosa.');
+  chk();
+
+  addBlock('NOVENA. – CONSERVACIÓN.', true);
+  addBlock('La parte arrendataria se compromete a mantener la vivienda en perfecto estado de uso, conservación, ornato y destino, reconociendo expresamente que la recibe en perfecto estado de conservación. La arrendadora, por su parte, se compromete a realizar, sin derecho a elevar por ello la renta, las reparaciones que sean necesarias para conservar la vivienda en condiciones de habitabilidad, salvo que aquellas sean consecuencia de un deterioro imputable a la arrendataria.');
+  chk();
+
+  addBlock('DÉCIMA. – OBRAS.', true);
+  addBlock('La parte arrendataria no podrá realizar en la vivienda obras que modifiquen su configuración o la de cualquiera de sus accesorios, sin el permiso claro y expreso de la parte arrendadora, que deberá ser por escrito. La contravención de esta cláusula será causa de resolución del presente acuerdo.');
+  chk();
+
+  addBlock('UNDÉCIMA. – CESIÓN Y SUBARRIENDO.', true);
+  addBlock('Queda terminantemente prohibido la cesión del contrato sin el consentimiento escrito, claro y expreso de la parte arrendadora.');
+  chk();
+
+  addBlock('DUODÉCIMA. – FIANZA.', true);
+  addBlock('La parte arrendataria entrega a la propiedad la cantidad de ' + formatEurLetras(datos.fianza) + ' (' + formatEur(datos.fianza) + '), en calidad de fianza y para responder de las obligaciones contraídas y en su caso de los daños y perjuicios. La parte arrendadora devolverá el importe de la fianza a la arrendataria a la terminación del contrato si se han cumplido todas las obligaciones asumidas. La fianza no se podrá usar como pago de ninguna mensualidad.');
+  chk();
+
+  addBlock('DÉCIMOTERCERA. – RESOLUCIÓN DEL CONTRATO.', true);
+  addBlock('El incumplimiento de cualquiera de las cláusulas que rigen este contrato o de la normativa que le resulte de aplicación, será causa de resolución del contrato para cualquiera de las partes.');
+  chk();
+
+  addBlock('DÉCIMOCUARTA. – RESOLUCIÓN DE CONFLICTOS.', true);
+  addBlock('Para la resolución de cualquier conflicto que pudiera derivarse de la interpretación del presente acuerdo, las partes se someten a los Juzgados y Tribunales competentes, según las normas procesales del Reino de España y, más expresamente, a los del lugar donde radica la finca arrendada.');
+}
+
+function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma) {
+  const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
+  const fStr = datos.fin ? formatFechaLarga(datos.fin) : '—';
+
+  addTitle('REUNIDOS');
+  addBlock('De una parte:');
+  if (arrendadorActivo === 'industrias') {
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. 23.257.329-M y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
+  } else {
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en ' + (arr.tipo === 'fisica' ? 'Carretera de Caravaca s/n, 30800 Lorca (Murcia).' : 'Carretera de Caravaca s/n, 30800 Lorca (Murcia).'));
+  }
+  addBlock('De otra parte: D./Dña. ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+
+  addTitle('INTERVIENEN');
+  if (arr.tipo === 'juridica') {
+    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. B73110009 y domicilio social en Avd. Juan Carlos I, nº55, 4º, 30800 Lorca (Murcia), en adelante "el arrendador" o "la parte arrendadora".');
+  } else {
+    addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante "el arrendador" o "la parte arrendadora".');
+  }
+  addBlock('D./Dña. ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante "el arrendatario" o "la parte arrendataria". Las partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+
+  addTitle('EXPONEN');
+  addBlock('I. – Que ' + (arr.tipo === 'juridica' ? 'la sociedad mercantil ' + arr.label : 'el arrendador') + ', es propietario/a de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
+  addBlock('II. – Que estando interesado/a D./Dña. ' + (datos.inqNombre || '—') + ' en el arrendamiento de la finca antes descrita, ambas partes han convenido en formalizar el presente contrato de arrendamiento de finca rústica con base en las siguientes,');
+  addLine();
+
+  addTitle('ESTIPULACIONES');
+
+  addBlock('PRIMERA. – RÉGIMEN LEGAL.', true);
+  addBlock('El presente contrato se regirá por lo aquí pactado, lo dispuesto en la Ley 49/2003, de 26 de noviembre, de Arrendamientos Rústicos (en adelante LAR) y, en lo no previsto, por las disposiciones del Código Civil y demás normas del Ordenamiento Jurídico del Reino de España que le resulten aplicables.');
+  chk();
+
+  addBlock('SEGUNDA. – OBJETO.', true);
+  addBlock(arr.label + ' cede en arrendamiento la finca descrita a D./Dña. ' + (datos.inqNombre || '—') + ', siendo objeto de este contrato y destino exclusivo que ha de darse por la parte arrendataria a la referida finca el aprovechamiento agrícola pactado. No corresponderán al arrendatario los demás aprovechamientos agrarios o no agrarios de que sea susceptible la finca.');
+  chk();
+
+  addBlock('TERCERA. – DURACIÓN.', true);
+  addBlock('El arrendamiento se estipula por una duración de CINCO AÑOS desde el ' + iStr + ', término que vencerá el día ' + fStr + '. Si la parte arrendadora desea recuperar la finca al término del plazo contractual, tiene que comunicárselo fehacientemente a la parte arrendataria con un año de antelación. De lo contrario, el contrato se entenderá prorrogado por periodos de CINCO AÑOS indefinidamente.');
+  chk();
+
+  addBlock('CUARTA. – PRECIO, FORMA DE PAGO Y ACTUALIZACIÓN DE LA RENTA.', true);
+  addBlock('Se fija la renta en la suma de ' + formatEurLetras(datos.renta) + ' (' + formatEur(datos.renta) + ') pagadera por anualidades anticipadas en los quince primeros días del año natural. Dicha renta se actualizará con referencia al Índice General de Precios al Consumo o índice referencial que lo sustituya.');
+  chk();
+
+  addBlock('QUINTA. – OBLIGACIONES DEL ARRENDATARIO.', true);
+  addBlock('El arrendatario se obliga a conservar la finca con la diligencia de un buen labrador, devolviéndola al término del contrato en perfecto estado. Son de cuenta del arrendatario las reparaciones que sean de cuenta del empresario agrícola, así como las que le correspondan por disposición legal o resolución judicial.');
+  chk();
+
+  addBlock('SEXTA. – OBLIGACIONES DEL ARRENDADOR.', true);
+  addBlock('Son de cuenta del arrendador las reparaciones necesarias para que la finca pueda servir para el destino pactado, salvo los daños causados por fuerza mayor.');
+  chk();
+
+  addBlock('SÉPTIMA. – OBRAS, REPARACIONES Y MEJORAS.', true);
+  addBlock('El arrendatario puede realizar las mejoras que estime oportunas, sin consentimiento del arrendador, salvo que su realización implique transformación de la finca. A la finalización del contrato la parte arrendataria solo podrá retirar las mejoras efectuadas si no causa un detrimento en la finca.');
+  chk();
+
+  addBlock('OCTAVA. – RENUNCIA EXPRESA AL DERECHO DE TANTEO, RETRACTO Y ADQUISICIÓN PREFERENTE.', true);
+  addBlock('La parte arrendataria renuncia clara y expresamente a los derechos de tanteo, retracto y adquisición preferente, a los que podría tener derecho en aplicación del artículo 22 de la Ley de Arrendamientos Rústicos.');
+  chk();
+
+  addBlock('NOVENA. – CESIÓN DEL CONTRATO Y SUBARRIENDO.', true);
+  addBlock('La parte arrendataria no podrá, en ningún caso, ceder el contrato, ni subarrendar total o parcialmente la finca objeto de arrendamiento. Será nula cualquier cesión o subarriendo total o parcial de la finca y será causa de resolución del presente contrato.');
+  chk();
+
+  addBlock('DÉCIMA. – RESOLUCIÓN DEL CONTRATO.', true);
+  addBlock('El contrato podrá resolverse de acuerdo con los términos previstos por la LAR en su capítulo VIII, artículos 24 a 27. Además, el arrendador podrá resolver de pleno derecho el contrato por: a) La falta de pago de una anualidad de la renta; b) El incumplimiento de las obligaciones contraídas en el presente pacto.');
+  chk();
+
+  addBlock('UNDÉCIMA. – JURISDICCIÓN Y FUERO.', true);
+  addBlock('Para la resolución de cualquier cuestión que pueda suscitarse, las partes se someten a los Juzgados y Tribunales del lugar donde radica la finca. Todos los gastos jurídicos que pudieran derivarse del incumplimiento serán por cuenta de la parte incumplidora.');
+}
+
+function generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma) {
+  const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
+  const fStr = datos.fin ? formatFechaLarga(datos.fin) : '—';
+
+  addTitle('REUNIDOS');
+  addBlock('De una parte:');
+  if (arrendadorActivo === 'industrias') {
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. 23.257.329-M y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
+  } else if (arr.tipo === 'fisica') {
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
+  } else {
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. 23.257.329-M y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
+  }
+  addBlock('De otra parte: D./Dña. ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+
+  addTitle('INTERVIENEN');
+  if (arr.tipo === 'juridica') {
+    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes' : 'D. Patricio y Dña. Mercedes') + ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil ' + arr.label + ', con C.I.F. B73110009, en adelante "la arrendadora" o "la parte arrendadora".');
+  } else {
+    addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante "la arrendadora" o "la parte arrendadora".');
+  }
+  addBlock('D./Dña. ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante "el arrendatario" o "la parte arrendataria". Las partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+
+  addTitle('EXPONEN');
+  addBlock('I. – Que ' + (arr.tipo === 'juridica' ? 'la sociedad mercantil ' + arr.label : 'el arrendador') + ', es propietario/a de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
+  addBlock('II. – Que D./Dña. ' + (datos.inqNombre || '—') + ' está interesado/a en arrendar la vivienda descrita para satisfacer una necesidad temporal de vivienda por motivos laborales durante un periodo cierto de tiempo. Ambas partes han convenido formalizar el presente contrato de arrendamiento de vivienda por temporada.');
+  addLine();
+
+  addTitle('ESTIPULACIONES');
+
+  addBlock('PRIMERA.', true);
+  addBlock('La parte arrendadora cede en arriendo por temporada la vivienda antes descrita.');
+  chk();
+
+  addBlock('SEGUNDA.', true);
+  addBlock('El inmueble se destinará exclusivamente a satisfacer la necesidad temporal de vivienda de la parte arrendataria, sin que pueda ser destinada a otro fin distinto al aquí pactado.');
+  chk();
+
+  addBlock('TERCERA.', true);
+  addBlock('El presente contrato se acuerda por la temporada comprendida entre el ' + iStr + ' y el ' + fStr + '. Siendo el plazo de duración del presente acuerdo de ' + datos.duracion + ' ' + (parseInt(datos.duracion) === 1 ? 'año' : 'años') + '. La parte arrendataria se obliga a utilizar el inmueble arrendado como vivienda temporal durante el plazo de duración pactado por motivos LABORALES, no pudiendo variar dicho uso sin consentimiento escrito de la parte arrendadora. El incumplimiento de esta estipulación será motivo de resolución del contrato.\n\nPor tanto, la vivienda objeto de este contrato no tendrá en ningún caso la finalidad de vivienda permanente de la parte arrendataria, de acuerdo con lo previsto por el artículo 3 de la LAU.');
+  chk();
+
+  addBlock('CUARTA.', true);
+  addBlock('La parte arrendataria deberá abonar al arrendador una indemnización igual a un mes de renta en caso de que pretenda o ejerza unilateralmente la finalización del contrato.');
+  chk();
+
+  addBlock('QUINTA.', true);
+  addBlock('El arrendatario declara recibir el inmueble en buen estado de uso y conservación y se compromete a devolverlo en el mismo estado a la conclusión de la relación contractual.');
+  chk();
+
+  addBlock('SEXTA.', true);
+  addBlock('La parte arrendataria abonará a la parte arrendadora en concepto de renta la cantidad de ' + formatEurLetras(datos.renta) + ' (' + formatEur(datos.renta) + '/mes), dentro de los cinco primeros días de cada mes, mediante ingreso o transferencia bancaria a la cuenta que el arrendador indique.');
+  chk();
+
+  addBlock('SÉPTIMA.', true);
+  addBlock('A la firma del presente contrato, la parte arrendataria hace entrega a la arrendadora de la cantidad de ' + formatEurLetras(datos.fianza) + ' (' + formatEur(datos.fianza) + '), en concepto de fianza legal arrendataria conforme al artículo 36.1 de la LAU. La fianza no será renta de ningún mes y será devuelta previa constatación del perfecto estado de conservación del inmueble.');
+  chk();
+
+  addBlock('OCTAVA.', true);
+  addBlock('Será por cuenta y cargo de la parte arrendadora el pago del Impuesto de Bienes Inmuebles (IBI). Será por cuenta de la parte arrendataria todos los gastos de suministros (luz, agua, etc.) y la tasa municipal de basuras.');
+  chk();
+
+  addBlock('NOVENA.', true);
+  addBlock('La parte arrendadora está obligada a realizar, sin derecho a elevar por ello la renta, todas las reparaciones que sean necesarias para conservar la vivienda en condiciones de habitabilidad. La parte arrendataria no podrá realizar sin consentimiento de la arrendadora obras que modifiquen la configuración de la vivienda.');
+  chk();
+
+  addBlock('DÉCIMA.', true);
+  addBlock('La parte arrendataria no podrá ceder este contrato ni subarrendar en todo o en parte la vivienda arrendada. El incumplimiento de esta cláusula será motivo para resolver automáticamente el presente contrato.');
+  chk();
+
+  addBlock('DÉCIMO PRIMERA.', true);
+  addBlock('El presente contrato se regirá por lo aquí pactado, por la LAU y, en lo no previsto, por las Disposiciones del Código Civil. Las partes reconocen expresamente que estamos ante un contrato de arrendamiento de vivienda por temporada, por lo que no podrá serle de aplicación la normativa prevista para el arrendamiento de vivienda habitual.');
+  chk();
+
+  addBlock('DÉCIMO SEGUNDA.', true);
+  addBlock('La parte arrendataria realiza expresa renuncia a lo dispuesto en el artículo 31 de la LAU. En caso de venta del inmueble arrendado no tendrá el arrendatario derecho de adquisición preferente, tanto o retracto, sobre el mismo.');
+  chk();
+
+  addBlock('DÉCIMO TERCERA.', true);
+  addBlock('La parte arrendadora podrá resolver de pleno derecho el contrato por: a) La falta de pago de tres mensualidades de la renta; b) El incumplimiento de las obligaciones contraídas en el presente pacto y la ejecución por parte del arrendatario de obras no consentidas.');
+}
+
+function generarAnexoPadron(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma, personas) {
+  doc.addPage();
+  let y = margin;
+
+  // Cabecera del anexo
+  doc.setFillColor(17, 24, 55);
+  doc.rect(0, 0, 210, 30, 'F');
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(200, 212, 232);
+  doc.text('ANEXO AL CONTRATO DE ARRENDAMIENTO', margin, 15);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(139, 155, 191);
+  doc.text('Control de Ocupación y Empadronamiento', margin, 23);
+  y = 40;
+
+  const addB = (text, bold = false) => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setTextColor(30, 30, 60);
+    const lines = doc.splitTextToSize(text, maxW);
+    if (y + lines.length * 5 > 270) { doc.addPage(); y = margin; }
+    doc.text(lines, margin, y);
+    y += lines.length * 5 + 3;
+  };
+  const addT = (text) => {
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 50, 100);
+    if (y + 10 > 270) { doc.addPage(); y = margin; }
+    doc.text(text, margin, y);
+    y += 8;
+  };
+
+  addB('En ' + ciudad + ' a ' + fechaFirma);
+  y += 3;
+  addB('CONTRATO DE REFERENCIA: Contrato del inmueble sito en ' + (datos.dir || '—') + ', referencia ' + (datos.ref || '—') + '.');
+  y += 3;
+
+  addT('REUNIDOS:');
+  addB('De una parte, D. Patricio Gómez García con DNI 23.257.330-Y, ' + (arr.tipo === 'juridica' ? 'en nombre y representación, como Apoderado, de la mercantil ' + arr.label + ' con CIF B-73110009 (el ARRENDADOR).' : 'en su propio nombre y representación (el ARRENDADOR).'));
+  addB('De otra parte, D./Dña. ' + (datos.inqNombre || '—') + ' con DNI/NIE ' + (datos.inqDNI || '—') + ' (el/la ARRENDATARIO/A).');
+  y += 3;
+
+  addT('CLÁUSULAS ADICIONALES');
+
+  addB('PRIMERA. – Relación de ocupantes autorizados.', true);
+  addB('La vivienda se arrienda exclusivamente para el uso residencial del Arrendatario y de las personas que se detallan a continuación. El Arrendatario asume la responsabilidad de que solo estas personas habiten el inmueble de forma permanente:');
+  y += 3;
+
+  // Tabla de personas
+  if (personas.length > 0) {
+    doc.setFillColor(26, 35, 71);
+    doc.rect(margin, y, maxW, 8, 'F');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(200, 212, 232);
+    doc.text('Nº', margin + 3, y + 5.5);
+    doc.text('Nombre y Apellidos', margin + 14, y + 5.5);
+    doc.text('DNI / NIE', margin + 100, y + 5.5);
+    doc.text('Relación', margin + 135, y + 5.5);
+    y += 8;
+    personas.forEach((p, i) => {
+      const bg = i % 2 === 0 ? [240, 244, 252] : [248, 250, 255];
+      doc.setFillColor(...bg);
+      doc.rect(margin, y, maxW, 8, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 60);
+      doc.text(String(p.num), margin + 3, y + 5.5);
+      doc.text(p.nombre.substring(0, 42), margin + 14, y + 5.5);
+      doc.text(p.dni, margin + 100, y + 5.5);
+      doc.text((p.rel || '—').substring(0, 22), margin + 135, y + 5.5);
+      y += 8;
+    });
+    y += 6;
+  }
+
+  addB('SEGUNDA. – Protocolo de Empadronamiento y Verificación.', true);
+  addB('1. Autorización Limitada: El Arrendador autoriza el empadronamiento únicamente a las personas listadas en la Cláusula Primera. Queda terminantemente prohibido el empadronamiento de terceras personas o el uso del domicilio como sede social para cualquier otra entidad mercantil o profesional sin consentimiento previo por escrito.');
+  addB('2. Facultad de Comprobación: El Arrendatario se obliga a entregar al Arrendador un Certificado de Empadronamiento Colectivo actualizado en un plazo de diez (10) días hábiles siempre que el Arrendador lo solicite por escrito.');
+  addB('3. Bajas de Oficio: En caso de resolución del contrato o salida de alguno de los ocupantes, el Arrendatario se compromete a tramitar la baja en el padrón. De no hacerlo, el Arrendador queda facultado para instar la baja de oficio ante el Ayuntamiento.');
+  y += 2;
+
+  addB('TERCERA. – Penalización por Incumplimiento.', true);
+  addB('El empadronamiento de personas no autorizadas o la negativa a facilitar el certificado colectivo de empadronamiento se considerará un incumplimiento contractual grave, que facultará al Arrendador para instar la resolución del contrato de pleno derecho (Art. 27.1 LAU). Se establece una penalización económica equivalente al 50% de una mensualidad de renta por cada mes que persista la situación.');
+  y += 2;
+
+  addB('CUARTA. – Prohibición de Cesión y Subarriendo.', true);
+  addB('Se reitera la prohibición absoluta de subarrendar total o parcialmente la vivienda o cederla a terceros. La presencia de personas empadronadas no listadas en este anexo será prueba suficiente de la existencia de un subarriendo no consentido.');
+
+  return y;
+}
+
+// =========== FUNCIÓN PRINCIPAL DE GENERACIÓN ===========
+async function generarPDF() {
+  const btn = document.getElementById('btn-gen-pdf');
+  const progress = document.getElementById('pdf-progress');
+  const bar = document.getElementById('pdf-bar');
+  const label = document.getElementById('pdf-progress-label');
+  btn.classList.add('generating'); btn.innerHTML = 'Generando...'; progress.classList.add('show');
+
+  const datos = {
+    ref: document.getElementById('f-ref').value || '',
+    dir: document.getElementById('f-dir').value || '',
+    catastral: document.getElementById('f-catastral').value || '',
+    inqNombre: document.getElementById('f-inq-nombre').value || '',
+    inqDNI: document.getElementById('f-inq-dni').value || '',
+    inqDom: document.getElementById('f-inq-dom').value || '',
+    renta: document.getElementById('f-renta').value || '0',
+    fianza: document.getElementById('f-fianza').value || '0',
+    duracion: document.getElementById('f-duracion').value || '3',
+    firma: document.getElementById('f-firma').value || '',
+    inicio: document.getElementById('f-inicio').value || '',
+    fin: document.getElementById('f-fin').value || '',
+    tipo: tipoSelected, padron: padronOn
+  };
+
+  const arr = ARRENDADORES[arrendadorActivo];
+  const steps = [
+    {p:15, t:'Cargando plantilla legal...'},
+    {p:35, t:'Insertando datos del contrato...'},
+    {p:60, t:'Redactando cláusulas...'},
+    {p:80, t: datos.padron ? 'Generando Anexo de Padrón...' : 'Maquetando documento...'},
+    {p:95, t:'Añadiendo firmas...'},
+    {p:100, t:'¡Contrato listo!'}
+  ];
+  for (const s of steps) { await sleep(300); bar.style.width = s.p + '%'; label.textContent = s.t; }
+  await sleep(150);
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const margin = 22, pageW = 210, maxW = pageW - margin * 2;
+    let y = margin;
+
+    // Helpers de tipografía
+    const addText = (text, x, fs = 10, style = 'normal', color = [0, 0, 0]) => {
+      doc.setFontSize(fs); doc.setFont('helvetica', style); doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(text, maxW);
+      doc.text(lines, x, y);
+      y += lines.length * (fs * 0.44) + 2;
+    };
+
+    // Párrafo con indent de 8mm (estilo notarial)
+    const addBlock = (text, bold = false) => {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setTextColor(20, 20, 40);
+      const lines = doc.splitTextToSize(text, maxW - 8);
+      if (y + lines.length * 4.8 > 272) { doc.addPage(); y = margin; }
+      doc.text(lines, margin + 8, y);
+      y += lines.length * 4.8 + 4;
+    };
+
+    // Título de sección (centrado, mayúsculas, espaciado)
+    const addTitle = (text) => {
+      if (y + 12 > 272) { doc.addPage(); y = margin; }
+      y += 4;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 50, 120);
+      doc.text(text, pageW / 2, y, { align: 'center' });
+      y += 10;
+    };
+
+    const addLine = () => {
+      doc.setDrawColor(180, 180, 210);
+      doc.line(margin, y, pageW - margin, y);
+      y += 6;
+    };
+
+    const chk = (needed = 30) => { if (y + needed > 272) { doc.addPage(); y = margin; } };
+
+    const ciudad = 'Lorca';
+    const fechaFirma = datos.firma ? formatFechaLarga(datos.firma) : formatFechaLarga(new Date().toISOString().split('T')[0]);
+
+    // ---- CABECERA ----
+    doc.setFillColor(15, 22, 48);
+    doc.rect(0, 0, 210, 32, 'F');
+    // Línea dorada decorativa
+    doc.setDrawColor(180, 150, 60);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 31, pageW - margin, 31);
+    doc.setLineWidth(0.2);
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(200, 175, 80);
+    doc.text(arr.labelCorto.toUpperCase(), margin, 14);
+
+    const titulosContrato = {
+      viv: 'CONTRATO DE ARRENDAMIENTO URBANO DE VIVIENDA HABITUAL',
+      vac: 'CONTRATO DE ARRENDAMIENTO URBANO POR TEMPORADA',
+      local: 'CONTRATO DE ARRENDAMIENTO PARA USO DISTINTO DE VIVIENDA',
+      rustica: 'CONTRATO DE ARRENDAMIENTO RÚSTICO',
+      rusticaTemp: 'CONTRATO DE ARRENDAMIENTO RÚSTICO DE TEMPORADA',
+      renov: 'DOCUMENTO DE RENOVACIÓN / PRÓRROGA DE CONTRATO',
+      anexo: 'DOCUMENTO DE MODIFICACIÓN — ANEXO AL CONTRATO',
+      rescision: 'DOCUMENTO DE RESCISIÓN DEL CONTRATO DE ARRENDAMIENTO',
+      padron: 'ANEXO DE AUTORIZACIÓN DE EMPADRONAMIENTO'
+    };
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(160, 175, 210);
+    doc.text(titulosContrato[datos.tipo] || 'CONTRATO DE ARRENDAMIENTO', margin, 22);
+
+    doc.setTextColor(120, 140, 180);
+    doc.text('Ref: ' + (datos.ref || '—') + '   ·   ' + ciudad + ', ' + fechaFirma, pageW - margin, 22, { align: 'right' });
+
+    y = 42;
+
+    // ---- CUERPO SEGÚN TIPO ----
+    if (datos.tipo === 'viv') {
+      generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma);
+    } else if (datos.tipo === 'rustica') {
+      generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma);
+    } else if (datos.tipo === 'vac') {
+      generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma);
+    } else {
+      // Generico para tipos no implementados aún
+      addTitle('CONTRATO DE ARRENDAMIENTO');
+      addBlock('Tipo de documento: ' + (titulosContrato[datos.tipo] || datos.tipo));
+      addBlock('Arrendador: ' + arr.label);
+      addBlock('Arrendatario/a: ' + (datos.inqNombre || '—') + ', DNI/NIE ' + (datos.inqDNI || '—'));
+      addBlock('Inmueble: ' + (datos.dir || '—') + ' (Ref. ' + (datos.ref || '—') + ')');
+      addBlock('Período: ' + (datos.inicio ? formatFechaLarga(datos.inicio) : '—') + ' — ' + (datos.fin ? formatFechaLarga(datos.fin) : '—'));
+      addBlock('Renta: ' + formatEur(datos.renta) + '/mes');
+    }
+
+    // ---- CIERRE Y FIRMAS ----
+    chk(55);
+    y += 6;
+    addLine();
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 100);
+    doc.text('Y para que conste, lo firman las partes por duplicado en el lugar y fecha al principio indicados.', margin, y, { maxWidth: maxW });
+    y += 10;
+
+    const c1 = margin + 5, c2 = pageW / 2 + 10;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 50, 120);
+    doc.text('EL ARRENDADOR', c1, y);
+    doc.text('EL/LA ARRENDATARIO/A', c2, y);
+    y += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 80);
+    doc.text(arr.label, c1, y);
+    doc.text((datos.inqNombre || '—'), c2, y);
+
+    y += 28;
+    doc.setDrawColor(100, 120, 180);
+    doc.setLineWidth(0.4);
+    doc.line(c1, y, c1 + 75, y);
+    doc.line(c2, y, c2 + 75, y);
+    doc.setLineWidth(0.2);
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.setTextColor(120, 130, 160);
+    doc.text('Firma y sello', c1, y);
+    doc.text('Firma y DNI', c2, y);
+
+    // ---- ANEXO PADRÓN con texto legal real ----
+    if (datos.padron && padronCount > 0) {
+      const personas = [];
+      for (let i = 1; i <= padronCount; i++) {
+        const n = document.getElementById('pp-nombre-' + i)?.value || '';
+        const d = document.getElementById('pp-dni-' + i)?.value || '';
+        const r = document.getElementById('pp-rel-' + i)?.value || '';
+        if (n) personas.push({ num: i, nombre: n, dni: d, rel: r });
+      }
+      if (personas.length > 0) {
+        generarAnexoPadron(doc, datos, arr, margin, pageW, maxW, addText, null, null, addLine, chk, ciudad, fechaFirma, personas);
+
+        // Firmas del anexo
+        const totalPagesNow = doc.getNumberOfPages();
+        doc.setPage(totalPagesNow);
+        const yF = 255;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 50, 120);
+        doc.text('EL ARRENDADOR', c1, yF);
+        doc.text('EL/LA ARRENDATARIO/A', c2, yF);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 80);
+        doc.text(arr.label, c1, yF + 5);
+        doc.text((datos.inqNombre || '—'), c2, yF + 5);
+        doc.setDrawColor(100, 120, 180);
+        doc.line(c1, yF + 22, c1 + 75, yF + 22);
+        doc.line(c2, yF + 22, c2 + 75, yF + 22);
+        doc.setFontSize(8);
+        doc.setTextColor(120, 130, 160);
+        doc.text('Firma y sello', c1, yF + 27);
+        doc.text('Firma y DNI', c2, yF + 27);
+      }
+    }
+
+    // ---- PIE DE PÁGINA en todas las páginas ----
+    const tp = doc.getNumberOfPages();
+    for (let i = 1; i <= tp; i++) {
+      doc.setPage(i);
+      // Línea fina inferior
+      doc.setDrawColor(50, 70, 140);
+      doc.setLineWidth(0.3);
+      doc.line(margin, 287, pageW - margin, 287);
+      doc.setLineWidth(0.2);
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 115, 160);
+      doc.text(arr.label + '  ·  Ref. ' + (datos.ref || '—') + '  ·  ' + (datos.inqNombre || '—'), margin, 292);
+      doc.text('Página ' + i + ' de ' + tp, pageW - margin, 292, { align: 'right' });
+    }
+
+    pdfDoc = doc;
+    // Data URI embebido — funciona en todos los entornos sin permisos especiales
+    const dataUri = doc.output('datauristring');
+    window._pdfDataUri = dataUri;
+    const iframe = document.getElementById('pdf-iframe');
+    // En iOS Safari el iframe no renderiza PDFs — siempre mostrar botón directo
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      iframe.style.display = 'none';
+      document.getElementById('pdf-open-direct').style.display = 'block';
+    } else {
+      iframe.src = dataUri;
+      iframe.style.display = 'block';
+      document.getElementById('pdf-open-direct').style.display = 'block'; // siempre visible como alternativa
+    }
+    progress.classList.remove('show');
+    btn.style.display = 'none';
+    document.getElementById('pdf-done').style.display = 'block';
+    document.getElementById('btns-pdf-footer').style.display = 'none';
+
+  } catch(e) {
+    console.error(e);
+    bar.style.width = '0%';
+    label.textContent = 'Error generando contrato. Intenta de nuevo.';
+    btn.classList.remove('generating');
+    btn.innerHTML = '<span>📄</span> Generar PDF';
+  }
+}
+
+function getPdfFilename() {
+  const ref = document.getElementById('f-ref').value || 'CTR';
+  const inq = (document.getElementById('f-inq-nombre').value || '').trim();
+  const inicio = document.getElementById('f-inicio').value || '';
+  // Formato fecha aammdd
+  let fecha = '';
+  if (inicio) {
+    const [y, m, d] = inicio.split('-');
+    fecha = y.substring(2) + m + d;
+  } else {
+    const hoy = new Date();
+    fecha = String(hoy.getFullYear()).substring(2) + String(hoy.getMonth()+1).padStart(2,'0') + String(hoy.getDate()).padStart(2,'0');
+  }
+  // Nombre: apellidos nombre sin espacios
+  const nombre = inq.replace(/\s+/g, '_').replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ_]/g, '') || 'Inquilino';
+  return nombre + '-' + ref + '-' + fecha + '.pdf';
+}
+function descargarPDF() {
+  if (!pdfDoc) return;
+  // jsPDF .save() usa <a download> internamente — funciona en Chrome/Firefox/Safari desktop y Netlify
+  pdfDoc.save(getPdfFilename());
+}
+
+function abrirPDFDirecto() {
+  if (!pdfDoc) return;
+  // Abrir data URI en nueva pestaña
+  if (window._pdfDataUri) {
+    const win = window.open(window._pdfDataUri, '_blank');
+    if (!win) { pdfDoc.save(getPdfFilename()); }
+  } else {
+    pdfDoc.save(getPdfFilename());
+  }
+}
+async function compartirPDF() {
+  if (!pdfDoc) return;
+  const fname = getPdfFilename();
+  try {
+    const blob = pdfDoc.output('blob');
+    const file = new File([blob], fname, { type: 'application/pdf' });
+    // Web Share API Level 2 — funciona en Safari iOS 15+ y Chrome Android
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: fname });
+      return;
+    }
+  } catch(e) {
+    if (e.name === 'AbortError') return; // usuario canceló
+  }
+  // Fallback universal: descarga directa
+  descargarPDF();
+}
+function emailPDF() {
+  if (!pdfDoc) return;
+  const inq = document.getElementById('f-inq-nombre').value || '';
+  const ref = document.getElementById('f-ref').value || '';
+  const arr = ARRENDADORES[arrendadorActivo];
+  descargarPDF();
+  setTimeout(() => {
+    const nl = '%0A';
+    const asunto = encodeURIComponent('Contrato ' + ref + ' - ' + inq);
+    const cuerpo = 'Estimado%2Fa ' + encodeURIComponent(inq) + ',' + nl + nl +
+      'Le adjunto el contrato de arrendamiento del inmueble ' + encodeURIComponent(ref) + '.' + nl + nl +
+      'Por favor%2C rev%C3%ADselo y confirme su conformidad.' + nl + nl +
+      'Un saludo%2C' + nl + encodeURIComponent(arr.label);
+    window.location.href = 'mailto:?subject=' + asunto + '&body=' + cuerpo;
+  }, 600);
+}
+function whatsappPDF() {
+  if (!pdfDoc) return;
+  const inq = document.getElementById('f-inq-nombre').value || '';
+  const ref = document.getElementById('f-ref').value || '';
+  const arr = ARRENDADORES[arrendadorActivo];
+  descargarPDF();
+  setTimeout(() => {
+    const msg = encodeURIComponent(
+      'Hola, te envío el contrato de arrendamiento ' + ref +
+      ' a nombre de ' + inq + '. Saludos, ' + arr.labelCorto + '.'
+    );
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    window.location.href = isIOS ? 'whatsapp://send?text=' + msg : 'https://web.whatsapp.com/send?text=' + msg;
+  }, 600);
+}
+
+function formatEur(v){return parseFloat(v||0).toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0})+'€';}
+function formatEurLetras(v){const n=parseInt(v||0);const u=['','UN','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE'],d=['','','VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];if(n===0)return'CERO EUROS';if(n<20)return u[n]+' EUROS';if(n<100){const a=Math.floor(n/10),b=n%10;return(b===0?d[a]:d[a]+' Y '+u[b])+' EUROS';}if(n<1000){const c=Math.floor(n/100),r=n%100;const cs=c===1?'CIEN':[,'CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'][c];return(r===0?cs:cs+' '+formatEurLetras(r).replace(' EUROS',''))+' EUROS';}const m=Math.floor(n/1000),r=n%1000;const ms=m===1?'MIL':formatEurLetras(m).replace(' EUROS','')+' MIL';return(r===0?ms:ms+' '+formatEurLetras(r).replace(' EUROS',''))+' EUROS';}
+function fmtDate(iso){if(!iso)return'—';const[y,m,d]=iso.split('-');return d+'/'+m+'/'+y;}
+function formatFechaLarga(iso){if(!iso)return'—';const[y,m,d]=iso.split('-'),mes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];return parseInt(d)+' de '+mes[parseInt(m)-1]+' de '+y;}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function openConfirm(title,msg,onOk,showCancel=true){document.getElementById('confirm-title').textContent=title;document.getElementById('confirm-msg').textContent=msg;document.getElementById('confirm-cancel-btn').style.display=showCancel?'block':'none';document.getElementById('confirm-ok-btn').onclick=()=>{closeConfirm();if(onOk)onOk();};document.getElementById('confirm-modal').classList.add('open');}
+function closeConfirm(){document.getElementById('confirm-modal').classList.remove('open');}
+
+// ─── ENTITY HEADER ───────────────────────────────────────────
+(function(){
+  const ENTS={empresa:{name:'Patrimer',color:'#5b8dee'},patricio:{name:'Patricio',color:'#4caf82'},industrias:{name:'Industrias',color:'#c9a84c'}};
+  const key=localStorage.getItem('patrimer:empresa')||'empresa';
+  const e=ENTS[key]||ENTS.empresa;
+  const dot=document.getElementById('header-dot');
+  const name=document.getElementById('header-entity-name');
+  if(dot) dot.style.background=e.color;
+  if(name) name.textContent=e.name;
+})();
+</script>
+
+
+
+</body>
+</html>
