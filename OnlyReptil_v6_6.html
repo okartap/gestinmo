@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OnlyReptil">
+    <title>OnlyReptil</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --verde:   #4caf50;
+            --azul:    #64b5f6;
+            --rojo:    #ef5350;
+            --naranja: #ff9800;
+            --fondo:   #1a1a2e;
+            --tarjeta: #16213e;
+            --tarjeta2:#0f3460;
+            --texto:   #e0e0e0;
+            --texto2:  #8892a4;
+            --borde:   #1e2d4a;
+            /* Colores por especie */
+            --sulcata:    #f5c518;
+            --radiata:    #ff7043;
+            --rusa:       #8d6e63;
+            --pardalis:   #9ccc65;
+            --carbonaria: #ef5350;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Rajdhani', 'Segoe UI', sans-serif; background: var(--fondo); color: var(--texto); padding-bottom: 80px; min-height: 100vh; }
+
+        header { background: var(--tarjeta); padding: 1rem 1.2rem; text-align: center; border-bottom: 2px solid var(--verde); font-size: 1.3rem; font-weight: 700; letter-spacing: 3px; color: var(--verde); position: sticky; top: 0; z-index: 50; }
+        .container { padding: 14px; max-width: 500px; margin: auto; }
+
+        #estado-conexion { text-align: center; font-size: 0.7rem; padding: 5px; margin-bottom: 12px; border-radius: 6px; letter-spacing: 1px; font-weight: 600; }
+        #estado-conexion.conectado { background: rgba(76,175,80,0.12); color: var(--verde); border: 1px solid rgba(76,175,80,0.3); }
+        #estado-conexion.cargando  { background: rgba(255,152,0,0.12); color: var(--naranja); border: 1px solid rgba(255,152,0,0.3); }
+        #estado-conexion.error     { background: rgba(239,83,80,0.12); color: var(--rojo); border: 1px solid rgba(239,83,80,0.3); }
+
+        /* STOCK BAR rediseñada */
+        .stock-bar { background: var(--tarjeta); padding: 12px 10px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--borde); }
+        .stock-bar-inner { display: flex; justify-content: space-around; align-items: stretch; gap: 6px; }
+        .stock-item { text-align: center; font-size: 0.65rem; letter-spacing: 1px; color: var(--texto2); font-weight: 600; flex: 1; background: var(--fondo); border-radius: 10px; padding: 8px 4px; border-top: 3px solid var(--verde); }
+        .stock-nombre { margin-bottom: 6px; font-size: 0.68rem; }
+        .stock-datos { display: flex; justify-content: center; gap: 10px; }
+        .stock-dato { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .stock-num { font-weight: 700; font-size: 1.1rem; }
+        .stock-icono { font-size: 0.8rem; }
+        .stock-ver-todas { display: block; text-align: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--borde); font-size: 0.72rem; color: var(--azul); cursor: pointer; letter-spacing: 1px; font-weight: 700; }
+
+        /* Cards de especie en pantalla todas */
+        .especie-card { border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--borde); border-left: 5px solid var(--verde); background: var(--tarjeta2); }
+        .especie-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .especie-nombre { font-size: 1rem; font-weight: 700; letter-spacing: 1px; }
+        .especie-badge { font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: 1px; background: rgba(255,255,255,0.08); }
+        .especie-datos { display: flex; gap: 16px; }
+        .especie-dato { font-size: 0.82rem; font-weight: 600; }
+        .especie-acciones { display: flex; justify-content: flex-end; margin-top: 10px; }
+        .btn-borrar-especie { background: rgba(239,83,80,0.12); color: var(--rojo); border: 1px solid rgba(239,83,80,0.25); border-radius: 6px; padding: 5px 12px; font-size: 0.7rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; cursor: pointer; letter-spacing: 0.5px; }
+
+        /* Añadir especie */
+        .add-especie-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 14px; }
+        .add-especie-color { width: 42px; height: 42px; border-radius: 8px; border: 1px solid var(--borde); cursor: pointer; background: var(--fondo); padding: 2px; }
+
+        .card-balance { background: var(--tarjeta); padding: 16px; border-radius: 12px; margin-bottom: 14px; border: 1px solid var(--borde); text-align: center; }
+        .balance-amount { font-size: 1.6rem; font-weight: 700; color: var(--verde); }
+        .balance-sub { font-size: 0.78rem; color: var(--texto2); margin-top: 3px; letter-spacing: 0.5px; }
+
+        .grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 16px; }
+        .btn-action { background: var(--tarjeta); padding: 16px 10px; border-radius: 12px; font-weight: 700; cursor: pointer; text-align: center; font-size: 0.9rem; letter-spacing: 1px; border: 1px solid var(--borde); transition: opacity 0.15s; }
+        .btn-action:active { opacity: 0.75; }
+        .btn-puesta  { border-left: 4px solid var(--azul);  color: var(--azul); }
+        .btn-nacer   { border-left: 4px solid var(--azul);  color: var(--azul); }
+        .btn-ingreso { border-left: 4px solid var(--verde); color: var(--verde); }
+        .btn-gasto   { border-left: 4px solid var(--rojo);  color: var(--rojo); }
+
+        .seccion-app { display: none; flex-direction: column; background: var(--tarjeta); padding: 20px; border-radius: 14px; border: 1px solid var(--borde); border-top: 3px solid var(--verde); margin-top: 8px; }
+        .titulo-centrado { text-align: center; font-weight: 700; font-size: 1rem; letter-spacing: 2px; margin-bottom: 16px; color: var(--texto); }
+
+        .form-group { width: 100%; margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.72rem; font-weight: 700; color: var(--texto2); letter-spacing: 1px; text-transform: uppercase; }
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 11px 14px; border-radius: 8px; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); font-size: 0.95rem; font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+        select:focus, input:focus { outline: none; border-color: var(--verde); }
+
+        .btn-save { background: var(--verde); color: #0a0a0a; border: none; font-weight: 700; width: 100%; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 10px; font-size: 0.9rem; letter-spacing: 1.5px; font-family: 'Rajdhani', sans-serif; }
+        .btn-save:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .btn-cancelar { background: transparent; color: var(--texto2); border: 1px solid var(--borde); width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 0.8rem; font-family: 'Rajdhani', sans-serif; }
+        .btn-secundario { background: transparent; color: var(--verde); border: 1px solid var(--verde); width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 0.85rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+
+        .tab-container { display: flex; gap: 6px; margin-bottom: 14px; }
+        .tab { flex: 1; padding: 9px 5px; background: var(--fondo); border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; color: var(--texto2); border: 1px solid var(--borde); }
+        .tab.active     { background: var(--verde); color: #0a0a0a; border-color: var(--verde); }
+        .tab.bio-active { background: var(--azul);  color: #0a0a0a; border-color: var(--azul); }
+
+        .lista-hist { display: none; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; }
+        .lista-hist.active { display: flex; }
+        .item-hist { background: var(--tarjeta2); padding: 11px 14px; border-radius: 10px; border: 1px solid var(--borde); border-left: 4px solid var(--verde); font-size: 0.85rem; }
+        .item-hist .item-monto  { font-weight: 700; font-size: 1rem; }
+        .item-hist .item-detalle { color: var(--texto); margin-top: 2px; }
+        .item-hist .item-meta   { color: var(--texto2); font-size: 0.75rem; margin-top: 4px; }
+        .item-bio   { border-left-color: var(--azul); }
+        .item-gasto { border-left-color: var(--rojo); }
+        .msg-vacio  { color: var(--texto2); text-align: center; padding: 24px; font-size: 0.85rem; }
+
+        .item-acciones { display: flex; gap: 6px; margin-top: 9px; }
+        .btn-item { flex: 1; padding: 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.72rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
+        .btn-editar { background: rgba(255,152,0,0.15); color: var(--naranja); border: 1px solid rgba(255,152,0,0.3); }
+        .btn-borrar { background: rgba(239,83,80,0.15);  color: var(--rojo);    border: 1px solid rgba(239,83,80,0.3); }
+
+        .cliente-item { display: flex; justify-content: space-between; align-items: center; background: var(--fondo); padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; font-size: 0.88rem; border: 1px solid var(--borde); font-weight: 600; }
+        .btn-borrar-cliente { background: none; border: none; color: var(--rojo); cursor: pointer; font-size: 1rem; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: var(--tarjeta); padding: 22px; border-radius: 14px; width: 90%; max-width: 400px; border: 1px solid var(--borde); border-top: 3px solid var(--naranja); }
+        .modal-titulo { font-weight: 700; text-align: center; margin-bottom: 16px; color: var(--naranja); letter-spacing: 2px; font-size: 0.95rem; }
+
+        .fecha-row { display: flex; gap: 6px; }
+        .fecha-sel { flex: 1; padding: 11px 8px; border-radius: 8px; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); font-size: 0.9rem; font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+        .fecha-sel:focus { outline: none; border-color: var(--verde); }
+
+        .btn-elec { width:100%; padding:11px; border-radius:8px; background:rgba(249,168,37,0.1); color:#f9a825; border:1px solid rgba(249,168,37,0.35); font-weight:700; font-family:'Rajdhani',sans-serif; font-size:0.82rem; letter-spacing:1.5px; cursor:pointer; margin-bottom:12px; }
+        .btn-elec:active { opacity:0.75; }
+
+        .elec-ultima-box { background:var(--fondo); border:1px solid rgba(249,168,37,0.3); border-left:4px solid #f9a825; border-radius:10px; padding:12px 14px; margin-bottom:16px; }
+        .elec-ultima-label { font-size:0.65rem; letter-spacing:1.5px; color:#f9a825; font-weight:700; margin-bottom:6px; }
+        .elec-ultima-valor { font-size:0.9rem; color:var(--texto); font-weight:600; line-height:1.5; }
+        .elec-editar-btn { background:none; border:none; color:#f9a825; font-size:0.78rem; font-weight:700; font-family:'Rajdhani',sans-serif; cursor:pointer; margin-top:8px; padding:0; letter-spacing:0.5px; }
+
+        .elec-resultado { background:rgba(249,168,37,0.08); border:1px solid rgba(249,168,37,0.3); border-radius:8px; padding:12px 14px; margin:8px 0; text-align:center; font-size:1.1rem; font-weight:700; color:#f9a825; letter-spacing:1px; }
+
+
+
+        /* PARENTALES */
+        .parental-card { background: var(--tarjeta2); border-radius: 12px; padding: 13px 15px; margin-bottom: 8px; border: 1px solid var(--borde); border-left: 5px solid var(--azul); }
+        .parental-card.hembra { border-left-color: #f48fb1; }
+        .parental-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .parental-nombre { font-size: 0.95rem; font-weight: 700; letter-spacing: 1px; }
+        .parental-sexo-badge { font-size: 0.65rem; font-weight: 700; padding: 3px 9px; border-radius: 20px; letter-spacing: 1px; }
+        .badge-macho  { background: rgba(100,181,246,0.15); color: var(--azul); border: 1px solid rgba(100,181,246,0.3); }
+        .badge-hembra { background: rgba(244,143,177,0.15); color: #f48fb1;     border: 1px solid rgba(244,143,177,0.3); }
+        .parental-meta { font-size: 0.75rem; color: var(--texto2); margin-top: 6px; line-height: 1.6; }
+        .parental-acciones { display: flex; gap: 6px; margin-top: 10px; }
+        .btn-edit-parental { flex:1; background: rgba(255,152,0,0.12); color: var(--naranja); border: 1px solid rgba(255,152,0,0.25); border-radius: 6px; padding: 6px; font-size: 0.7rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; cursor: pointer; letter-spacing: 0.5px; }
+        .btn-del-parental  { flex:1; background: rgba(239,83,80,0.12);  color: var(--rojo);    border: 1px solid rgba(239,83,80,0.25);  border-radius: 6px; padding: 6px; font-size: 0.7rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; cursor: pointer; letter-spacing: 0.5px; }
+        .parentales-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+
+
+        /* PAREJAS */
+        .pareja-card { background: var(--tarjeta2); border-radius: 10px; padding: 11px 14px; margin-bottom: 6px; border: 1px solid var(--borde); border-left: 5px solid var(--verde); }
+        .pareja-nombre-tag { font-size: 1rem; font-weight: 700; letter-spacing: 2px; }
+        .pareja-meta { font-size: 0.75rem; color: var(--texto2); margin-top: 5px; line-height: 1.6; }
+        .pareja-acciones { display: flex; gap: 6px; margin-top: 8px; }
+        .btn-del-pareja { background: rgba(239,83,80,0.12); color: var(--rojo); border: 1px solid rgba(239,83,80,0.25); border-radius: 6px; padding: 6px 12px; font-size: 0.7rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; cursor: pointer; }
+        .btn-add-pareja { background: rgba(76,175,80,0.12); color: var(--verde); border: 1px solid rgba(76,175,80,0.25); border-radius: 6px; padding: 6px 10px; font-size: 0.7rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; cursor: pointer; letter-spacing: 0.5px; }
+        .modal-box.azul { border-top-color: var(--azul); }
+        .modal-titulo.azul { color: var(--azul); }
+
+        /* CHIPS */
+        .chips-contador { display: flex; gap: 10px; margin-bottom: 14px; }
+        .chip-stat { flex: 1; background: var(--fondo); border-radius: 10px; padding: 12px 8px; text-align: center; border: 1px solid var(--borde); }
+        .chip-stat-num { font-size: 1.6rem; font-weight: 700; }
+        .chip-stat-label { font-size: 0.65rem; letter-spacing: 1px; color: var(--texto2); font-weight: 600; margin-top: 2px; }
+        .chip-stat.alerta .chip-stat-num { color: var(--rojo); }
+        .chip-stat.ok .chip-stat-num { color: var(--verde); }
+        .chip-stat.usado .chip-stat-num { color: var(--texto2); }
+        .alerta-chips { background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.82rem; color: var(--rojo); font-weight: 700; text-align: center; letter-spacing: 0.5px; display: none; }
+        .alerta-chips.visible { display: block; }
+        .chips-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .chip-item { background: var(--tarjeta2); padding: 9px 14px; border-radius: 8px; border: 1px solid var(--borde); border-left: 4px solid var(--verde); font-size: 0.82rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .chip-item.usado { border-left-color: var(--texto2); opacity: 0.6; }
+        .chip-item.alerta-item { border-left-color: var(--rojo); }
+        .chip-num { font-family: 'Rajdhani', monospace; letter-spacing: 1px; }
+        .chip-meta { font-size: 0.7rem; color: var(--texto2); margin-top: 2px; }
+        .btn-borrar-chip { background: none; border: none; color: var(--rojo); cursor: pointer; font-size: 0.9rem; padding: 2px 6px; }
+        .chips-lista-scroll { max-height: 38vh; overflow-y: auto; }
+        .add-chips-box { background: var(--fondo); border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--borde); }
+        .add-chips-titulo { font-size: 0.68rem; letter-spacing: 1.5px; color: var(--texto2); font-weight: 700; margin-bottom: 10px; }
+        .chips-modo-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .chips-modo-btn { flex: 1; padding: 8px; border-radius: 8px; background: var(--tarjeta2); border: 1px solid var(--borde); color: var(--texto2); font-size: 0.72rem; font-weight: 700; font-family: 'Rajdhani', sans-serif; cursor: pointer; letter-spacing: 1px; text-align: center; }
+        .chips-modo-btn.active { background: var(--azul); color: #0a0a0a; border-color: var(--azul); }
+
+        nav { position: fixed; bottom: 0; width: 100%; background: var(--tarjeta); display: flex; justify-content: space-around; padding: 10px 0 14px; border-top: 2px solid var(--verde); z-index: 100; }
+        .nav-item { text-align: center; font-size: 0.65rem; color: var(--texto2); cursor: pointer; font-weight: 700; letter-spacing: 1px; padding: 4px 16px; border-radius: 8px; transition: color 0.15s; }
+        .nav-item.activo { color: var(--verde); }
+        .nav-item span { display: block; font-size: 1.2rem; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+<header>🦎 ONLYREPTIL</header>
+<div class="container">
+    <div id="estado-conexion" class="cargando">⏳ CONECTANDO...</div>
+    <div class="stock-bar">
+        <div class="stock-bar-inner" id="stock-bar-inner">
+            <!-- Se rellena dinámicamente -->
+        </div>
+        <span class="stock-ver-todas" onclick="irA('pantalla-especies')">🐢 VER TODAS LAS ESPECIES →</span>
+    </div>
+    <div class="card-balance">
+        <div class="balance-amount" id="balance-texto">0,00€</div>
+        <div class="balance-sub" id="balance-sub">Estado de cuentas</div>
+    </div>
+
+    <div id="pantalla-inicio">
+        <div class="alerta-chips" id="alerta-chips-inicio" style="margin-bottom:10px;">⚠️ QUEDAN MENOS DE 50 CHIPS LIBRES — VE A 💉 CHIPS</div>
+        <div class="grid-actions">
+            <div class="btn-action btn-puesta"  onclick="irA('form-puesta')">🥚 PUESTA</div>
+            <div class="btn-action btn-nacer"   onclick="irA('form-nacimiento')">🐢 NACIMIENTO</div>
+            <div class="btn-action btn-ingreso" onclick="irA('form-ingreso')">＋ INGRESO</div>
+            <div class="btn-action btn-gasto"   onclick="irA('form-gasto')">－ GASTO</div>
+        </div>
+        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="btn-action" style="border-left:4px solid var(--azul);color:var(--azul);" onclick="irA('pantalla-chips')">💉 CHIPS</div>
+            <div class="btn-action" style="border-left:4px solid var(--azul);color:var(--azul);" onclick="irA('pantalla-parentales')">🐢 PLANTEL</div>
+        </div>
+    </div>
+
+    <div id="form-puesta" class="seccion-app" style="border-top-color:var(--azul);">
+        <div class="titulo-centrado" style="color:var(--azul);">🥚 NUEVA PUESTA</div>
+        <div class="form-group">
+            <label>Especie</label>
+            <select id="p-especie" onchange="cargarParejasPorEspecie()"></select>
+        </div>
+        <div class="form-group">
+            <label>Pareja</label>
+            <select id="p-pareja" onchange="actualizarInfoPareja()">
+                <option value="">— Primero selecciona especie —</option>
+            </select>
+        </div>
+        <div id="p-ultima-puesta" style="font-size:0.75rem;color:var(--texto2);margin:-6px 0 10px 0;padding-left:2px;display:none;">
+            📅 Última puesta declarada: <span id="p-ultima-fecha"></span>
+        </div>
+        <div id="p-eclosion-info" style="font-size:0.75rem;color:var(--azul);margin:-6px 0 10px 0;padding-left:2px;display:none;">
+            🌡️ Eclosión estimada: <span id="p-eclosion-fecha"></span>
+        </div>
+        <div class="form-group"><label>Fecha de la Puesta</label><div class="fecha-row"><select class="fecha-sel" id="p-fecha-d"></select><select class="fecha-sel" id="p-fecha-m"></select><select class="fecha-sel" id="p-fecha-y"></select></div></div>
+        <div class="form-group"><label>Nº de Huevos</label><input type="number" id="p-huevos" value="1" min="1" onchange="actualizarIdPuesta()"></div>
+        <div class="form-group">
+            <label>ID de Puesta (auto)</label>
+            <input type="text" id="p-id-puesta" placeholder="Se genera automáticamente" readonly style="opacity:0.6;cursor:default;">
+        </div>
+        <button class="btn-save" id="btn-guardar-puesta" onclick="guardarPuesta()" style="background:var(--azul);">REGISTRAR PUESTA</button>
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">CANCELAR</button>
+    </div>
+
+    <div id="form-nacimiento" class="seccion-app" style="border-top-color:var(--azul);">
+        <div class="titulo-centrado" style="color:var(--azul);">🐢 ECLOSIÓN / NACIMIENTO</div>
+        <div class="form-group"><label>Especie</label><select id="n-especie"><option value="Sulcata">Sulcata</option><option value="Radiata">Radiata</option><option value="Rusa">Rusa</option><option value="Pardalis">Pardalis</option><option value="Carbonaria">Carbonaria</option></select></div>
+        <div class="form-group"><label>Cantidad</label><input type="number" id="n-cant" value="1" min="1"></div>
+        <button class="btn-save" id="btn-guardar-nacimiento" onclick="guardarNacimiento()" style="background:var(--azul);color:#0a0a0a;">SUMAR AL STOCK</button>
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">CANCELAR</button>
+    </div>
+
+    <div id="form-gasto" class="seccion-app" style="border-top-color:var(--rojo);">
+        <div class="titulo-centrado" style="color:var(--rojo);">－ NUEVO GASTO</div>
+        <div class="form-group"><label>Concepto</label><input type="text" id="g-concepto" placeholder="Ej: Pienso, veterinario..."></div>
+        <div class="form-group"><label>Importe (€)</label><input type="number" id="g-monto" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Fecha</label><div class="fecha-row"><select class="fecha-sel" id="g-fecha-d"></select><select class="fecha-sel" id="g-fecha-m"></select><select class="fecha-sel" id="g-fecha-y"></select></div></div>
+        <div class="form-group"><label>Socio</label><select id="g-socio"><option value="Martin">Martín</option><option value="Patry">Patry</option></select></div>
+        <button class="btn-save" id="btn-guardar-gasto" onclick="guardarMovimiento('gasto')" style="background:var(--rojo);">GUARDAR GASTO</button>
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">CANCELAR</button>
+    </div>
+
+    <div id="form-ingreso" class="seccion-app" style="border-top-color:var(--verde);">
+        <div class="titulo-centrado" style="color:var(--verde);">＋ NUEVO INGRESO</div>
+        <div class="form-group"><label>Cliente</label><select id="i-cliente"></select></div>
+        <div class="form-group"><label>Producto / Especie</label>
+            <select id="i-especie" onchange="toggleOtrosIngreso()">
+                <option>Sulcata</option><option>Radiata</option><option>Rusa</option><option>Pardalis</option><option>Carbonaria</option><option value="Otros">Otros</option>
+            </select>
+        </div>
+        <div class="form-group" id="grupo-otros-concepto" style="display:none;"><label>Concepto</label><input type="text" id="i-otros-concepto" placeholder="Ej: Terrario, Accesorios..."></div>
+        <div class="form-group"><label>Cantidad</label><input type="number" id="i-cant" value="1" min="1"></div>
+        <div class="form-group"><label>Total (€)</label><input type="number" id="i-monto" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Fecha</label><div class="fecha-row"><select class="fecha-sel" id="i-fecha-d"></select><select class="fecha-sel" id="i-fecha-m"></select><select class="fecha-sel" id="i-fecha-y"></select></div></div>
+        <div class="form-group"><label>Socio</label><select id="i-socio"><option value="Martin">Martín</option><option value="Patry">Patry</option></select></div>
+        <button class="btn-save" id="btn-guardar-ingreso" onclick="guardarMovimiento('ingreso')">REGISTRAR INGRESO</button>
+        <button class="btn-secundario" onclick="irA('pantalla-clientes')">＋ GESTIONAR CLIENTES</button>
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">CANCELAR</button>
+    </div>
+
+    <div id="pantalla-clientes" class="seccion-app" style="border-top-color:var(--naranja);">
+        <div class="titulo-centrado" style="color:var(--naranja);">👤 CLIENTES</div>
+        <div class="form-group" style="display:flex;gap:8px;align-items:flex-end;">
+            <div style="flex:1;"><label>Nombre</label><input type="text" id="nuevo-cliente-nombre" placeholder="Nombre del cliente"></div>
+            <button class="btn-save" style="width:auto;padding:11px 18px;margin-top:0;" onclick="agregarCliente()">＋</button>
+        </div>
+        <div id="lista-clientes"></div>
+        <button class="btn-cancelar" onclick="irA('form-ingreso')">← VOLVER</button>
+    </div>
+
+    <div id="pantalla-exito" class="seccion-app" style="text-align:center;">
+        <div style="font-size:56px;margin:16px 0;">✅</div>
+        <div style="font-size:1.1rem;font-weight:700;letter-spacing:2px;" id="exito-titulo">REGISTRADO</div>
+        <p id="exito-detalle" style="color:var(--texto2);margin-top:8px;font-size:0.9rem;"></p>
+        <button class="btn-save" style="margin-top:20px;" onclick="irA('pantalla-inicio')">VOLVER AL INICIO</button>
+        <p id="link-caja" onclick="navA('pantalla-caja')" style="text-decoration:underline;cursor:pointer;font-size:0.82rem;margin-top:16px;color:var(--verde);display:none;letter-spacing:1px;">VER HISTORIAL DE CAJA →</p>
+        <p id="link-bio"  onclick="navA('pantalla-pyn')"  style="text-decoration:underline;cursor:pointer;font-size:0.82rem;margin-top:16px;color:var(--azul);display:none;letter-spacing:1px;">VER PyN →</p>
+    </div>
+
+    <div id="pantalla-caja" class="seccion-app">
+        <div class="titulo-centrado">💰 HISTORIAL DE CAJA</div>
+        <button class="btn-elec" onclick="irA('pantalla-electricidad')">⚡ REGISTRAR LECTURA DE LUZ</button>
+        <div class="tab-container">
+            <div class="tab active" id="t-a" onclick="verTab('a')">TODOS</div>
+            <div class="tab" id="t-g" onclick="verTab('g')">GASTOS</div>
+            <div class="tab" id="t-i" onclick="verTab('i')">INGRESOS</div>
+        </div>
+        <div id="l-a" class="lista-hist active"></div>
+        <div id="l-g" class="lista-hist"></div>
+        <div id="l-i" class="lista-hist"></div>
+    </div>
+
+    <div id="pantalla-electricidad" class="seccion-app" style="border-top-color:#f9a825;">
+        <div class="titulo-centrado" style="color:#f9a825;">⚡ LECTURA DE LUZ</div>
+
+        <!-- Última lectura confirmada -->
+        <div class="elec-ultima-box" id="elec-ultima-box">
+            <div class="elec-ultima-label">ÚLTIMA LECTURA CONFIRMADA</div>
+            <div class="elec-ultima-valor" id="elec-ultima-valor">— Sin datos —</div>
+            <button class="elec-editar-btn" id="elec-editar-btn" onclick="editarUltimaLectura()" style="display:none;">✏️ EDITAR</button>
+        </div>
+
+        <!-- Formulario nueva lectura -->
+        <div class="form-group"><label>Lectura Anterior (kWh)</label><input type="number" id="elec-anterior" placeholder="Ej: 1250" step="0.01"></div>
+        <div class="form-group"><label>Lectura Actual (kWh)</label><input type="number" id="elec-actual" placeholder="Ej: 1380" step="0.01"></div>
+        <div class="form-group"><label>Precio medio (€/kWh)</label><input type="number" id="elec-precio" placeholder="Ej: 0.18" step="0.001"></div>
+        <div class="form-group"><label>Fecha</label><div class="fecha-row"><select class="fecha-sel" id="elec-fecha-d"></select><select class="fecha-sel" id="elec-fecha-m"></select><select class="fecha-sel" id="elec-fecha-y"></select></div></div>
+
+        <!-- Resultado calculado -->
+        <div class="elec-resultado" id="elec-resultado" style="display:none;">
+            <span id="elec-res-texto"></span>
+        </div>
+
+        <button class="btn-save" style="background:#f9a825;color:#0a0a0a;margin-top:4px;" onclick="calcularLuz()">CALCULAR</button>
+        <button class="btn-save" id="btn-confirmar-luz" style="display:none;" onclick="confirmarLuz()">✅ CONFIRMAR Y GUARDAR GASTO</button>
+        <button class="btn-cancelar" onclick="irA('pantalla-caja')">← VOLVER</button>
+    </div>
+
+    <div id="pantalla-pyn" class="seccion-app" style="border-top-color:var(--azul);">
+        <div class="titulo-centrado" style="color:var(--azul);">🥚 PyN · PUESTAS Y NACIMIENTOS</div>
+        <div class="tab-container">
+            <div class="tab bio-active" id="tb-a" onclick="verTabBio('a')">TODO</div>
+            <div class="tab" id="tb-p" onclick="verTabBio('p')">PUESTAS</div>
+            <div class="tab" id="tb-n" onclick="verTabBio('n')">NACIDOS</div>
+        </div>
+        <div id="lb-a" class="lista-hist active"></div>
+        <div id="lb-p" class="lista-hist"></div>
+        <div id="lb-n" class="lista-hist"></div>
+    </div>
+    <!-- TODAS LAS ESPECIES -->
+    <div id="pantalla-especies" class="seccion-app" style="border-top-color:var(--verde);">
+        <div class="titulo-centrado">🐢 STOCK POR ESPECIE</div>
+
+        <div id="lista-especies"></div>
+
+        <!-- Añadir nueva especie -->
+        <div style="background:var(--fondo);border-radius:10px;padding:12px;margin-top:6px;margin-bottom:10px;border:1px solid var(--borde);">
+            <div style="font-size:0.68rem;letter-spacing:1.5px;color:var(--texto2);font-weight:700;margin-bottom:10px;">＋ AÑADIR ESPECIE</div>
+            <div class="add-especie-row">
+                <div style="flex:1;"><label>Nombre</label><input type="text" id="nueva-especie-nombre" placeholder="Ej: Hermann"></div>
+                <div><label>Color</label><input type="color" id="nueva-especie-color" class="add-especie-color" value="#4caf50"></div>
+                <button class="btn-save" style="width:auto;padding:11px 16px;margin-top:0;" onclick="agregarEspecie()">＋</button>
+            </div>
+        </div>
+
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">← VOLVER</button>
+    </div>
+</div>
+
+    <!-- MÓDULO PARENTALES -->
+    <div id="pantalla-parentales" class="seccion-app" style="border-top-color:var(--azul);">
+        <div class="titulo-centrado" style="color:var(--azul);">🐢 PLANTEL DE CRIADORES</div>
+
+        <!-- Filtro especie -->
+        <div class="form-group" style="margin-bottom:10px;">
+            <label>Especie</label>
+            <select id="parental-filtro-especie" onchange="renderParentales()">
+                <option value="">— Todas las especies —</option>
+            </select>
+        </div>
+
+        <!-- Tabs macho / hembra / todos -->
+        <div class="parentales-tabs">
+            <div class="tab bio-active" id="pt-a" onclick="verTabParental('a')">TODOS</div>
+            <div class="tab" id="pt-m" onclick="verTabParental('m')">MACHOS</div>
+            <div class="tab" id="pt-h" onclick="verTabParental('h')">HEMBRAS</div>
+        </div>
+
+        <!-- Lista -->
+        <div id="parentales-lista" style="max-height:38vh;overflow-y:auto;margin-bottom:12px;"></div>
+
+        <!-- Añadir / Editar parental -->
+        <div style="background:var(--fondo);border-radius:10px;padding:12px;border:1px solid var(--borde);margin-bottom:10px;">
+            <div style="font-size:0.68rem;letter-spacing:1.5px;color:var(--texto2);font-weight:700;margin-bottom:10px;" id="parentales-form-titulo">＋ AÑADIR PARENTAL</div>
+            <input type="hidden" id="parental-edit-id">
+            <div class="form-group"><label>Nombre identificativo</label><input type="text" id="parental-nombre" placeholder="Ej: Sulcata Macho 01"></div>
+            <div class="form-group"><label>Especie</label><select id="parental-especie"></select></div>
+            <div class="form-group"><label>Sexo</label>
+                <select id="parental-sexo">
+                    <option value="Macho">Macho</option>
+                    <option value="Hembra">Hembra</option>
+                </select>
+            </div>
+            <div class="form-group"><label>ID Espécimen MITECO</label><input type="text" id="parental-id-especimen" placeholder="Ej: 243LA000140"></div>
+            <div class="form-group"><label>Marca / Doc. CITES (opcional)</label><input type="text" id="parental-marca" placeholder="Ej: 900215000933580 o 413AB000003"></div>
+            <button class="btn-save" style="background:var(--azul);color:#0a0a0a;" onclick="guardarParental()">GUARDAR PARENTAL</button>
+            <button class="btn-cancelar" id="btn-cancelar-parental" style="display:none;" onclick="cancelarEditarParental()">CANCELAR EDICIÓN</button>
+        </div>
+
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">← VOLVER</button>
+    </div>
+
+    <!-- MÓDULO CHIPS -->
+    <div id="pantalla-chips" class="seccion-app" style="border-top-color:var(--azul);">
+        <div class="titulo-centrado" style="color:var(--azul);">💉 GESTIÓN DE MICROCHIPS</div>
+
+        <!-- Contadores -->
+        <div class="chips-contador">
+            <div class="chip-stat ok" id="chip-stat-libres">
+                <div class="chip-stat-num" id="chip-num-libres">0</div>
+                <div class="chip-stat-label">LIBRES</div>
+            </div>
+            <div class="chip-stat usado">
+                <div class="chip-stat-num" id="chip-num-usados">0</div>
+                <div class="chip-stat-label">USADOS</div>
+            </div>
+            <div class="chip-stat usado">
+                <div class="chip-stat-num" id="chip-num-total">0</div>
+                <div class="chip-stat-label">TOTAL</div>
+            </div>
+        </div>
+
+        <!-- Alerta stock bajo -->
+        <div class="alerta-chips" id="alerta-chips">⚠️ QUEDAN MENOS DE 50 CHIPS LIBRES — PIDE REPOSICIÓN</div>
+
+        <!-- Añadir chips -->
+        <div class="add-chips-box">
+            <div class="add-chips-titulo">＋ AÑADIR CHIPS</div>
+            <div class="chips-modo-row">
+                <div class="chips-modo-btn active" id="chips-btn-rango" onclick="setModoChip('rango')">POR RANGO</div>
+                <div class="chips-modo-btn" id="chips-btn-uno" onclick="setModoChip('uno')">UNO A UNO</div>
+            </div>
+            <!-- Modo rango -->
+            <div id="chips-form-rango">
+                <div class="form-group"><label>Desde (nº chip)</label><input type="text" id="chip-desde" placeholder="Ej: 900263004245592"></div>
+                <div class="form-group"><label>Hasta (nº chip)</label><input type="text" id="chip-hasta" placeholder="Ej: 900263004245791"></div>
+                <button class="btn-save" style="background:var(--azul);color:#0a0a0a;" onclick="agregarChipsRango()">AÑADIR RANGO</button>
+            </div>
+            <!-- Modo uno a uno -->
+            <div id="chips-form-uno" style="display:none;">
+                <div class="form-group"><label>Nº de chip</label><input type="text" id="chip-uno" placeholder="Ej: 900263000424300"></div>
+                <button class="btn-save" style="background:var(--azul);color:#0a0a0a;" onclick="agregarChipUno()">AÑADIR CHIP</button>
+            </div>
+        </div>
+
+        <!-- Tabs libre / usado -->
+        <div class="chips-tabs">
+            <div class="tab bio-active" id="cht-l" onclick="verTabChip('l')">LIBRES</div>
+            <div class="tab" id="cht-u" onclick="verTabChip('u')">USADOS</div>
+        </div>
+
+        <!-- Lista chips -->
+        <div class="chips-lista-scroll" id="chips-lista"></div>
+
+        <button class="btn-cancelar" onclick="irA('pantalla-inicio')">← VOLVER</button>
+    </div>
+
+<div class="modal-overlay" id="modal-pareja">
+    <div class="modal-box azul">
+        <div class="modal-titulo azul">🔗 NUEVA PAREJA</div>
+        <input type="hidden" id="pareja-hembra-id">
+        <input type="hidden" id="pareja-especie">
+        <div class="form-group">
+            <label>Hembra</label>
+            <div id="pareja-hembra-nombre" style="padding:8px 0;font-weight:700;color:#f48fb1;font-size:0.9rem;"></div>
+        </div>
+        <div class="form-group">
+            <label>Macho</label>
+            <select id="pareja-macho-sel"></select>
+        </div>
+        <div class="form-group">
+            <label>Nombre de pareja</label>
+            <input type="text" id="pareja-nombre" placeholder="Ej: SUL01">
+        </div>
+        <div class="form-group">
+            <label>Días de incubación</label>
+            <input type="number" id="pareja-dias" value="90" min="1">
+        </div>
+        <button class="btn-save" style="background:var(--azul);color:#0a0a0a;" onclick="guardarPareja()">CREAR PAREJA</button>
+        <button class="btn-cancelar" onclick="cerrarModalPareja()">CANCELAR</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-nacimiento">
+    <div class="modal-box azul">
+        <div class="modal-titulo azul">🐢 REGISTRAR NACIMIENTO</div>
+        <input type="hidden" id="nac-puesta-id">
+        <div id="nac-puesta-info" style="background:var(--fondo);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:0.82rem;color:var(--texto2);line-height:1.6;"></div>
+        <div class="form-group"><label>Cantidad nacida</label><input type="number" id="nac-cant" value="1" min="1"></div>
+        <div class="form-group"><label>Fecha de Eclosión</label><div class="fecha-row"><select class="fecha-sel" id="nac-fecha-d"></select><select class="fecha-sel" id="nac-fecha-m"></select><select class="fecha-sel" id="nac-fecha-y"></select></div></div>
+        <button class="btn-save" style="background:var(--azul);color:#0a0a0a;" onclick="guardarNacimientoPuesta()">REGISTRAR ECLOSIÓN</button>
+        <button class="btn-cancelar" onclick="cerrarModalNacimiento()">CANCELAR</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-edit-puesta">
+    <div class="modal-box azul">
+        <div class="modal-titulo azul">✏️ EDITAR PUESTA</div>
+        <input type="hidden" id="edit-puesta-id">
+        <div class="form-group"><label>Especie</label><select id="edit-p-especie" onchange="cargarParejasEditPuesta()"></select></div>
+        <div class="form-group"><label>Pareja</label><select id="edit-p-pareja"></select></div>
+        <div class="form-group"><label>Fecha de la Puesta</label><div class="fecha-row"><select class="fecha-sel" id="edit-p-fecha-d"></select><select class="fecha-sel" id="edit-p-fecha-m"></select><select class="fecha-sel" id="edit-p-fecha-y"></select></div></div>
+        <div class="form-group"><label>Nº de Huevos</label><input type="number" id="edit-p-huevos" value="1" min="1"></div>
+        <button class="btn-save" style="background:var(--azul);color:#0a0a0a;" onclick="guardarEditPuesta()">GUARDAR CAMBIOS</button>
+        <button class="btn-cancelar" onclick="cerrarModalEditPuesta()">CANCELAR</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-editar">
+    <div class="modal-box">
+        <div class="modal-titulo">✏️ EDITAR REGISTRO</div>
+        <input type="hidden" id="edit-id">
+        <div class="form-group"><label>Concepto / Detalle</label><input type="text" id="edit-detalle"></div>
+        <div class="form-group"><label>Importe (€)</label><input type="number" id="edit-monto" step="0.01"></div>
+        <div class="form-group"><label>Fecha</label><div class="fecha-row"><select class="fecha-sel" id="edit-fecha-d"></select><select class="fecha-sel" id="edit-fecha-m"></select><select class="fecha-sel" id="edit-fecha-y"></select></div></div>
+        <div class="form-group"><label>Socio</label><select id="edit-socio"><option value="Martin">Martín</option><option value="Patry">Patry</option></select></div>
+        <button class="btn-save" onclick="guardarEdicion()">GUARDAR CAMBIOS</button>
+        <button class="btn-cancelar" onclick="cerrarModal()">CANCELAR</button>
+    </div>
+</div>
+
+<nav>
+    <div class="nav-item activo" id="nav-inicio" onclick="navA('pantalla-inicio')"><span>🏠</span>INICIO</div>
+    <div class="nav-item" id="nav-pyn"  onclick="navA('pantalla-pyn')"><span>🥚</span>PyN</div>
+    <div class="nav-item" id="nav-caja" onclick="navA('pantalla-caja')"><span>💰</span>CAJA</div>
+</nav>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB1X8b7u1-Xm6FTlV5JxdNvBjfUPrBQuNg",
+        authDomain: "onlyreptil.firebaseapp.com",
+        projectId: "onlyreptil",
+        storageBucket: "onlyreptil.firebasestorage.app",
+        messagingSenderId: "588712119670",
+        appId: "1:588712119670:web:33b3fdf6bc27e4b8b2be57"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    let historico = [], histBio = [], clientes = [];
+    let inventario = { Sulcata:0, Radiata:0, Rusa:0, Pardalis:0, Carbonaria:0 };
+    const SECCIONES = ['pantalla-inicio','form-gasto','form-ingreso','form-nacimiento','form-puesta','pantalla-caja','pantalla-exito','pantalla-pyn','pantalla-clientes','pantalla-especies','pantalla-electricidad','pantalla-chips','pantalla-parentales'];
+
+    // Pantallas donde se ocultan stock-bar y/o card-balance
+    const SIN_STOCKBAR = ['pantalla-parentales'];
+    const SIN_BALANCE  = ['pantalla-pyn','pantalla-parentales','form-puesta','form-nacimiento','form-gasto','form-ingreso','pantalla-clientes','pantalla-especies','pantalla-electricidad','pantalla-chips','pantalla-exito'];
+
+    window.irA = function(id) {
+        SECCIONES.forEach(s => { const el = document.getElementById(s); if(el) el.style.display = 'none'; });
+        // Mostrar/ocultar stock-bar y balance según pantalla
+        const sb = document.querySelector('.stock-bar');
+        const cb = document.querySelector('.card-balance');
+        if(sb) sb.style.display = SIN_STOCKBAR.includes(id) ? 'none' : '';
+        if(cb) cb.style.display = SIN_BALANCE.includes(id)  ? 'none' : '';
+        const t = document.getElementById(id);
+        if(t) t.style.display = id === 'pantalla-inicio' ? 'block' : 'flex';
+        if(id === 'form-ingreso') { cargarSelectClientes(); setFechaHoy('i-fecha'); }
+        if(id === 'form-gasto') { setFechaHoy('g-fecha'); }
+        if(id === 'pantalla-electricidad') { setFechaHoy('elec-fecha'); renderUltimaLectura(); resetFormLuz(); }
+        if(id === 'pantalla-chips') { renderChips(); }
+        if(id === 'pantalla-parentales') { sincronizarSelectParentalEspecie(); sincronizarFiltroEspecie(); renderParentales(); }
+        if(id === 'pantalla-clientes') renderClientes();
+        if(id === 'pantalla-especies') renderEspecies();
+        if(id === 'form-puesta') { setFechaHoy('p-fecha'); cargarParejasPorEspecie(); }
+    }
+    window.navA = function(id) {
+        ['nav-inicio','nav-pyn','nav-caja'].forEach(n => document.getElementById(n).classList.remove('activo'));
+        const map = {'pantalla-inicio':'nav-inicio','pantalla-pyn':'nav-pyn','pantalla-caja':'nav-caja'};
+        if(map[id]) document.getElementById(map[id]).classList.add('activo');
+        window.irA(id);
+    }
+    function setEstado(e,m){ const el=document.getElementById('estado-conexion'); el.className=e; el.innerText=m; }
+    function setBotones(d){ ['btn-guardar-puesta','btn-guardar-nacimiento','btn-guardar-gasto','btn-guardar-ingreso'].forEach(id=>{ const b=document.getElementById(id); if(b) b.disabled=d; }); }
+
+    onSnapshot(query(collection(db,"clientes"),orderBy("nombre","asc")), snap => {
+        clientes=[]; snap.forEach(d=>clientes.push({id:d.id,...d.data()}));
+        renderClientes(); cargarSelectClientes();
+    });
+    function cargarSelectClientes(){ const sel=document.getElementById('i-cliente'); if(!sel) return; sel.innerHTML=clientes.length===0?'<option value="">— Sin clientes —</option>':clientes.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join(''); }
+    function renderClientes(){ const lista=document.getElementById('lista-clientes'); if(!lista) return; if(clientes.length===0){lista.innerHTML='<p class="msg-vacio">Sin clientes aún</p>';return;} lista.innerHTML=clientes.map(c=>`<div class="cliente-item"><span>${c.nombre}</span><button class="btn-borrar-cliente" onclick="borrarCliente('${c.id}')">🗑️</button></div>`).join(''); }
+    window.agregarCliente=async function(){ const n=document.getElementById('nuevo-cliente-nombre').value.trim(); if(!n) return alert("Escribe un nombre"); if(clientes.find(c=>c.nombre.toLowerCase()===n.toLowerCase())) return alert("Ya existe"); await addDoc(collection(db,"clientes"),{nombre:n}); document.getElementById('nuevo-cliente-nombre').value=''; }
+    window.borrarCliente=async function(id){ if(!confirm("¿Borrar este cliente?")) return; await deleteDoc(doc(db,"clientes",id)); }
+    window.toggleOtrosIngreso=function(){ const v=document.getElementById('i-especie').value; document.getElementById('grupo-otros-concepto').style.display=v==='Otros'?'block':'none'; }
+
+    onSnapshot(query(collection(db,"caja"),orderBy("timestamp","asc")), snap => {
+        historico=[]; inventario={};
+        snap.forEach(d=>{ const data={id:d.id,...d.data()}; historico.push(data); if(data.tipo==='ingreso'&&data.especie&&data.cant) inventario[data.especie]=(inventario[data.especie]||0)-parseInt(data.cant); });
+        recalcularStock(); actualizarUI(); setEstado('conectado','🟢 CONECTADO · TIEMPO REAL'); setBotones(false);
+    }, err=>setEstado('error','🔴 ERROR · '+err.message));
+
+    onSnapshot(query(collection(db,"bio"),orderBy("timestamp","asc")), snap => {
+        histBio=[]; let sb={}, hb={};
+        snap.forEach(d=>{ const data={id:d.id,...d.data()}; histBio.push(data);
+            if(data.tipo==='nacimiento') sb[data.especie]=(sb[data.especie]||0)+parseInt(data.cant);
+            if(data.tipo==='puesta') hb[data.especie]=(hb[data.especie]||0)+parseInt(data.cant);
+        });
+        window._stockBio=sb; window._huevosBio=hb; recalcularStock(); renderBio();
+    });
+
+    // ── ESPECIES (Firebase) ──────────────────────────────────────
+    const ESPECIES_DEFAULT = [
+        { nombre: 'Sulcata',    color: '#f5c518' },
+        { nombre: 'Radiata',    color: '#ff7043' },
+        { nombre: 'Rusa',       color: '#8d6e63' },
+        { nombre: 'Pardalis',   color: '#9ccc65' },
+        { nombre: 'Carbonaria', color: '#ef5350' },
+    ];
+
+    // Lista en memoria, se actualiza con onSnapshot
+    let especiesLista = [...ESPECIES_DEFAULT];
+
+    function getEspecies() { return especiesLista; }
+    function getColorEspecie(nombre) {
+        const esp = especiesLista.find(e => e.nombre === nombre);
+        return esp ? esp.color : '#4caf50';
+    }
+    function getNombresEspecies() {
+        return especiesLista.map(e => e.nombre);
+    }
+
+    // Escucha cambios en Firestore en tiempo real
+    onSnapshot(collection(db, 'especies'), async snap => {
+        if (snap.empty) {
+            // Primera vez: sembrar las 5 especies por defecto en Firestore
+            for (const esp of ESPECIES_DEFAULT) {
+                await setDoc(doc(db, 'especies', esp.nombre), {
+                    color: esp.color,
+                    orden: ESPECIES_DEFAULT.findIndex(e => e.nombre === esp.nombre)
+                });
+            }
+            return; // el onSnapshot volverá a dispararse tras el seed
+        }
+        const arr = [];
+        snap.forEach(d => arr.push({ nombre: d.id, color: d.data().color, orden: d.data().orden !== undefined ? d.data().orden : 99 }));
+        arr.sort((a, b) => a.orden - b.orden);
+        especiesLista = arr;
+        recalcularStock();
+        sincronizarSelectsEspecies();
+        renderEspecies();
+    });
+
+    // Sync all species selects in the app
+    function sincronizarSelectsEspecies() {
+        const nombres = getNombresEspecies();
+        ['p-especie','n-especie'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const val = sel.value;
+            sel.innerHTML = nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+            if (nombres.includes(val)) sel.value = val;
+        });
+        // Ingreso select keeps Otros at the end
+        const iSel = document.getElementById('i-especie');
+        if (iSel) {
+            const val = iSel.value;
+            iSel.innerHTML = nombres.map(n => `<option value="${n}">${n}</option>`).join('') +
+                '<option value="Otros">Otros</option>';
+            if (nombres.includes(val) || val === 'Otros') iSel.value = val;
+        }
+    }
+
+    window.agregarEspecie = async function() {
+        const nombre = document.getElementById('nueva-especie-nombre').value.trim();
+        const color  = document.getElementById('nueva-especie-color').value;
+        if (!nombre) return alert('Escribe un nombre');
+        if (especiesLista.find(e => e.nombre.toLowerCase() === nombre.toLowerCase())) return alert('Esa especie ya existe');
+        const orden = especiesLista.length;
+        try {
+            await setDoc(doc(db, 'especies', nombre), { color, orden });
+            document.getElementById('nueva-especie-nombre').value = '';
+            document.getElementById('nueva-especie-color').value = '#4caf50';
+        } catch(err) { alert('Error al guardar: ' + err.message); }
+    }
+
+    window.eliminarEspecie = async function(nombre) {
+        if (!confirm(`¿Eliminar la especie "${nombre}"? Solo se elimina de la lista, no los datos ya registrados.`)) return;
+        if (especiesLista.length <= 1) return alert('Debe quedar al menos una especie.');
+        try {
+            await deleteDoc(doc(db, 'especies', nombre));
+        } catch(err) { alert('Error al eliminar: ' + err.message); }
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    function recalcularStock() {
+        const nacimientos = window._stockBio  || {};  // total nacidos por especie
+        const puestas     = window._huevosBio || {};  // total huevos puestos
+        const nombres = getNombresEspecies();
+        window._stockData = nombres.map(nombre => ({
+            nombre,
+            color:   getColorEspecie(nombre),
+            // 🥚 Huevos pendientes de eclosionar = puestos - nacidos
+            huevos:  Math.max(0, (puestas[nombre] || 0) - (nacimientos[nombre] || 0)),
+            // 🐢 Nacidos pendientes de vender = nacidos totales
+            nacidos: nacimientos[nombre] || 0
+        }));
+        renderStockBar();
+    }
+
+    function renderStockBar() {
+        const data   = window._stockData || [];
+        const sorted = [...data].sort((a,b) => (b.huevos + b.nacidos) - (a.huevos + a.nacidos));
+        const top3   = sorted.slice(0, 3);
+        const bar    = document.getElementById('stock-bar-inner');
+        if (!bar) return;
+        bar.innerHTML = top3.map(e => `
+            <div class="stock-item" style="border-top-color:${e.color};">
+                <div class="stock-nombre" style="color:${e.color};">${e.nombre.toUpperCase()}</div>
+                <div class="stock-datos">
+                    <div class="stock-dato"><span class="stock-icono">🥚</span><span class="stock-num" style="color:${e.color};">${e.huevos}</span></div>
+                    <div class="stock-dato"><span class="stock-icono">🐢</span><span class="stock-num" style="color:${e.color};">${e.nacidos}</span></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderEspecies() {
+        const data  = window._stockData || [];
+        const lista = document.getElementById('lista-especies');
+        if (!lista) return;
+        const FIJAS = ['Sulcata','Radiata','Rusa','Pardalis','Carbonaria'];
+        lista.innerHTML = data.map(e => `
+            <div class="especie-card" style="border-left-color:${e.color};">
+                <div class="especie-card-header">
+                    <span class="especie-nombre" style="color:${e.color};">${e.nombre}</span>
+                </div>
+                <div class="especie-datos">
+                    <span class="especie-dato" style="color:${e.color};">🥚 ${e.huevos} huevos</span>
+                    <span class="especie-dato" style="color:${e.color};">🐢 ${e.nacidos} en stock</span>
+                </div>
+                <div class="especie-acciones"><button class="btn-borrar-especie" onclick="eliminarEspecie('${e.nombre}')">🗑️ ELIMINAR</button></div>
+            </div>
+        `).join('') || '<p class="msg-vacio">Sin datos aún</p>';
+    }
+
+    function cargarParejasPorEspecie() {
+        const selEsp    = document.getElementById('p-especie');
+        const selPareja = document.getElementById('p-pareja');
+        if (!selEsp || !selPareja) return;
+        // Poblar especie si está vacío
+        const nombres = getNombresEspecies();
+        if (!selEsp.options.length || selEsp.options[0].value === '') {
+            selEsp.innerHTML = nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+        }
+        const especie = selEsp.value;
+        const parejas = parejasData.filter(p => p.especie === especie);
+        if (parejas.length === 0) {
+            selPareja.innerHTML = '<option value="">— Sin parejas para esta especie —</option>';
+            document.getElementById('p-ultima-puesta').style.display = 'none';
+            document.getElementById('p-eclosion-info').style.display = 'none';
+            document.getElementById('p-id-puesta').value = '';
+            return;
+        }
+        selPareja.innerHTML = parejas.map(p => `<option value="${p.id}" data-nombre="${p.nombre}" data-dias="${p.diasIncubacion||90}">${p.nombre}</option>`).join('');
+        actualizarInfoPareja();
+    }
+
+    function actualizarInfoPareja() {
+        const selPareja = document.getElementById('p-pareja');
+        const opt = selPareja ? selPareja.options[selPareja.selectedIndex] : null;
+        if (!opt || !opt.value) return;
+        const nombrePareja = opt.getAttribute('data-nombre');
+        const dias = parseInt(opt.getAttribute('data-dias')) || 90;
+        // Última puesta de esta pareja
+        const puestasPareja = histBio.filter(b => b.tipo === 'puesta' && b.idPareja === opt.value);
+        const ultima = puestasPareja.length > 0 ? puestasPareja[puestasPareja.length - 1] : null;
+        const boxUltima = document.getElementById('p-ultima-puesta');
+        if (ultima) {
+            document.getElementById('p-ultima-fecha').innerText = ultima.fecha;
+            boxUltima.style.display = 'block';
+        } else {
+            boxUltima.style.display = 'none';
+        }
+        // Fecha estimada de eclosión desde la fecha de puesta seleccionada
+        const isoP = getFechaIso('p-fecha');
+        const baseDate = isoP ? new Date(isoP + 'T12:00:00') : new Date();
+        const eclosion = new Date(baseDate.getTime() + dias * 24 * 60 * 60 * 1000);
+        const dd = String(eclosion.getDate()).padStart(2,'0');
+        const mm = String(eclosion.getMonth()+1).padStart(2,'0');
+        const yy = eclosion.getFullYear();
+        document.getElementById('p-eclosion-fecha').innerText = `${dd}/${mm}/${yy} (~${dias} días)`;
+        document.getElementById('p-eclosion-info').style.display = 'block';
+        actualizarIdPuesta();
+    }
+
+    function actualizarIdPuesta() {
+        const selPareja = document.getElementById('p-pareja');
+        const opt = selPareja ? selPareja.options[selPareja.selectedIndex] : null;
+        if (!opt || !opt.value) return;
+        const nombrePareja = opt.getAttribute('data-nombre') || '';
+        const huevos = document.getElementById('p-huevos').value || '0';
+        const iso = getFechaIso('p-fecha');
+        const partes = iso.split('-');
+        const yy = partes[0].slice(2), mm = partes[1], dd = partes[2];
+        document.getElementById('p-id-puesta').value = `${nombrePareja}-${yy}${mm}${dd}-${huevos}`;
+    }
+
+    window.guardarPuesta = async function() {
+        const parejaId  = document.getElementById('p-pareja').value;
+        const huevos    = parseInt(document.getElementById('p-huevos').value);
+        const idPuesta  = document.getElementById('p-id-puesta').value;
+        const especie   = document.getElementById('p-especie').value;
+        if (!parejaId)    return alert('Selecciona una pareja');
+        if (!huevos || huevos < 1) return alert('Introduce el número de huevos');
+        const pareja = parejasData.find(p => p.id === parejaId);
+        if (!pareja) return alert('Error al obtener los datos de la pareja');
+        const fechaIso = getFechaIso('p-fecha');
+        const fechaDate = new Date(fechaIso + 'T12:00:00');
+        const fecha = isoAEs(fechaIso);
+        const dias  = pareja.diasIncubacion || 90;
+        const eclosionTs = fechaDate.getTime() + dias * 24 * 60 * 60 * 1000;
+        const eclosionDate = new Date(eclosionTs);
+        const fechaEclosion = eclosionDate.toLocaleDateString('es-ES');
+        setBotones(true);
+        try {
+            await addDoc(collection(db,'bio'), {
+                tipo: 'puesta',
+                especie,
+                cant: huevos,
+                idPareja: parejaId,
+                nombrePareja: pareja.nombre,
+                idEspecimenMacho: pareja.idEspecimenMacho,
+                idEspecimenHembra: pareja.idEspecimenHembra,
+                idPuesta,
+                detalle: idPuesta,
+                fecha,
+                fechaEclosionEstimada: fechaEclosion,
+                timestamp: Date.now()
+            });
+            finalizar('BIO', `${huevos} huevos · ${pareja.nombre} · Eclosión est. ${fechaEclosion}`);
+        } catch(err) { alert('Error: ' + err.message); setBotones(false); }
+    }
+    window.guardarNacimiento=async function(){ const c=document.getElementById('n-cant').value,e=document.getElementById('n-especie').value; setBotones(true); try{ await addDoc(collection(db,"bio"),{tipo:'nacimiento',especie:e,cant:c,detalle:'Eclosión',fecha:new Date().toLocaleDateString('es-ES'),timestamp:Date.now()}); finalizar('BIO',`${c} nuevas ${e} nacidas`); }catch(err){alert("Error: "+err.message);setBotones(false);} }
+
+    const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    function poblarSelectFecha(prefijo) {
+        const selD = document.getElementById(prefijo+'-d');
+        const selM = document.getElementById(prefijo+'-m');
+        const selY = document.getElementById(prefijo+'-y');
+        if (!selD || !selM || !selY) return;
+        // Días
+        if (!selD.options.length) { for(let d=1;d<=31;d++) selD.add(new Option(String(d).padStart(2,'0'),String(d).padStart(2,'0'))); }
+        // Meses
+        if (!selM.options.length) { MESES.forEach((m,i)=>selM.add(new Option(m,String(i+1).padStart(2,'0')))); }
+        // Años
+        if (!selY.options.length) { const ay=new Date().getFullYear(); for(let y=ay-3;y<=ay+1;y++) selY.add(new Option(y,y)); }
+    }
+
+    function setFechaHoy(prefijo) {
+        poblarSelectFecha(prefijo);
+        const hoy = new Date();
+        const d = String(hoy.getDate()).padStart(2,'0');
+        const m = String(hoy.getMonth()+1).padStart(2,'0');
+        const y = hoy.getFullYear();
+        const selD = document.getElementById(prefijo+'-d');
+        const selM = document.getElementById(prefijo+'-m');
+        const selY = document.getElementById(prefijo+'-y');
+        if(selD) selD.value = d;
+        if(selM) selM.value = m;
+        if(selY) selY.value = y;
+    }
+
+    function getFechaIso(prefijo) {
+        const d = document.getElementById(prefijo+'-d');
+        const m = document.getElementById(prefijo+'-m');
+        const y = document.getElementById(prefijo+'-y');
+        if (!d || !m || !y) return new Date().toISOString().slice(0,10);
+        return `${y.value}-${m.value}-${d.value}`;
+    }
+
+    function setFechaFromIso(prefijo, iso) {
+        poblarSelectFecha(prefijo);
+        if (!iso) { setFechaHoy(prefijo); return; }
+        const [y,m,d] = iso.split('-');
+        const selD = document.getElementById(prefijo+'-d');
+        const selM = document.getElementById(prefijo+'-m');
+        const selY = document.getElementById(prefijo+'-y');
+        if(selD) selD.value = d;
+        if(selM) selM.value = m;
+        if(selY) selY.value = y;
+    }
+
+    function isoAEs(iso) {
+        if (!iso) return '';
+        const [y,m,d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    }
+    function isoATimestamp(iso) {
+        if (!iso) return Date.now();
+        return new Date(iso + 'T12:00:00').getTime();
+    }
+
+    window.guardarMovimiento=async function(tipo){ const pref=tipo==='gasto'?'g-':'i-',monto=parseFloat(document.getElementById(pref+'monto').value),socio=document.getElementById(pref+'socio').value; if(!monto||monto<=0) return alert("Introduce un importe válido"); const fechaIso=getFechaIso(pref+'fecha'); const fechaEs=isoAEs(fechaIso); let datos={tipo,socio,monto,fecha:fechaEs,fechaIso:fechaIso,timestamp:isoATimestamp(fechaIso)}; if(tipo==='ingreso'){const especie=document.getElementById('i-especie').value,cant=parseInt(document.getElementById('i-cant').value),cliente=document.getElementById('i-cliente').value||"Sin cliente",concepto=especie==='Otros'?(document.getElementById('i-otros-concepto').value||'Otros'):especie; datos.especie=especie;datos.cant=cant;datos.cliente=cliente;datos.detalle=`${concepto} x${cant} · ${cliente}`;}else{datos.detalle=document.getElementById('g-concepto').value||"Sin concepto";} setBotones(true); try{await addDoc(collection(db,"caja"),datos);finalizar('DINERO',`${monto.toFixed(2)}€ registrados`);}catch(err){alert("Error: "+err.message);setBotones(false);} }
+
+    window.eliminarRegistro=async function(id){ if(!confirm("¿Eliminar este registro?")) return; await deleteDoc(doc(db,"caja",id)); }
+    window.abrirEditar=function(id,detalle,monto,socio,fechaIso){ document.getElementById('edit-id').value=id; document.getElementById('edit-detalle').value=detalle; document.getElementById('edit-monto').value=monto; document.getElementById('edit-socio').value=socio; setFechaFromIso('edit-fecha', fechaIso||''); document.getElementById('modal-editar').classList.add('active'); }
+    window.cerrarModal=function(){ document.getElementById('modal-editar').classList.remove('active'); }
+    window.guardarEdicion=async function(){ const id=document.getElementById('edit-id').value,detalle=document.getElementById('edit-detalle').value,monto=parseFloat(document.getElementById('edit-monto').value),socio=document.getElementById('edit-socio').value,fechaIso=getFechaIso('edit-fecha'); if(!monto||monto<=0) return alert("Importe inválido"); const fechaEs=isoAEs(fechaIso); await updateDoc(doc(db,"caja",id),{detalle,monto,socio,fecha:fechaEs,fechaIso:fechaIso,timestamp:isoATimestamp(fechaIso)}); cerrarModal(); }
+
+    function finalizar(tipo,msg){ document.getElementById('exito-titulo').innerText=tipo==='BIO'?'¡REGISTRADO!':'¡GUARDADO!'; document.getElementById('exito-detalle').innerText=msg; document.getElementById('link-caja').style.display=tipo==='DINERO'?'block':'none'; document.getElementById('link-bio').style.display=tipo==='BIO'?'block':'none'; window.irA('pantalla-exito'); }
+
+    function fmt(n){
+        const parts = n.toFixed(2).split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return parts[0] + ',' + parts[1] + '€';
+    }
+
+    function actualizarUI(){
+        // Neto en bolsillo de cada socio = ingresos cobrados - gastos pagados
+        // El que tiene más neto positivo le debe la mitad de la diferencia al otro
+        let netoM=0, netoP=0;
+        historico.forEach(h=>{
+            const s = h.socio === 'Martin';
+            if(h.tipo === 'ingreso'){ if(s) netoM += h.monto; else netoP += h.monto; }
+            else                   { if(s) netoM -= h.monto; else netoP -= h.monto; }
+        });
+        // Quien tiene más neto en su bolsillo le debe la diferencia/2 al otro
+        const diff = Math.abs(netoM - netoP) / 2;
+        // Si netoM > netoP → Martín tiene más dinero del negocio → Martín debe a Patry
+        const deudor   = netoM > netoP ? 'Martín' : 'Patry';
+        const acreedor = netoM > netoP ? 'Patry'  : 'Martín';
+        document.getElementById('balance-texto').innerText = fmt(diff);
+        document.getElementById('balance-sub').innerText   = diff > 0.005 ? `${deudor} debe a ${acreedor}` : 'Cuentas al día ✅';
+        renderCaja();
+    }
+
+    window.verTab=function(t){ ['t-a','t-g','t-i'].forEach(id=>document.getElementById(id).classList.remove('active')); ['l-a','l-g','l-i'].forEach(id=>document.getElementById(id).classList.remove('active')); document.getElementById('t-'+t).classList.add('active'); document.getElementById('l-'+t).classList.add('active'); }
+    window.verTabBio=function(t){ ['tb-a','tb-p','tb-n'].forEach(id=>document.getElementById(id).classList.remove('bio-active')); ['lb-a','lb-p','lb-n'].forEach(id=>document.getElementById(id).classList.remove('active')); document.getElementById('tb-'+t).classList.add('bio-active'); document.getElementById('lb-'+t).classList.add('active'); }
+
+    function renderCaja(){ const la=document.getElementById('l-a'),lg=document.getElementById('l-g'),li=document.getElementById('l-i'); la.innerHTML=lg.innerHTML=li.innerHTML=""; if(historico.length===0){la.innerHTML='<p class="msg-vacio">Sin movimientos aún</p>';return;} historico.slice().sort((a,b)=>b.timestamp-a.timestamp).forEach(h=>{ const fechaIso=h.fechaIso||''; const esGasto=h.tipo==='gasto',color=esGasto?'var(--rojo)':'var(--verde)',signo=esGasto?'−':'+'; const html=`<div class="item-hist ${esGasto?'item-gasto':''}" style="border-left-color:${color}"><div class="item-monto" style="color:${color}">${signo} ${fmt(h.monto)}</div><div class="item-detalle">${h.detalle}</div><div class="item-meta">${h.socio} · ${h.fecha}</div><div class="item-acciones"><button class="btn-item btn-editar" onclick="abrirEditar('${h.id}','${h.detalle.replace(/'/g,"\\'")}',${h.monto},'${h.socio}','${fechaIso}')">✏️ EDITAR</button><button class="btn-item btn-borrar" onclick="eliminarRegistro('${h.id}')">🗑️ ELIMINAR</button></div></div>`; la.innerHTML+=html; if(esGasto) lg.innerHTML+=html; else li.innerHTML+=html; }); }
+
+    function renderBio(){
+        const lba=document.getElementById('lb-a'),lbp=document.getElementById('lb-p'),lbn=document.getElementById('lb-n');
+        lba.innerHTML=lbp.innerHTML=lbn.innerHTML="";
+        if(histBio.length===0){lba.innerHTML='<p class="msg-vacio">Sin registros aún</p>';return;}
+        histBio.slice().reverse().forEach(b=>{
+            const esPuesta=b.tipo==='puesta', emoji=esPuesta?'🥚':'🐢';
+            const colorBorde = esPuesta ? 'var(--azul)' : 'var(--verde)';
+            const pareja = b.nombrePareja ? ' · ' + b.nombrePareja : '';
+            const eclosion = b.fechaEclosionEstimada ? '<br>🌡️ Eclosión est: ' + b.fechaEclosionEstimada : '';
+            const acciones = esPuesta
+                ? `<div class="item-acciones">
+                    <button class="btn-item btn-editar" onclick="abrirModalEditPuesta('${b.id}')">✏️ EDITAR</button>
+                    <button class="btn-item" style="background:rgba(100,181,246,0.15);color:var(--azul);border:1px solid rgba(100,181,246,0.3);" onclick="abrirModalNacimiento('${b.id}')">🐢 NACIMIENTO</button>
+                    <button class="btn-item btn-borrar" onclick="eliminarBio('${b.id}')">🗑️</button>
+                   </div>`
+                : `<div class="item-acciones">
+                    <button class="btn-item btn-borrar" onclick="eliminarBio('${b.id}')">🗑️ ELIMINAR</button>
+                   </div>`;
+            const html=`<div class="item-hist item-bio" style="border-left-color:${colorBorde}">
+                <div class="item-monto" style="color:var(--azul)">${emoji} ${b.tipo.toUpperCase()}${pareja}</div>
+                <div class="item-detalle">${b.cant}x ${b.especie}</div>
+                <div class="item-meta">${b.fecha}${eclosion}</div>
+                ${acciones}
+            </div>`;
+            lba.innerHTML+=html;
+            if(esPuesta) lbp.innerHTML+=html; else lbn.innerHTML+=html;
+        });
+    }
+
+    window.eliminarBio = async function(id) {
+        if(!confirm('¿Eliminar este registro?')) return;
+        try { await deleteDoc(doc(db,'bio',id)); } catch(err) { alert('Error: '+err.message); }
+    }
+
+
+
+    // ── PAREJAS ──────────────────────────────────────────────────
+    let parejasData = [];
+
+    onSnapshot(collection(db, 'parejas'), snap => {
+        parejasData = [];
+        snap.forEach(d => parejasData.push({ id: d.id, ...d.data() }));
+    });
+
+    // Prefijos por especie para generar nombre automático
+    function prefijoPorEspecie(especie) {
+        const mapa = { 'Sulcata':'SUL', 'Radiata':'RAD', 'Rusa':'RUS', 'Pardalis':'PAR', 'Carbonaria':'CAR' };
+        return mapa[especie] || especie.slice(0,3).toUpperCase();
+    }
+
+    function siguienteNombrePareja(especie) {
+        const prefijo = prefijoPorEspecie(especie);
+        const yaUsados = parejasData
+            .map(p => p.nombre)
+            .filter(n => n && n.startsWith(prefijo))
+            .map(n => parseInt(n.replace(prefijo, '')) || 0)
+            .filter(n => !isNaN(n));
+        const siguiente = yaUsados.length > 0 ? Math.max(...yaUsados) + 1 : 1;
+        return prefijo + String(siguiente).padStart(2, '0');
+    }
+
+    window.abrirModalPareja = function(hembraId) {
+        const hembra = parentalesData.find(p => p.id === hembraId);
+        if (!hembra) return;
+        const especie = hembra.especie;
+        // Rellenar datos
+        document.getElementById('pareja-hembra-id').value    = hembraId;
+        document.getElementById('pareja-especie').value      = especie;
+        document.getElementById('pareja-hembra-nombre').innerText = hembra.nombre + ' · ' + hembra.idEspecimen;
+        // Cargar machos de la misma especie
+        const machos = parentalesData.filter(p => p.especie === especie && p.sexo === 'Macho');
+        const selMacho = document.getElementById('pareja-macho-sel');
+        if (machos.length === 0) {
+            selMacho.innerHTML = '<option value="">— Sin machos de esta especie —</option>';
+        } else {
+            selMacho.innerHTML = machos.map(m => `<option value="${m.id}">${m.nombre} · ${m.idEspecimen}</option>`).join('');
+        }
+        // Nombre automático
+        document.getElementById('pareja-nombre').value = siguienteNombrePareja(especie);
+        document.getElementById('pareja-dias').value  = 90;
+        document.getElementById('modal-pareja').classList.add('active');
+    }
+
+    window.cerrarModalPareja = function() {
+        document.getElementById('modal-pareja').classList.remove('active');
+    }
+
+    window.guardarPareja = async function() {
+        const hembraId  = document.getElementById('pareja-hembra-id').value;
+        const machoId   = document.getElementById('pareja-macho-sel').value;
+        const nombre    = document.getElementById('pareja-nombre').value.trim().toUpperCase();
+        const especie   = document.getElementById('pareja-especie').value;
+        const dias      = parseInt(document.getElementById('pareja-dias').value) || 90;
+        if (!machoId)  return alert('Selecciona un macho');
+        if (!nombre)   return alert('El nombre de pareja no puede estar vacío');
+        // Verificar que el nombre no existe ya
+        if (parejasData.find(p => p.nombre.toUpperCase() === nombre)) {
+            return alert('Ya existe una pareja con ese nombre. Elige otro.');
+        }
+        const hembra = parentalesData.find(p => p.id === hembraId);
+        const macho  = parentalesData.find(p => p.id === machoId);
+        if (!hembra || !macho) return alert('Error al obtener los datos de los parentales');
+        try {
+            await addDoc(collection(db, 'parejas'), {
+                nombre,
+                especie,
+                idHembra:       hembraId,
+                nombreHembra:   hembra.nombre,
+                idEspecimenHembra: hembra.idEspecimen,
+                marcaHembra:    hembra.marca || '',
+                idMacho:        machoId,
+                nombreMacho:    macho.nombre,
+                idEspecimenMacho: macho.idEspecimen,
+                marcaMacho:     macho.marca || '',
+                diasIncubacion: dias,
+                timestamp:      Date.now()
+            });
+            cerrarModalPareja();
+            alert('✅ Pareja ' + nombre + ' creada correctamente');
+        } catch(err) { alert('Error: ' + err.message); }
+    }
+    // ─────────────────────────────────────────────────────────────
+
+
+    // ── EDITAR PUESTA ─────────────────────────────────────────────
+    window.abrirModalEditPuesta = function(id) {
+        const b = histBio.find(x => x.id === id);
+        if (!b) return;
+        document.getElementById('edit-puesta-id').value = id;
+        // Poblar especie
+        const selEsp = document.getElementById('edit-p-especie');
+        selEsp.innerHTML = getNombresEspecies().map(n => `<option value="${n}">${n}</option>`).join('');
+        selEsp.value = b.especie;
+        // Poblar parejas
+        cargarParejasEditPuesta(b.idPareja);
+        // Fecha
+        const iso = b.fecha ? b.fecha.split('/').reverse().join('-') : '';
+        setFechaFromIso('edit-p-fecha', iso);
+        // Huevos
+        document.getElementById('edit-p-huevos').value = b.cant;
+        document.getElementById('modal-edit-puesta').classList.add('active');
+    }
+
+    window.cargarParejasEditPuesta = function(seleccionarId) {
+        const especie = document.getElementById('edit-p-especie').value;
+        const parejas = parejasData.filter(p => p.especie === especie);
+        const sel = document.getElementById('edit-p-pareja');
+        if (parejas.length === 0) {
+            sel.innerHTML = '<option value="">— Sin parejas —</option>';
+        } else {
+            sel.innerHTML = parejas.map(p => `<option value="${p.id}" data-nombre="${p.nombre}" data-dias="${p.diasIncubacion||90}">${p.nombre}</option>`).join('');
+        }
+        if (seleccionarId && parejas.find(p => p.id === seleccionarId)) sel.value = seleccionarId;
+    }
+
+    window.guardarEditPuesta = async function() {
+        const id      = document.getElementById('edit-puesta-id').value;
+        const especie = document.getElementById('edit-p-especie').value;
+        const parejaId= document.getElementById('edit-p-pareja').value;
+        const huevos  = parseInt(document.getElementById('edit-p-huevos').value);
+        const fechaIso= getFechaIso('edit-p-fecha');
+        if (!parejaId) return alert('Selecciona una pareja');
+        if (!huevos || huevos < 1) return alert('Introduce el número de huevos');
+        const pareja = parejasData.find(p => p.id === parejaId);
+        if (!pareja) return alert('Error al obtener la pareja');
+        const fecha = isoAEs(fechaIso);
+        const dias  = pareja.diasIncubacion || 90;
+        const eclosionTs   = new Date(fechaIso+'T12:00:00').getTime() + dias*24*60*60*1000;
+        const fechaEclosion= new Date(eclosionTs).toLocaleDateString('es-ES');
+        // Recalcular ID
+        const yy = fechaIso.slice(2,4), mm2 = fechaIso.slice(5,7), dd2 = fechaIso.slice(8,10);
+        const idPuesta = `${pareja.nombre}-${yy}${mm2}${dd2}-${huevos}`;
+        try {
+            await updateDoc(doc(db,'bio',id), {
+                especie, cant: huevos, idPareja: parejaId,
+                nombrePareja: pareja.nombre,
+                idEspecimenMacho: pareja.idEspecimenMacho,
+                idEspecimenHembra: pareja.idEspecimenHembra,
+                idPuesta, detalle: idPuesta,
+                fecha, fechaEclosionEstimada: fechaEclosion,
+                timestamp: isoATimestamp(fechaIso)
+            });
+            cerrarModalEditPuesta();
+        } catch(err) { alert('Error: '+err.message); }
+    }
+
+    window.cerrarModalEditPuesta = function() {
+        document.getElementById('modal-edit-puesta').classList.remove('active');
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    // ── NACIMIENTO VINCULADO A PUESTA ─────────────────────────────
+    window.abrirModalNacimiento = function(puestaId) {
+        const puesta = histBio.find(x => x.id === puestaId);
+        if (!puesta) return;
+        document.getElementById('nac-puesta-id').value = puestaId;
+        // Info de la puesta
+        const nacidosYa = histBio.filter(b => b.tipo==='nacimiento' && b.idPuestaOrigen===puestaId)
+            .reduce((s,b) => s + parseInt(b.cant||0), 0);
+        const pendientes = Math.max(0, parseInt(puesta.cant||0) - nacidosYa);
+        document.getElementById('nac-puesta-info').innerHTML =
+            `🥚 Puesta: <strong>${puesta.idPuesta || puesta.detalle}</strong><br>` +
+            `📦 Huevos: ${puesta.cant} · Nacidos ya: ${nacidosYa} · Pendientes: ${pendientes}`;
+        document.getElementById('nac-cant').value = pendientes > 0 ? pendientes : 1;
+        setFechaHoy('nac-fecha');
+        document.getElementById('modal-nacimiento').classList.add('active');
+    }
+
+    window.cerrarModalNacimiento = function() {
+        document.getElementById('modal-nacimiento').classList.remove('active');
+    }
+
+    window.guardarNacimientoPuesta = async function() {
+        const puestaId = document.getElementById('nac-puesta-id').value;
+        const cant     = parseInt(document.getElementById('nac-cant').value);
+        const fechaIso = getFechaIso('nac-fecha');
+        if (!cant || cant < 1) return alert('Introduce una cantidad válida');
+        const puesta = histBio.find(x => x.id === puestaId);
+        if (!puesta) return alert('Error al obtener la puesta');
+        const fecha = isoAEs(fechaIso);
+        try {
+            await addDoc(collection(db,'bio'), {
+                tipo: 'nacimiento',
+                especie: puesta.especie,
+                cant,
+                idPuestaOrigen: puestaId,
+                idPareja: puesta.idPareja || '',
+                nombrePareja: puesta.nombrePareja || '',
+                idEspecimenMacho: puesta.idEspecimenMacho || '',
+                idEspecimenHembra: puesta.idEspecimenHembra || '',
+                idPuesta: puesta.idPuesta || puesta.detalle || '',
+                detalle: `Eclosión de ${puesta.idPuesta || puesta.detalle}`,
+                fecha,
+                timestamp: isoATimestamp(fechaIso)
+            });
+            cerrarModalNacimiento();
+            finalizar('BIO', `${cant} nacidos de ${puesta.nombrePareja||puesta.especie}`);
+        } catch(err) { alert('Error: '+err.message); }
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    // ── PARENTALES ───────────────────────────────────────────────
+    let parentalesData = [];
+    let parentalTabActual = 'a';
+
+    onSnapshot(query(collection(db, 'parentales'), orderBy('nombre', 'asc')), snap => {
+        parentalesData = [];
+        snap.forEach(d => parentalesData.push({ id: d.id, ...d.data() }));
+        renderParentales();
+    });
+
+    function sincronizarSelectParentalEspecie() {
+        const sel = document.getElementById('parental-especie');
+        if (!sel) return;
+        const val = sel.value;
+        const nombres = getNombresEspecies();
+        sel.innerHTML = nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+        if (nombres.includes(val)) sel.value = val;
+    }
+
+    window.verTabParental = function(t) {
+        parentalTabActual = t;
+        ['pt-a','pt-m','pt-h'].forEach(id => document.getElementById(id).classList.remove('bio-active'));
+        document.getElementById('pt-' + t).classList.add('bio-active');
+        renderParentales();
+    }
+
+    function sincronizarFiltroEspecie() {
+        const sel = document.getElementById('parental-filtro-especie');
+        if (!sel) return;
+        const val = sel.value;
+        const nombres = getNombresEspecies();
+        sel.innerHTML = '<option value="">— Todas las especies —</option>' +
+            nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+        if (nombres.includes(val)) sel.value = val;
+    }
+
+    function renderParentales() {
+        const lista = document.getElementById('parentales-lista');
+        if (!lista) return;
+        const filtroEsp = document.getElementById('parental-filtro-especie');
+        const especieSel = filtroEsp ? filtroEsp.value : '';
+        let mostrar = especieSel ? parentalesData.filter(p => p.especie === especieSel) : parentalesData;
+        if (parentalTabActual === 'm') mostrar = mostrar.filter(p => p.sexo === 'Macho');
+        if (parentalTabActual === 'h') mostrar = mostrar.filter(p => p.sexo === 'Hembra');
+        if (mostrar.length === 0) {
+            lista.innerHTML = '<p class="msg-vacio">Sin parentales registrados</p>';
+            return;
+        }
+        lista.innerHTML = mostrar.map(p => {
+            const esMacho = p.sexo === 'Macho';
+            const colorEsp = getColorEspecie(p.especie);
+            return `<div class="parental-card ${esMacho ? '' : 'hembra'}">
+                <div class="parental-card-top">
+                    <div class="parental-nombre" style="color:${colorEsp};">${p.nombre}</div>
+                    <span class="parental-sexo-badge ${esMacho ? 'badge-macho' : 'badge-hembra'}">${p.sexo === 'Macho' ? '♂ MACHO' : '♀ HEMBRA'}</span>
+                </div>
+                <div class="parental-meta">
+                    <span style="color:${colorEsp};">${p.especie}</span>
+                    ${p.idEspecimen ? ' · ID: <strong>' + p.idEspecimen + '</strong>' : ''}
+                    ${p.marca ? ' · Marca: ' + p.marca : ''}
+                </div>
+                <div class="parental-acciones">
+                    <button class="btn-edit-parental" onclick="editarParental('${p.id}')">✏️ EDITAR</button>
+                    <button class="btn-del-parental"  onclick="borrarParental('${p.id}')">🗑️ ELIMINAR</button>
+                    ${!esMacho ? '<button class="btn-add-pareja" onclick="abrirModalPareja(\''+p.id+'\')">🔗 ＋ PAREJA</button>' : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    window.guardarParental = async function() {
+        const editId  = document.getElementById('parental-edit-id').value;
+        const nombre  = document.getElementById('parental-nombre').value.trim();
+        const especie = document.getElementById('parental-especie').value;
+        const sexo    = document.getElementById('parental-sexo').value;
+        const idEsp   = document.getElementById('parental-id-especimen').value.trim();
+        const marca   = document.getElementById('parental-marca').value.trim();
+        if (!nombre)  return alert('Escribe un nombre identificativo');
+        if (!idEsp)   return alert('El ID Espécimen MITECO es obligatorio');
+        const datos = { nombre, especie, sexo, idEspecimen: idEsp, marca: marca || '' };
+        try {
+            if (editId) {
+                await updateDoc(doc(db, 'parentales', editId), datos);
+            } else {
+                await addDoc(collection(db, 'parentales'), datos);
+            }
+            limpiarFormParental();
+        } catch(err) { alert('Error: ' + err.message); }
+    }
+
+    window.editarParental = function(id) {
+        const p = parentalesData.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById('parental-edit-id').value    = id;
+        document.getElementById('parental-nombre').value     = p.nombre;
+        document.getElementById('parental-especie').value    = p.especie;
+        document.getElementById('parental-sexo').value       = p.sexo;
+        document.getElementById('parental-id-especimen').value = p.idEspecimen || '';
+        document.getElementById('parental-marca').value      = p.marca || '';
+        document.getElementById('parentales-form-titulo').innerText = '✏️ EDITAR PARENTAL';
+        const btnCancelar = document.getElementById('btn-cancelar-parental');
+        if (btnCancelar) btnCancelar.style.display = 'block';
+        // Scroll al formulario
+        document.getElementById('parental-nombre').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    window.cancelarEditarParental = function() {
+        limpiarFormParental();
+    }
+
+    function limpiarFormParental() {
+        document.getElementById('parental-edit-id').value      = '';
+        document.getElementById('parental-nombre').value       = '';
+        document.getElementById('parental-id-especimen').value = '';
+        document.getElementById('parental-marca').value        = '';
+        document.getElementById('parentales-form-titulo').innerText = '＋ AÑADIR PARENTAL';
+        const btnCancelar = document.getElementById('btn-cancelar-parental');
+        if (btnCancelar) btnCancelar.style.display = 'none';
+    }
+
+    window.borrarParental = async function(id) {
+        if (!confirm('¿Eliminar este parental? Se perderán sus datos pero no afectará a los registros ya existentes.')) return;
+        try { await deleteDoc(doc(db, 'parentales', id)); }
+        catch(err) { alert('Error: ' + err.message); }
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    // ── MICROCHIPS ───────────────────────────────────────────────
+    let chipsData = []; // [{id, numero, usado, fechaUso, idPuesta}]
+    let chipTabActual = 'l';
+
+    onSnapshot(collection(db, 'chips'), snap => {
+        chipsData = [];
+        snap.forEach(d => chipsData.push({ id: d.id, ...d.data() }));
+        // Ordenar numéricamente (Firestore ordena como texto si el campo es string)
+        chipsData.sort((a, b) => {
+            const na = BigInt(a.numero || '0');
+            const nb = BigInt(b.numero || '0');
+            return na < nb ? -1 : na > nb ? 1 : 0;
+        });
+        renderChips();
+        actualizarContadorChips();
+    });
+
+    function limpiarNumChip(n) {
+        // Quitar puntos, espacios y cualquier caracter no numérico, y ceros iniciales
+        return String(n).replace(/[^0-9]/g, '').replace(/^0+/, '').trim();
+    }
+
+    function actualizarContadorChips() {
+        const libres = chipsData.filter(c => !c.usado).length;
+        const usados = chipsData.filter(c => c.usado).length;
+        const total  = chipsData.length;
+        const elLibres = document.getElementById('chip-num-libres');
+        const elUsados = document.getElementById('chip-num-usados');
+        const elTotal  = document.getElementById('chip-num-total');
+        const statLibres = document.getElementById('chip-stat-libres');
+        const alerta = document.getElementById('alerta-chips');
+        if(elLibres) elLibres.innerText = libres;
+        if(elUsados) elUsados.innerText = usados;
+        if(elTotal)  elTotal.innerText  = total;
+        if(statLibres) {
+            if(libres < 50) { statLibres.classList.add('alerta'); statLibres.classList.remove('ok'); }
+            else            { statLibres.classList.add('ok');     statLibres.classList.remove('alerta'); }
+        }
+        if(alerta) {
+            if(libres < 50 && libres > 0) alerta.classList.add('visible');
+            else alerta.classList.remove('visible');
+        }
+        const alertaInicio = document.getElementById('alerta-chips-inicio');
+        if(alertaInicio) {
+            if(libres < 50 && libres > 0) alertaInicio.classList.add('visible');
+            else alertaInicio.classList.remove('visible');
+        }
+    }
+
+    window.setModoChip = function(modo) {
+        document.getElementById('chips-btn-rango').classList.toggle('active', modo === 'rango');
+        document.getElementById('chips-btn-uno').classList.toggle('active', modo === 'uno');
+        document.getElementById('chips-form-rango').style.display = modo === 'rango' ? 'block' : 'none';
+        document.getElementById('chips-form-uno').style.display   = modo === 'uno'   ? 'block' : 'none';
+    }
+
+    window.agregarChipsRango = async function() {
+        const desdeRaw = document.getElementById('chip-desde').value.trim();
+        const hastaRaw = document.getElementById('chip-hasta').value.trim();
+        const desde = limpiarNumChip(desdeRaw);
+        const hasta = limpiarNumChip(hastaRaw);
+        if(!desde || !hasta) return alert('Introduce los dos números de chip');
+        if(desde.length < 10 || hasta.length < 10) return alert('Números de chip demasiado cortos');
+        // Validar que son numéricos y que desde <= hasta
+        const numDesde = BigInt(desde);
+        const numHasta = BigInt(hasta);
+        if(numHasta < numDesde) return alert('El chip final debe ser mayor o igual que el inicial');
+        const cantidad = Number(numHasta - numDesde) + 1;
+        if(cantidad > 500) return alert('Máximo 500 chips por rango. Divide en varios lotes.');
+        if(!confirm(`¿Añadir ${cantidad} chips (${desde} → ${hasta})?`)) return;
+        // Chips ya existentes para evitar duplicados
+        const yaExisten = new Set(chipsData.map(c => c.numero));
+        let añadidos = 0, duplicados = 0;
+        const batch = [];
+        for(let n = numDesde; n <= numHasta; n++) {
+            const num = n.toString();
+            if(yaExisten.has(num)) { duplicados++; continue; }
+            batch.push(num);
+        }
+        try {
+            for(const num of batch) {
+                await setDoc(doc(db, 'chips', num), { numero: num, usado: false, fechaUso: null, idPuesta: null });
+                añadidos++;
+            }
+            document.getElementById('chip-desde').value = '';
+            document.getElementById('chip-hasta').value = '';
+            alert(`✅ ${añadidos} chips añadidos${duplicados > 0 ? `. ${duplicados} ya existían y se omitieron.` : '.'}`);
+        } catch(err) { alert('Error: ' + err.message); }
+    }
+
+    window.agregarChipUno = async function() {
+        const raw = document.getElementById('chip-uno').value.trim();
+        const num = limpiarNumChip(raw);
+        if(!num || num.length < 10) return alert('Número de chip no válido');
+        if(chipsData.find(c => c.numero === num)) return alert('Ese chip ya existe en la base de datos');
+        try {
+            await setDoc(doc(db, 'chips', num), { numero: num, usado: false, fechaUso: null, idPuesta: null });
+            document.getElementById('chip-uno').value = '';
+        } catch(err) { alert('Error: ' + err.message); }
+    }
+
+    window.borrarChip = async function(id) {
+        const chip = chipsData.find(c => c.id === id);
+        if(!chip) return;
+        if(chip.usado) return alert('No se puede eliminar un chip ya asignado a un animal.');
+        if(!confirm('¿Eliminar este chip libre?')) return;
+        try { await deleteDoc(doc(db, 'chips', id)); }
+        catch(err) { alert('Error: ' + err.message); }
+    }
+
+    window.verTabChip = function(t) {
+        chipTabActual = t;
+        ['cht-l','cht-u'].forEach(id => document.getElementById(id).classList.remove('bio-active'));
+        document.getElementById('cht-' + t).classList.add('bio-active');
+        renderChips();
+    }
+
+    function renderChips() {
+        const lista = document.getElementById('chips-lista');
+        if(!lista) return;
+        const mostrar = chipsData.filter(c => chipTabActual === 'l' ? !c.usado : c.usado);
+        if(mostrar.length === 0) {
+            lista.innerHTML = '<p class="msg-vacio">' + (chipTabActual === 'l' ? 'Sin chips libres' : 'Sin chips usados') + '</p>';
+            return;
+        }
+        lista.innerHTML = mostrar.map(c => {
+            const num = c.numero;
+            // Formatear con puntos para legibilidad: 900.263.004.245.592
+            const fmt = num.length === 15
+                ? num.replace(/(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})/, '$1.$2.$3.$4.$5')
+                : num;
+            if(c.usado) {
+                return '<div class="chip-item usado"><div><div class="chip-num">' + fmt + '</div><div class="chip-meta">Asignado · ' + (c.fechaUso || '—') + (c.idPuesta ? ' · ' + c.idPuesta : '') + '</div></div></div>';
+            } else {
+                return '<div class="chip-item"><div class="chip-num">' + fmt + '</div><button class="btn-borrar-chip" onclick="borrarChip(\'' + c.id + '\')">🗑️</button></div>';
+            }
+        }).join('');
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    // ── ELECTRICIDAD ─────────────────────────────────────────────
+    let _luzPendiente = null; // datos calculados esperando confirmación
+
+    function resetFormLuz() {
+        _luzPendiente = null;
+        const r = document.getElementById('elec-resultado');
+        const b = document.getElementById('btn-confirmar-luz');
+        if(r) r.style.display = 'none';
+        if(b) b.style.display = 'none';
+    }
+
+    function renderUltimaLectura() {
+        try {
+            const raw = localStorage.getItem('elec_ultima');
+            const box = document.getElementById('elec-ultima-box');
+            const val = document.getElementById('elec-ultima-valor');
+            const btn = document.getElementById('elec-editar-btn');
+            if (!raw) { if(val) val.innerText = '— Sin datos aún —'; if(btn) btn.style.display='none'; return; }
+            const d = JSON.parse(raw);
+            if(val) val.innerHTML = `📅 ${d.fecha}<br>📊 Lectura: <strong>${d.lectura} kWh</strong><br>💡 Precio: ${d.precio} €/kWh`;
+            if(btn) btn.style.display = 'block';
+            // Pre-rellenar lectura anterior con el valor guardado
+            const ant = document.getElementById('elec-anterior');
+            if(ant && !ant.value) ant.value = d.lectura;
+        } catch(e) {}
+    }
+
+    window.calcularLuz = function() {
+        const ant   = parseFloat(document.getElementById('elec-anterior').value);
+        const act   = parseFloat(document.getElementById('elec-actual').value);
+        const precio= parseFloat(document.getElementById('elec-precio').value);
+        if(isNaN(ant)||isNaN(act)||isNaN(precio)||act<=ant||precio<=0)
+            return alert('Revisa los datos: la lectura actual debe ser mayor que la anterior y el precio válido.');
+        const kwh    = act - ant;
+        const importe= kwh * precio;
+        _luzPendiente = { ant, act, precio, kwh, importe };
+        const res = document.getElementById('elec-resultado');
+        const txt = document.getElementById('elec-res-texto');
+        if(txt) txt.innerText = `${kwh.toFixed(2)} kWh × ${precio}€ = ${fmt(importe)}`;
+        if(res) res.style.display = 'block';
+        const btn = document.getElementById('btn-confirmar-luz');
+        if(btn) btn.style.display = 'block';
+    }
+
+    window.confirmarLuz = async function() {
+        if(!_luzPendiente) return;
+        const {ant, act, precio, kwh, importe} = _luzPendiente;
+        const fechaIso = getFechaIso('elec-fecha');
+        const fechaEs  = isoAEs(fechaIso);
+        const detalle  = `Luz ${ant}→${act} kWh (${kwh.toFixed(2)} kWh × ${precio}€/kWh)`;
+        setBotones(true);
+        try {
+            await addDoc(collection(db,'caja'), {
+                tipo:'gasto', socio:'Martin', monto:importe,
+                detalle, fecha:fechaEs, fechaIso, timestamp:isoATimestamp(fechaIso)
+            });
+            // Guardar última lectura en localStorage
+            localStorage.setItem('elec_ultima', JSON.stringify({
+                lectura: act, fecha: fechaEs, precio
+            }));
+            resetFormLuz();
+            finalizar('DINERO', `Luz: ${fmt(importe)} registrado como gasto de Martín`);
+        } catch(err) { alert('Error: '+err.message); }
+        setBotones(false);
+    }
+
+    window.editarUltimaLectura = function() {
+        try {
+            const raw = localStorage.getItem('elec_ultima');
+            if(!raw) return;
+            const d = JSON.parse(raw);
+            const nueva = prompt(`Editar última lectura (kWh actual):\nValor actual: ${d.lectura}`);
+            if(nueva === null) return;
+            const n = parseFloat(nueva);
+            if(isNaN(n)||n<0) return alert('Valor no válido');
+            d.lectura = n;
+            localStorage.setItem('elec_ultima', JSON.stringify(d));
+            renderUltimaLectura();
+            const ant = document.getElementById('elec-anterior');
+            if(ant) ant.value = n;
+        } catch(e) {}
+    }
+    // ─────────────────────────────────────────────────────────────
+
+</script>
+</body>
+</html>
