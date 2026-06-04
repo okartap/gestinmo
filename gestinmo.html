@@ -3020,10 +3020,6 @@ window.loadFromFirestore().then(() => {
 
 <!-- FACTURAR MES -->
 <div class="view" id="cob-view-facturar">
-  <header class="header">
-    <div class="hback" onclick="showMain()">‹</div>
-    <div class="htitle" style="font-size:14px" id="fac-titulo">Facturar</div>
-  </header>
   <main class="main">
     <div class="fintro"><div class="fintro-icon">📋</div><div><div class="fintro-t">Revisión previa al cierre del mes</div><div class="fintro-s">Los alquilados están marcados. Puedes añadir vacantes que se hayan alquilado este mes.</div></div></div>
 
@@ -6778,8 +6774,28 @@ function setView(id){
   if(cobHeader) cobHeader.style.display = (id==='cob-view-cuenta'||id==='cob-view-facturar') ? 'none' : '';
   window.scrollTo(0,0);
 }
-function showMain(){renderMain();setView('cob-view-main');}
-function showFacturar(){renderFacturar();setView('cob-view-facturar');}
+function showMain(){
+  renderMain();
+  setView('cob-view-main');
+  // Restaurar header principal
+  const nm = document.querySelector('#hdr-main .header-module-name');
+  if(nm) nm.textContent = 'Facturación';
+  const btn = document.querySelector('#hdr-main .hbtn');
+  if(btn) btn.style.display = '';
+  const hback = document.querySelector('#hdr-main .header-back');
+  if(hback){ hback.onclick = function(){ showModule('inicio'); }; }
+}
+function showFacturar(){
+  renderFacturar();
+  setView('cob-view-facturar');
+  // Actualizar header principal — usa mesActual() igual que renderFacturar
+  const nm = document.querySelector('#hdr-main .header-module-name');
+  if(nm) nm.textContent = 'Facturar ' + mesNombre(mesActual());
+  const btn = document.querySelector('#hdr-main .hbtn');
+  if(btn) btn.style.display = 'none';
+  const hback = document.querySelector('#hdr-main .header-back');
+  if(hback){ hback.onclick = function(){ showMain(); }; }
+}
 
 function setMTab(el,id){
   document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
@@ -7084,6 +7100,13 @@ function showCuenta(idx, nombreOverride){
 
   renderNotasCuenta(idx);
   setView('cob-view-cuenta');
+  // Actualizar header principal con nombre del inquilino
+  const nm = document.querySelector('#hdr-main .header-module-name');
+  if(nm) nm.textContent = nombreFinal;
+  const btn = document.querySelector('#hdr-main .hbtn');
+  if(btn) btn.style.display = 'none';
+  const hback = document.querySelector('#hdr-main .header-back');
+  if(hback){ hback.onclick = function(){ showMain(); }; }
 }
 
 function renderNotasCuenta(idx){
@@ -7115,7 +7138,6 @@ function tickNota(localIdx){
 function renderFacturar(){
   const now=new Date();
   const mes=mesActual();
-  document.getElementById('fac-titulo').textContent='Facturar '+mesNombre(mes);
 
   const inmuebles=getInmuebles();
   const alquilados=inmuebles.filter(i=>i.estado==='alquilado');
