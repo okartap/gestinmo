@@ -7138,7 +7138,6 @@ function tickNota(localIdx){
 function renderFacturar(){
   const now=new Date();
   const mes=mesActual();
-  document.getElementById('fac-titulo').textContent='Facturar '+mesNombre(mes);
 
   const inmuebles=getInmuebles();
   const alquilados=inmuebles.filter(i=>i.estado==='alquilado');
