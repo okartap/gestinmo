@@ -3021,7 +3021,10 @@ window.loadFromFirestore().then(() => {
 <!-- FACTURAR MES -->
 <div class="view" id="cob-view-facturar">
   <main class="main">
-    <div class="fintro"><div class="fintro-icon">📋</div><div><div class="fintro-t">Revisión previa al cierre del mes</div><div class="fintro-s">Los alquilados están marcados. Puedes añadir vacantes que se hayan alquilado este mes.</div></div></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">
+      <div id="fac-mes-titulo" style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--silver-bright);">Facturación</div>
+      <button onclick="document.getElementById('fac-info-modal').classList.add('open')" style="background:none;border:1px solid var(--silver-dim);border-radius:50%;width:16px;height:16px;font-size:10px;color:var(--silver-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">?</button>
+    </div>
 
     <div id="facturar-lista"></div>
 
@@ -3032,6 +3035,15 @@ window.loadFromFirestore().then(() => {
     <button class="btn1" onclick="confirmFactura()">Confirmar y facturar →</button>
     <button class="btn2" onclick="showMain()">Cancelar</button>
   </main>
+</div>
+
+<!-- MODAL INFO FACTURAR -->
+<div class="moverlay" id="fac-info-modal">
+  <div class="modal">
+    <div class="mtitle">📋 ¿Cómo funciona?<span class="mclose" onclick="document.getElementById('fac-info-modal').classList.remove('open')">✕</span></div>
+    <p style="font-size:13px;color:var(--silver-mid);line-height:1.6;margin:0;">Los inmuebles alquilados están marcados automáticamente. Puedes modificar el importe si es necesario.<br><br>Si has alquilado un inmueble vacante este mes, pulsa <strong style="color:var(--silver-bright)">＋ Añadir inmueble vacante</strong> para incluirlo.<br><br>Pulsa <strong style="color:var(--silver-bright)">Confirmar y facturar</strong> cuando estés listo.</p>
+    <button class="btn1" onclick="document.getElementById('fac-info-modal').classList.remove('open')" style="margin-top:14px;">Entendido</button>
+  </div>
 </div>
 
 <!-- CUENTA CLIENTE -->
@@ -6791,6 +6803,9 @@ function showFacturar(){
   // Actualizar header principal — usa mesActual() igual que renderFacturar
   const nm = document.querySelector('#hdr-main .header-module-name');
   if(nm) nm.textContent = 'Facturar ' + mesNombre(mesActual());
+  // Actualizar también el título dentro de la vista
+  const mt = document.getElementById('fac-mes-titulo');
+  if(mt) mt.textContent = 'Facturación ' + mesNombre(mesActual());
   const btn = document.querySelector('#hdr-main .hbtn');
   if(btn) btn.style.display = 'none';
   const hback = document.querySelector('#hdr-main .header-back');
