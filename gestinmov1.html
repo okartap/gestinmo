@@ -818,6 +818,13 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .ifprice-input{background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--silver-bright);width:74px;text-align:right;outline:none;}
 .ifunit{font-size:11px;color:var(--silver-dim);}
 .vacante-btn{width:100%;padding:11px;background:rgba(224,156,58,.08);border:1px dashed rgba(224,156,58,.4);border-radius:10px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1px;color:var(--amber);cursor:pointer;margin-bottom:16px;text-transform:uppercase;}
+.ipc-banner{background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.35);border-left:3px solid var(--accent-blue);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;}
+.ipc-banner-icon{font-size:20px;flex-shrink:0;}
+.ipc-banner-body{flex:1;min-width:0;}
+.ipc-banner-title{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-bright);margin-bottom:2px;}
+.ipc-banner-sub{font-size:11px;color:var(--silver-mid);line-height:1.4;}
+.ipc-banner-btn{background:var(--accent-blue);border:none;border-radius:8px;padding:7px 12px;font-family:"Rajdhani",sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:white;cursor:pointer;flex-shrink:0;}
+.ipc-banner-btn:active{transform:scale(.95);}
 .ftotal{background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;}
 .ftotal-l{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}
 .ftotal-v{font-size:24px;font-weight:700;color:var(--green);}
@@ -1782,7 +1789,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC0G56byj1jZSF6Bzga9-QrvWPa_JlLOqc",
+  apiKey: "AIzaSyDxtqNsvRhVl4yL9-FdPwQeIokQGhXdR0U",
   authDomain: "gestinmo-13c65.firebaseapp.com",
   projectId: "gestinmo-13c65",
   storageBucket: "gestinmo-13c65.firebasestorage.app",
@@ -3020,12 +3027,14 @@ window.loadFromFirestore().then(() => {
 
 <!-- FACTURAR MES -->
 <div class="view" id="cob-view-facturar">
-  <header class="header">
-    <div class="hback" onclick="showMain()">‹ Volver</div>
-    <div class="htitle" style="font-size:14px" id="fac-titulo">Facturar</div>
-  </header>
   <main class="main">
-    <div class="fintro"><div class="fintro-icon">📋</div><div><div class="fintro-t">Revisión previa al cierre del mes</div><div class="fintro-s">Los alquilados están marcados. Puedes añadir vacantes que se hayan alquilado este mes.</div></div></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">
+      <div id="fac-mes-titulo" style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--silver-bright);">Facturación</div>
+      <button onclick="document.getElementById('fac-info-modal').classList.add('open')" style="background:none;border:1px solid var(--silver-dim);border-radius:50%;width:16px;height:16px;font-size:10px;color:var(--silver-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">?</button>
+    </div>
+
+    <!-- BANNERS IPC -->
+    <div id="ipc-banners"></div>
 
     <div id="facturar-lista"></div>
 
@@ -3038,10 +3047,59 @@ window.loadFromFirestore().then(() => {
   </main>
 </div>
 
+<!-- MODAL INFO FACTURAR -->
+<div class="moverlay" id="fac-info-modal">
+  <div class="modal">
+    <div class="mtitle">📋 ¿Cómo funciona?<span class="mclose" onclick="document.getElementById('fac-info-modal').classList.remove('open')">✕</span></div>
+    <p style="font-size:13px;color:var(--silver-mid);line-height:1.6;margin:0;">Los inmuebles alquilados están marcados automáticamente. Puedes modificar el importe si es necesario.<br><br>Si has alquilado un inmueble vacante este mes, pulsa <strong style="color:var(--silver-bright)">＋ Añadir inmueble vacante</strong> para incluirlo.<br><br>Pulsa <strong style="color:var(--silver-bright)">Confirmar y facturar</strong> cuando estés listo.</p>
+    <button class="btn1" onclick="document.getElementById('fac-info-modal').classList.remove('open')" style="margin-top:14px;">Entendido</button>
+  </div>
+</div>
+
+<!-- MODAL IPC ACTUALIZACIÓN RENTA -->
+<div class="moverlay" id="ipc-modal">
+  <div class="modal">
+    <div class="mtitle">📈 Actualización IPC<span class="mclose" onclick="closeModalById('ipc-modal')">✕</span></div>
+    <div id="ipc-modal-info" style="font-size:12px;color:var(--silver-mid);margin-bottom:14px;line-height:1.5;padding:10px 12px;background:rgba(91,141,238,.08);border-radius:10px;border:1px solid rgba(91,141,238,.2);"></div>
+    <div class="mfield">
+      <div class="mflabel">% IPC (variación anual)</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input class="minput" type="number" inputmode="decimal" step="0.01" placeholder="Ej: 3.5" id="ipc-pct" oninput="ipc_calcular()" style="flex:1;">
+        <span style="color:var(--silver-dim);font-size:13px;flex-shrink:0;">%</span>
+      </div>
+    </div>
+    <div class="mfield">
+      <div class="mflabel">Renta anterior</div>
+      <div style="font-size:16px;font-weight:700;color:var(--silver-bright);" id="ipc-renta-ant">— €/mes</div>
+    </div>
+    <div class="mfield">
+      <div class="mflabel">Nueva renta</div>
+      <div style="font-size:20px;font-weight:700;color:var(--accent-green);" id="ipc-renta-nueva">— €/mes</div>
+    </div>
+    <button class="btn1" onclick="ipc_aplicar()">✓ Aplicar y generar adenda PDF</button>
+    <button class="btn2" onclick="closeModalById('ipc-modal')" style="margin-top:8px;">Ahora no</button>
+  </div>
+</div>
+
+<!-- MODAL REGISTRAR COBRO AL FACTURAR -->
+<div class="moverlay" id="fac-cobro-modal">
+  <div class="modal">
+    <div class="mtitle">💶 Registrar cobro<span class="mclose" onclick="closeModalById('fac-cobro-modal')">✕</span></div>
+    <div id="fac-cobro-info" style="font-size:12px;color:var(--silver-mid);margin-bottom:14px;line-height:1.5;padding:10px 12px;background:rgba(76,175,130,.08);border-radius:10px;border:1px solid rgba(76,175,130,.2);"></div>
+    <div class="mfield">
+      <div class="mflabel">Importe cobrado (€)</div>
+      <input class="minput" type="number" inputmode="decimal" step="0.01" placeholder="0,00" id="fac-cobro-importe" oninput="facCobro_calcSaldo()">
+    </div>
+    <div id="fac-cobro-saldo-preview" style="display:none;margin:10px 0;padding:10px 12px;border-radius:10px;font-size:13px;"></div>
+    <button class="btn1" onclick="facCobro_guardar()">Guardar</button>
+    <button class="btn2" onclick="closeModalById('fac-cobro-modal')" style="margin-top:8px;">Saltar — registrar luego</button>
+  </div>
+</div>
+
 <!-- CUENTA CLIENTE -->
 <div class="view" id="cob-view-cuenta">
   <header class="header">
-    <div class="hback" onclick="showMain()">‹ Cobros</div>
+    <div class="hback" onclick="showMain()">‹</div>
     <div class="htitle" style="font-size:13px" id="cta-titulo">Cuenta</div>
   </header>
   <main class="main">
@@ -6770,12 +6828,39 @@ function info(msg){showConfirm('✅','Hecho',msg,[{label:'Aceptar',cls:'g',fn:()
 
 // ─── VISTAS ───────────────────────────────────────────────────
 function setView(id){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  // Solo afectar a las vistas del módulo cobros, no a todos los módulos
+  document.querySelectorAll('#mod-cobros .view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Ocultar/mostrar header del módulo cobros según la vista
+  const cobHeader = document.querySelector('#mod-cobros > header');
+  if(cobHeader) cobHeader.style.display = (id==='cob-view-cuenta'||id==='cob-view-facturar') ? 'none' : '';
   window.scrollTo(0,0);
 }
-function showMain(){renderMain();setView('cob-view-main');}
-function showFacturar(){renderFacturar();setView('cob-view-facturar');}
+function showMain(){
+  renderMain();
+  setView('cob-view-main');
+  // Restaurar header principal
+  const nm = document.querySelector('#hdr-main .header-module-name');
+  if(nm) nm.textContent = 'Facturación';
+  const btn = document.querySelector('#hdr-main .hbtn');
+  if(btn) btn.style.display = '';
+  const hback = document.querySelector('#hdr-main .header-back');
+  if(hback){ hback.onclick = function(){ showModule('inicio'); }; }
+}
+function showFacturar(){
+  renderFacturar();
+  setView('cob-view-facturar');
+  // Actualizar header principal — usa mesActual() igual que renderFacturar
+  const nm = document.querySelector('#hdr-main .header-module-name');
+  if(nm) nm.textContent = 'Facturar ' + mesNombre(mesActual());
+  // Actualizar también el título dentro de la vista
+  const mt = document.getElementById('fac-mes-titulo');
+  if(mt) mt.textContent = 'Facturación ' + mesNombre(mesActual());
+  const btn = document.querySelector('#hdr-main .hbtn');
+  if(btn) btn.style.display = 'none';
+  const hback = document.querySelector('#hdr-main .header-back');
+  if(hback){ hback.onclick = function(){ showMain(); }; }
+}
 
 function setMTab(el,id){
   document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
@@ -7012,7 +7097,7 @@ function cob_seleccionarInquilino(idx){
   if(m) m.classList.remove('open');
   // Abrir cuenta — si tiene índice de inmueble usamos showCuenta normal
   if(d.inmuebleIdx!==null&&d.inmuebleIdx>=0){
-    showCuenta(d.inmuebleIdx);
+    showCuenta(d.inmuebleIdx, d.nombre);
   } else {
     // Sin inmueble asociado: abrir cuenta con datos del contrato
     cob_showCuentaContrato(d);
@@ -7024,18 +7109,19 @@ function cob_showCuentaContrato(d){
   // Buscar si hay algún inmueble con la referencia
   const inmuebles=getInmuebles();
   const idx=inmuebles.findIndex(i=>i.ref&&d.sub&&d.sub.includes(i.ref));
-  if(idx>=0){ showCuenta(idx); return; }
+  if(idx>=0){ showCuenta(idx, d.nombre); return; }
   // Si no hay inmueble, informar al usuario
   showConfirm('ℹ️','Sin inmueble vinculado','Este inquilino no tiene un inmueble registrado en la app. Añade el inmueble en el módulo Inmuebles para ver su cuenta.',[{label:'Entendido',cls:'g',fn:()=>{}}]);
 }
 
 // ─── CUENTA CLIENTE ───────────────────────────────────────────
-function showCuenta(idx){
+function showCuenta(idx, nombreOverride){
   ctaInmuebleIdx=idx;
   const inm=getInmuebles()[idx];
   if(!inm)return;
-  document.getElementById('cta-titulo').textContent=(inm.inquilino||'Cliente').split(' ')[0];
-  document.getElementById('cta-nombre').textContent=inm.inquilino||'Sin inquilino';
+  const nombreFinal = nombreOverride || inm.inquilino || 'Sin inquilino';
+  document.getElementById('cta-titulo').textContent=nombreFinal;
+  document.getElementById('cta-nombre').textContent=nombreFinal;
   document.getElementById('cta-sub').textContent=(TIPO_LABELS[inm.tipo]||'')+' · '+(inm.direccion||'—');
 
   const cobros=load(KEYS.cobros).filter(c=>c.inmuebleIdx===idx);
@@ -7079,6 +7165,13 @@ function showCuenta(idx){
 
   renderNotasCuenta(idx);
   setView('cob-view-cuenta');
+  // Actualizar header principal con nombre del inquilino
+  const nm = document.querySelector('#hdr-main .header-module-name');
+  if(nm) nm.textContent = nombreFinal;
+  const btn = document.querySelector('#hdr-main .hbtn');
+  if(btn) btn.style.display = 'none';
+  const hback = document.querySelector('#hdr-main .header-back');
+  if(hback){ hback.onclick = function(){ showMain(); }; }
 }
 
 function renderNotasCuenta(idx){
@@ -7110,7 +7203,6 @@ function tickNota(localIdx){
 function renderFacturar(){
   const now=new Date();
   const mes=mesActual();
-  document.getElementById('fac-titulo').textContent='Facturar '+mesNombre(mes);
 
   const inmuebles=getInmuebles();
   const alquilados=inmuebles.filter(i=>i.estado==='alquilado');
@@ -7156,6 +7248,7 @@ function renderFacturar(){
   document.getElementById('btn-mostrar-vacantes').dataset.vacantes=JSON.stringify(vacantes.map(inm=>inmuebles.indexOf(inm)));
 
   calcTotal();
+  ipc_renderBanners();
 }
 
 function mostrarVacantes(){
@@ -7253,9 +7346,310 @@ function confirmFactura(){
       save(KEYS.facturas,filtered);
       info('✓ Factura de '+mesNombre(mes)+' guardada correctamente.');
       showMain();
+      // Preguntar cobros por cada inmueble tras un breve delay
+      setTimeout(()=>facCobro_iniciarFlujo(items,0),400);
     }},
     {label:'Cancelar',cls:'c',fn:()=>{}}
   ]);
+}
+
+// ─── FLUJO COBROS TRAS FACTURAR ───────────────────────────────
+let _facCobroItems=[];
+let _facCobroIdx=0;
+
+function facCobro_iniciarFlujo(items,idx){
+  // Filtrar solo inmuebles con renta > 0
+  const validos=items.filter(it=>it.precio>0);
+  _facCobroItems=validos;
+  _facCobroIdx=0;
+  facCobro_mostrarSiguiente();
+}
+
+function facCobro_mostrarSiguiente(){
+  if(_facCobroIdx>=_facCobroItems.length) return; // todos registrados
+  const it=_facCobroItems[_facCobroIdx];
+  const inmuebles=getInmuebles();
+  const inm=inmuebles[it.idx]||{};
+  const nombre=inm.inquilino||inm.direccion||'Inmueble '+it.idx;
+  const direccion=inm.direccion||'';
+  const importe=it.precio;
+
+  const info_el=document.getElementById('fac-cobro-info');
+  if(info_el) info_el.innerHTML=`<strong style="color:var(--silver-bright)">${nombre}</strong>${direccion?'<br>'+direccion:''}<br><span style="color:var(--accent-green);font-size:14px;font-weight:700;">Fra: ${fmtE(importe)}</span>`;
+
+  const imp_el=document.getElementById('fac-cobro-importe');
+  if(imp_el){ imp_el.value=importe; }
+
+  const prev=document.getElementById('fac-cobro-saldo-preview');
+  if(prev) prev.style.display='none';
+
+  document.getElementById('fac-cobro-modal').classList.add('open');
+}
+
+function facCobro_calcSaldo(){
+  const it=_facCobroItems[_facCobroIdx];
+  if(!it) return;
+  const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
+  const facturado=it.precio;
+  const diferencia=cobrado-facturado;
+  const prev=document.getElementById('fac-cobro-saldo-preview');
+  if(!prev) return;
+  if(cobrado===0){ prev.style.display='none'; return; }
+  prev.style.display='block';
+  if(Math.abs(diferencia)<0.01){
+    prev.style.background='rgba(76,175,130,.12)';
+    prev.style.border='1px solid rgba(76,175,130,.3)';
+    prev.style.color='var(--accent-green)';
+    prev.textContent='✓ Saldo a cero — cobrado completo';
+  } else if(diferencia<0){
+    prev.style.background='rgba(224,156,58,.1)';
+    prev.style.border='1px solid rgba(224,156,58,.3)';
+    prev.style.color='var(--amber)';
+    prev.textContent='⚠ Pendiente '+fmtE(Math.abs(diferencia))+' — irá a Cobros automáticamente';
+  } else {
+    prev.style.background='rgba(91,141,238,.1)';
+    prev.style.border='1px solid rgba(91,141,238,.3)';
+    prev.style.color='var(--accent-blue)';
+    prev.textContent='ℹ Cobro en exceso '+fmtE(diferencia)+' — se registra el importe introducido';
+  }
+}
+
+function facCobro_guardar(){
+  const it=_facCobroItems[_facCobroIdx];
+  if(!it){ closeModalById('fac-cobro-modal'); return; }
+  const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
+  if(cobrado>0){
+    const cobros=load(KEYS.cobros);
+    cobros.push({inmuebleIdx:it.idx,fecha:hoy(),importe:cobrado,concepto:'Cobro '+mesNombre(mesActual())});
+    save(KEYS.cobros,cobros);
+    renderAnalisis();
+    renderCobros();
+  }
+  closeModalById('fac-cobro-modal');
+  _facCobroIdx++;
+  setTimeout(()=>facCobro_mostrarSiguiente(),300);
+}
+
+// ─── IPC BANNERS Y ACTUALIZACIÓN DE RENTA ────────────────────
+let _ipcContratoActual=null;
+
+function ipc_renderBanners(){
+  const bannersEl=document.getElementById('ipc-banners');
+  if(!bannersEl) return;
+  const mes=mesActual(); // 'YYYY-MM'
+  const [anioS,mesS]=mes.split('-');
+  const anio=parseInt(anioS);
+  const mesN=parseInt(mesS);
+  const contratos=JSON.parse(localStorage.getItem('contratos:lista')||'[]');
+  const inmuebles=getInmuebles();
+
+  let html='';
+  contratos.filter(c=>c.estado==='activo'&&c.inicio).forEach(c=>{
+    const ini=new Date(c.inicio);
+    // ¿coincide el mes y día del año con hoy? → anualidad
+    if(ini.getMonth()+1===mesN){
+      // Calcular qué renovación es
+      const aniosTranscurridos=anio-ini.getFullYear();
+      if(aniosTranscurridos<=0) return; // primer año, sin renovación
+      const numRenovacion=aniosTranscurridos;
+      const sufijo=numRenovacion===1?'1ª':numRenovacion===2?'2ª':numRenovacion===3?'3ª':numRenovacion+'ª';
+      const nombre=c.inqNombre||c.dir||'Contrato';
+      const renta=parseFloat(c.renta)||0;
+      html+=`<div class="ipc-banner">
+        <div class="ipc-banner-icon">📈</div>
+        <div class="ipc-banner-body">
+          <div class="ipc-banner-title">${sufijo} anualidad · ${c.ref||''}</div>
+          <div class="ipc-banner-sub">${nombre}${renta?' · Renta actual '+fmtE(renta)+'/mes':''}</div>
+        </div>
+        <button class="ipc-banner-btn" onclick="ipc_abrirModal('${c.id}')">Actualizar IPC</button>
+      </div>`;
+    }
+  });
+  bannersEl.innerHTML=html;
+}
+
+function ipc_abrirModal(contratoId){
+  const contratos=JSON.parse(localStorage.getItem('contratos:lista')||'[]');
+  const c=contratos.find(x=>x.id===contratoId);
+  if(!c){ info('Contrato no encontrado.'); return; }
+  _ipcContratoActual=c;
+  const renta=parseFloat(c.renta)||0;
+  const mes=mesActual();
+  const [anioS,mesS]=mes.split('-');
+  const anio=parseInt(anioS);
+  const ini=c.inicio?new Date(c.inicio):null;
+  const numRenovacion=ini?anio-ini.getFullYear():1;
+  const sufijo=numRenovacion===1?'1ª':numRenovacion===2?'2ª':numRenovacion===3?'3ª':numRenovacion+'ª';
+
+  const infoEl=document.getElementById('ipc-modal-info');
+  if(infoEl) infoEl.innerHTML=`<strong style="color:var(--silver-bright)">${sufijo} renovación — ${c.inqNombre||c.ref||''}</strong><br>${c.dir||''}${c.ref?' · '+c.ref:''}`;
+
+  const rentaAntEl=document.getElementById('ipc-renta-ant');
+  if(rentaAntEl) rentaAntEl.textContent=fmtE(renta)+'/mes';
+
+  const rentaNuevaEl=document.getElementById('ipc-renta-nueva');
+  if(rentaNuevaEl) rentaNuevaEl.textContent='— €/mes';
+
+  const pctEl=document.getElementById('ipc-pct');
+  if(pctEl) pctEl.value='';
+
+  document.getElementById('ipc-modal').classList.add('open');
+}
+
+function ipc_calcular(){
+  if(!_ipcContratoActual) return;
+  const renta=parseFloat(_ipcContratoActual.renta)||0;
+  const pct=parseFloat(document.getElementById('ipc-pct').value)||0;
+  const nuevaRenta=Math.round((renta*(1+pct/100))*100)/100;
+  const el=document.getElementById('ipc-renta-nueva');
+  if(el) el.textContent=pct?fmtE(nuevaRenta)+'/mes':'— €/mes';
+}
+
+function ipc_aplicar(){
+  if(!_ipcContratoActual){ closeModalById('ipc-modal'); return; }
+  const pct=parseFloat(document.getElementById('ipc-pct').value);
+  if(!pct||isNaN(pct)){info('Introduce el % de IPC para continuar.');return;}
+  const rentaAnterior=parseFloat(_ipcContratoActual.renta)||0;
+  const nuevaRenta=Math.round((rentaAnterior*(1+pct/100))*100)/100;
+
+  // 1. Actualizar renta en contratos:lista
+  const contratos=JSON.parse(localStorage.getItem('contratos:lista')||'[]');
+  const idx=contratos.findIndex(x=>x.id===_ipcContratoActual.id);
+  if(idx>=0){
+    contratos[idx].renta=nuevaRenta;
+    contratos[idx].rentaAnterior=rentaAnterior;
+    contratos[idx].ipcAplicado=(contratos[idx].ipcAplicado||[]).concat({mes:mesActual(),pct,rentaAnterior,rentaNueva:nuevaRenta});
+    localStorage.setItem('contratos:lista',JSON.stringify(contratos));
+  }
+
+  // 2. Actualizar renta en inmuebles
+  const inmuebles=getInmuebles();
+  const inmIdx=inmuebles.findIndex(i=>i.ref===_ipcContratoActual.ref);
+  if(inmIdx>=0){
+    inmuebles[inmIdx].renta=nuevaRenta;
+    save(KEYS.inmuebles,inmuebles);
+    // Actualizar input visible en pantalla
+    const inputEl=document.querySelector(`#ifitem-${inmIdx} .ifprice-input`);
+    if(inputEl){ inputEl.value=nuevaRenta; calcTotal(); }
+  }
+
+  closeModalById('ipc-modal');
+
+  // 3. Generar adenda PDF
+  setTimeout(()=>ipc_generarAdendaPDF(_ipcContratoActual,rentaAnterior,nuevaRenta,pct),300);
+}
+
+function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const EMPRESAS={
+      patrimer:{legalName:'Patrimer Levante, S.L.',cif:'B-73110009',rep:'D. Patricio Gómez García',repDNI:'23.257.330-Y'},
+      patricio:{legalName:'D. Patricio Gómez García',cif:null,rep:'D. Patricio Gómez García',repDNI:'23.257.330-Y'},
+      industrias:{legalName:'Industrias Gómez y Cayuela S.L.',cif:'B-pendiente',rep:'D. Patricio Gómez García',repDNI:'23.257.330-Y'}
+    };
+    // Determinar empresa arrendadora
+    const arrKey=c.arrendador&&c.arrendador.toLowerCase().includes('patrimer')?'patrimer':c.arrendador&&c.arrendador.toLowerCase().includes('patricio')?'patricio':'patrimer';
+    const emp=EMPRESAS[arrKey]||EMPRESAS.patrimer;
+
+    const mesActualObj=new Date();
+    const mes=mesActual();
+    const [anioS]=mes.split('-');
+    const anio=parseInt(anioS);
+    const ini=c.inicio?new Date(c.inicio):null;
+    const numRen=ini?anio-ini.getFullYear():1;
+    const sufijo=numRen===1?'1ª':numRen===2?'2ª':numRen===3?'3ª':numRen+'ª';
+    const numRenTexto=numRen===1?'primera':numRen===2?'segunda':numRen===3?'tercera':numRen+'ª';
+
+    // Fechas
+    const fechaAnualInicio=ini?new Date(ini.getFullYear()+numRen,ini.getMonth(),ini.getDate()):new Date();
+    const fechaAnualFin=new Date(fechaAnualInicio.getFullYear()+1,fechaAnualInicio.getMonth(),fechaAnualInicio.getDate()-1);
+    const fmtFecha=d=>`${String(d.getDate()).padStart(2,'0')} de ${['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][d.getMonth()]} de ${d.getFullYear()}`;
+    const fmtFechaCorta=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    const ciudadFecha=`Lorca, a ${fmtFecha(mesActualObj)}`;
+
+    const pctStr=(pct>0?'+':'')+pct.toFixed(2).replace('.',',')+'%';
+    const rentaAntStr=rentaAnterior.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    const rentaNuevaStr=nuevaRenta.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+
+    const margin=20;const pw=170;
+    let y=20;
+    const ln=(txt,sz,bold,center,color)=>{
+      doc.setFontSize(sz||10);
+      doc.setFont('helvetica',bold?'bold':'normal');
+      if(color) doc.setTextColor(...color); else doc.setTextColor(30,30,30);
+      const x=center?(210-doc.getTextWidth(txt))/2:margin;
+      doc.text(txt,x,y);
+    };
+    const lnW=(txt,sz,justify)=>{
+      doc.setFontSize(sz||10);doc.setFont('helvetica','normal');doc.setTextColor(30,30,30);
+      const lines=doc.splitTextToSize(txt,pw);
+      doc.text(lines,margin,y);
+      y+=lines.length*4.5+1;
+    };
+    const sp=(n)=>{ y+=n||4; };
+
+    // TÍTULO
+    ln(`ADENDA DE RENOVACIÓN ${sufijo.toUpperCase()} AL CONTRATO DE ARRENDAMIENTO`,11,true,true);
+    sp(5);
+    ln(c.dir||'Inmueble',10,false,true,[80,80,80]);
+    sp(8);
+    ln(ciudadFecha,10,false,false,[80,80,80]);
+    sp(8);
+
+    // REUNIDOS
+    ln('REUNIDOS',11,true);sp(5);
+    lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, actuando en nombre y representación de ${emp.legalName}${emp.cif?', con CIF '+emp.cif:''},  en calidad de ARRENDADOR.`);
+    sp(3);
+    const inqTratamiento=(c.inqGenero||'D.')+' ';
+    lnW(`De otra parte, ${inqTratamiento}${c.inqNombre||'—'}, con DNI ${c.inqDNI||'—'}, en calidad de ARRENDATARIO/A.`);
+    sp(3);
+    lnW('Ambas partes se reconocen mutuamente la capacidad legal necesaria para suscribir la presente adenda, y');
+    sp(8);
+
+    // EXPONEN
+    ln('EXPONEN',11,true);sp(5);
+    const iniStr=ini?fmtFecha(ini):'—';
+    lnW(`PRIMERO. - Que con fecha ${iniStr} se suscribió contrato de arrendamiento sobre el inmueble sito en ${c.dir||'—'}${c.ref?', referencia '+c.ref:''}.`);
+    sp(3);
+    lnW(`SEGUNDO. - Que dicho contrato ha sido renovado por tácita reconducción en aplicación de la cláusula correspondiente del mismo, correspondiendo la presente renovación a la ${sufijo} prórroga anual.`);
+    sp(8);
+
+    // ACUERDAN
+    ln('ACUERDAN',11,true);sp(5);
+    lnW(`PRIMERO. - Las partes acuerdan la ${sufijo} renovación del contrato de arrendamiento por un período de UN AÑO, con vigencia desde el ${fmtFechaCorta(fechaAnualInicio)} hasta el ${fmtFechaCorta(fechaAnualFin)}.`);
+    sp(3);
+    lnW(`SEGUNDO. - La renta mensual se actualiza conforme al IPC interanual correspondiente al mes de ${['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][mesActualObj.getMonth()]} de ${anio}, siendo dicha variación del ${pctStr}, pasando la renta de ${rentaAntStr}/mes a ${rentaNuevaStr}/mes a partir del ${fmtFechaCorta(fechaAnualInicio)}.`);
+    sp(3);
+    lnW('TERCERO. - El resto de cláusulas y condiciones del contrato original permanecen en vigor sin modificación alguna.');
+    sp(8);
+    lnW('Y en prueba de conformidad, ambas partes firman la presente adenda por duplicado, en el lugar y fecha arriba indicados.');
+    sp(16);
+
+    // FIRMAS
+    const col1=margin;const col2=130;
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
+    doc.text('EL ARRENDADOR',col1,y);
+    doc.text('EL/LA ARRENDATARIO/A',col2,y);
+    sp(12);
+    doc.setFont('helvetica','normal');
+    doc.text('________________________',col1,y);
+    doc.text('________________________',col2,y);
+    sp(5);
+    doc.text(emp.legalName,col1,y);
+    doc.text(`${inqTratamiento}${c.inqNombre||'—'}`,col2,y);
+    sp(4);
+    doc.text(emp.rep,col1,y);
+
+    const fecha=new Date().toISOString().slice(0,10);
+    const nombre=`adenda_ipc_${(c.ref||'contrato').toLowerCase()}_${fecha}.pdf`;
+    doc.save(nombre);
+    info('✓ Adenda PDF generada y descargada correctamente.');
+    ipc_renderBanners();
+  } catch(e){
+    console.error('Error PDF adenda:',e);
+    info('Error al generar el PDF. Verifica que jsPDF esté disponible.');
+  }
 }
 
 // ─── COBRO ────────────────────────────────────────────────────
