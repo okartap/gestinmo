@@ -5111,6 +5111,10 @@ function saveInmueble() {
   const cp = document.getElementById('f-cp').value.trim();
   const localidad = document.getElementById('f-localidad').value.trim();
   const dirCompleta = [direccion, piso, letra].filter(Boolean).join(' ') + (cp||localidad ? ', '+[cp,localidad].filter(Boolean).join(' ') : '');
+  // Buscar inquilino desde contratos activos
+  const _ctrsInm = JSON.parse(localStorage.getItem('contratos:lista')||'[]');
+  const _ctrActivo = _ctrsInm.find(c=>c.ref===refInm && c.estado==='activo' && c.inqNombre);
+  const _inquilinoNombre = _ctrActivo ? _ctrActivo.inqNombre : '';
   const inm = {
     id: Date.now(),
     ref: refInm,
@@ -5130,6 +5134,7 @@ function saveInmueble() {
     reforma: document.getElementById('f-reforma').value,
     gastosAnuales: document.getElementById('f-gastos-anuales').value,
     notas: document.getElementById('f-notas').value.trim(),
+    inquilino: _inquilinoNombre,
   };
   const modal = document.getElementById('inm-modal-inmueble');
   const arr = loadInmuebles();
@@ -9204,8 +9209,29 @@ function limpiarContratoPrueba(){
   }
 }
 
+
+// ─── SYNC INQUILINOS DESDE CONTRATOS ─────────────────────────
+// Rellena el campo inquilino en inmuebles usando contratos activos
+function syncInquilinosDesdeContratos(){
+  const contratos = JSON.parse(localStorage.getItem('contratos:lista')||'[]');
+  const inmuebles = JSON.parse(localStorage.getItem('inmuebles:lista')||'[]');
+  let cambios = 0;
+  inmuebles.forEach((inm, idx) => {
+    const ctr = contratos.find(c => c.ref === inm.ref && c.estado === 'activo' && c.inqNombre);
+    if(ctr && inm.inquilino !== ctr.inqNombre){
+      inmuebles[idx].inquilino = ctr.inqNombre;
+      cambios++;
+    }
+  });
+  if(cambios > 0){
+    localStorage.setItem('inmuebles:lista', JSON.stringify(inmuebles));
+    console.log('[Sync] Inquilinos actualizados en '+cambios+' inmuebles.');
+  }
+}
+
 // ─── ARRANQUE ───────────────────────────────────────
 inyectarDatosPruebaIPC();
+syncInquilinosDesdeContratos();
 document.addEventListener("DOMContentLoaded", loginInit);
 
 
