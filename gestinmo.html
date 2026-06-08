@@ -4398,6 +4398,14 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
       <span>Total fondos</span><span id="fin-fondos-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
     </div>
   </div>
+  <!-- RESUMEN ANUAL DIVIDENDOS -->
+  <div class="fin-section-header" style="margin-top:10px;">
+    <span>&#128197; Resumen anual dividendos</span>
+    <button class="fin-add-btn" onclick="fin_toggleResumenAnual()" id="fin-resumen-toggle" style="font-size:14px;padding:0 10px;">&#9654;</button>
+  </div>
+  <div id="fin-resumen-anual" style="display:none;margin-bottom:6px;">
+    <div id="fin-resumen-anual-content" style="font-size:12px;color:var(--silver-dim);text-align:center;padding:10px 0;">Sin datos.</div>
+  </div>
   <div class="fin-patrimonio-card">
     <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:6px;">Patrimonio financiero total</div>
     <div style="font-size:28px;font-weight:700;color:var(--silver-bright);" id="fin-patrimonio-total">-</div>
@@ -4437,14 +4445,31 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
     </div>
     <div class="mfield" id="fin-ticker-manual-row" style="display:none"><div class="mflabel">Ticker Yahoo Finance</div><input class="minput" id="fin-accion-ticker-manual" placeholder="Ej: IBE.MC"></div>
     <div class="mfield"><div class="mflabel">Tipo</div>
-      <select class="minput" id="fin-accion-tipo">
+      <select class="minput" id="fin-accion-tipo" onchange="fin_tipoChange()">
         <option value="compra">Compra</option>
         <option value="venta">Venta</option>
-        <option value="dividendo">Dividendo</option>
+        <option value="dividendo">Dividendo en efectivo</option>
+        <option value="scrip">Scrip dividend (acciones)</option>
       </select>
     </div>
-    <div class="mfield"><div class="mflabel">Cantidad (acciones)</div><input class="minput" id="fin-accion-cantidad" type="number" inputmode="decimal" step="0.0001" placeholder="0"></div>
-    <div class="mfield"><div class="mflabel">Precio unitario (euros)</div><input class="minput" id="fin-accion-precio" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+    <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" id="fin-accion-fecha" type="date"></div>
+    <!-- Campos compra/venta -->
+    <div id="fin-campos-compraventa">
+      <div class="mfield"><div class="mflabel">Cantidad (acciones)</div><input class="minput" id="fin-accion-cantidad" type="number" inputmode="decimal" step="0.0001" placeholder="0"></div>
+      <div class="mfield"><div class="mflabel">Precio unitario (euros)</div><input class="minput" id="fin-accion-precio" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+    </div>
+    <!-- Campos dividendo efectivo -->
+    <div id="fin-campos-dividendo" style="display:none">
+      <div class="mfield"><div class="mflabel">Num. acciones en ese momento</div><input class="minput" id="fin-div-acciones" type="number" inputmode="decimal" step="0.0001" placeholder="0"></div>
+      <div class="mfield"><div class="mflabel">Importe bruto total (euros)</div><input class="minput" id="fin-div-importe" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+      <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-div-obs" placeholder="Ej: A cuenta, Complementario..."></div>
+    </div>
+    <!-- Campos scrip dividend -->
+    <div id="fin-campos-scrip" style="display:none">
+      <div class="mfield"><div class="mflabel">Acciones recibidas</div><input class="minput" id="fin-scrip-acciones" type="number" inputmode="decimal" step="0.0001" placeholder="0"></div>
+      <div class="mfield"><div class="mflabel">Efectivo por derechos sobrantes (euros)</div><input class="minput" id="fin-scrip-sobrantes" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+      <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-scrip-obs" placeholder="Opcional"></div>
+    </div>
     <button class="btn1" onclick="fin_guardarAccion()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-accion')" style="margin-top:8px;">Cancelar</button>
   </div>
@@ -9500,10 +9525,11 @@ function fin_renderAcciones() {
   for (var i = 0; i < ops.length; i++) {
     var op = ops[i];
     var t = op.ticker;
-    if (!pos[t]) pos[t] = { ticker: t, nombre: FIN_NOMBRES[t] || t, num: 0, coste: 0, divs: 0 };
+    if (!pos[t]) pos[t] = { ticker: t, nombre: FIN_NOMBRES[t] || t, num: 0, coste: 0, divsEfectivo: 0, divsSobrantes: 0 };
     if (op.tipo === 'compra') { pos[t].num += parseFloat(op.cantidad) || 0; pos[t].coste += (parseFloat(op.cantidad) || 0) * (parseFloat(op.precio) || 0); }
     else if (op.tipo === 'venta') { pos[t].num -= parseFloat(op.cantidad) || 0; }
-    else if (op.tipo === 'dividendo') { pos[t].divs += parseFloat(op.precio) || 0; }
+    else if (op.tipo === 'dividendo') { pos[t].divsEfectivo += parseFloat(op.divImporte) || parseFloat(op.precio) || 0; }
+    else if (op.tipo === 'scrip') { pos[t].num += parseFloat(op.scripAcciones) || 0; pos[t].divsSobrantes += parseFloat(op.scripSobrantes) || 0; }
   }
   var totalValor = 0;
   var html = '';
@@ -9520,18 +9546,27 @@ function fin_renderAcciones() {
     var cotTxt = cot ? (cot.toFixed(2) + ' \u20ac ') : '';
     var cotBtn = '<span style="font-size:10px;color:var(--accent-blue);cursor:pointer;margin-left:6px;" onclick="fin_setCotizacion(\'' + p.ticker + '\')">' + (cot ? '[' + cotTxt + 'actualizar]' : '[+ cotizacion]') + '</span>';
     var plHtml = pl !== null ? ('<span class="fin-meta-val ' + (pl >= 0 ? 'fin-plus' : 'fin-minus') + '">' + fin_fmt(pl) + ' (' + fin_fmtPct(plp) + ')</span>') : '<span class="fin-meta-val">-</span>';
+    // Calculos dividendos
+    var totalDivs = p.divsEfectivo + p.divsSobrantes;
+    var dpa = p.num > 0 && totalDivs > 0 ? totalDivs / p.num : null;
+    var yoc = pm > 0 && dpa !== null ? (dpa / pm) * 100 : null;
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top"><div>';
     html += '<div class="fin-card-nombre">' + p.nombre + cotBtn + '</div>';
     html += '<div class="fin-card-sub">' + p.num.toFixed(4).replace(/\.?0+$/, '') + ' acc \u00b7 P.M. ' + pm.toFixed(2) + ' \u20ac</div>';
     html += '</div><div class="fin-card-saldo">' + (val !== null ? fin_fmt(val) : '-') + '</div></div>';
     html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: ' + plHtml + '</div>';
-    if (p.divs > 0) html += '<div class="fin-meta-item">Dividendos: <span class="fin-meta-val fin-plus">' + fin_fmt(p.divs) + '</span></div>';
+    if (totalDivs > 0) {
+      html += '<div class="fin-meta-item">Dividendos cobrados: <span class="fin-meta-val fin-plus">' + fin_fmt(totalDivs) + '</span></div>';
+      if (dpa !== null) html += '<div class="fin-meta-item">Total por accion: <span class="fin-meta-val">' + dpa.toFixed(4).replace(/\.?0+$/, '') + ' \u20ac/acc</span></div>';
+      if (yoc !== null) html += '<div class="fin-meta-item">Yield on Cost: <span class="fin-meta-val fin-plus">' + fin_fmtPct(yoc) + '</span></div>';
+    }
     html += '</div>';
     html += '<div class="fin-card-actions">';
     html += '<div class="fin-action-btn" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'compra\')">+ Compra</div>';
     html += '<div class="fin-action-btn red" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'venta\')">- Venta</div>';
     html += '<div class="fin-action-btn green" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'dividendo\')">Dividendo</div>';
+    html += '<div class="fin-action-btn" onclick="fin_verHistorico(\'' + p.ticker + '\')">Historico</div>';
     html += '</div></div>';
   }
   lista.innerHTML = html || '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin posiciones activas.</div>';
@@ -9541,6 +9576,91 @@ function fin_renderAcciones() {
     if (av) av.textContent = fin_fmt(totalValor);
   }
   fin_calcPatrimonio();
+}
+function fin_verHistorico(ticker) {
+  var ops = fin_load('fin:acciones');
+  var nombre = FIN_NOMBRES[ticker] || ticker;
+  var cot = _finCotizaciones[ticker] || null;
+  // Filtrar solo dividendos y scrip de este ticker
+  var divOps = [];
+  for (var i = 0; i < ops.length; i++) {
+    var op = ops[i];
+    if (op.ticker !== ticker) continue;
+    if (op.tipo === 'dividendo' || op.tipo === 'scrip') divOps.push(op);
+  }
+  if (divOps.length === 0) {
+    alert('Sin historial de dividendos para ' + nombre + '.');
+    return;
+  }
+  // Ordenar por fecha
+  divOps.sort(function(a, b) { return (a.fecha || '').localeCompare(b.fecha || ''); });
+  // Agrupar por año
+  var porAnio = {};
+  for (var j = 0; j < divOps.length; j++) {
+    var dop = divOps[j];
+    var anio = (dop.fecha || '????').slice(0, 4);
+    if (!porAnio[anio]) porAnio[anio] = [];
+    porAnio[anio].push(dop);
+  }
+  var anios = Object.keys(porAnio).sort();
+  var totalHist = 0;
+  var html = '<div style="padding:4px 0;">';
+  for (var k = 0; k < anios.length; k++) {
+    var yr = anios[k];
+    var lista = porAnio[yr];
+    var totalAnio = 0;
+    html += '<div style="font-size:11px;font-weight:700;color:var(--accent-blue);margin:10px 0 4px;">' + yr + '</div>';
+    for (var m = 0; m < lista.length; m++) {
+      var d = lista[m];
+      if (d.tipo === 'dividendo') {
+        var imp = parseFloat(d.divImporte) || parseFloat(d.precio) || 0;
+        var acc = parseFloat(d.divAcciones) || 0;
+        var dpa2 = acc > 0 ? imp / acc : null;
+        totalAnio += imp; totalHist += imp;
+        html += '<div style="font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.06);">';
+        html += '<span style="color:var(--silver-dim);">' + (d.fecha || '-') + '</span>';
+        html += ' &nbsp; Efectivo &nbsp; <span style="color:#4caf82;font-weight:600;">' + fin_fmt(imp) + '</span>';
+        if (dpa2 !== null) html += ' &nbsp; <span style="font-size:10px;color:var(--silver-dim);">DPA ' + dpa2.toFixed(4).replace(/\.?0+$/, '') + '\u20ac</span>';
+        if (d.divObs) html += ' &nbsp; <span style="font-size:10px;color:var(--silver-dim);">' + d.divObs + '</span>';
+        html += '</div>';
+      } else if (d.tipo === 'scrip') {
+        var sacc = parseFloat(d.scripAcciones) || 0;
+        var ssob = parseFloat(d.scripSobrantes) || 0;
+        var scripVal = cot ? sacc * cot + ssob : ssob;
+        totalAnio += scripVal; totalHist += scripVal;
+        html += '<div style="font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.06);">';
+        html += '<span style="color:var(--silver-dim);">' + (d.fecha || '-') + '</span>';
+        html += ' &nbsp; Scrip &nbsp; +' + sacc + ' acc';
+        if (ssob > 0) html += ' + ' + fin_fmt(ssob) + ' sobrantes';
+        html += ' &nbsp; <span style="color:#4caf82;font-weight:600;">' + fin_fmt(scripVal) + (cot ? ' (cot. actual)' : '') + '</span>';
+        if (d.scripObs) html += ' &nbsp; <span style="font-size:10px;color:var(--silver-dim);">' + d.scripObs + '</span>';
+        html += '</div>';
+      }
+    }
+    html += '<div style="font-size:11px;font-weight:600;text-align:right;padding:3px 0;color:var(--silver);">Total ' + yr + ': ' + fin_fmt(totalAnio) + '</div>';
+  }
+  html += '<div style="font-size:12px;font-weight:700;text-align:right;padding:8px 0;border-top:1px solid rgba(255,255,255,0.15);color:var(--accent-blue);">Total historico: ' + fin_fmt(totalHist) + '</div>';
+  html += '</div>';
+  // Mostrar en modal generico reutilizando el modal de fondo
+  var mo = document.getElementById('fin-modal-fondo');
+  if (!mo) { alert(html.replace(/<[^>]+>/g, '')); return; }
+  mo.querySelector('.mtitle').innerHTML = 'Dividendos \u2014 ' + nombre + '<span class="mclose" onclick="closeModalById(\'fin-modal-fondo\')">&#10005;</span>';
+  var body = mo.querySelector('.modal');
+  // Limpiar campos del formulario y mostrar historico
+  var campos = body.querySelectorAll('.mfield, button');
+  for (var x = 0; x < campos.length; x++) campos[x].style.display = 'none';
+  var divHist = body.querySelector('#fin-hist-div');
+  if (!divHist) { divHist = document.createElement('div'); divHist.id = 'fin-hist-div'; body.appendChild(divHist); }
+  divHist.innerHTML = html;
+  divHist.style.display = 'block';
+  mo.classList.add('open');
+  // Restaurar campos al cerrar
+  mo.querySelector('.mclose').onclick = function() {
+    closeModalById('fin-modal-fondo');
+    for (var y = 0; y < campos.length; y++) campos[y].style.display = '';
+    if (divHist) divHist.style.display = 'none';
+    mo.querySelector('.mtitle').innerHTML = 'Fondo de inversion<span class="mclose" onclick="closeModalById(\'fin-modal-fondo\')">&#10005;</span>';
+  };
 }
 function fin_setCotizacion(ticker) {
   var val = prompt('Precio actual de ' + (FIN_NOMBRES[ticker] || ticker) + ' (euros):');
@@ -9557,30 +9677,63 @@ function fin_tickerChange() {
   var v = document.getElementById('fin-accion-ticker').value;
   document.getElementById('fin-ticker-manual-row').style.display = v === 'OTRO' ? 'block' : 'none';
 }
+function fin_tipoChange() {
+  var tipo = document.getElementById('fin-accion-tipo').value;
+  document.getElementById('fin-campos-compraventa').style.display = (tipo === 'compra' || tipo === 'venta') ? 'block' : 'none';
+  document.getElementById('fin-campos-dividendo').style.display = tipo === 'dividendo' ? 'block' : 'none';
+  document.getElementById('fin-campos-scrip').style.display = tipo === 'scrip' ? 'block' : 'none';
+}
 function fin_nuevaAccion() {
+  var hoy = new Date().toISOString().slice(0, 10);
   document.getElementById('fin-accion-ticker').value = '';
   document.getElementById('fin-accion-ticker-manual').value = '';
   document.getElementById('fin-ticker-manual-row').style.display = 'none';
   document.getElementById('fin-accion-tipo').value = 'compra';
+  document.getElementById('fin-accion-fecha').value = hoy;
   document.getElementById('fin-accion-cantidad').value = '';
   document.getElementById('fin-accion-precio').value = '';
+  document.getElementById('fin-div-acciones').value = '';
+  document.getElementById('fin-div-importe').value = '';
+  document.getElementById('fin-div-obs').value = '';
+  document.getElementById('fin-scrip-acciones').value = '';
+  document.getElementById('fin-scrip-sobrantes').value = '';
+  document.getElementById('fin-scrip-obs').value = '';
+  document.getElementById('fin-campos-compraventa').style.display = 'block';
+  document.getElementById('fin-campos-dividendo').style.display = 'none';
+  document.getElementById('fin-campos-scrip').style.display = 'none';
   document.getElementById('fin-modal-accion').classList.add('open');
 }
 function fin_nuevaAccionPre(ticker, tipo) {
   fin_nuevaAccion();
   document.getElementById('fin-accion-ticker').value = ticker;
   document.getElementById('fin-accion-tipo').value = tipo;
+  fin_tipoChange();
 }
 function fin_guardarAccion() {
   var ticker = document.getElementById('fin-accion-ticker').value;
   if (ticker === 'OTRO') ticker = (document.getElementById('fin-accion-ticker-manual').value || '').trim().toUpperCase();
   if (!ticker) { alert('Selecciona el valor.'); return; }
-  var cantidad = parseFloat(document.getElementById('fin-accion-cantidad').value) || 0;
-  if (cantidad <= 0) { alert('Introduce la cantidad.'); return; }
-  var precio = parseFloat(document.getElementById('fin-accion-precio').value) || 0;
   var tipo = document.getElementById('fin-accion-tipo').value;
+  var fecha = document.getElementById('fin-accion-fecha').value || new Date().toISOString().slice(0, 10);
   var ops = fin_load('fin:acciones');
-  ops.push({ ticker: ticker, nombre: FIN_NOMBRES[ticker] || ticker, cantidad: cantidad, precio: precio, tipo: tipo, fecha: new Date().toISOString().slice(0, 10) });
+  if (tipo === 'compra' || tipo === 'venta') {
+    var cantidad = parseFloat(document.getElementById('fin-accion-cantidad').value) || 0;
+    if (cantidad <= 0) { alert('Introduce la cantidad.'); return; }
+    var precio = parseFloat(document.getElementById('fin-accion-precio').value) || 0;
+    ops.push({ ticker: ticker, nombre: FIN_NOMBRES[ticker] || ticker, cantidad: cantidad, precio: precio, tipo: tipo, fecha: fecha });
+  } else if (tipo === 'dividendo') {
+    var divAcc = parseFloat(document.getElementById('fin-div-acciones').value) || 0;
+    var divImp = parseFloat(document.getElementById('fin-div-importe').value) || 0;
+    if (divImp <= 0) { alert('Introduce el importe bruto.'); return; }
+    var divObs = document.getElementById('fin-div-obs').value.trim();
+    ops.push({ ticker: ticker, nombre: FIN_NOMBRES[ticker] || ticker, tipo: 'dividendo', fecha: fecha, divAcciones: divAcc, divImporte: divImp, divObs: divObs });
+  } else if (tipo === 'scrip') {
+    var scripAcc = parseFloat(document.getElementById('fin-scrip-acciones').value) || 0;
+    if (scripAcc <= 0) { alert('Introduce las acciones recibidas.'); return; }
+    var scripSob = parseFloat(document.getElementById('fin-scrip-sobrantes').value) || 0;
+    var scripObs = document.getElementById('fin-scrip-obs').value.trim();
+    ops.push({ ticker: ticker, nombre: FIN_NOMBRES[ticker] || ticker, tipo: 'scrip', fecha: fecha, scripAcciones: scripAcc, scripSobrantes: scripSob, scripObs: scripObs });
+  }
   fin_save('fin:acciones', ops);
   closeModalById('fin-modal-accion');
   fin_renderAcciones();
@@ -9680,6 +9833,70 @@ function fin_calcPatrimonio() {
   var total = cuentas + fondos + acciones;
   var el = document.getElementById('fin-patrimonio-total');
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
+}
+
+// --- RESUMEN ANUAL DIVIDENDOS ---
+function fin_toggleResumenAnual() {
+  var div = document.getElementById('fin-resumen-anual');
+  var btn = document.getElementById('fin-resumen-toggle');
+  if (!div) return;
+  if (div.style.display === 'none') {
+    fin_renderResumenAnual();
+    div.style.display = 'block';
+    if (btn) btn.innerHTML = '&#9660;';
+  } else {
+    div.style.display = 'none';
+    if (btn) btn.innerHTML = '&#9654;';
+  }
+}
+function fin_renderResumenAnual() {
+  var ops = fin_load('fin:acciones');
+  var el = document.getElementById('fin-resumen-anual-content');
+  if (!el) return;
+  // Agrupar todos los dividendos y scrip por año
+  var porAnio = {};
+  for (var i = 0; i < ops.length; i++) {
+    var op = ops[i];
+    if (op.tipo !== 'dividendo' && op.tipo !== 'scrip') continue;
+    var anio = (op.fecha || '????').slice(0, 4);
+    if (!porAnio[anio]) porAnio[anio] = { efectivo: 0, scrip: 0 };
+    if (op.tipo === 'dividendo') {
+      porAnio[anio].efectivo += parseFloat(op.divImporte) || parseFloat(op.precio) || 0;
+    } else if (op.tipo === 'scrip') {
+      var cot = _finCotizaciones[op.ticker] || null;
+      var sacc = parseFloat(op.scripAcciones) || 0;
+      var ssob = parseFloat(op.scripSobrantes) || 0;
+      porAnio[anio].scrip += cot ? sacc * cot + ssob : ssob;
+    }
+  }
+  var anios = Object.keys(porAnio).sort();
+  if (anios.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:10px 0;color:var(--silver-dim);">Sin dividendos registrados.</div>';
+    return;
+  }
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<tr style="color:var(--silver-dim);font-size:10px;text-transform:uppercase;">';
+  html += '<td style="padding:4px 2px;">Año</td><td style="padding:4px 2px;text-align:right;">Efectivo</td><td style="padding:4px 2px;text-align:right;">Scrip*</td><td style="padding:4px 2px;text-align:right;">Total</td><td style="padding:4px 2px;text-align:right;">Var.</td>';
+  html += '</tr>';
+  var totalAnterior = null;
+  for (var j = 0; j < anios.length; j++) {
+    var yr = anios[j];
+    var d = porAnio[yr];
+    var total = d.efectivo + d.scrip;
+    var varPct = totalAnterior !== null && totalAnterior > 0 ? ((total - totalAnterior) / totalAnterior) * 100 : null;
+    var varHtml = varPct !== null ? ('<span style="color:' + (varPct >= 0 ? '#4caf82' : '#e57373') + ';">' + (varPct >= 0 ? '+' : '') + fin_fmtPct(varPct) + '</span>') : '<span style="color:var(--silver-dim);">-</span>';
+    html += '<tr style="border-top:1px solid rgba(255,255,255,0.06);">';
+    html += '<td style="padding:5px 2px;font-weight:600;color:var(--accent-blue);">' + yr + '</td>';
+    html += '<td style="padding:5px 2px;text-align:right;color:var(--silver);">' + fin_fmt(d.efectivo) + '</td>';
+    html += '<td style="padding:5px 2px;text-align:right;color:var(--silver);">' + (d.scrip > 0 ? fin_fmt(d.scrip) : '-') + '</td>';
+    html += '<td style="padding:5px 2px;text-align:right;font-weight:700;color:#4caf82;">' + fin_fmt(total) + '</td>';
+    html += '<td style="padding:5px 2px;text-align:right;">' + varHtml + '</td>';
+    html += '</tr>';
+    totalAnterior = total;
+  }
+  html += '</table>';
+  html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:6px;">* Scrip valorado a cotizacion actual introducida</div>';
+  el.innerHTML = html;
 }
 
 function fin_loadCotizaciones() {
