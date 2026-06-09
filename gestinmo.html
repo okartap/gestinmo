@@ -820,7 +820,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .vacante-btn{width:100%;padding:11px;background:rgba(224,156,58,.08);border:1px dashed rgba(224,156,58,.4);border-radius:10px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1px;color:var(--amber);cursor:pointer;margin-bottom:16px;text-transform:uppercase;}
 .fin-section{background:var(--navy-card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:14px;}
 .fin-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.fin-section-title{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-bright);}
+.fin-section-title{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-bright);flex:1;text-align:center;}
 .fin-add-btn{background:rgba(91,141,238,.15);border:1px solid rgba(91,141,238,.3);border-radius:8px;padding:4px 10px;font-size:16px;color:var(--accent-blue);cursor:pointer;line-height:1;}
 .fin-add-btn:active{transform:scale(.92);}
 .fin-card{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;}
@@ -1832,7 +1832,20 @@ const DATA_KEYS = [
   'documentos:lista',
   'calculadora:estudios',
   'contratos:lista',
-  'clientes:lista'
+  'clientes:lista',
+  'fin:cuentas:empresa',
+  'fin:cuentas:patrimer',
+  'fin:cuentas:patricio',
+  'fin:cuentas:industrias',
+  'fin:acciones:empresa',
+  'fin:acciones:patrimer',
+  'fin:acciones:patricio',
+  'fin:acciones:industrias',
+  'fin:fondos:empresa',
+  'fin:fondos:patrimer',
+  'fin:fondos:patricio',
+  'fin:fondos:industrias',
+  'fin:cotizaciones'
 ];
 
 // Convertir clave localStorage a nombre de documento Firestore
@@ -3008,16 +3021,49 @@ window.loadFromFirestore().then(() => {
   <div class="main-tabs">
     <div class="mtab active" onclick="setMTab(this,'tab-a')">Análisis</div>
     <div class="mtab" onclick="setMTab(this,'tab-c')">Cobros</div>
+    <div class="mtab" onclick="setMTab(this,'tab-h');fac_renderHistorico()">Histórico</div>
   </div>
   <div class="main">
     <!-- ANÁLISIS -->
     <div id="tab-a">
       <div class="slabel" style="margin-bottom:12px" id="analisis-periodo">—</div>
       <div class="kpi-grid" id="kpi-grid">
-        <div class="kpi"><div class="kpi-l">Facturado mes</div><div class="kpi-v g" id="kpi-facturado">0€</div><div class="kpi-s" id="kpi-facturado-s">—</div></div>
-        <div class="kpi"><div class="kpi-l">Cobrado mes</div><div class="kpi-v" id="kpi-cobrado">0€</div><div class="kpi-s" id="kpi-cobrado-s">—</div></div>
-        <div class="kpi"><div class="kpi-l">Saldo pendiente</div><div class="kpi-v a" id="kpi-pendiente">0€</div><div class="kpi-s" id="kpi-pendiente-s">—</div></div>
-        <div class="kpi"><div class="kpi-l">Previsión anual</div><div class="kpi-v go" id="kpi-prevision">0€</div><div class="kpi-s up" id="kpi-prevision-s">—</div></div>
+        <div class="kpi">
+          <div class="kpi-l" id="kpi-acum-titulo" style="font-size:13px;">HASTA — · VS AÑO ANTERIOR</div>
+          <div class="kpi-v g" id="kpi-acum-euros">—</div>
+          <div class="kpi-s" id="kpi-acum-pct" style="font-size:13px;">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l" id="kpi-resto-titulo" style="font-size:13px;">PARA IGUALAR AÑO ANTERIOR</div>
+          <div class="kpi-v go" id="kpi-resto-euros">—</div>
+          <div class="kpi-s" id="kpi-resto-pct" style="font-size:13px;">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l" style="font-size:13px;">PREVISIÓN ANUAL</div>
+          <div class="kpi-v" id="kpi-prevision">—</div>
+          <div class="kpi-s up" id="kpi-prevision-s" style="font-size:13px;">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l" style="font-size:13px;">REPARTO</div>
+          <div style="margin-top:4px;" id="kpi-reparto">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+              <span style="color:var(--silver-dim);">Urbano</span>
+              <span id="kpi-urbano-val" style="color:var(--silver-bright);font-weight:600;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+              <span style="color:var(--silver-dim);"></span>
+              <span id="kpi-urbano-pct" style="color:var(--silver-dim);">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+              <span style="color:var(--silver-dim);">Rústico</span>
+              <span id="kpi-rustico-val" style="color:var(--silver-bright);font-weight:600;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;">
+              <span style="color:var(--silver-dim);"></span>
+              <span id="kpi-rustico-pct" style="color:var(--silver-dim);">—</span>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="chart-card">
         <div class="chart-title">Facturación mensual · <span id="chart-year">2025</span></div>
@@ -3032,6 +3078,31 @@ window.loadFromFirestore().then(() => {
         <div class="mth-row"><div class="mth">Mes</div><div class="mth">Facturado</div><div class="mth">Cobrado</div><div class="mth">Estado</div></div>
         <div id="historial-rows"><div class="empty-state">Sin facturas registradas aún.<br>Pulsa "Facturar mes" para empezar.</div></div>
       </div>
+    </div>
+    <!-- HISTÓRICO GLOBAL -->
+    <div id="tab-h" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div class="slabel">Facturación histórica global</div>
+        <button class="cob-add-btn" onclick="fac_abrirNuevoHistorico()" title="Añadir mes manual">＋</button>
+      </div>
+
+      <!-- GRÁFICA 1: ANUAL -->
+      <div class="chart-card" style="margin-bottom:16px;">
+        <div class="chart-title" style="margin-bottom:10px;">Evolución anual</div>
+        <div id="fac-chart-anual" style="position:relative;height:110px;width:100%;"></div>
+        <div id="fac-legend-anual" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;"></div>
+        <div id="fac-selector-anual" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+      </div>
+
+      <!-- GRÁFICA 2: MENSUAL -->
+      <div class="chart-card" style="margin-bottom:16px;">
+        <div class="chart-title" style="margin-bottom:10px;">Facturación acumulada por mes</div>
+        <div id="fac-chart-mensual" style="position:relative;height:110px;width:100%;"></div>
+        <div id="fac-legend-mensual" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;"></div>
+        <div id="fac-selector-mensual" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+      </div>
+
+      <div id="fac-historico-lista"></div>
     </div>
     <!-- COBROS -->
     <div id="tab-c" style="display:none">
@@ -3067,6 +3138,17 @@ window.loadFromFirestore().then(() => {
     <button class="btn1" onclick="confirmFactura()">Confirmar y facturar →</button>
     <button class="btn2" onclick="showMain()">Cancelar</button>
   </main>
+</div>
+
+<!-- MODAL HISTÓRICO -->
+<div class="moverlay" id="fac-modal-historico">
+  <div class="modal">
+    <div class="mtitle">Registro histórico<span class="mclose" onclick="closeModalById('fac-modal-historico')">&#10005;</span></div>
+    <div class="mfield"><div class="mflabel">Mes</div><input class="minput" id="fac-hist-mes" type="month"></div>
+    <div class="mfield"><div class="mflabel">Importe total (euros)</div><input class="minput" id="fac-hist-importe" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+    <button class="btn1" onclick="fac_guardarHistorico()">Guardar</button>
+    <button class="btn2" onclick="closeModalById('fac-modal-historico')" style="margin-top:8px;">Cancelar</button>
+  </div>
 </div>
 
 <!-- MODAL INFO FACTURAR -->
@@ -4366,6 +4448,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
     <div class="header-company-name" id="fin-company-name">Patrimer</div>
     <div class="htitle">FINANZAS</div>
   </div>
+  <button onclick="fin_abrirAsistente()" class="fin-add-btn" style="font-size:20px;padding:4px 10px;">&#128257;</button>
 </header>
 <div class="view active" style="padding:16px;padding-bottom:100px;min-height:100vh;">
   <div class="fin-section">
@@ -4414,6 +4497,21 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 </div>
 </div>
 
+
+<!-- MODAL ASISTENTE ACTUALIZAR VALORES -->
+<div class="moverlay" id="fin-modal-asistente" style="display:none;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:360px;width:92%;">
+    <div class="mtitle" id="fin-asi-titulo">Actualizar valores<span class="mclose" onclick="fin_cerrarAsistente()">&#10005;</span></div>
+    <div style="font-size:12px;color:var(--silver-dim);margin-bottom:4px;" id="fin-asi-progreso"></div>
+    <div style="font-size:16px;font-weight:600;color:var(--silver-bright);margin-bottom:14px;" id="fin-asi-pregunta"></div>
+    <div style="font-size:12px;color:var(--silver-dim);margin-bottom:8px;" id="fin-asi-actual"></div>
+    <input class="minput" id="fin-asi-input" type="text" inputmode="decimal" placeholder="0,00" style="font-size:20px;text-align:right;padding:14px;" oninput="fin_asiFormatInput(this)">
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn2" onclick="fin_asiSaltar()" style="flex:1;">Saltar</button>
+      <button class="btn1" onclick="fin_asiSiguiente()" style="flex:2;">Siguiente &#8250;</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL CUENTA -->
 <div class="moverlay" id="fin-modal-cuenta">
   <div class="modal">
@@ -4804,7 +4902,12 @@ function setActive(el) { document.querySelectorAll('.nav-item').forEach(n=>n.cla
 const BACKUP_KEYS = [
   'pam_profile','patrimer:empresa','inmuebles:lista',
   'patrimer_plantillas','facturacion:facturas','facturacion:cobros',
-  'facturacion:notas','documentos:lista','calculadora:estudios'
+  'facturacion:notas','documentos:lista','calculadora:estudios',
+  'contratos:lista','clientes:lista',
+  'fin:cuentas:empresa','fin:cuentas:patrimer','fin:cuentas:patricio','fin:cuentas:industrias',
+  'fin:acciones:empresa','fin:acciones:patrimer','fin:acciones:patricio','fin:acciones:industrias',
+  'fin:fondos:empresa','fin:fondos:patrimer','fin:fondos:patricio','fin:fondos:industrias',
+  'fin:cotizaciones'
 ];
 const BACKUP_PWD = 'patrimer2024';
 let _pwdAccion = null;
@@ -4922,7 +5025,9 @@ function showModule(name) {
   }
   // Renderizar cobros al abrir el módulo
   if (name === 'cobros' && typeof renderMain === 'function') {
+    fac_loadHistorico();
     renderMain();
+    setTimeout(function(){ if(typeof buildChart==='function'){ var now=new Date(); buildChart(load(KEYS.facturas),[],now.getFullYear()); }}, 50);
   }
   // Renderizar finanzas al abrir el módulo
   if (name === 'finanzas' && typeof fin_render === 'function') {
@@ -7035,6 +7140,337 @@ function setMTab(el,id){
   el.classList.add('active');
   document.getElementById('tab-a').style.display=id==='tab-a'?'block':'none';
   document.getElementById('tab-c').style.display=id==='tab-c'?'block':'none';
+  document.getElementById('tab-h').style.display=id==='tab-h'?'block':'none';
+}
+
+// ─── HISTÓRICO GLOBAL DE FACTURACIÓN ─────────────────────────
+var FAC_COLORES = ['#5b8dee','#4caf82','#c9a84c','#e57373','#9c7fe0','#4dd0e1','#ff8a65'];
+var FAC_ANIOS_SEL = null;
+var FAC_ANIOS_MEN = null;
+
+function fac_getAnios(data) {
+  var anios = [];
+  for (var i = 0; i < data.length; i++) {
+    var yr = data[i].mes.slice(0,4);
+    if (anios.indexOf(yr) < 0) anios.push(yr);
+  }
+  return anios.sort();
+}
+
+function fac_dibujarGrafica(containerId, labels, series) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  var W = el.offsetWidth || 300;
+  var H = 110;
+  var PAD_L = 44, PAD_R = 8, PAD_T = 10, PAD_B = 22;
+  var gW = W - PAD_L - PAD_R;
+  var gH = H - PAD_T - PAD_B;
+  var n = labels.length;
+  if (n === 0) { el.innerHTML = ''; return; }
+  var maxVal = 0;
+  for (var s = 0; s < series.length; s++) {
+    for (var v = 0; v < series[s].valores.length; v++) {
+      if (series[s].valores[v] > maxVal) maxVal = series[s].valores[v];
+    }
+  }
+  if (maxVal === 0) maxVal = 1;
+  var barGroupW = gW / n;
+  var barW = Math.max(3, Math.floor(barGroupW / (series.length + 1)) - 1);
+  var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
+  for (var r = 0; r <= 4; r++) {
+    var ry = PAD_T + gH - Math.round(gH * r / 4);
+    var rv = Math.round(maxVal * r / 4);
+    var rvL = rv >= 1000 ? (rv/1000).toFixed(0)+'k' : rv;
+    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+    svg += '<text x="' + (PAD_L-4) + '" y="' + (ry+4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.3)">' + rvL + '</text>';
+  }
+  for (var s = 0; s < series.length; s++) {
+    var ser = series[s];
+    var puntos = [];
+    for (var i = 0; i < n; i++) {
+      var val = ser.valores[i] || 0;
+      var cx = PAD_L + barGroupW * i + barGroupW / 2;
+      if (val > 0) {
+        var bh = Math.max(2, Math.round(gH * val / maxVal));
+        var totalBarW = series.length * (barW + 2);
+        var bx = PAD_L + barGroupW * i + (barGroupW - totalBarW) / 2 + s * (barW + 2);
+        var by = PAD_T + gH - bh;
+        svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="2" fill="' + ser.color + '" opacity="0.85"/>';
+        puntos.push({x: Math.round(bx + barW/2), y: by});
+      } else {
+        puntos.push(null);
+      }
+    }
+    // Sin línea de tendencia
+    var segActual = [];
+    for (var p = 0; p < puntos.length; p++) {
+      if (puntos[p] !== null) { segActual.push(puntos[p]); }
+      else { segActual = []; }
+    }
+  }
+  for (var i = 0; i < n; i++) {
+    var lx = PAD_L + barGroupW * i + barGroupW / 2;
+    svg += '<text x="' + lx + '" y="' + (H-4) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + labels[i] + '</text>';
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function fac_dibujarGraficaAnual(aniosSel, todosAnios, totAnio) {
+  var el = document.getElementById('fac-chart-anual');
+  if (!el) return;
+  var W = el.offsetWidth || 300;
+  var H = 110;
+  var PAD_L = 48, PAD_R = 8, PAD_T = 20, PAD_B = 22;
+  var gW = W - PAD_L - PAD_R;
+  var gH = H - PAD_T - PAD_B;
+  var n = aniosSel.length;
+  if (n === 0) { el.innerHTML = ''; return; }
+  var maxVal = 0;
+  for (var i = 0; i < n; i++) { if ((totAnio[aniosSel[i]]||0) > maxVal) maxVal = totAnio[aniosSel[i]]; }
+  if (maxVal === 0) maxVal = 1;
+  var barW = Math.max(16, Math.floor(gW / n) - 12);
+  var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
+  for (var r = 0; r <= 4; r++) {
+    var ry = PAD_T + gH - Math.round(gH * r / 4);
+    var rv = Math.round(maxVal * r / 4);
+    var rvL = rv >= 1000 ? (rv/1000).toFixed(0)+'k' : rv;
+    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+    svg += '<text x="' + (PAD_L-4) + '" y="' + (ry+4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.3)">' + rvL + '</text>';
+  }
+  for (var i = 0; i < n; i++) {
+    var yr = aniosSel[i];
+    var val = totAnio[yr] || 0;
+    var col = FAC_COLORES[todosAnios.indexOf(yr) % FAC_COLORES.length];
+    var cx = PAD_L + (gW / n) * i + (gW / n) / 2;
+    var bh = Math.max(2, Math.round(gH * val / maxVal));
+    var bx = cx - barW / 2;
+    var by = PAD_T + gH - bh;
+    svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="3" fill="' + col + '" opacity="0.85"/>';
+    var totalLabel = (totAnio[yr]/1000).toFixed(1) + 'k';
+    svg += '<text x="' + Math.round(cx) + '" y="' + (by - 5) + '" text-anchor="middle" font-size="9" font-weight="600" fill="rgba(255,255,255,0.85)">' + totalLabel + '</text>';
+    svg += '<text x="' + Math.round(cx) + '" y="' + (H-4) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function fac_renderGraficas() {
+  var data = fac_loadHistorico();
+  var todosAnios = fac_getAnios(data);
+  if (!FAC_ANIOS_SEL) FAC_ANIOS_SEL = todosAnios.slice();
+  if (!FAC_ANIOS_MEN) FAC_ANIOS_MEN = todosAnios.slice(-2);
+  // Totales anuales
+  var totAnio = {};
+  for (var i = 0; i < data.length; i++) {
+    var yr = data[i].mes.slice(0,4);
+    if (!totAnio[yr]) totAnio[yr] = 0;
+    totAnio[yr] += data[i].importe;
+  }
+  // Gráfica anual
+  var aniosSel = FAC_ANIOS_SEL.filter(function(a){ return todosAnios.indexOf(a) >= 0; });
+  fac_dibujarGraficaAnual(aniosSel, todosAnios, totAnio);
+  // Leyenda anual
+  var legA = document.getElementById('fac-legend-anual');
+  if (legA) {
+    var lh = '';
+    for (var j = 0; j < aniosSel.length; j++) {
+      var col = FAC_COLORES[todosAnios.indexOf(aniosSel[j]) % FAC_COLORES.length];
+      lh += '<div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:2px;background:' + col + '"></div><span style="color:var(--silver-dim);">' + aniosSel[j] + '</span></div>';
+    }
+    legA.innerHTML = lh;
+  }
+  // Selector anual
+  var selA = document.getElementById('fac-selector-anual');
+  if (selA) {
+    var sh = '';
+    for (var j = 0; j < todosAnios.length; j++) {
+      var yr = todosAnios[j]; var activo = FAC_ANIOS_SEL.indexOf(yr) >= 0;
+      var col = FAC_COLORES[j % FAC_COLORES.length];
+      sh += '<div onclick="fac_toggleAnioSel(\'anual\',\'' + yr + '\')" style="padding:3px 8px;border-radius:20px;font-size:10px;cursor:pointer;border:1px solid ' + col + ';color:' + (activo?'#fff':col) + ';background:' + (activo?col:'transparent') + ';">' + yr + '</div>';
+    }
+    selA.innerHTML = sh;
+  }
+  // Gráfica mensual
+  var MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var aniosMenSel = FAC_ANIOS_MEN.filter(function(a){ return todosAnios.indexOf(a) >= 0; });
+  var seriesMen = [];
+  for (var j = 0; j < aniosMenSel.length; j++) {
+    var yr = aniosMenSel[j];
+    var col = FAC_COLORES[todosAnios.indexOf(yr) % FAC_COLORES.length];
+    var vals = [];
+    var acum = 0;
+    for (var m = 1; m <= 12; m++) {
+      var mesKey = yr + '-' + String(m).padStart(2,'0');
+      var found = 0;
+      for (var d = 0; d < data.length; d++) { if (data[d].mes === mesKey) { found = data[d].importe; break; } }
+      if (found > 0) { acum += found; vals.push(acum); }
+      else { vals.push(0); } // 0 = sin dato, la línea se interrumpe
+    }
+    seriesMen.push({label: yr, color: col, valores: vals});
+  }
+  fac_dibujarGrafica('fac-chart-mensual', MESES_CORTO, seriesMen);
+  // Leyenda mensual
+  var legM = document.getElementById('fac-legend-mensual');
+  if (legM) {
+    var lhM = '';
+    for (var j = 0; j < seriesMen.length; j++) {
+      lhM += '<div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:2px;background:' + seriesMen[j].color + '"></div><span style="color:var(--silver-dim);">' + seriesMen[j].label + '</span></div>';
+    }
+    legM.innerHTML = lhM;
+  }
+  // Selector mensual
+  var selM = document.getElementById('fac-selector-mensual');
+  if (selM) {
+    var shM = '';
+    for (var j = 0; j < todosAnios.length; j++) {
+      var yr = todosAnios[j]; var activo = FAC_ANIOS_MEN.indexOf(yr) >= 0;
+      var col = FAC_COLORES[j % FAC_COLORES.length];
+      shM += '<div onclick="fac_toggleAnioSel(\'mensual\',\'' + yr + '\')" style="padding:3px 8px;border-radius:20px;font-size:10px;cursor:pointer;border:1px solid ' + col + ';color:' + (activo?'#fff':col) + ';background:' + (activo?col:'transparent') + ';">' + yr + '</div>';
+    }
+    selM.innerHTML = shM;
+  }
+}
+
+function fac_toggleAnioSel(tipo, yr) {
+  var arr = tipo === 'anual' ? FAC_ANIOS_SEL : FAC_ANIOS_MEN;
+  var idx = arr.indexOf(yr);
+  if (idx >= 0) { if (arr.length > 1) arr.splice(idx, 1); }
+  else { arr.push(yr); arr.sort(); }
+  fac_renderGraficas();
+}
+
+var FAC_HIST_KEY = 'facturacion:historico';
+
+var FAC_HIST_INICIAL = [
+  {mes:'2023-01',importe:13546.17},{mes:'2023-02',importe:13603.73},{mes:'2023-03',importe:13883.81},
+  {mes:'2023-04',importe:13938.06},{mes:'2023-05',importe:14136.06},{mes:'2023-06',importe:13980.88},
+  {mes:'2023-07',importe:14018.55},{mes:'2023-08',importe:14018.55},{mes:'2023-09',importe:12995.72},
+  {mes:'2023-10',importe:13004.42},{mes:'2023-11',importe:14035.30},{mes:'2023-12',importe:14020.00},
+  {mes:'2024-01',importe:14064.39},{mes:'2024-02',importe:14074.39},{mes:'2024-03',importe:13656.10},
+  {mes:'2024-04',importe:14021.52},{mes:'2024-05',importe:14021.52},{mes:'2024-06',importe:14153.68},
+  {mes:'2024-07',importe:14153.68},{mes:'2024-08',importe:14217.79},{mes:'2024-09',importe:14245.62},
+  {mes:'2024-10',importe:14205.99},{mes:'2024-11',importe:14235.98},{mes:'2024-12',importe:14255.24},
+  {mes:'2025-01',importe:14407.85},{mes:'2025-02',importe:14414.99},{mes:'2025-03',importe:15129.63},
+  {mes:'2025-04',importe:15129.63},{mes:'2025-05',importe:15172.05},{mes:'2025-06',importe:15180.93},
+  {mes:'2025-07',importe:15211.45},{mes:'2025-08',importe:15229.93},{mes:'2025-09',importe:15214.30},
+  {mes:'2025-10',importe:15244.86},{mes:'2025-11',importe:16252.33},{mes:'2025-12',importe:15684.54},
+  {mes:'2026-01',importe:16393.99},{mes:'2026-02',importe:16193.66},{mes:'2026-03',importe:16279.70},
+  {mes:'2026-04',importe:16896.36},{mes:'2026-05',importe:16960.53},{mes:'2026-06',importe:16975.32}
+];
+
+function fac_loadHistorico() {
+  var raw = localStorage.getItem(FAC_HIST_KEY);
+  if (raw) { try { return JSON.parse(raw); } catch(e) {} }
+  // Primera vez: cargar datos históricos y guardar
+  localStorage.setItem(FAC_HIST_KEY, JSON.stringify(FAC_HIST_INICIAL));
+  return FAC_HIST_INICIAL;
+}
+function fac_saveHistorico(data) {
+  localStorage.setItem(FAC_HIST_KEY, JSON.stringify(data));
+}
+function fac_abrirNuevoHistorico() {
+  var hoy = new Date();
+  var mm = String(hoy.getMonth()+1).padStart(2,'0');
+  document.getElementById('fac-hist-mes').value = hoy.getFullYear() + '-' + mm;
+  document.getElementById('fac-hist-importe').value = '';
+  document.getElementById('fac-modal-historico').classList.add('open');
+}
+function fac_editarMes(mes, importe) {
+  document.getElementById('fac-hist-mes').value = mes;
+  document.getElementById('fac-hist-importe').value = importe;
+  document.getElementById('fac-modal-historico').classList.add('open');
+}
+function fac_guardarHistorico() {
+  var mes = document.getElementById('fac-hist-mes').value;
+  var imp = parseFloat(document.getElementById('fac-hist-importe').value) || 0;
+  if (!mes) { alert('Selecciona el mes.'); return; }
+  if (imp <= 0) { alert('Introduce el importe.'); return; }
+  var data = fac_loadHistorico();
+  var idx = -1;
+  for (var i = 0; i < data.length; i++) { if (data[i].mes === mes) { idx = i; break; } }
+  if (idx >= 0) { data[idx].importe = imp; } else { data.push({mes: mes, importe: imp}); }
+  data.sort(function(a,b){ return a.mes.localeCompare(b.mes); });
+  fac_saveHistorico(data);
+  closeModalById('fac-modal-historico');
+  fac_renderHistorico();
+}
+function fac_renderHistorico() {
+  fac_renderGraficas();
+  var el = document.getElementById('fac-historico-lista');
+  if (!el) return;
+  var data = fac_loadHistorico();
+  if (data.length === 0) {
+    el.innerHTML = '<div class="empty-state">Sin datos históricos. Pulsa ＋ para añadir.</div>';
+    return;
+  }
+  // Agrupar por año
+  var porAnio = {};
+  for (var i = 0; i < data.length; i++) {
+    var yr = data[i].mes.slice(0,4);
+    if (!porAnio[yr]) porAnio[yr] = [];
+    porAnio[yr].push(data[i]);
+  }
+  var anios = Object.keys(porAnio).sort().reverse(); // más reciente primero
+  var MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var html = '';
+  var totales = {};
+  for (var j = 0; j < anios.length; j++) {
+    var yr = anios[j];
+    var meses = porAnio[yr];
+    var totalAnio = 0;
+    for (var m = 0; m < meses.length; m++) totalAnio += meses[m].importe;
+    totales[yr] = totalAnio;
+  }
+  for (var j = 0; j < anios.length; j++) {
+    var yr = anios[j];
+    var meses = porAnio[yr];
+    var totalAnio = totales[yr];
+    var yrAnterior = String(parseInt(yr) - 1);
+    var varHtml = '';
+    if (totales[yrAnterior] !== undefined && totales[yrAnterior] > 0) {
+      var pct = ((totalAnio - totales[yrAnterior]) / totales[yrAnterior]) * 100;
+      var color = pct >= 0 ? '#4caf82' : '#e57373';
+      varHtml = ' <span style="font-size:11px;color:' + color + ';">' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%</span>';
+    }
+    html += '<div style="margin-bottom:10px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;">';
+    // Cabecera año — clickable para desplegar
+    html += '<div onclick="fac_toggleAnio(this)" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.04);cursor:pointer;">';
+    html += '<div style="font-size:14px;font-weight:700;color:var(--accent-blue);">' + yr + varHtml + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:10px;">';
+    html += '<div style="font-size:14px;font-weight:700;color:#4caf82;">' + fmtEur(totalAnio) + '</div>';
+    html += '<div style="font-size:12px;color:var(--silver-dim);">&#9654;</div>';
+    html += '</div></div>';
+    // Desglose mensual (oculto por defecto)
+    html += '<div class="fac-hist-meses" style="display:none;padding:8px 14px;">';
+    for (var m = 0; m < meses.length; m++) {
+      var mesNum = parseInt(meses[m].mes.slice(5,7)) - 1;
+      var mesNom = MESES[mesNum] || meses[m].mes;
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;">';
+      html += '<span style="color:var(--silver-mid);">' + mesNom + ' ' + yr + '</span>';
+      html += '<div style="display:flex;align-items:center;gap:10px;">';
+      html += '<span style="color:var(--silver-bright);">' + fmtEur(meses[m].importe) + '</span>';
+      html += '<span onclick="fac_editarMes(\'' + meses[m].mes + '\',' + meses[m].importe + ')" style="font-size:10px;color:var(--accent-blue);cursor:pointer;">Editar</span>';
+      html += '</div></div>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+function fac_toggleAnio(header) {
+  var detalle = header.nextElementSibling;
+  var arrow = header.querySelector('div:last-child div:last-child');
+  if (detalle.style.display === 'none') {
+    detalle.style.display = 'block';
+    if (arrow) arrow.innerHTML = '&#9660;';
+  } else {
+    detalle.style.display = 'none';
+    if (arrow) arrow.innerHTML = '&#9654;';
+  }
+}
+function fmtEur(n) {
+  return fmt(n) + ' €';
 }
 
 // ─── INMUEBLES (desde módulo Inmuebles) ───────────────────────
@@ -7049,72 +7485,153 @@ function renderMain(){
 }
 
 function renderAnalisis(){
-  const facturas=load(KEYS.facturas);
-  const cobros=load(KEYS.cobros);
-  const mes=mesActual();
-  const now=new Date();
-  const year=now.getFullYear();
+  const facturas = load(KEYS.facturas);
+  const now = new Date();
+  const year = now.getFullYear();
+  const hist = fac_loadHistorico();
+  const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-  document.getElementById('analisis-periodo').textContent=mesNombre(mes)+' · En curso';
-  document.getElementById('chart-year').textContent=year;
-  document.getElementById('legend-prev-year').textContent=year-1;
-  document.getElementById('legend-cur-year').textContent=year;
+  document.getElementById('analisis-periodo').textContent = mesNombre(mesActual()) + ' · En curso';
+  document.getElementById('chart-year').textContent = year;
+  document.getElementById('legend-prev-year').textContent = year-1;
+  document.getElementById('legend-cur-year').textContent = year;
 
-  // KPIs del mes actual
-  const facMes=facturas.filter(f=>f.mes===mes);
-  const totalFac=facMes.reduce((s,f)=>s+(f.total||0),0);
-  const cobMes=cobros.filter(c=>c.fecha&&c.fecha.startsWith(mes));
-  const totalCob=cobMes.reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
-  const pendiente=Math.max(0,totalFac-totalCob);
-  const mesesConFac=facturas.filter(f=>f.mes&&f.mes.startsWith(year+'')).length;
-  const prevision=mesesConFac>0?(totalFac/Math.max(1,mesesConFac))*12:0;
+  // Calcular acumulado hasta el último mes con dato de este año
+  var ultimoMes = 0;
+  var acumActual = 0, acumAnterior = 0;
+  for (var m = 1; m <= 12; m++) {
+    var mesKey = year + '-' + String(m).padStart(2,'0');
+    var val = facturas.filter(f=>f.mes===mesKey).reduce((s,f)=>s+(f.total||0),0);
+    if (val === 0) { var hc = hist.find(h=>h.mes===mesKey); if(hc) val = hc.importe; }
+    if (val > 0) { acumActual += val; ultimoMes = m; }
+  }
+  for (var m = 1; m <= ultimoMes; m++) {
+    var mesKeyP = (year-1) + '-' + String(m).padStart(2,'0');
+    var valP = facturas.filter(f=>f.mes===mesKeyP).reduce((s,f)=>s+(f.total||0),0);
+    if (valP === 0) { var hp = hist.find(h=>h.mes===mesKeyP); if(hp) valP = hp.importe; }
+    acumAnterior += valP;
+  }
+  // Total año anterior completo
+  var totalAnterior = 0;
+  for (var m = 1; m <= 12; m++) {
+    var mesKeyT = (year-1) + '-' + String(m).padStart(2,'0');
+    var valT = facturas.filter(f=>f.mes===mesKeyT).reduce((s,f)=>s+(f.total||0),0);
+    if (valT === 0) { var ht = hist.find(h=>h.mes===mesKeyT); if(ht) valT = ht.importe; }
+    totalAnterior += valT;
+  }
 
-  document.getElementById('kpi-facturado').textContent=fmtE(totalFac);
-  document.getElementById('kpi-cobrado').textContent=fmtE(totalCob);
-  document.getElementById('kpi-pendiente').textContent=fmtE(pendiente);
-  document.getElementById('kpi-prevision').textContent=fmtE(prevision);
-  document.getElementById('kpi-facturado-s').textContent=facMes.length+' facturas';
-  document.getElementById('kpi-cobrado-s').textContent=cobMes.length+' cobros';
-  document.getElementById('kpi-pendiente-s').textContent=pendiente>0?'Pendiente de cobro':'Al corriente';
-  document.getElementById('kpi-prevision-s').textContent='Estimación anual';
+  // KPI 1: acumulado vs mismo periodo año anterior
+  var diffAcum = acumActual - acumAnterior;
+  var pctAcum = acumAnterior > 0 ? (diffAcum / acumAnterior * 100) : 0;
+  var mesNom = ultimoMes > 0 ? MESES_NOMBRE[ultimoMes-1] : '—';
+  var tit1 = document.getElementById('kpi-acum-titulo');
+  var val1 = document.getElementById('kpi-acum-euros');
+  var pct1 = document.getElementById('kpi-acum-pct');
+  if (tit1) tit1.textContent = 'HASTA ' + mesNom + ' ' + year + ' · VS ' + (year-1);
+  if (val1) { val1.textContent = fmtE(acumActual); val1.className = 'kpi-v g'; }
+  if (pct1) {
+    var signo = diffAcum >= 0 ? '+' : '';
+    pct1.textContent = signo + fmtE(diffAcum) + ' (' + signo + pctAcum.toFixed(1) + '%)';
+    pct1.className = 'kpi-s ' + (diffAcum >= 0 ? 'up' : 'dn');
+  }
+
+  // KPI 2: lo que falta para igualar año anterior (o exceso si ya se superó)
+  var resto = totalAnterior - acumActual;
+  var pctResto = totalAnterior > 0 ? (Math.abs(resto) / totalAnterior * 100) : 0;
+  var tit2 = document.getElementById('kpi-resto-titulo');
+  var val2 = document.getElementById('kpi-resto-euros');
+  var pct2 = document.getElementById('kpi-resto-pct');
+  if (tit2) tit2.textContent = resto >= 0 ? 'PARA IGUALAR ' + (year-1) : 'SUPERADO ' + (year-1);
+  if (val2) {
+    val2.textContent = fmtE(Math.abs(resto));
+    val2.className = 'kpi-v ' + (resto <= 0 ? 'g' : 'go');
+  }
+  if (pct2) {
+    pct2.textContent = pctResto.toFixed(1) + '% ' + (resto >= 0 ? 'restante' : 'de exceso');
+    pct2.className = 'kpi-s ' + (resto <= 0 ? 'up' : '');
+  }
+
+  // KPI 3: previsión anual (media últimos 4 meses)
+  var ultimos4 = [];
+  for (var m = ultimoMes; m >= 1 && ultimos4.length < 4; m--) {
+    var mesK4 = year + '-' + String(m).padStart(2,'0');
+    var v4 = facturas.filter(f=>f.mes===mesK4).reduce((s,f)=>s+(f.total||0),0);
+    if (v4 === 0) { var h4 = hist.find(h=>h.mes===mesK4); if(h4) v4 = h4.importe; }
+    if (v4 > 0) ultimos4.push(v4);
+  }
+  var mediaMes = ultimos4.length > 0 ? ultimos4.reduce((s,v)=>s+v,0) / ultimos4.length : 0;
+  var prevision = mediaMes * 12;
+  var pctPrev = totalAnterior > 0 ? ((prevision - totalAnterior) / totalAnterior * 100) : 0;
+  var elPrev = document.getElementById('kpi-prevision');
+  var elPrevS = document.getElementById('kpi-prevision-s');
+  if (elPrev) elPrev.textContent = fmtE(prevision);
+  if (elPrevS) {
+    var signoPrev = pctPrev >= 0 ? '+' : '';
+    elPrevS.textContent = signoPrev + pctPrev.toFixed(1) + '% vs ' + (year-1);
+    elPrevS.className = 'kpi-s ' + (pctPrev >= 0 ? 'up' : 'dn');
+  }
+
+  // KPI 4: reparto urbano/rústico (por ahora solo urbano)
+  var elUrbVal = document.getElementById('kpi-urbano-val');
+  var elUrbPct = document.getElementById('kpi-urbano-pct');
+  var elRusVal = document.getElementById('kpi-rustico-val');
+  var elRusPct = document.getElementById('kpi-rustico-pct');
+  if (elUrbVal) elUrbVal.textContent = fmtE(acumActual);
+  if (elUrbPct) elUrbPct.textContent = '100% (pendiente clasificar)';
+  if (elRusVal) elRusVal.textContent = '—';
+  if (elRusPct) elRusPct.textContent = 'Sin datos';
 
   // Historial
-  const rows=document.getElementById('historial-rows');
-  const facYear=facturas.filter(f=>f.mes&&f.mes.startsWith(year+'')).sort((a,b)=>b.mes.localeCompare(a.mes));
-  if(facYear.length===0){
-    rows.innerHTML='<div class="empty-state">Sin facturas este año aún.</div>';
+  const rows = document.getElementById('historial-rows');
+  const facYear = facturas.filter(f=>f.mes&&f.mes.startsWith(year+'')).sort((a,b)=>b.mes.localeCompare(a.mes));
+  if (facYear.length === 0) {
+    rows.innerHTML = '<div class="empty-state">Sin facturas este año aún.</div>';
   } else {
-    rows.innerHTML=facYear.map(f=>{
-      const cobradoMes=cobros.filter(c=>c.fecha&&c.fecha.startsWith(f.mes)).reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
-      const pct=f.total>0?Math.round(cobradoMes/f.total*100):0;
-      const estadoCls=pct>=100?'up':pct>0?'':'dn';
-      const estadoTxt=pct>=100?'✓ Cobrado':pct>0?pct+'% cobrado':'Pendiente';
+    const cobros = load(KEYS.cobros);
+    rows.innerHTML = facYear.map(f=>{
+      const cobradoMes = cobros.filter(c=>c.fecha&&c.fecha.startsWith(f.mes)).reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
+      const pct = f.total>0 ? Math.round(cobradoMes/f.total*100) : 0;
+      const estadoCls = pct>=100?'up':pct>0?'':'dn';
+      const estadoTxt = pct>=100?'✓ Cobrado':pct>0?pct+'% cobrado':'Pendiente';
       return `<div class="mtr"><div class="mtd">${mesNombre(f.mes)}</div><div class="mtd">${fmtE(f.total)}</div><div class="mtd">${fmtE(cobradoMes)}</div><div class="mtd ${estadoCls}">${estadoTxt}</div></div>`;
     }).join('');
   }
 
-  buildChart(facturas,cobros,year);
+  buildChart(facturas, [], year);
 }
 
 function buildChart(facturas,cobros,year){
   const meses=['E','F','M','A','M','J','J','A','S','O','N','D'];
+  // Cargar histórico — si localStorage está vacío usa los datos iniciales directamente
+  var hist = [];
+  try { hist = fac_loadHistorico(); } catch(e) { hist = FAC_HIST_INICIAL || []; }
+  if (!hist || hist.length === 0) hist = FAC_HIST_INICIAL || [];
   const d=meses.map((_,i)=>{
     const ym=`${year}-${String(i+1).padStart(2,'0')}`;
     const ymPrev=`${year-1}-${String(i+1).padStart(2,'0')}`;
-    return {
-      cur:facturas.filter(f=>f.mes===ym).reduce((s,f)=>s+(f.total||0),0),
-      prv:facturas.filter(f=>f.mes===ymPrev).reduce((s,f)=>s+(f.total||0),0)
-    };
+    var cur = facturas.filter(f=>f.mes===ym).reduce((s,f)=>s+(f.total||0),0);
+    if (cur === 0) { var hc = hist.find(function(h){return h.mes===ym;}); if(hc) cur = hc.importe; }
+    var prv = facturas.filter(f=>f.mes===ymPrev).reduce((s,f)=>s+(f.total||0),0);
+    if (prv === 0) { var hp = hist.find(function(h){return h.mes===ymPrev;}); if(hp) prv = hp.importe; }
+    return { cur: cur, prv: prv };
   });
-  const mx=Math.max(...d.map(v=>Math.max(v.cur,v.prv)),1);
+  // Acumulado progresivo
+  var acumCur = 0, acumPrv = 0;
+  const dAcum = d.map(function(v) {
+    if (v.cur > 0) acumCur += v.cur;
+    if (v.prv > 0) acumPrv += v.prv;
+    return { cur: v.cur > 0 ? acumCur : 0, prv: v.prv > 0 ? acumPrv : 0 };
+  });
+  const mx=Math.max(...dAcum.map(v=>Math.max(v.cur,v.prv)),1);
   const ch=document.getElementById('bar-chart');ch.innerHTML='';
+  const barW = Math.max(4, Math.floor(402 / meses.length / 2) - 2);
   meses.forEach((m,i)=>{
-    const h24=Math.round(d[i].prv/mx*68);
-    const h25=Math.round(d[i].cur/mx*68);
+    const h24=Math.round(dAcum[i].prv/mx*68);
+    const h25=Math.round(dAcum[i].cur/mx*68);
     const w=document.createElement('div');w.className='bwrap';
     w.innerHTML=`<div style="display:flex;align-items:flex-end;gap:2px;height:68px">
-      ${h24>0?`<div class="bar prv" style="height:${h24}px;flex:1"></div>`:'<div style="flex:1"></div>'}
-      ${h25>0?`<div class="bar cur" style="height:${h25}px;flex:1"></div>`:'<div style="flex:1"></div>'}
+      ${h24>0?`<div style="width:${barW}px;height:${h24}px;background:#6b7fa3;border-radius:3px 3px 0 0;"></div>`:'<div style="width:${barW}px"></div>'}
+      ${h25>0?`<div style="width:${barW}px;height:${h25}px;background:#c8d0e0;border-radius:3px 3px 0 0;"></div>`:'<div style="width:${barW}px"></div>'}
     </div><div class="blabel">${m}</div>`;
     ch.appendChild(w);
   });
@@ -7514,6 +8031,12 @@ function confirmFactura(){
       const filtered=facturas.filter(f=>f.mes!==mes);
       filtered.push({mes,fecha:hoy(),total,items});
       save(KEYS.facturas,filtered);
+      // Sincronizar con histórico global
+      var hist = fac_loadHistorico();
+      var idx = -1;
+      for (var hi = 0; hi < hist.length; hi++) { if (hist[hi].mes === mes) { idx = hi; break; } }
+      if (idx >= 0) { hist[idx].importe = total; } else { hist.push({mes: mes, importe: total}); hist.sort(function(a,b){return a.mes.localeCompare(b.mes);}); }
+      fac_saveHistorico(hist);
       info('✓ Factura de '+mesNombre(mes)+' guardada correctamente.');
       showMain();
       // Preguntar cobros por cada inmueble tras un breve delay
@@ -7964,7 +8487,6 @@ function fmt(n){
     return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + parts[1];
   }
 }
-function fmtE(n){ return fmt(n) + '€'; }
 
 // ── FORMATO AUTOMÁTICO EN INPUTS NUMÉRICOS ──────────────────
 // Llama a esto en onblur de cualquier input numérico de la calculadora
@@ -8005,6 +8527,7 @@ document.addEventListener('firebaseLoaded', function() {
   syncInquilinosDesdeContratos();
   if (typeof cal_renderLista === 'function') cal_renderLista();
   renderLista();
+  fac_loadHistorico(); // inicializar histórico para que buildChart lo encuentre
 });
 
 // ─────────────────────────────────────────
@@ -9398,6 +9921,99 @@ function syncInquilinosDesdeContratos(){
 
 
 // =========================================================
+
+// ── ASISTENTE ACTUALIZAR VALORES ──────────────────────────────────────
+var _finAsiPasos = [];
+var _finAsiIdx = 0;
+
+function fin_abrirAsistente() {
+  _finAsiPasos = [];
+  _finAsiIdx = 0;
+  // Construir lista de pasos: cuentas, acciones, fondos
+  var cuentas = fin_load('fin:cuentas');
+  for (var i = 0; i < cuentas.length; i++) {
+    _finAsiPasos.push({ tipo: 'cuenta', idx: i, nombre: cuentas[i].nombre || 'Cuenta ' + (i+1), actual: fin_fmt(cuentas[i].saldo || 0) });
+  }
+  var tickers = [];
+  var ops = fin_load('fin:acciones');
+  var tickersSeen = {};
+  for (var j = 0; j < ops.length; j++) {
+    var t = ops[j].ticker;
+    if (t && !tickersSeen[t]) { tickersSeen[t] = true; tickers.push(t); }
+  }
+  var cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}');
+  for (var k = 0; k < tickers.length; k++) {
+    var t2 = tickers[k];
+    var cotActual = cache[t2] ? fin_fmt(cache[t2].precio) : 'Sin cotizacion';
+    _finAsiPasos.push({ tipo: 'accion', ticker: t2, nombre: FIN_NOMBRES[t2] || t2, actual: cotActual });
+  }
+  var fondos = fin_load('fin:fondos');
+  for (var m = 0; m < fondos.length; m++) {
+    _finAsiPasos.push({ tipo: 'fondo', idx: m, nombre: fondos[m].nombre || 'Fondo ' + (m+1), actual: fin_fmt(fondos[m].valor || 0) });
+  }
+  if (_finAsiPasos.length === 0) { alert('No hay datos que actualizar. Añade cuentas, acciones o fondos primero.'); return; }
+  fin_asiMostrarPaso();
+  document.getElementById('fin-modal-asistente').style.display = 'flex';
+}
+
+function fin_cerrarAsistente() {
+  document.getElementById('fin-modal-asistente').style.display = 'none';
+  fin_render();
+}
+
+function fin_asiMostrarPaso() {
+  var paso = _finAsiPasos[_finAsiIdx];
+  var total = _finAsiPasos.length;
+  var iconos = { cuenta: '🏦', accion: '📈', fondo: '📊' };
+  var etiquetas = { cuenta: 'Saldo cuenta', accion: 'Cotización', fondo: 'Valor actual' };
+  document.getElementById('fin-asi-progreso').textContent = 'Paso ' + (_finAsiIdx + 1) + ' de ' + total;
+  document.getElementById('fin-asi-titulo').innerHTML = (iconos[paso.tipo] || '') + ' ' + etiquetas[paso.tipo] + '<span class="mclose" onclick="fin_cerrarAsistente()">&#10005;</span>';
+  document.getElementById('fin-asi-pregunta').textContent = paso.nombre;
+  document.getElementById('fin-asi-actual').textContent = 'Valor actual: ' + paso.actual;
+  document.getElementById('fin-asi-input').value = '';
+  setTimeout(function() { document.getElementById('fin-asi-input').focus(); }, 150);
+  var btnSig = document.querySelector('#fin-modal-asistente .btn1');
+  if (btnSig) btnSig.textContent = (_finAsiIdx === total - 1) ? 'Finalizar ✓' : 'Siguiente ›';
+}
+
+function fin_asiFormatInput(el) {
+  var v = el.value.replace(/[^0-9,\.]/g, '');
+  el.value = v;
+}
+
+function fin_asiGuardarPaso(paso, valor) {
+  if (paso.tipo === 'cuenta') {
+    var data = fin_load('fin:cuentas');
+    if (data[paso.idx]) { data[paso.idx].saldo = valor; fin_save('fin:cuentas', data); }
+  } else if (paso.tipo === 'accion') {
+    _finCotizaciones[paso.ticker] = valor;
+    var cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}');
+    cache[paso.ticker] = { precio: valor, fecha: new Date().toISOString().slice(0, 10) };
+    localStorage.setItem('fin:cotizaciones', JSON.stringify(cache));
+  } else if (paso.tipo === 'fondo') {
+    var fondos = fin_load('fin:fondos');
+    if (fondos[paso.idx]) { fondos[paso.idx].valor = valor; fin_save('fin:fondos', fondos); }
+  }
+}
+
+function fin_asiSiguiente() {
+  var paso = _finAsiPasos[_finAsiIdx];
+  var raw = document.getElementById('fin-asi-input').value.replace(',', '.').trim();
+  var valor = parseFloat(raw);
+  if (!isNaN(valor) && valor >= 0) {
+    fin_asiGuardarPaso(paso, valor);
+  }
+  _finAsiIdx++;
+  if (_finAsiIdx >= _finAsiPasos.length) { fin_cerrarAsistente(); return; }
+  fin_asiMostrarPaso();
+}
+
+function fin_asiSaltar() {
+  _finAsiIdx++;
+  if (_finAsiIdx >= _finAsiPasos.length) { fin_cerrarAsistente(); return; }
+  fin_asiMostrarPaso();
+}
+
 // MODULO FINANZAS
 // =========================================================
 
@@ -9939,6 +10555,19 @@ window._refreshCurrentModule = function(key) {
     'calculadora:estudios': 'analisis',
     'contratos:lista': 'contratos',
     'clientes:lista': 'contratos',
+    'fin:cuentas:empresa': 'finanzas',
+    'fin:cuentas:patrimer': 'finanzas',
+    'fin:cuentas:patricio': 'finanzas',
+    'fin:cuentas:industrias': 'finanzas',
+    'fin:acciones:empresa': 'finanzas',
+    'fin:acciones:patrimer': 'finanzas',
+    'fin:acciones:patricio': 'finanzas',
+    'fin:acciones:industrias': 'finanzas',
+    'fin:fondos:empresa': 'finanzas',
+    'fin:fondos:patrimer': 'finanzas',
+    'fin:fondos:patricio': 'finanzas',
+    'fin:fondos:industrias': 'finanzas',
+    'fin:cotizaciones': 'finanzas',
   };
   const module = keyModuleMap[key];
   if (!module) return;
@@ -9947,10 +10576,11 @@ window._refreshCurrentModule = function(key) {
   if (mod && mod.classList.contains('active')) {
     // Llamar a la función de render del módulo correspondiente
     if (module === 'inmuebles' && typeof renderLista === 'function') renderLista();
-    if (module === 'cobros' && typeof renderMain === 'function') renderMain();
+    if (module === 'cobros' && typeof renderMain === 'function') { fac_loadHistorico(); renderMain(); }
     if (module === 'analisis' && typeof cal_renderLista === 'function') cal_renderLista();
     if (module === 'documentos' && typeof doc_renderLista === 'function') doc_renderLista();
     if (module === 'clientes' && typeof cli_renderLista === 'function') cli_renderLista();
+    if (module === 'finanzas' && typeof fin_render === 'function') fin_render();
   }
 };
 
