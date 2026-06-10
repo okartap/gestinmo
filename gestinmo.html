@@ -2167,9 +2167,10 @@ window.loadFromFirestore().then(() => {
       <div onclick="showModule('cobros');" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">VER COBROS</div>
       </div>
+      <div onclick="showModule('renta');" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">📊 RENTA PATRICIO</div>
+      </div>
     </div>
-
-    <!-- COBROS PENDIENTES -->
     <div id="dash-cobros-section" style="display:none;margin-bottom:16px;"></div>
 
     <!-- AVISO RÚSTICO julio/agosto -->
@@ -3191,6 +3192,70 @@ window.loadFromFirestore().then(() => {
     <div class="mtitle">📋 ¿Cómo funciona?<span class="mclose" onclick="document.getElementById('fac-info-modal').classList.remove('open')">✕</span></div>
     <p style="font-size:13px;color:var(--silver-mid);line-height:1.6;margin:0;">Los inmuebles alquilados están marcados automáticamente. Puedes modificar el importe si es necesario.<br><br>Si has alquilado un inmueble vacante este mes, pulsa <strong style="color:var(--silver-bright)">＋ Añadir inmueble vacante</strong> para incluirlo.<br><br>Pulsa <strong style="color:var(--silver-bright)">Confirmar y facturar</strong> cuando estés listo.</p>
     <button class="btn1" onclick="document.getElementById('fac-info-modal').classList.remove('open')" style="margin-top:14px;">Entendido</button>
+  </div>
+</div>
+
+<!-- MODAL RENTA: NÓMINA -->
+<div id="renta-modal-nomina" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💼 AÑADIR NÓMINA</div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MES</div>
+      <select id="renta-nom-mes" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;"></select>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">SALARIO BRUTO (€)</div>
+      <input id="renta-nom-bruto" type="text" inputmode="decimal" placeholder="3.500" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">RETENCIÓN IRPF (€)</div>
+      <input id="renta-nom-retencion" type="text" inputmode="decimal" placeholder="420" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">SEGURIDAD SOCIAL (€)</div>
+      <input id="renta-nom-ss" type="text" inputmode="decimal" placeholder="210" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <button onclick="renta_guardarNomina()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
+    <button onclick="renta_cerrarModalNomina()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL RENTA: GASTO CON FACTURA -->
+<div id="renta-modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">🧾 AÑADIR GASTO</div>
+    <input type="hidden" id="renta-gasto-tipo-hidden">
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CONCEPTO</div>
+      <input id="renta-gasto-concepto" type="text" placeholder="Ej: IBI, reparación caldera..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">IMPORTE (€)</div>
+      <input id="renta-gasto-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA</div>
+      <input id="renta-gasto-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CATEGORÍA</div>
+      <select id="renta-gasto-categoria" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        <option value="IBI">IBI</option>
+        <option value="Reparación">Reparación / Conservación</option>
+        <option value="Seguro">Seguro</option>
+        <option value="Comunidad">Comunidad de propietarios</option>
+        <option value="Gestoría">Gestoría / Asesoría</option>
+        <option value="Suministros">Suministros</option>
+        <option value="Otros">Otros</option>
+      </select>
+    </div>
+    <div style="background:rgba(91,141,238,0.1);border:1px dashed rgba(91,141,238,0.3);border-radius:10px;padding:12px;margin-bottom:20px;text-align:center;color:var(--text-secondary);font-size:12px;">
+      📎 Adjuntar foto de factura — disponible en próxima versión (se guardará en Google Drive)
+    </div>
+    <button onclick="renta_guardarGasto()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
+    <button onclick="renta_cerrarModalGasto()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
   </div>
 </div>
 
@@ -4742,6 +4807,135 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 </nav>
 </div><!-- mod-clientes -->
 
+<!-- ── MÓDULO: RENTA PATRICIO ── fuera de appShell -->
+<div id="mod-renta" class="module-view">
+<header class="header">
+  <div class="header-back" onclick="showModule('inicio')">&#8249;</div>
+  <div class="header-identity">
+    <div class="header-single-row">
+      <span class="header-module-name">Renta Patricio</span>
+    </div>
+  </div>
+</header>
+
+<div class="main" style="padding-top:64px;padding-bottom:80px;">
+
+  <!-- Selector de año -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <button onclick="renta_anioAnterior()" style="background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-size:20px;width:40px;height:40px;cursor:pointer;">‹</button>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--silver-bright);letter-spacing:2px;" id="renta-anio-label">2025</div>
+    <button onclick="renta_anioSiguiente()" style="background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-size:20px;width:40px;height:40px;cursor:pointer;">›</button>
+  </div>
+
+  <!-- Tarjeta resumen previsión IRPF -->
+  <div style="background:linear-gradient(135deg,#1a2a4a,#0f1e36);border:1px solid rgba(91,141,238,0.3);border-radius:16px;padding:16px;margin-bottom:20px;">
+    <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">Previsión IRPF a pagar / devolver</div>
+    <div style="font-size:28px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-prevision-irpf">— €</div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="renta-prevision-nota">Añade datos para ver la previsión</div>
+  </div>
+
+  <!-- Bloque A: Trabajo / Nómina -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-trabajo')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">💼</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">TRABAJO</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Nóminas · Retención IRPF · SS</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-trabajo">— €</div>
+        <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-trabajo">›</span>
+      </div>
+    </div>
+    <div id="bloque-trabajo" style="display:none;padding:0 16px 14px;">
+      <div id="renta-lista-nominas" style="margin-bottom:12px;"></div>
+      <button onclick="renta_abrirModalNomina()" style="width:100%;background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir nómina</button>
+    </div>
+  </div>
+
+  <!-- Bloque B: Alquileres -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-alquileres')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">🏠</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">ALQUILERES</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Ingresos · Gastos deducibles</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-alquileres">— €</div>
+        <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-alquileres">›</span>
+      </div>
+    </div>
+    <div id="bloque-alquileres" style="display:none;padding:0 16px 14px;">
+      <div style="font-size:12px;color:var(--text-secondary);padding:8px 0 12px;">Los ingresos se cargan automáticamente desde Patrimer (empresa Patricio).</div>
+      <div id="renta-lista-alquileres" style="margin-bottom:12px;"></div>
+      <button onclick="renta_abrirModalGasto('alquiler')" style="width:100%;background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir gasto deducible</button>
+    </div>
+  </div>
+
+  <!-- Bloque C: Capital Mobiliario -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-capital')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">📈</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">CAPITAL MOBILIARIO</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Dividendos · Plusvalías fondos/acciones</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-capital">— €</div>
+        <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-capital">›</span>
+      </div>
+    </div>
+    <div id="bloque-capital" style="display:none;padding:0 16px 14px;">
+      <div style="font-size:12px;color:var(--text-secondary);padding:8px 0 12px;">Datos cargados desde el módulo Finanzas de Patricio.</div>
+      <div id="renta-lista-capital"></div>
+    </div>
+  </div>
+
+  <!-- Bloque D: Otros gastos con factura -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-gastos')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">🧾</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">OTROS GASTOS</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Facturas deducibles con foto</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:#e07070;" id="renta-total-gastos">— €</div>
+        <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-gastos">›</span>
+      </div>
+    </div>
+    <div id="bloque-gastos" style="display:none;padding:0 16px 14px;">
+      <div id="renta-lista-gastos" style="margin-bottom:12px;"></div>
+      <button onclick="renta_abrirModalGasto('otro')" style="width:100%;background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir gasto con factura</button>
+    </div>
+  </div>
+
+  <!-- Bloque F: Exportar -->
+  <button onclick="renta_exportarCSV()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:12px;">
+    <span>📤</span> EXPORTAR PARA ASESOR (CSV)
+  </button>
+
+</div><!-- /main -->
+
+<nav class="nav" id="renta-nav-fixed" style="display:flex;">
+  <div class="nav-item" onclick="showModule('inicio')"><div class="nav-icon">🏠</div><div class="nav-label">Inicio</div></div>
+  <div class="nav-item" onclick="showModule('inmuebles')"><div class="nav-icon">🏢</div><div class="nav-label">Inmuebles</div></div>
+  <div class="nav-item" onclick="showModule('contratos')"><div class="nav-icon">📄</div><div class="nav-label">Contratos</div></div>
+  <div class="nav-item" onclick="showModule('cobros')"><div class="nav-icon">💶</div><div class="nav-label">Cobros</div></div>
+  <div class="nav-item" onclick="showModule('finanzas')"><div class="nav-icon">💰</div><div class="nav-label">Finanzas</div></div>
+  <div class="nav-item active"><div class="nav-icon">📊</div><div class="nav-label">Renta</div></div>
+</nav>
+</div><!-- mod-renta -->
+
 <!-- ══════════════════════════════════════════════
      FAB
 ══════════════════════════════════════════════ -->
@@ -5032,7 +5226,7 @@ function showModule(name) {
   if (mod) mod.scrollTop = 0;
   // Actualizar nav activo en TODOS los navs
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const navMap = { inicio:0, inmuebles:1, contratos:2, cobros:3, finanzas:4, documentos:5 };
+  const navMap = { inicio:0, inmuebles:1, contratos:2, cobros:3, finanzas:4, documentos:5, renta:6 };
   const idx = navMap[name];
   if (idx !== undefined) {
     document.querySelectorAll('.nav-item').forEach((el, i) => {
@@ -5080,6 +5274,10 @@ function showModule(name) {
   if (name === 'finanzas' && typeof fin_render === 'function') {
     fin_loadCotizaciones();
     fin_render();
+  }
+  // Renderizar renta al abrir el módulo
+  if (name === 'renta' && typeof renta_render === 'function') {
+    renta_render();
   }
 }
 
@@ -7691,7 +7889,7 @@ function rus_verHistorico(ref, nombre) {
   document.getElementById('rus-modal-historico').style.display = 'flex';
 }
 
-var FAC_HIST_KEY = 'facturacion:historico';
+function FAC_HIST_KEY() { var emp = localStorage.getItem('patrimer:empresa') || 'empresa'; return 'facturacion:historico:' + emp; }
 
 var FAC_HIST_INICIAL = [
   {mes:'2023-01',importe:13546.17},{mes:'2023-02',importe:13603.73},{mes:'2023-03',importe:13883.81},
@@ -7711,14 +7909,32 @@ var FAC_HIST_INICIAL = [
 ];
 
 function fac_loadHistorico() {
-  var raw = localStorage.getItem(FAC_HIST_KEY);
-  if (raw) { try { return JSON.parse(raw); } catch(e) {} }
-  // Primera vez: cargar datos históricos y guardar
-  localStorage.setItem(FAC_HIST_KEY, JSON.stringify(FAC_HIST_INICIAL));
-  return FAC_HIST_INICIAL;
+  var emp = localStorage.getItem('patrimer:empresa') || 'empresa';
+  var raw = localStorage.getItem(FAC_HIST_KEY());
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      // Si es empresa principal, devolver tal cual
+      if (emp === 'empresa' || emp === 'patrimer') return parsed;
+      // Para otras empresas: detectar si el dato guardado es el histórico inicial
+      // de Patrimer (contaminado). Lo identificamos por el primer valor conocido.
+      if (parsed.length > 0 && parsed[0].mes === '2023-01' && parsed[0].importe === 13546.17) {
+        // Dato contaminado — limpiar y devolver vacío
+        localStorage.removeItem(FAC_HIST_KEY());
+        return [];
+      }
+      return parsed;
+    } catch(e) {}
+  }
+  // Sin dato guardado
+  if (emp === 'empresa' || emp === 'patrimer') {
+    localStorage.setItem(FAC_HIST_KEY(), JSON.stringify(FAC_HIST_INICIAL));
+    return FAC_HIST_INICIAL;
+  }
+  return [];
 }
 function fac_saveHistorico(data) {
-  localStorage.setItem(FAC_HIST_KEY, JSON.stringify(data));
+  localStorage.setItem(FAC_HIST_KEY(), JSON.stringify(data));
 }
 function fac_abrirNuevoHistorico() {
   var hoy = new Date();
@@ -11264,13 +11480,29 @@ function con_renderLista() {
   const _arrMap = {
     'empresa':    ['patrimer levante','patrimer','b-73110009'],
     'patrimer':   ['patrimer levante','patrimer','b-73110009'],
-    'patricio':   ['patricio gómez','patricio gomez','patricio g'],
+    'patricio':   ['patricio gómez garcía a título personal','patricio gomez garcia a titulo personal','como titular personal'],
     'industrias': ['industrias gómez','industrias gomez','igc','b-pendiente']
   };
   const _claves = _arrMap[_empActiva] || _arrMap['empresa'];
+  // Obtener índices de inmuebles del propietario activo para filtrar por inmueble
+  const _todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || localStorage.getItem('inmuebles:lista') || '[]');
+  const _propMap = { 'empresa':'patrimer', 'patrimer':'patrimer', 'patricio':'patricio', 'industrias':'industrias' };
+  const _propBuscado = _propMap[_empActiva] || 'patrimer';
+  const _refsEmp = {};
+  _todosInm.forEach(function(inm) {
+    var p = (inm.propietario || 'patrimer').toLowerCase();
+    if (p === _propBuscado || ((_propBuscado === 'patrimer' || _propBuscado === 'empresa') && (p === 'empresa' || p === 'patrimer'))) {
+      if (inm.ref) _refsEmp[inm.ref] = true;
+    }
+  });
   const contratos = _todosContratos.filter(c => {
-    if (!c.arrendador) return true; // sin arrendador → mostrar siempre
+    // Filtrar por inmueble si el contrato tiene ref
+    if (c.ref && Object.keys(_refsEmp).length > 0) return !!_refsEmp[c.ref];
+    // Fallback: filtrar por arrendador
+    if (!c.arrendador) return false;
     const arr = c.arrendador.toLowerCase();
+    // Excluir contratos de Patrimer del perfil Patricio
+    if (_empActiva === 'patricio' && (arr.includes('patrimer') || arr.includes('b-73110009'))) return false;
     return _claves.some(k => arr.includes(k));
   });
   const hoy = new Date();
@@ -11622,6 +11854,394 @@ function cli_rescision() {
     }, 400);
   }, 300);
 }
+
+// ─── JS MÓDULO RENTA PATRICIO ─────────────────────────────────────────────
+
+var renta_anio = new Date().getFullYear();
+
+function renta_render() {
+  document.getElementById('renta-anio-label').textContent = renta_anio;
+  renta_renderNominas();
+  renta_renderAlquileres();
+  renta_renderCapital();
+  renta_renderGastos();
+  renta_calcPrevision();
+}
+
+function renta_anioAnterior() {
+  renta_anio--;
+  renta_render();
+}
+
+function renta_anioSiguiente() {
+  renta_anio++;
+  renta_render();
+}
+
+function renta_toggleBloque(id) {
+  var el = document.getElementById(id);
+  var nombre = id.replace('bloque-', '');
+  var chevron = document.getElementById('renta-chevron-' + nombre);
+  if (!el) return;
+  var abierto = el.style.display !== 'none';
+  el.style.display = abierto ? 'none' : 'block';
+  if (chevron) chevron.textContent = abierto ? '›' : '⌄';
+}
+
+// ── Nóminas ──────────────────────────────────────────────────────────────
+function renta_getNominas() {
+  return JSON.parse(localStorage.getItem('renta:nominas:' + renta_anio) || '[]');
+}
+function renta_saveNominas(arr) {
+  localStorage.setItem('renta:nominas:' + renta_anio, JSON.stringify(arr));
+}
+
+function renta_renderNominas() {
+  var nominas = renta_getNominas();
+  var cont = document.getElementById('renta-lista-nominas');
+  if (!cont) return;
+  if (nominas.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin nóminas introducidas.</div>';
+    document.getElementById('renta-total-trabajo').textContent = '— €';
+    return;
+  }
+  var totalBruto = 0, totalRetencion = 0, totalSS = 0;
+  var html = '';
+  for (var i = 0; i < nominas.length; i++) {
+    var n = nominas[i];
+    totalBruto += parseFloat(n.bruto) || 0;
+    totalRetencion += parseFloat(n.retencion) || 0;
+    totalSS += parseFloat(n.ss) || 0;
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + n.mes + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">Bruto: ' + fmtGlobal(n.bruto) + '€ · IRPF: ' + fmtGlobal(n.retencion) + '€ · SS: ' + fmtGlobal(n.ss) + '€</div></div>'
+      + '<button onclick="renta_borrarNomina(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
+      + '</div>';
+  }
+  cont.innerHTML = html;
+  document.getElementById('renta-total-trabajo').textContent = fmtGlobal(totalBruto) + ' €';
+}
+
+function renta_borrarNomina(idx) {
+  var arr = renta_getNominas();
+  arr.splice(idx, 1);
+  renta_saveNominas(arr);
+  renta_renderNominas();
+  renta_calcPrevision();
+}
+
+// Modal nómina
+function renta_abrirModalNomina() {
+  document.getElementById('renta-modal-nomina').style.display = 'flex';
+  var meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre','Extra junio','Extra diciembre'];
+  var sel = document.getElementById('renta-nom-mes');
+  if (sel && sel.options.length === 0) {
+    for (var mi = 0; mi < meses.length; mi++) {
+      var o = document.createElement('option');
+      o.value = meses[mi]; o.textContent = meses[mi]; sel.appendChild(o);
+    }
+    sel.value = meses[new Date().getMonth()];
+  }
+}
+function renta_cerrarModalNomina() {
+  document.getElementById('renta-modal-nomina').style.display = 'none';
+}
+function renta_guardarNomina() {
+  var mes = document.getElementById('renta-nom-mes').value;
+  var bruto = parseFmtGlobal(document.getElementById('renta-nom-bruto').value);
+  var retencion = parseFmtGlobal(document.getElementById('renta-nom-retencion').value);
+  var ss = parseFmtGlobal(document.getElementById('renta-nom-ss').value);
+  if (!mes || !bruto) { alert('Introduce al menos el mes y el salario bruto.'); return; }
+  var arr = renta_getNominas();
+  arr.push({ mes: mes, bruto: bruto, retencion: retencion, ss: ss });
+  renta_saveNominas(arr);
+  renta_cerrarModalNomina();
+  document.getElementById('renta-nom-bruto').value = '';
+  document.getElementById('renta-nom-retencion').value = '';
+  document.getElementById('renta-nom-ss').value = '';
+  renta_renderNominas();
+  renta_calcPrevision();
+}
+
+// ── Alquileres (cargados desde Patrimer empresa patricio) ─────────────────
+function renta_renderAlquileres() {
+  var cont = document.getElementById('renta-lista-alquileres');
+  if (!cont) return;
+
+  // Identificar indices de inmuebles de Patricio
+  var todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || '[]');
+  var idxPatricio = [];
+  for (var i = 0; i < todosInm.length; i++) {
+    var prop = (todosInm[i].propietario || '').toLowerCase();
+    if (prop === 'patricio') idxPatricio.push(i);
+  }
+
+  if (idxPatricio.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">No hay inmuebles asignados a Patricio en la app.</div>';
+    document.getElementById('renta-total-alquileres').textContent = '— €';
+    return;
+  }
+
+  // Filtrar facturas del año con items de Patricio
+  var facturas = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
+  var facAnio = [];
+  for (var j = 0; j < facturas.length; j++) {
+    var f = facturas[j];
+    if (!f.mes) continue;
+    var anioFac = parseInt(f.mes.split('-')[0]);
+    if (anioFac !== renta_anio) continue;
+    var importePatricio = 0;
+    if (f.items && f.items.length) {
+      for (var k = 0; k < f.items.length; k++) {
+        if (idxPatricio.indexOf(f.items[k].idx) >= 0) {
+          importePatricio += parseFloat(f.items[k].precio) || 0;
+        }
+      }
+    } else {
+      importePatricio = parseFloat(f.total) || 0;
+    }
+    if (importePatricio > 0) facAnio.push({ mes: f.mes, importe: importePatricio });
+  }
+
+  if (facAnio.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin facturas de alquiler de Patricio para ' + renta_anio + '.</div>';
+    document.getElementById('renta-total-alquileres').textContent = '— €';
+    return;
+  }
+
+  var totalAlq = 0;
+  var html = '';
+  for (var m = 0; m < facAnio.length; m++) {
+    totalAlq += facAnio[m].importe;
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + facAnio[m].mes + '</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(facAnio[m].importe) + ' €</div>'
+      + '</div>';
+  }
+  cont.innerHTML = html;
+  document.getElementById('renta-total-alquileres').textContent = fmtGlobal(totalAlq) + ' €';
+}
+
+// ── Capital mobiliario (desde Finanzas patricio) ───────────────────────────
+function renta_renderCapital() {
+  var cont = document.getElementById('renta-lista-capital');
+  if (!cont) return;
+
+  // Leer operaciones de acciones de Patricio — campo clave: divImporte
+  var ops = JSON.parse(localStorage.getItem('fin:acciones:patricio') || '[]');
+  var divs = [];
+  for (var i = 0; i < ops.length; i++) {
+    var o = ops[i];
+    if (o.tipo !== 'dividendo') continue;
+    if (!o.fecha) continue;
+    if (new Date(o.fecha).getFullYear() !== renta_anio) continue;
+    divs.push(o);
+  }
+
+  if (divs.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos registrados en Finanzas para ' + renta_anio + '.</div>';
+    document.getElementById('renta-total-capital').textContent = '— €';
+    return;
+  }
+
+  var total = 0;
+  var html = '';
+  for (var j = 0; j < divs.length; j++) {
+    var d = divs[j];
+    var importe = parseFloat(d.divImporte) || 0;
+    total += importe;
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + (d.ticker || '—') + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + (d.divObs ? ' · ' + d.divObs : '') + '</div></div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(importe) + ' €</div>'
+      + '</div>';
+  }
+  cont.innerHTML = html;
+  document.getElementById('renta-total-capital').textContent = fmtGlobal(total) + ' €';
+}
+
+// ── Gastos con factura ────────────────────────────────────────────────────
+function renta_getGastos() {
+  return JSON.parse(localStorage.getItem('renta:gastos:' + renta_anio) || '[]');
+}
+function renta_saveGastos(arr) {
+  localStorage.setItem('renta:gastos:' + renta_anio, JSON.stringify(arr));
+}
+function renta_renderGastos() {
+  var gastos = renta_getGastos();
+  var cont = document.getElementById('renta-lista-gastos');
+  if (!cont) return;
+  if (gastos.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin gastos añadidos.</div>';
+    document.getElementById('renta-total-gastos').textContent = '— €';
+    return;
+  }
+  var total = 0;
+  var html = '';
+  for (var i = 0; i < gastos.length; i++) {
+    var g = gastos[i];
+    total += parseFloat(g.importe) || 0;
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + g.concepto + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + (g.fecha || '') + (g.categoria ? ' · ' + g.categoria : '') + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<div style="font-size:13px;font-weight:700;color:#e07070;">-' + fmtGlobal(g.importe) + ' €</div>'
+      + '<button onclick="renta_borrarGasto(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
+      + '</div></div>';
+  }
+  cont.innerHTML = html;
+  document.getElementById('renta-total-gastos').textContent = fmtGlobal(total) + ' €';
+}
+
+function renta_borrarGasto(idx) {
+  var arr = renta_getGastos();
+  arr.splice(idx, 1);
+  renta_saveGastos(arr);
+  renta_renderGastos();
+  renta_calcPrevision();
+}
+
+function renta_abrirModalGasto(tipo) {
+  document.getElementById('renta-modal-gasto').style.display = 'flex';
+  document.getElementById('renta-gasto-tipo-hidden').value = tipo;
+  var hoyStr = new Date().toISOString().split('T')[0];
+  document.getElementById('renta-gasto-fecha').value = hoyStr;
+}
+function renta_cerrarModalGasto() {
+  document.getElementById('renta-modal-gasto').style.display = 'none';
+}
+function renta_guardarGasto() {
+  var concepto = document.getElementById('renta-gasto-concepto').value.trim();
+  var importe = parseFmtGlobal(document.getElementById('renta-gasto-importe').value);
+  var fecha = document.getElementById('renta-gasto-fecha').value;
+  var categoria = document.getElementById('renta-gasto-categoria').value;
+  if (!concepto || !importe) { alert('Introduce el concepto y el importe.'); return; }
+  var arr = renta_getGastos();
+  arr.push({ concepto: concepto, importe: importe, fecha: fecha, categoria: categoria, fotoUrl: null });
+  renta_saveGastos(arr);
+  renta_cerrarModalGasto();
+  document.getElementById('renta-gasto-concepto').value = '';
+  document.getElementById('renta-gasto-importe').value = '';
+  renta_renderGastos();
+  renta_calcPrevision();
+}
+
+// ── Previsión IRPF (estimación simplificada) ─────────────────────────────
+function renta_calcPrevision() {
+  var nominas = renta_getNominas();
+  var brutoTrabajo = 0, retencionAcum = 0, ssTrabajo = 0;
+  for (var ni = 0; ni < nominas.length; ni++) {
+    brutoTrabajo += parseFloat(nominas[ni].bruto) || 0;
+    retencionAcum += parseFloat(nominas[ni].retencion) || 0;
+    ssTrabajo += parseFloat(nominas[ni].ss) || 0;
+  }
+
+  // Alquileres Patricio desde inmuebles
+  var todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || '[]');
+  var idxP = [];
+  for (var ii = 0; ii < todosInm.length; ii++) {
+    if ((todosInm[ii].propietario || '').toLowerCase() === 'patricio') idxP.push(ii);
+  }
+  var facturas = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
+  var ingresoAlquiler = 0;
+  for (var fi = 0; fi < facturas.length; fi++) {
+    var f = facturas[fi];
+    if (!f.mes || parseInt(f.mes.split('-')[0]) !== renta_anio) continue;
+    if (f.items && f.items.length) {
+      for (var fk = 0; fk < f.items.length; fk++) {
+        if (idxP.indexOf(f.items[fk].idx) >= 0) ingresoAlquiler += parseFloat(f.items[fk].precio) || 0;
+      }
+    }
+  }
+
+  // Gastos deducibles
+  var gastosArr = renta_getGastos();
+  var gastosDeducibles = 0;
+  for (var gi = 0; gi < gastosArr.length; gi++) { gastosDeducibles += parseFloat(gastosArr[gi].importe) || 0; }
+
+  // Capital mobiliario (dividendos)
+  var ops = JSON.parse(localStorage.getItem('fin:acciones:patricio') || '[]');
+  var capitalMobiliario = 0;
+  for (var oi = 0; oi < ops.length; oi++) {
+    var op = ops[oi];
+    if (op.tipo === 'dividendo' && op.fecha && new Date(op.fecha).getFullYear() === renta_anio) {
+      capitalMobiliario += parseFloat(op.divImporte) || 0;
+    }
+  }
+
+  var baseGeneral = Math.max(0, brutoTrabajo - ssTrabajo - 2000);
+  var baseAlquiler = Math.max(0, ingresoAlquiler - gastosDeducibles);
+  var baseAhorro = capitalMobiliario;
+
+  if (brutoTrabajo === 0 && ingresoAlquiler === 0 && capitalMobiliario === 0) {
+    document.getElementById('renta-prevision-irpf').textContent = '\u2014 \u20ac';
+    document.getElementById('renta-prevision-irpf').style.color = 'var(--silver-bright)';
+    document.getElementById('renta-prevision-nota').textContent = 'A\u00f1ade datos para ver la previsi\u00f3n';
+    return;
+  }
+
+  function calcIRPF(base) {
+    var tramos = [[0,12450,0.19],[12450,20200,0.24],[20200,35200,0.30],[35200,60000,0.37],[60000,300000,0.45],[300000,999999999,0.47]];
+    var imp = 0;
+    for (var t = 0; t < tramos.length; t++) {
+      if (base <= tramos[t][0]) break;
+      imp += (Math.min(base, tramos[t][1]) - tramos[t][0]) * tramos[t][2];
+    }
+    return imp;
+  }
+  function calcAhorro(base) {
+    var tramos = [[0,6000,0.19],[6000,50000,0.21],[50000,200000,0.23],[200000,999999999,0.27]];
+    var imp = 0;
+    for (var t = 0; t < tramos.length; t++) {
+      if (base <= tramos[t][0]) break;
+      imp += (Math.min(base, tramos[t][1]) - tramos[t][0]) * tramos[t][2];
+    }
+    return imp;
+  }
+
+  var cuotaGeneral = calcIRPF(baseGeneral + baseAlquiler);
+  var cuotaAhorro = calcAhorro(baseAhorro);
+  var cuotaTotal = cuotaGeneral + cuotaAhorro;
+  var resultado = cuotaTotal - retencionAcum;
+
+  var elPrev = document.getElementById('renta-prevision-irpf');
+  var notaPrev = document.getElementById('renta-prevision-nota');
+  elPrev.textContent = (resultado >= 0 ? '+' : '') + fmtGlobal(resultado.toFixed(0)) + ' \u20ac';
+  elPrev.style.color = resultado > 0 ? '#e07070' : '#4caf82';
+  notaPrev.textContent = resultado > 0
+    ? 'Estimaci\u00f3n: a PAGAR (cuota ' + fmtGlobal(cuotaTotal.toFixed(0)) + '\u20ac \u2212 retenciones ' + fmtGlobal(retencionAcum.toFixed(0)) + '\u20ac)'
+    : 'Estimaci\u00f3n: a DEVOLVER (cuota ' + fmtGlobal(cuotaTotal.toFixed(0)) + '\u20ac \u2212 retenciones ' + fmtGlobal(retencionAcum.toFixed(0)) + '\u20ac)';
+}
+
+// ── Exportar CSV ───────────────────────────────────────────────────────────
+function renta_exportarCSV() {
+  var nominas = renta_getNominas();
+  var gastos = renta_getGastos();
+  var csv = 'RENTA ' + renta_anio + '\n\n';
+  csv += 'BLOQUE A - TRABAJO\n';
+  csv += 'Mes,Bruto,Retenci\u00f3n IRPF,Seguridad Social\n';
+  for (var ni = 0; ni < nominas.length; ni++) {
+    var n = nominas[ni];
+    csv += n.mes + ',' + n.bruto + ',' + n.retencion + ',' + n.ss + '\n';
+  }
+  csv += '\nBLOQUE D - OTROS GASTOS DEDUCIBLES\n';
+  csv += 'Fecha,Concepto,Categor\u00eda,Importe\n';
+  for (var gi = 0; gi < gastos.length; gi++) {
+    var g = gastos[gi];
+    csv += (g.fecha || '') + ',' + g.concepto + ',' + (g.categoria || '') + ',' + g.importe + '\n';
+  }
+
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Renta_Patricio_' + renta_anio + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 
 </script>
 </body>
