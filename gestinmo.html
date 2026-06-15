@@ -2168,7 +2168,7 @@ window.loadFromFirestore().then(() => {
       <div onclick="showModule('cobros');" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">VER COBROS</div>
       </div>
-      <div onclick="showModule('renta');" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
+      <div id="dash-btn-renta" onclick="showModule('renta');" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;display:none;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">📊 RENTA PATRICIO</div>
       </div>
     </div>
@@ -3351,7 +3351,7 @@ window.loadFromFirestore().then(() => {
       <div class="res-row">
         <div class="res-head">Inmueble</div>
         <div class="res-head" style="text-align:center">R.Neta</div>
-        <div class="res-head" style="text-align:center">R.Bruta</div>
+        <div class="res-head" style="text-align:center">Alq.Año Neto</div>
         <div class="res-head" style="text-align:right">Alquiler</div>
       </div>
       <div id="resumen-rows">
@@ -3362,7 +3362,7 @@ window.loadFromFirestore().then(() => {
     <div class="limit-banner" id="limit-banner">⚠️ Máximo 7 estudios alcanzado. Elimina uno para crear otro.</div>
 
     <div class="top-row">
-      <div class="slabel">Estudios guardados</div>
+      <div class="slabel" style="text-align:center;color:var(--silver-bright);">Estudios guardados</div>
     </div>
 
     <!-- Lista de cards -->
@@ -3526,7 +3526,7 @@ window.loadFromFirestore().then(() => {
       </div>
       <div class="sem-label" id="sem1_label"></div>
       <div class="res-mini-grid">
-        <div class="res-mini"><div class="res-mini-l">Rent. bruta</div><div class="res-mini-v" id="r_bruta">—</div></div>
+        <div class="res-mini"><div class="res-mini-l">Alq. Año Neto</div><div class="res-mini-v" id="r_bruta">—</div></div>
         <div class="res-mini"><div class="res-mini-l">Rent. neta</div><div class="res-mini-v" id="r_neta" style="color:var(--green)">—</div></div>
         <div class="res-mini"><div class="res-mini-l">Rto. neto anual</div><div class="res-mini-v" id="r_anual">—</div></div>
         <div class="res-mini"><div class="res-mini-l">Amortización</div><div class="res-mini-v" id="r_amort">—</div></div>
@@ -4769,6 +4769,31 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
     <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">Previsión IRPF a pagar / devolver</div>
     <div style="font-size:28px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-prevision-irpf">— €</div>
     <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="renta-prevision-nota">Añade datos para ver la previsión</div>
+  </div>
+
+  <!-- Mínimo personal y familiar -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;padding:14px 16px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:12px;">👤 MÍNIMO PERSONAL Y FAMILIAR</div>
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <div style="flex:1;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:0.5px;">ESTADO CIVIL</div>
+        <select id="renta-estado-civil" onchange="renta_calcPrevision()" style="width:100%;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:'Rajdhani',sans-serif;">
+          <option value="soltero">Soltero / Sin pareja</option>
+          <option value="casado">Casado (declaración individual)</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:0.5px;">HIJOS A CARGO</div>
+        <select id="renta-hijos" onchange="renta_calcPrevision()" style="width:100%;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:'Rajdhani',sans-serif;">
+          <option value="0">Sin hijos</option>
+          <option value="1">1 hijo</option>
+          <option value="2">2 hijos</option>
+          <option value="3">3 hijos</option>
+          <option value="4">4 o más hijos</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary);line-height:1.5;">💡 El mínimo personal (5.550€) y familiar (por hijos) se descuenta de la base antes de calcular la cuota IRPF estimada.</div>
   </div>
 
   <!-- Bloque A: Trabajo / Nómina -->
@@ -9343,7 +9368,7 @@ function calcEstudio(){
   const neta      = total > 0 ? (beneficio / total * 100) : 0;
   const amort     = beneficio > 0 ? total / beneficio : 0;
 
-  document.getElementById('r_bruta').textContent = total > 0 ? bruta.toFixed(1)+'%' : '—';
+  document.getElementById('r_bruta').textContent = beneficio > 0 ? fmtE(beneficio) : '—';
   document.getElementById('r_neta').textContent  = total > 0 ? neta.toFixed(1)+'%'  : '—';
   document.getElementById('r_anual').textContent = beneficio > 0 ? fmtE(beneficio) : '—';
   document.getElementById('r_amort').textContent = amort > 0 ? '~'+Math.round(amort)+' años' : '—';
@@ -9626,7 +9651,7 @@ function cal_renderLista(){
       row.innerHTML = `
         <div class="res-name">${e.nombre}</div>
         <div class="res-pct ${clr}">${e.neta.toFixed(1)}%</div>
-        <div class="res-pct" style="text-align:center;font-size:12px;color:var(--silver-dim)">${e.bruta.toFixed(1)}%</div>
+        <div class="res-pct" style="text-align:center;font-size:12px;color:var(--silver-dim)">${e.beneficio > 0 ? fmtE(e.beneficio) : '—'}</div>
         <div class="res-val">${fmt(e.alquiler)}€/m</div>
       `;
       resRows.appendChild(row);
@@ -9726,6 +9751,8 @@ function limpiarFormulario(){
   document.getElementById('otros-expand-btn').classList.remove('open');
   document.getElementById('otros-sub-panel').classList.remove('open');
   _impManualMode = false;
+  _notariaManual = false;
+  _registroManual = false;
   ['not','obra','mob','otros'].forEach(cat=>{
     document.getElementById('rows-'+cat).innerHTML = '';
   });
@@ -10725,6 +10752,7 @@ function fin_editarCuenta(idx) {
   document.getElementById('fin-cuenta-saldo').value = c.saldo || '';
   document.getElementById('fin-cuenta-idx').value = idx;
   document.getElementById('fin-modal-cuenta').classList.add('open');
+  setTimeout(function() { var el = document.getElementById('fin-cuenta-saldo'); if (el) { el.focus(); el.select(); } }, 150);
 }
 function fin_guardarCuenta() {
   var nombre = document.getElementById('fin-cuenta-nombre').value.trim();
@@ -11007,6 +11035,7 @@ function fin_renderFondos() {
     html += '</div>';
     html += '<div class="fin-card-actions">';
     html += '<div class="fin-action-btn" onclick="fin_editarFondo(' + i + ')">Actualizar valor</div>';
+    html += '<div class="fin-action-btn" onclick="fin_editarFondoNombre(' + i + ')">Editar nombre</div>';
     html += '<div class="fin-action-btn red" onclick="fin_borrarFondo(' + i + ')">Eliminar</div>';
     html += '</div></div>';
   }
@@ -11035,6 +11064,11 @@ function fin_editarFondo(idx) {
   document.getElementById('fin-fondo-valor').value = f.valor || '';
   document.getElementById('fin-fondo-idx').value = idx;
   document.getElementById('fin-modal-fondo').classList.add('open');
+  setTimeout(function() { var el = document.getElementById('fin-fondo-valor'); if (el) { el.focus(); el.select(); } }, 150);
+}
+function fin_editarFondoNombre(idx) {
+  fin_editarFondo(idx);
+  setTimeout(function() { var el = document.getElementById('fin-fondo-nombre'); if (el) { el.focus(); el.select(); } }, 200);
 }
 function fin_guardarFondo() {
   var nombre = document.getElementById('fin-fondo-nombre').value.trim();
@@ -11382,6 +11416,10 @@ function dash_render() {
 
   // ── Gráfica mensual del dashboard ────────────────────────────────
   dash_buildChart(year);
+
+  // ── Botón Renta Patricio (solo entidad Patricio) ────────────────
+  var btnRenta = document.getElementById('dash-btn-renta');
+  if (btnRenta) btnRenta.style.display = (_empDash === 'patricio') ? '' : 'none';
 
   // ── Aviso rústico julio/agosto (solo Patrimer) ──────────────────
   var _empDash = localStorage.getItem('patrimer:empresa') || 'empresa';
@@ -12112,60 +12150,114 @@ function renta_guardarNomina() {
 }
 
 // ── Alquileres (cargados desde Patrimer empresa patricio) ─────────────────
+// ── Datos extra por inmueble (tipo alquiler + amortización) ───────────────
+function renta_getInmDatos() {
+  return JSON.parse(localStorage.getItem('renta:inm_datos') || '{}');
+}
+function renta_saveInmDatos(obj) {
+  localStorage.setItem('renta:inm_datos', JSON.stringify(obj));
+}
+function renta_setInmCampo(inmId, campo, valor) {
+  var datos = renta_getInmDatos();
+  if (!datos[inmId]) datos[inmId] = {};
+  datos[inmId][campo] = valor;
+  renta_saveInmDatos(datos);
+  renta_calcPrevision();
+}
+
 function renta_renderAlquileres() {
   var cont = document.getElementById('renta-lista-alquileres');
   if (!cont) return;
 
-  // Identificar indices de inmuebles de Patricio
+  // Identificar inmuebles de Patricio
   var todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || '[]');
-  var idxPatricio = [];
+  var inmPatricio = [];
   for (var i = 0; i < todosInm.length; i++) {
     var prop = (todosInm[i].propietario || '').toLowerCase();
-    if (prop === 'patricio') idxPatricio.push(i);
+    if (prop === 'patricio') inmPatricio.push({ idx: i, inm: todosInm[i] });
   }
 
-  if (idxPatricio.length === 0) {
+  if (inmPatricio.length === 0) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">No hay inmuebles asignados a Patricio en la app.</div>';
     document.getElementById('renta-total-alquileres').textContent = '— €';
     return;
   }
 
-  // Filtrar facturas del año con items de Patricio
+  // Sumar ingresos por inmueble del año
   var facturas = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
-  var facAnio = [];
+  var ingresosPorInm = {};
   for (var j = 0; j < facturas.length; j++) {
     var f = facturas[j];
-    if (!f.mes) continue;
-    var anioFac = parseInt(f.mes.split('-')[0]);
-    if (anioFac !== renta_anio) continue;
-    var importePatricio = 0;
+    if (!f.mes || parseInt(f.mes.split('-')[0]) !== renta_anio) continue;
     if (f.items && f.items.length) {
       for (var k = 0; k < f.items.length; k++) {
-        if (idxPatricio.indexOf(f.items[k].idx) >= 0) {
-          importePatricio += parseFloat(f.items[k].precio) || 0;
-        }
+        var idxF = f.items[k].idx;
+        var importe = parseFloat(f.items[k].precio) || 0;
+        if (importe > 0) ingresosPorInm[idxF] = (ingresosPorInm[idxF] || 0) + importe;
       }
-    } else {
-      importePatricio = parseFloat(f.total) || 0;
     }
-    if (importePatricio > 0) facAnio.push({ mes: f.mes, importe: importePatricio });
   }
 
-  if (facAnio.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin facturas de alquiler de Patricio para ' + renta_anio + '.</div>';
-    document.getElementById('renta-total-alquileres').textContent = '— €';
-    return;
-  }
-
+  var datos = renta_getInmDatos();
   var totalAlq = 0;
   var html = '';
-  for (var m = 0; m < facAnio.length; m++) {
-    totalAlq += facAnio[m].importe;
-    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + facAnio[m].mes + '</div>'
-      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(facAnio[m].importe) + ' €</div>'
+
+  for (var m = 0; m < inmPatricio.length; m++) {
+    var idx = inmPatricio[m].idx;
+    var inm = inmPatricio[m].inm;
+    var ingreso = ingresosPorInm[idx] || 0;
+    totalAlq += ingreso;
+    var inmId = 'inm_' + idx;
+    var d = datos[inmId] || {};
+    var tipoVal = d.tipo || 'otro';
+    var amorBase = d.amorBase || '';
+
+    var amorAnual = 0;
+    if (amorBase) amorAnual = (parseFloat(amorBase) || 0) * 0.03;
+
+    var label = inm.direccion || inm.ref || ('Inmueble ' + (idx + 1));
+
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:12px 14px;margin-bottom:10px;">';
+    // Cabecera inmueble
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + label + '</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(ingreso) + ' €</div>'
       + '</div>';
+
+    // Selector tipo de alquiler
+    html += '<div style="margin-bottom:8px;">'
+      + '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:0.5px;">TIPO DE ALQUILER</div>'
+      + '<select onchange="renta_setInmCampo(\'' + inmId + '\',\'tipo\',this.value)" style="width:100%;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:\'Rajdhani\',sans-serif;">'
+      + '<option value="vivienda"' + (tipoVal === 'vivienda' ? ' selected' : '') + '>Vivienda habitual del inquilino (reducción 50%)</option>'
+      + '<option value="otro"' + (tipoVal === 'otro' ? ' selected' : '') + '>Otro uso (local, garaje, rústico, 2ª residencia...)</option>'
+      + '</select>'
+      + '</div>';
+
+    // Campo base amortización
+    html += '<div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:0.5px;">BASE AMORTIZACIÓN (€)</div>'
+      + '<input type="text" inputmode="decimal" value="' + (amorBase ? fmtGlobal(parseFloat(amorBase)) : '') + '"'
+      + ' onfocus="this.value=this.value.replace(/[.]/g,\'\').replace(/,/g,\'.\').replace(/[^0-9.]/g,\'\')"'
+      + ' onblur="var v=parseFmtGlobal(this.value);this.value=v?fmtGlobal(v):\'\';renta_setInmCampo(\'' + inmId + '\',\'amorBase\',v||\'\')"'
+      + ' placeholder="0" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:\'Rajdhani\',sans-serif;">'
+      + '</div>';
+
+    // Nota informativa
+    html += '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5;">'
+      + '💡 El mayor entre el valor catastral de construcción (recibo del IBI) o coste de adquisición × % construcción. Puedes encontrar el importe exacto en tu declaración de renta del año anterior. Consúltalo con tu asesor.'
+      + '</div>';
+
+    // Resultado amortización si hay dato
+    if (amorAnual > 0) {
+      html += '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">'
+        + '<div style="font-size:12px;color:var(--text-secondary);">Amortización deducible (3% anual)</div>'
+        + '<div style="font-size:12px;font-weight:700;color:#e07070;">− ' + fmtGlobal(amorAnual.toFixed(0)) + ' €</div>'
+        + '</div>';
+    }
+
+    html += '</div>';
   }
+
   cont.innerHTML = html;
   document.getElementById('renta-total-alquileres').textContent = fmtGlobal(totalAlq) + ' €';
 }
@@ -12303,7 +12395,7 @@ function renta_guardarGasto() {
   }
 }
 
-// ── Previsión IRPF (estimación simplificada) ─────────────────────────────
+// ── Previsión IRPF (estimación simplificada 2025) ─────────────────────────
 function renta_calcPrevision() {
   var nominas = renta_getNominas();
   var brutoTrabajo = 0, retencionAcum = 0, ssTrabajo = 0;
@@ -12313,28 +12405,53 @@ function renta_calcPrevision() {
     ssTrabajo += parseFloat(nominas[ni].ss) || 0;
   }
 
-  // Alquileres Patricio desde inmuebles
+  // Alquileres Patricio: ingresos, amortización y reducción por tipo
   var todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || '[]');
-  var idxP = [];
+  var inmPatricio = [];
   for (var ii = 0; ii < todosInm.length; ii++) {
-    if ((todosInm[ii].propietario || '').toLowerCase() === 'patricio') idxP.push(ii);
+    if ((todosInm[ii].propietario || '').toLowerCase() === 'patricio') inmPatricio.push(ii);
   }
   var facturas = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
-  var ingresoAlquiler = 0;
+  var ingresosPorInm = {};
   for (var fi = 0; fi < facturas.length; fi++) {
     var f = facturas[fi];
     if (!f.mes || parseInt(f.mes.split('-')[0]) !== renta_anio) continue;
     if (f.items && f.items.length) {
       for (var fk = 0; fk < f.items.length; fk++) {
-        if (idxP.indexOf(f.items[fk].idx) >= 0) ingresoAlquiler += parseFloat(f.items[fk].precio) || 0;
+        var idxF = f.items[fk].idx;
+        if (inmPatricio.indexOf(idxF) >= 0) {
+          ingresosPorInm[idxF] = (ingresosPorInm[idxF] || 0) + (parseFloat(f.items[fk].precio) || 0);
+        }
       }
     }
   }
 
-  // Gastos deducibles
+  // Gastos deducibles generales (bloque D)
   var gastosArr = renta_getGastos();
   var gastosDeducibles = 0;
   for (var gi = 0; gi < gastosArr.length; gi++) { gastosDeducibles += parseFloat(gastosArr[gi].importe) || 0; }
+
+  // Calcular base alquiler por inmueble con amortización y reducción
+  var datos = renta_getInmDatos();
+  var ingresoAlquilerTotal = 0;
+  var baseAlquilerTotal = 0;
+  for (var mi = 0; mi < inmPatricio.length; mi++) {
+    var idx = inmPatricio[mi];
+    var inmId = 'inm_' + idx;
+    var d = datos[inmId] || {};
+    var ingreso = ingresosPorInm[idx] || 0;
+    ingresoAlquilerTotal += ingreso;
+    var amorBase = parseFloat(d.amorBase) || 0;
+    var amorAnual = amorBase * 0.03;
+    var rendNeto = Math.max(0, ingreso - amorAnual);
+    // Reducción 50% solo vivienda habitual
+    if (d.tipo === 'vivienda') {
+      rendNeto = rendNeto * 0.50;
+    }
+    baseAlquilerTotal += rendNeto;
+  }
+  // Restar gastos deducibles generales (bloque D) de la base alquiler
+  baseAlquilerTotal = Math.max(0, baseAlquilerTotal - gastosDeducibles);
 
   // Capital mobiliario (dividendos)
   var ops = JSON.parse(localStorage.getItem('fin:acciones:patricio') || '[]');
@@ -12346,11 +12463,22 @@ function renta_calcPrevision() {
     }
   }
 
-  var baseGeneral = Math.max(0, brutoTrabajo - ssTrabajo - 2000);
-  var baseAlquiler = Math.max(0, ingresoAlquiler - gastosDeducibles);
-  var baseAhorro = capitalMobiliario;
+  // Mínimo personal y familiar (2025)
+  var estadoCivil = 'soltero';
+  var hijos = 0;
+  var elEstado = document.getElementById('renta-estado-civil');
+  var elHijos = document.getElementById('renta-hijos');
+  if (elEstado) estadoCivil = elEstado.value;
+  if (elHijos) hijos = parseInt(elHijos.value) || 0;
 
-  if (brutoTrabajo === 0 && ingresoAlquiler === 0 && capitalMobiliario === 0) {
+  var minimoPersonal = 5550;
+  // Mínimo por descendientes 2025: 1º hijo 2400, 2º 2700, 3º 4000, 4º y ss 4500
+  var minimoHijos = [0, 2400, 5100, 9100, 13600];
+  var minimoFamiliar = minimoPersonal + (minimoHijos[Math.min(hijos, 4)] || 0);
+  // En casado individual también aplica el mismo mínimo personal
+  // El mínimo reduce la cuota: cuota = calcIRPF(base) - calcIRPF(minimo)
+  
+  if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0) {
     document.getElementById('renta-prevision-irpf').textContent = '\u2014 \u20ac';
     document.getElementById('renta-prevision-irpf').style.color = 'var(--silver-bright)';
     document.getElementById('renta-prevision-nota').textContent = 'A\u00f1ade datos para ver la previsi\u00f3n';
@@ -12376,8 +12504,12 @@ function renta_calcPrevision() {
     return imp;
   }
 
-  var cuotaGeneral = calcIRPF(baseGeneral + baseAlquiler);
-  var cuotaAhorro = calcAhorro(baseAhorro);
+  var baseGeneral = Math.max(0, brutoTrabajo - ssTrabajo - 2000);
+  var baseTotal = baseGeneral + baseAlquilerTotal;
+
+  // Cuota general menos efecto del mínimo personal/familiar
+  var cuotaGeneral = Math.max(0, calcIRPF(baseTotal) - calcIRPF(minimoFamiliar));
+  var cuotaAhorro = calcAhorro(capitalMobiliario);
   var cuotaTotal = cuotaGeneral + cuotaAhorro;
   var resultado = cuotaTotal - retencionAcum;
 
