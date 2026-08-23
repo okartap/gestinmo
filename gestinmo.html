@@ -2132,16 +2132,16 @@ window.loadFromFirestore().then(() => {
         <!-- Vista Patricio -->
         <div id="dash-reparto-patricio" style="display:none;font-size:13px;line-height:2;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-dim);">Ingresos año</span>
+            <span style="color:var(--silver-mid);">Ingresos año</span>
             <span id="dash-pat-ingresos" style="color:var(--silver-bright);font-weight:700;font-size:15px;">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-dim);">Inmuebles</span>
+            <span style="color:var(--silver-mid);">Inmuebles</span>
             <span id="dash-pat-ninm" style="color:var(--silver-bright);font-weight:700;font-size:15px;">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-dim);">Media/mes</span>
-            <span id="dash-pat-media" style="color:var(--silver-dim);font-size:13px;">—</span>
+            <span style="color:var(--silver-mid);">Media/mes</span>
+            <span id="dash-pat-media" style="color:var(--silver-bright);font-size:13px;">—</span>
           </div>
         </div>
       </div>
@@ -2281,64 +2281,19 @@ window.loadFromFirestore().then(() => {
   </div>
   <div class="tab-content" id="tab-docs">
     <div class="info-section-title" style="margin-bottom:14px">Documentación</div>
-    <div class="doc-grid">
-      <div class="doc-chip has"><div class="doc-chip-icon">📋</div><div class="doc-chip-label">Escritura</div></div>
-      <div class="doc-chip has"><div class="doc-chip-icon">🏛️</div><div class="doc-chip-label">Registro</div></div>
-      <div class="doc-chip has"><div class="doc-chip-icon">👤</div><div class="doc-chip-label">Inquilino</div></div>
-      <div class="doc-chip has"><div class="doc-chip-icon">📄</div><div class="doc-chip-label">Contrato</div></div>
-      <div class="doc-chip missing"><div class="doc-chip-icon">🏢</div><div class="doc-chip-label">Adm. Fincas</div></div>
-    </div>
-    <div class="info-section">
-      <div class="info-section-title">Fechas clave</div>
-      <div class="info-row"><div class="info-label">Fecha contrato</div><div class="info-value">01/03/2023</div></div>
-      <div class="info-row"><div class="info-label">Vencimiento</div><div class="info-value warn">28/02/2026</div></div>
-      <div class="info-row"><div class="info-label">IPC aplicable</div><div class="info-value">3,2%</div></div>
-      <div class="info-row"><div class="info-label">Nueva renta estimada</div><div class="info-value ok">774€/mes</div></div>
-    </div>
+    <div class="empty-state">Aún no hay documentos registrados para este inmueble.</div>
   </div>
   <div class="tab-content" id="tab-gastos">
     <div class="info-section-title" style="margin-bottom:14px">Gastos anuales recurrentes</div>
-    <div class="info-section">
-      <div class="info-row"><div class="info-label">IBI</div><div class="info-value">420€</div></div>
-      <div class="info-row"><div class="info-label">Comunidad</div><div class="info-value">780€</div></div>
-      <div class="info-row"><div class="info-label">Seguro hogar</div><div class="info-value">320€</div></div>
-      <div class="info-row"><div class="info-label">Mantenimiento</div><div class="info-value">360€</div></div>
-      <div class="info-row"><div class="info-label">Adm. fincas</div><div class="info-value">400€</div></div>
-    </div>
-    <table class="gastos-table">
-      <thead><tr><th>Descripción</th><th>Año</th><th style="text-align:right">Importe</th></tr></thead>
-      <tbody>
-        <tr><td>Fontanería baño</td><td>2024</td><td class="amount">380€</td></tr>
-        <tr><td>Pintura interior</td><td>2024</td><td class="amount">850€</td></tr>
-        <tr><td>Cambio cerradura</td><td>2023</td><td class="amount">120€</td></tr>
-        <tr><td>Electrodomésticos</td><td>2023</td><td class="amount">1.200€</td></tr>
-      </tbody>
-    </table>
-    <div class="gastos-total"><div class="gastos-total-label">Total invertido</div><div class="gastos-total-value">4.830€</div></div>
+    <div class="empty-state">Aún no hay gastos registrados para este inmueble.</div>
   </div>
   <div class="tab-content" id="tab-contratos">
     <div class="info-section-title" style="margin-bottom:14px">Historial de contratos</div>
-    <div class="contrato-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div style="text-align:center;padding:10px;color:var(--silver-dim);font-size:13px">Sin contratos aún.</div>
-        <div class="contrato-right"><div class="contrato-renta">750€</div><div class="contrato-days warn">Vence en 18 días</div></div>
-      </div>
-    </div>
-    <div class="contrato-card expired">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-
-        <div class="contrato-right"><div class="contrato-renta" style="color:var(--silver-dim)">680€</div><div class="contrato-days" style="color:var(--silver-dim)">Finalizado</div></div>
-      </div>
-    </div>
+    <div id="tab-contratos-list"></div>
   </div>
   <div class="tab-content" id="tab-fotos">
-    <div class="info-section-title" style="margin-bottom:6px">Estado antes de alquiler actual</div>
-    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:14px">Añadidas el 28/02/2023 · 8 fotos</div>
-    <div class="fotos-grid">
-      <div class="foto-thumb">🛋️</div><div class="foto-thumb">🍳</div><div class="foto-thumb">🛏️</div>
-      <div class="foto-thumb">🚿</div><div class="foto-thumb">🪟</div><div class="foto-thumb">🚪</div>
-      <div class="foto-thumb foto-add">＋</div>
-    </div>
+    <div class="info-section-title" style="margin-bottom:14px">Fotos</div>
+    <div class="empty-state">Aún no hay fotos añadidas.</div>
   </div>
   <div style="height:100px"></div>
 </div>
@@ -3334,6 +3289,7 @@ window.loadFromFirestore().then(() => {
       <div class="frow frow-contact">
         <div class="flabel" style="color:var(--blue)">👤 Contacto / vendedor</div>
         <input class="finput" id="e_contacto_nombre" placeholder="Nombre..." style="width:80px;font-size:13px;">
+        <input class="finput" id="e_contacto_tel" placeholder="Teléfono..." type="tel" style="width:80px;font-size:13px;">
       </div>
 
     </div>
@@ -3399,7 +3355,7 @@ window.loadFromFirestore().then(() => {
         <div class="funit">€</div>
       </div>
       <div class="frow" style="background:rgba(201,168,76,.07);border-color:rgba(201,168,76,.3)">
-        <div class="flabel" style="font-weight:700;color:var(--silver-bright)">Total coste</div>
+        <div class="flabel" style="font-weight:700;color:var(--silver-bright)">Total invertido</div>
         <div class="finput" id="e_total" style="color:var(--gold);font-size:15px;font-weight:700;text-align:right;width:110px;">0</div>
         <div class="funit">€</div>
       </div>
@@ -3453,7 +3409,7 @@ window.loadFromFirestore().then(() => {
       </div>
       <div class="sem-label" id="sem1_label"></div>
       <div class="res-mini-grid">
-        <div class="res-mini"><div class="res-mini-l">Alq. Año Neto</div><div class="res-mini-v" id="r_bruta">—</div></div>
+        <div class="res-mini"><div class="res-mini-l">Alquiler Año</div><div class="res-mini-v" id="r_bruta">—</div></div>
         <div class="res-mini"><div class="res-mini-l">Rent. neta</div><div class="res-mini-v" id="r_neta" style="color:var(--green)">—</div></div>
         <div class="res-mini"><div class="res-mini-l">Rto. neto anual</div><div class="res-mini-v" id="r_anual">—</div></div>
         <div class="res-mini"><div class="res-mini-l">Amortización</div><div class="res-mini-v" id="r_amort">—</div></div>
@@ -4682,6 +4638,15 @@ function abrirEstudios() {
 
 // Volver desde Estudios — al dashboard si hay empresa, al splash si no
 function abrirEstudiosBack() {
+  // BLINDAJE DE DATOS: si estás dentro de un estudio (viendo Estudio/Gastos/
+  // Resultado), la flecha debe volver a la lista de "Estudios guardados",
+  // no saltar directamente a Inicio. Solo se sale al menú principal cuando
+  // ya se está en la lista.
+  const detalle = document.getElementById('cal-view-detalle');
+  if (detalle && detalle.classList.contains('active')) {
+    cal_showLista();
+    return;
+  }
   const key = loadProfile();
   if (key) {
     showModule('inicio');
@@ -4759,7 +4724,7 @@ function renderLista() {
   document.getElementById('stat-libres').textContent = libres;
   document.getElementById('section-label').textContent = inmuebles.length + ' inmuebles';
 
-  const emojis = { piso:'🏢', local:'🏪', garaje:'🚗', rustico:'🌿', otro:'🏗️' };
+  const emojis = { piso:'🏠', local:'🏪', garaje:'🚗', rustico:'🌾', otro:'📦' };
   const tipoLabels = { piso:'Piso', local:'Local comercial', garaje:'Garaje', rustico:'Rústico', otro:'Otro' };
   const propLabels = { empresa:'Patrimer', patrimer:'Patrimer', patricio:'Patricio', industrias:'Industrias' };
 
@@ -4787,9 +4752,19 @@ function renderLista() {
     // Propietario
     const propTxt = propLabels[inm.propietario] || inm.propietario || '';
 
-    // Botón histórico rústico
+    // Botón histórico rústico — integrado en la fila inferior, junto a Rent. neta
     const rusHistBtn = esRustico
-      ? `<button class="fin-add-btn" style="font-size:11px;padding:3px 8px;margin-top:4px;" onclick="event.stopPropagation();rus_verHistorico('${inm.ref}','${inm.direccion.replace(/'/g,'')}')">📋 Histórico</button>`
+      ? `<button class="fin-add-btn" style="font-size:11px;padding:4px 9px;white-space:nowrap;flex-shrink:0;" onclick="event.stopPropagation();rus_verHistorico('${inm.ref}','${inm.direccion.replace(/'/g,'')}')">📋 Histórico</button>`
+      : '';
+
+    // Rent. neta: en Rústico sin dato de inversión, se oculta del todo (deja sitio al botón Histórico)
+    // en el resto de tipos se mantiene igual que antes, con guion si no hay dato.
+    const mostrarRentNeta = !(esRustico && !rent);
+    const rentNetaBlock = mostrarRentNeta
+      ? `<div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:10px;color:var(--silver-dim);">Rent. neta</div>
+          ${rentPct}
+        </div>`
       : '';
 
     const div = document.createElement('div');
@@ -4799,24 +4774,23 @@ function renderLista() {
     div.style.cssText += 'padding:12px 14px;';
     div.onclick = () => inm_showDetail(idx);
     div.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:22px;flex-shrink:0;">${emojis[inm.tipo]||'🏠'}</div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="font-size:22px;flex-shrink:0;line-height:1.35;">${emojis[inm.tipo]||'🏠'}</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:700;color:var(--silver-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${inm.ref ? '<span style="color:var(--accent-blue);margin-right:6px;">'+inm.ref+'</span>' : ''}${inm.direccion}</div>
-          <div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">${tipoLabels[inm.tipo]||''}${propTxt?' · '+propTxt:''}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--silver-bright);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${inm.ref ? '<span style="color:var(--accent-blue);margin-right:6px;">'+inm.ref+'</span>' : ''}${inm.direccion}</div>
+          <div style="font-size:11px;color:var(--silver-dim);margin-top:3px;">${tipoLabels[inm.tipo]||''}${propTxt?' · '+propTxt:''}</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
-        <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);gap:10px;">
+        <div style="min-width:0;">
           <span style="font-size:11px;color:${estadoColor};font-weight:600;margin-right:10px;">● ${estadoTxt}</span>
           <span style="font-size:13px;font-weight:700;color:${rentaColor};">${rentaValor}</span>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:10px;color:var(--silver-dim);">Rent. neta</div>
-          ${rentPct}
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          ${rentNetaBlock}
+          ${rusHistBtn}
         </div>
-      </div>
-      ${rusHistBtn}`;
+      </div>`;
     container.appendChild(div);
   });
 
@@ -4834,7 +4808,7 @@ function inm_showDetail(idx) {
   const inm = inmuebles[idx];
   const rent = calcRent(inm);
 
-  const emojis = { piso:'🏢', local:'🏪', garaje:'🚗', rustico:'🌿', otro:'🏗️' };
+  const emojis = { piso:'🏠', local:'🏪', garaje:'🚗', rustico:'🌾', otro:'📦' };
   const propLabels = { empresa:'Patrimer Levante S.L.', patricio:'Patricio Gómez García', industrias:'Industrias G&C' };
   const tipoLabels = { piso:'Piso', local:'Local comercial', garaje:'Garaje', rustico:'Rústico', otro:'Otro' };
 
@@ -4889,12 +4863,64 @@ function inm_showDetail(idx) {
   const btnAsignar = document.getElementById('btn-asignar-inquilino');
   if (btnAsignar) btnAsignar.style.display = (inm.estado === 'vacio') ? 'block' : 'none';
 
+  // Tab contratos: historial real de contratos de este inmueble
+  inm_renderTabContratos(inm);
+
   document.getElementById('inm-view-lista').classList.remove('active');
   document.getElementById('inm-view-detalle').classList.add('active');
   // Reset tabs
   document.querySelectorAll('.detail-tab').forEach((t,i) => t.classList.toggle('active', i===0));
   document.querySelectorAll('.tab-content').forEach((t,i) => t.classList.toggle('active', i===0));
   window.scrollTo(0,0);
+}
+
+function inm_renderTabContratos(inm) {
+  const cont = document.getElementById('tab-contratos-list');
+  if (!cont) return;
+  const todos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
+  const propios = todos.filter(c => c.ref === inm.ref);
+  if (propios.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Sin contratos registrados para este inmueble.</div>';
+    return;
+  }
+  const hoy = new Date();
+  const clasificados = propios.map(c => {
+    let estado = 'activo';
+    if (c.estado === 'renovado' || c.estado === 'rescindido') {
+      estado = c.estado;
+    } else if (c.fin) {
+      const fin = new Date(c.fin);
+      const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+      if (dias < 0) estado = 'vencido';
+      else if (dias <= 60) estado = 'proxVencer';
+    }
+    return { ...c, _estado: estado };
+  }).sort((a, b) => new Date(b.creadoEn || 0) - new Date(a.creadoEn || 0));
+
+  cont.innerHTML = clasificados.map(c => {
+    const fechaInicio = c.inicio ? new Date(c.inicio).toLocaleDateString('es-ES', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+    const fechaFin    = c.fin    ? new Date(c.fin).toLocaleDateString('es-ES', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+    const renta       = c.renta  ? fmt(parseFloat(c.renta)) + '€' : '—';
+    const esVigente    = c._estado === 'activo';
+    const claseExpired = esVigente ? '' : ' expired';
+    const diasClase = c._estado === 'proxVencer' ? ' warn' : '';
+    const diasTxt = c._estado === 'vencido' ? 'Vencido'
+      : c._estado === 'proxVencer' ? 'Vence en ' + Math.max(0, Math.ceil((new Date(c.fin) - hoy) / (1000 * 60 * 60 * 24))) + ' días'
+      : c._estado === 'renovado' ? 'Renovado'
+      : c._estado === 'rescindido' ? 'Rescindido'
+      : 'Vigente';
+    const colorInactivo = esVigente ? '' : ' style="color:var(--silver-dim)"';
+    const idSafe = (c.id || '').toString().replace(/[^a-zA-Z0-9_-]/g, '');
+    return `<div class="contrato-card${claseExpired}" onclick="showModule('contratos');setTimeout(function(){if(typeof showDetalle==='function')showDetalle('${idSafe}');},250);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--silver-bright)">${c.inqNombre || '—'}</div>
+          <div style="font-size:11px;color:var(--silver-dim);margin-top:2px">📅 ${fechaInicio} → ${fechaFin}</div>
+        </div>
+        <div class="contrato-right"><div class="contrato-renta"${colorInactivo}>${renta}</div><div class="contrato-days${diasClase}"${colorInactivo}>${diasTxt}</div></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function inm_showLista() {
@@ -4981,7 +5007,7 @@ function openModal(editIdx) {
     document.getElementById('f-estado').value = inm.estado || 'vacio';
     document.getElementById('f-hab').value = inm.hab || '';
     document.getElementById('f-banos').value = inm.banos || '';
-    document.getElementById('f-con-renta').value = inm.renta ? fmtGlobal(parseFmtGlobal(inm.renta)) : '';
+    document.getElementById('f-renta').value = inm.renta ? fmtGlobal(parseFmtGlobal(inm.renta)) : '';
     document.getElementById('f-renta-est').value = inm.rentaEst ? fmt(parseFmt(inm.rentaEst)) : '';
     document.getElementById('f-precio').value = inm.precio ? fmt(parseFmt(inm.precio)) : '';
     document.getElementById('f-gastos-compra').value = inm.gastosCompra || '';
@@ -5012,7 +5038,7 @@ function clearForm() {
 }
 
 function recalcPreview() {
-  const renta = parseFmtGlobal(document.getElementById('f-con-renta').value) || 0;
+  const renta = parseFmtGlobal(document.getElementById('f-renta').value) || 0;
   const precio = parseFmt(document.getElementById('f-precio').value) || 0;
   const gastosCompra = parseFloat(document.getElementById('f-gastos-compra').value) || 0;
   const reforma = parseFloat(document.getElementById('f-reforma').value) || 0;
@@ -5062,7 +5088,7 @@ function saveInmueble() {
     estado: document.getElementById('f-estado').value,
     hab: document.getElementById('f-hab').value,
     banos: document.getElementById('f-banos').value,
-    renta: parseFmtGlobal(document.getElementById('f-con-renta').value) || '',
+    renta: parseFmtGlobal(document.getElementById('f-renta').value) || '',
     rentaEst: parseFmtGlobal(document.getElementById('f-renta-est').value) || '',
     precio: parseFmtGlobal(document.getElementById('f-precio').value) || '',
     gastosCompra: document.getElementById('f-gastos-compra').value,
@@ -9129,7 +9155,7 @@ function calcEstudio(){
   const neta      = total > 0 ? (beneficio / total * 100) : 0;
   const amort     = beneficio > 0 ? total / beneficio : 0;
 
-  document.getElementById('r_bruta').textContent = beneficio > 0 ? fmtE(beneficio) : '—';
+  document.getElementById('r_bruta').textContent = alqAnual > 0 ? fmtE(alqAnual) : '—';
   document.getElementById('r_neta').textContent  = total > 0 ? neta.toFixed(1)+'%'  : '—';
   document.getElementById('r_anual').textContent = beneficio > 0 ? fmtE(beneficio) : '—';
   document.getElementById('r_amort').textContent = amort > 0 ? '~'+Math.round(amort)+' años' : '—';
@@ -9273,13 +9299,17 @@ function renderPaso3(){
       const pct     = c.prev > 0 ? (desv / c.prev * 100) : null;
       const signo   = desv > 0 ? '+' : '';
       let badgeClass, badgeText;
-      if (c.prev === 0 && c.real === 0){ badgeClass='desv-neutral'; badgeText='—'; }
+      // BLINDAJE DE DATOS: si todavía no se ha registrado ningún gasto real
+      // en el Paso 2 para este concepto, NO se puede saber si se ha
+      // ahorrado o no — antes esto se mostraba como "-100%" en verde
+      // (parecía un ahorro grande cuando en realidad es que faltan datos).
+      if (c.real === 0){ badgeClass='desv-neutral'; badgeText = c.prev > 0 ? 'Sin gastos reales aún' : '—'; }
       else if (desv === 0)             { badgeClass='desv-ok';      badgeText='En presupuesto'; }
       else if (desv < 0)               { badgeClass='desv-ok';      badgeText=`${signo}${fmt(desv)}€`; }
       else if (pct !== null && pct <= 10){ badgeClass='desv-warn';  badgeText=`+${fmt(desv)}€`; }
       else                             { badgeClass='desv-bad';     badgeText=`+${fmt(desv)}€`; }
 
-      const pctStr = pct !== null ? `<span style="margin-left:3px;font-size:9px;opacity:.7">(${signo}${pct.toFixed(0)}%)</span>` : '';
+      const pctStr = (pct !== null && c.real > 0) ? `<span style="margin-left:3px;font-size:9px;opacity:.7">(${signo}${pct.toFixed(0)}%)</span>` : '';
       const prevLabel = c.prev > 0 ? `Prev. ${fmtE(c.prev)}` : 'Sin previsión';
 
       rows.innerHTML += `
@@ -9297,8 +9327,13 @@ function renderPaso3(){
     const tDesv   = totalReal - totalPrev;
     const tPct    = totalPrev > 0 ? (tDesv / totalPrev * 100) : null;
     const tSigno  = tDesv >= 0 ? '+' : '';
-    let tClass, tColor;
-    if (tDesv <= 0)                         { tClass='desv-total-ok';      tColor='var(--green)'; }
+    let tClass, tColor, tText;
+    // Mismo blindaje que en cada fila: si aún no hay NINGÚN gasto real
+    // registrado en el Paso 2, el total no puede mostrarse como "ahorro"
+    // en verde — se muestra neutro indicando que faltan datos.
+    if (totalReal === 0 && totalPrev > 0){
+      tClass='desv-total-neutral'; tColor='var(--silver-dim)'; tText='Sin gastos reales registrados aún';
+    } else if (tDesv <= 0)                         { tClass='desv-total-ok';      tColor='var(--green)'; }
     else if (tPct !== null && tPct <= 10)   { tClass='desv-total-warn';    tColor='var(--amber)'; }
     else                                    { tClass='desv-total-bad';     tColor='var(--red)'; }
 
@@ -9307,7 +9342,7 @@ function renderPaso3(){
     document.getElementById('desv-total-val').style.color = tColor;
     const tPctStr = tPct !== null ? ` (${tSigno}${tPct.toFixed(0)}%)` : '';
     document.getElementById('desv-total-val').textContent =
-      tDesv === 0 ? '✓ En presupuesto' : `${tSigno}${fmt(tDesv)}€${tPctStr}`;
+      tText ? tText : (tDesv === 0 ? '✓ En presupuesto' : `${tSigno}${fmt(tDesv)}€${tPctStr}`);
   }
 }
 
@@ -9449,7 +9484,7 @@ function cal_renderLista(){
           </div>
         </div>
         <div class="ecard-body">
-          <div><div class="ecard-stat-l">Coste total</div><div class="ecard-stat-v">${fmt(e.total)}€</div></div>
+          <div><div class="ecard-stat-l">Total invertido</div><div class="ecard-stat-v">${fmt(e.total)}€</div></div>
           <div><div class="ecard-stat-l">Alquiler/mes</div><div class="ecard-stat-v">${fmt(e.alquiler)}€</div></div>
           <div><div class="ecard-stat-l">Amortización</div><div class="ecard-stat-v">~${Math.round(e.amort)} años</div></div>
         </div>
@@ -9547,6 +9582,17 @@ function cargarFormulario(e){
     const tog = document.getElementById('com-toggle');
     tog.style.color = 'var(--gold)'; tog.style.borderColor = 'var(--gold)'; tog.textContent = '€';
     set('e_comision_pct', (e.comisionPct||'').toString().replace('.',','));
+    // BLINDAJE DE DATOS: _comisionImportePct es la variable interna que
+    // realmente usan los cálculos (getComisionImporte()). Antes solo se
+    // rellenaba el campo visible del %, pero esta variable se quedaba con
+    // el valor de la ÚLTIMA vez que se tocó (de otro estudio, o 0 al
+    // arrancar la app) — así que al abrir un estudio guardado en modo %,
+    // "Total invertido" y la rentabilidad podían salir mal hasta que
+    // tocaras el campo a mano. Se sincroniza aquí con el importe ya
+    // guardado, que es el correcto.
+    _comisionImportePct = e.comision || 0;
+    const elCalc = document.getElementById('e_comision_calculada');
+    if (elCalc) elCalc.textContent = fmt(Math.round(_comisionImportePct)) + '€';
   } else {
     _comisionModoPct = false;
     document.getElementById('com-modo-eur').style.display = 'flex';
@@ -11309,7 +11355,13 @@ function dash_render() {
   var _esPatrimer = (_empDash === 'patrimer');
 
   // ── KPIs de facturación — misma fórmula que Facturación (fac_resumenAnual) ──
-  var kpiDash = fac_resumenAnual(year);
+  // BLINDAJE DE DATOS: hay que pasarle las facturas REALES del mes (igual
+  // que hace Cobros/renderAnalisis), si no fac_resumenAnual solo ve el
+  // histórico y nunca se entera de una factura recién generada con
+  // "Facturar" hasta que también se añada a mano al histórico — Inicio se
+  // quedaba desactualizado aunque Cobros ya mostrase el dato correcto.
+  var facturasDash = load(KEYS.facturas);
+  var kpiDash = fac_resumenAnual(year, facturasDash);
   var ultimoMes = kpiDash.ultimoMes;
   var acumActual = kpiDash.acumActualUrbano; // urbano puro, para el reparto de abajo
   var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -11351,7 +11403,12 @@ function dash_render() {
 
   if (_esPatricioRep) {
     // Vista Patricio: ingresos totales, nº inmuebles, media mensual
-    var todosInmP = JSON.parse(localStorage.getItem('patrimer:inmuebles') || '[]');
+    // BLINDAJE DE DATOS: 'patrimer:inmuebles' no es la clave real donde se
+    // guardan los inmuebles (esa es 'inmuebles:lista', ver módulo
+    // Inmuebles) — nunca se escribe nada ahí, así que esta tarjeta siempre
+    // mostraba 0 inmuebles y 0€ de ingresos para Patricio. Corregido para
+    // leer la clave correcta.
+    var todosInmP = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
     var nInmP = 0;
     var idxP = [];
     for (var pi = 0; pi < todosInmP.length; pi++) {
@@ -11425,7 +11482,7 @@ function dash_render() {
   var dPatF = document.getElementById('dash-pat-fondos'); if (dPatF) dPatF.textContent = fondos > 0 ? fin_fmt(fondos) : '—';
 
   // ── Gráfica mensual del dashboard ────────────────────────────────
-  dash_buildChart(year);
+  dash_buildChart(year, facturasDash);
 
   // ── Botón Renta Patricio (solo entidad Patricio) ────────────────
   var btnRenta = document.getElementById('dash-btn-renta');
@@ -11435,14 +11492,22 @@ function dash_render() {
   if (typeof ipc_renderBanners === 'function') ipc_renderBanners();
 }
 
-function dash_buildChart(year) {
+function dash_buildChart(year, facturas) {
+  // BLINDAJE DE DATOS: igual que en fac_resumenAnual, hay que mirar
+  // primero las facturas REALES del mes (facturacion:facturas) y solo
+  // usar el histórico como respaldo cuando no hay factura real — si no,
+  // la gráfica de Inicio se queda desactualizada aunque ya hayas
+  // facturado el mes desde Cobros.
+  facturas = facturas || [];
   var meses = ['E','F','M','A','M','J','J','A','S','O','N','D'];
   var hist = fac_loadHistorico ? fac_loadHistorico() : [];
   var d = meses.map(function(_,i) {
     var ym = year + '-' + String(i+1).padStart(2,'0');
     var ymPrev = (year-1) + '-' + String(i+1).padStart(2,'0');
-    var hc = hist.find(function(h){return h.mes===ym;}); var cur = hc ? hc.importe : 0;
-    var hp = hist.find(function(h){return h.mes===ymPrev;}); var prv = hp ? hp.importe : 0;
+    var cur = facturas.filter(function(f){return f.mes===ym;}).reduce(function(s,f){return s+(f.total||0);},0);
+    if (cur === 0) { var hc = hist.find(function(h){return h.mes===ym;}); if (hc) cur = hc.importe; }
+    var prv = facturas.filter(function(f){return f.mes===ymPrev;}).reduce(function(s,f){return s+(f.total||0);},0);
+    if (prv === 0) { var hp = hist.find(function(h){return h.mes===ymPrev;}); if (hp) prv = hp.importe; }
     var _empChart = localStorage.getItem('patrimer:empresa') || 'patrimer'; var _esPatrimerChart = (_empChart === 'patrimer'); if (_esPatrimerChart) { var _rusReal=(function(){var h=rus_loadHistorico();return h[String(year)]?true:false;})(); if(_rusReal) cur += rus_totalMes(year, i+1); prv += rus_totalMes(year-1, i+1); }
     return {cur:cur,prv:prv};
   });
