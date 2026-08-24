@@ -4924,9 +4924,25 @@ function inm_contratoActivo(ref) {
 // todavía, cae a la fecha de firma del contrato para no dejarlo en blanco.
 function inm_fechaRentaActualizada(inm, c) {
   if (inm.tipo === 'rustico') {
-    var hist = rus_loadHistorico();
-    var anios = Object.keys(hist).filter(function(a){ return hist[a][inm.ref]; }).sort();
-    return anios.length ? ('Año ' + anios[anios.length - 1]) : null;
+    // BLINDAJE: renderLista() se llama también en el arranque de la app
+    // (INIT, línea ~5421), antes incluso de que se declare RUS_HIST_INICIAL
+    // más abajo en el archivo — en ese primer instante, rus_loadHistorico()
+    // podía romperse y bloquear TODA la app (pantalla de PIN incluida,
+    // porque el fallo ocurría al ejecutar el script, no al pulsar nada).
+    // Si todavía no está disponible, no se avisa ni se fuerza nada: esta
+    // tarjeta se queda sin ese dato concreto en esa primera pasada, y se
+    // rellena sola en cuanto entras de verdad al módulo de Inmuebles (para
+    // entonces el archivo ya ha terminado de cargar). El try/catch de abajo
+    // es solo un segundo cinturón, por si pasara cualquier otra cosa.
+    if (typeof RUS_HIST_INICIAL === 'undefined') return null;
+    try {
+      var hist = rus_loadHistorico();
+      var anios = Object.keys(hist).filter(function(a){ return hist[a][inm.ref]; }).sort();
+      return anios.length ? ('Año ' + anios[anios.length - 1]) : null;
+    } catch (e) {
+      console.warn('inm_fechaRentaActualizada: histórico rústico no disponible todavía', e);
+      return null;
+    }
   }
   if (c && c.ipcAplicado && c.ipcAplicado.length) {
     return mesNombre(c.ipcAplicado[c.ipcAplicado.length - 1].mes);
