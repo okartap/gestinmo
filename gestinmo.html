@@ -1852,7 +1852,11 @@ const DATA_KEYS = [
   'facturacion:historico:patrimer',
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
-  'app:notas_mejoras'
+  'app:notas_mejoras',
+  // Fecha de la última copia de seguridad (Exportar) — se sincroniza entre
+  // dispositivos para que el futuro aviso de "hace tiempo que no exportas"
+  // sepa la fecha real, la hayas exportado desde el móvil de quien sea.
+  'app:ultimo_backup'
 ];
 // BLINDAJE DE DATOS (Bloque 4): las nóminas y gastos de "Renta Patricio" se
 // guardan en una clave por año (renta:gastos:2026, renta:nominas:2026...).
@@ -2041,19 +2045,24 @@ window.loadFromFirestore().then(() => {
   <!-- ESTUDIOS -->
   <div onclick="abrirEstudios()" style="margin-top:10px;width:100%;max-width:340px;background:rgba(220,60,60,.12);border:1px solid rgba(220,60,60,.35);border-radius:20px;padding:9px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.96)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.96)'" ontouchend="this.style.transform=''">
     <span style="font-size:18px">📊</span>
-    <span style="font-size:13px;font-weight:700;letter-spacing:1px;color:#e07070;text-transform:uppercase;flex:1">Estudios de rentabilidad</span>
+    <span style="font-size:13px;font-weight:700;letter-spacing:1px;color:#e07070;text-transform:uppercase;flex:1;text-align:center">Estudios de rentabilidad</span>
     <span style="font-size:16px;color:#e07070">›</span>
   </div>
 
   <!-- BACKUP ROW -->
+  <!-- BLINDAJE: renombrado — "Exportar"/"Importar C.S." no dejaba claro qué
+  hacía cada botón (confirmado: no sabías que "Importar" era restaurar tu
+  copia de seguridad). Ahora dicen literalmente lo que hacen, y se han
+  corregido también los iconos, que estaban cambiados entre sí (📥 de
+  "recibir/traer" es el que corresponde a Restaurar, no a Guardar). -->
   <div style="margin-top:16px;display:flex;justify-content:center;gap:20px;">
     <div onclick="pedirPasswordExportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;display:flex;align-items:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
-      <span style="font-size:14px">📥</span>
-      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase">Exportar C.S.</span>
+      <span style="font-size:14px">💾</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase">Guardar copia</span>
     </div>
     <div onclick="pedirPasswordImportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;display:flex;align-items:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
-      <span style="font-size:14px">📤</span>
-      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase">Importar C.S.</span>
+      <span style="font-size:14px">📥</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase">Restaurar copia</span>
     </div>
   </div>
   <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importarDatos(event)">
@@ -2063,7 +2072,7 @@ window.loadFromFirestore().then(() => {
 <!-- MODAL CONTRASEÑA -->
 <div id="modal-pwd" style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;">
   <div style="background:#1a2347;border:1px solid #2d3d6e;border-radius:20px;padding:24px 20px;width:100%;max-width:320px;">
-    <div style="font-size:15px;font-weight:700;letter-spacing:1px;margin-bottom:6px;text-align:center;" id="pwd-titulo">Exportar datos</div>
+    <div style="font-size:15px;font-weight:700;letter-spacing:1px;margin-bottom:6px;text-align:center;" id="pwd-titulo">Guardar copia de seguridad</div>
     <div style="font-size:12px;color:#8a9bbf;text-align:center;margin-bottom:18px;">Introduce la contraseña para continuar</div>
     <input id="pwd-input" type="password" placeholder="Contraseña" style="width:100%;background:#111827;border:1px solid #2d3d6e;border-radius:10px;padding:12px 14px;font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:#c8d4e8;outline:none;margin-bottom:10px;" onkeydown="if(event.key==='Enter')confirmarPassword()">
     <div id="pwd-error" style="font-size:11px;color:#e05555;text-align:center;margin-bottom:10px;display:none">Contraseña incorrecta</div>
@@ -2167,6 +2176,20 @@ window.loadFromFirestore().then(() => {
       </div>
     </div>
 
+    <!-- PENDIENTE DE GESTIONAR: reúne en un solo sitio los avisos que antes
+         estaban repartidos por módulos (contratos por vencer, IPC sin
+         actualizar, rústico sin importe del año, copia de seguridad
+         desactualizada). Cerrado por defecto — solo hay que abrirlo si hay
+         algo. Si no hay nada pendiente, la tarjeta entera desaparece sola,
+         igual que el aviso de rústico en Cobros. -->
+    <div class="chart-card" id="pend-card" style="margin-bottom:16px;display:none;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;position:relative;" onclick="pend_toggle()">
+        <div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);text-align:center;">⚠️ PENDIENTE DE GESTIONAR<span id="pend-contador" style="font-size:11px;font-weight:600;color:var(--accent-amber);margin-left:8px;"></span></div>
+        <div id="pend-toggle-icon" style="font-size:12px;color:var(--silver-dim);position:absolute;right:0;">▾</div>
+      </div>
+      <div id="pend-body" style="display:none;margin-top:12px;"></div>
+    </div>
+
     <!-- ACCIONES RÁPIDAS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <div onclick="showModule('cobros');showFacturar();" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
@@ -2189,9 +2212,9 @@ window.loadFromFirestore().then(() => {
 
     <!-- IDEAS / MEJORAS PARA LA APP -->
     <div class="chart-card" style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="notas_toggle()">
-        <div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">💡 IDEAS PARA LA APP<span id="notas-contador" style="font-size:11px;font-weight:600;color:var(--silver-dim);margin-left:8px;"></span></div>
-        <div id="notas-toggle-icon" style="font-size:12px;color:var(--silver-dim);">▾</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;position:relative;" onclick="notas_toggle()">
+        <div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);text-align:center;">💡 IDEAS PARA LA APP<span id="notas-contador" style="font-size:11px;font-weight:600;color:var(--silver-dim);margin-left:8px;"></span></div>
+        <div id="notas-toggle-icon" style="font-size:12px;color:var(--silver-dim);position:absolute;right:0;">▾</div>
       </div>
       <div id="notas-body" style="display:none;margin-top:12px;">
         <div style="display:flex;gap:8px;margin-bottom:10px;">
@@ -4522,12 +4545,12 @@ let _pwdAccion = null;
 
 function pedirPasswordExportar(){
   _pwdAccion = 'exportar';
-  document.getElementById('pwd-titulo').textContent = 'Exportar datos';
+  document.getElementById('pwd-titulo').textContent = 'Guardar copia de seguridad';
   abrirModalPwd();
 }
 function pedirPasswordImportar(){
   _pwdAccion = 'importar';
-  document.getElementById('pwd-titulo').textContent = 'Importar datos';
+  document.getElementById('pwd-titulo').textContent = 'Restaurar copia de seguridad';
   abrirModalPwd();
 }
 function abrirModalPwd(){
@@ -4564,6 +4587,29 @@ function exportarDatos(){
   document.body.appendChild(a);
   a.click();
   setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  // PREPARADO PARA EL PANEL "PENDIENTE DE GESTIONAR": queda registrada la
+  // fecha de esta copia de seguridad — ver backupNecesitaAviso() más abajo.
+  // No se guarda dentro del propio archivo de backup (BACKUP_KEYS) a
+  // propósito: es un dato sobre el proceso de copia, no un dato de la app.
+  localStorage.setItem('app:ultimo_backup', new Date().toISOString());
+}
+
+// ─── AVISO DE COPIA DE SEGURIDAD (preparado para el panel "Pendiente de
+// gestionar" de Inicio — de momento no se muestra en ningún sitio) ───
+const BACKUP_AVISO_DIAS = 30;
+function backupNecesitaAviso() {
+  const ultima = localStorage.getItem('app:ultimo_backup');
+  if (!ultima) {
+    // Primera vez que se comprueba y nunca se ha registrado una fecha —
+    // en vez de avisar de inmediato como si nunca se hubiera hecho copia
+    // (podría no ser cierto, si se hizo antes de tener este control), se
+    // toma hoy como punto de partida silencioso.
+    const ahora = new Date().toISOString();
+    localStorage.setItem('app:ultimo_backup', ahora);
+    return { necesita: false, dias: 0, ultimaFecha: ahora };
+  }
+  const dias = Math.max(0, Math.floor((new Date() - new Date(ultima)) / (1000 * 60 * 60 * 24)));
+  return { necesita: dias >= BACKUP_AVISO_DIAS, dias: dias, ultimaFecha: ultima };
 }
 function importarDatos(e){
   const file = e.target.files[0]; if(!file) return;
@@ -8725,7 +8771,15 @@ function ipc_renderBanners(){
   });
 
   let html='';
-  contratos.filter(c=>c.estado==='activo'&&c.inicio&&(!c.ref||refsEmpresaIpc[c.ref])).forEach(c=>{
+  // BLINDAJE: los contratos rústicos (tipo 'rustica'/'rusticatemp') NO se
+  // avisan aquí — su renta anual no sube por un % de IPC como los demás,
+  // se registra directamente el importe real cobrado cada año en el
+  // "Histórico" de la propia finca (Inmuebles → finca rústica → 📋
+  // Histórico). Antes de este cambio, en cuanto llegaba su mes de
+  // anualidad (julio/agosto) salían aquí como "pendientes" aunque el
+  // importe real de ese año ya estuviera cargado, porque este aviso solo
+  // miraba la fecha, nunca si de verdad hacía falta subir nada.
+  contratos.filter(c=>c.estado==='activo'&&c.inicio&&c.tipo!=='rustica'&&c.tipo!=='rusticatemp'&&(!c.ref||refsEmpresaIpc[c.ref])).forEach(c=>{
     const ini=new Date(c.inicio);
     // ¿coincide el mes y día del año con hoy? → anualidad
     if(ini.getMonth()+1===mesN){
@@ -9610,9 +9664,21 @@ function guardarEstudio(){
 
 function eliminarEstudio(idx, e){
   e.stopPropagation();
-  estudios.splice(idx, 1);
-  saveStorage();
-  cal_renderLista();
+  // BLINDAJE DE DATOS: antes borraba directamente, sin preguntar — pendiente
+  // anotado hace días. Ahora pide confirmación, igual que el resto de
+  // borrados de la app (documentos, clientes...).
+  const nombre = (estudios[idx] && estudios[idx].nombre) ? estudios[idx].nombre : 'este estudio';
+  showConfirm('🗑️', '¿Eliminar estudio?',
+    '¿Seguro que quieres eliminar "' + nombre + '"? Esta acción no se puede deshacer.',
+    [
+      {label:'Cancelar', cls:'c', fn:()=>{}},
+      {label:'Eliminar', cls:'r', fn:()=>{
+        estudios.splice(idx, 1);
+        saveStorage();
+        cal_renderLista();
+        showToast('🗑️ Estudio eliminado', 'success');
+      }}
+    ]);
 }
 
 // ─────────────────────────────────────────
@@ -11770,6 +11836,9 @@ function dash_render() {
 
   // ── Ideas / mejoras para la app ────────────────────────────────────
   if (typeof notas_render === 'function') notas_render();
+
+  // ── Pendiente de gestionar ──────────────────────────────────────────
+  if (typeof pend_render === 'function') pend_render();
 }
 
 // ─── IDEAS / MEJORAS PARA LA APP ────────────────────────────────────────
@@ -11855,6 +11924,145 @@ function notas_render() {
       </div>
       <div onclick="notas_eliminar('${n.id}')" style="color:var(--silver-dim);cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;">🗑️</div>
     </div>`).join('');
+}
+
+// ─── PENDIENTE DE GESTIONAR ──────────────────────────────────────────────
+// Reúne en un solo panel de Inicio los avisos que antes vivían repartidos
+// por otros módulos: contratos que vencen pronto, IPC de contratos que les
+// toca actualizar este mes, fincas rústicas sin el importe del año en
+// curso, y la copia de seguridad si hace tiempo que no se guarda. Cada
+// aviso se calcula leyendo los mismos datos que ya usan Contratos/Cobros —
+// no se guarda nada nuevo, solo se repite el cálculo aquí para poder
+// mostrarlo junto. Si no hay nada pendiente, pend_render() oculta la
+// tarjeta entera (igual que el aviso de rústico en Cobros).
+function pend_contratosPorVencer() {
+  try {
+    var todos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
+    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
+    var arrMap = {
+      'patrimer':   ['patrimer levante','patrimer','b-73110009'],
+      'patricio':   ['patricio gómez garcía a título personal','patricio gomez garcia a titulo personal','como titular personal'],
+      'industrias': ['industrias gómez','industrias gomez','igc','b-pendiente']
+    };
+    var claves = arrMap[emp] || arrMap['patrimer'];
+    var todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || localStorage.getItem('inmuebles:lista') || '[]');
+    var refsEmp = {};
+    todosInm.forEach(function(inm) {
+      var p = normEmpresa((inm.propietario || 'patrimer').toLowerCase());
+      if (p === emp) { if (inm.ref) refsEmp[inm.ref] = true; }
+    });
+    var contratos = todos.filter(function(c) {
+      if (c.ref && Object.keys(refsEmp).length > 0) return !!refsEmp[c.ref];
+      if (!c.arrendador) return false;
+      var arr = c.arrendador.toLowerCase();
+      if (emp === 'patricio' && (arr.includes('patrimer') || arr.includes('b-73110009'))) return false;
+      return claves.some(function(k) { return arr.includes(k); });
+    });
+    var hoy = new Date();
+    var res = [];
+    contratos.forEach(function(c) {
+      if (c.estado === 'renovado' || c.estado === 'rescindido') return;
+      if (!c.fin) return;
+      var fin = new Date(c.fin);
+      var dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+      if (dias >= 0 && dias <= 60) res.push({ nombre: c.inqNombre || c.dir || 'Contrato', dias: dias });
+    });
+    return res;
+  } catch (e) { return []; }
+}
+
+function pend_ipcPendientes() {
+  try {
+    var mes = mesActual();
+    var partes = mes.split('-');
+    var anio = parseInt(partes[0]);
+    var mesN = parseInt(partes[1]);
+    var contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
+    var inmuebles = getInmuebles();
+    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
+    var refsEmpresa = {};
+    inmuebles.forEach(function(inm) {
+      if (!inm.propietario || normEmpresa(inm.propietario) === normEmpresa(emp)) {
+        if (inm.ref) refsEmpresa[inm.ref] = true;
+      }
+    });
+    var res = [];
+    // BLINDAJE: los contratos rústicos no entran aquí — su importe anual se
+    // registra a mano en el Histórico de cada finca, no sube por IPC (ver
+    // el mismo blindaje en ipc_renderBanners).
+    contratos.filter(function(c) { return c.estado === 'activo' && c.inicio && c.tipo !== 'rustica' && c.tipo !== 'rusticatemp' && (!c.ref || refsEmpresa[c.ref]); }).forEach(function(c) {
+      var ini = new Date(c.inicio);
+      if (ini.getMonth() + 1 === mesN) {
+        var aniosTranscurridos = anio - ini.getFullYear();
+        if (aniosTranscurridos <= 0) return;
+        res.push({ nombre: c.inqNombre || c.dir || 'Contrato', ref: c.ref || '' });
+      }
+    });
+    return res;
+  } catch (e) { return []; }
+}
+
+function pend_calcular() {
+  var items = [];
+  try {
+    var b = (typeof backupNecesitaAviso === 'function') ? backupNecesitaAviso() : null;
+    if (b && b.necesita) {
+      items.push({ icon: '💾', t: 'Hace ' + b.dias + ' días que no guardas una copia de seguridad', s: 'Pantalla de inicio de sesión → "Guardar copia"' });
+    }
+  } catch (e) {}
+  try {
+    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
+    if (emp === 'patrimer' && typeof rus_pendientes === 'function') {
+      var anio = new Date().getFullYear();
+      rus_pendientes(anio).forEach(function(p) {
+        items.push({ icon: '🌾', t: 'Finca "' + p.nombre + '" sin importe de rústico de ' + anio, s: 'Estimado según ' + (anio - 1) + ': ~' + fmtE(p.estimado) });
+      });
+    }
+  } catch (e) {}
+  try {
+    pend_contratosPorVencer().forEach(function(c) {
+      items.push({ icon: '📄', t: 'Contrato de "' + c.nombre + '" vence en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's'), s: 'Revisa si renueva o finaliza' });
+    });
+  } catch (e) {}
+  try {
+    pend_ipcPendientes().forEach(function(c) {
+      items.push({ icon: '📈', t: 'IPC pendiente de actualizar: ' + c.nombre, s: (c.ref ? c.ref + ' · ' : '') + 'Le toca anualidad este mes' });
+    });
+  } catch (e) {}
+  return items;
+}
+
+let _pendAbiertos = false;
+function pend_toggle() {
+  _pendAbiertos = !_pendAbiertos;
+  var body = document.getElementById('pend-body');
+  var icon = document.getElementById('pend-toggle-icon');
+  if (body) body.style.display = _pendAbiertos ? 'block' : 'none';
+  if (icon) icon.textContent = _pendAbiertos ? '▴' : '▾';
+}
+
+function pend_render() {
+  var card = document.getElementById('pend-card');
+  var body = document.getElementById('pend-body');
+  var contador = document.getElementById('pend-contador');
+  if (!card || !body) return;
+  var items = pend_calcular();
+  if (items.length === 0) {
+    card.style.display = 'none';
+    body.innerHTML = '';
+    return;
+  }
+  card.style.display = 'block';
+  if (contador) contador.textContent = '(' + items.length + ')';
+  body.innerHTML = items.map(function(it) {
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+      '<div style="font-size:15px;flex-shrink:0;margin-top:1px;">' + it.icon + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:12.5px;color:var(--silver-bright);line-height:1.35;">' + it.t + '</div>' +
+        '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:1px;">' + it.s + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function dash_buildChart(year, facturas) {
@@ -11987,6 +12195,7 @@ window._refreshCurrentModule = function(key) {
     }
     if (module === 'renta' && typeof renta_render === 'function') renta_render();
     if (module === 'inicio' && typeof notas_render === 'function') notas_render();
+    if (module === 'inicio' && typeof pend_render === 'function') pend_render();
   }
 };
 
