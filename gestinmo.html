@@ -2257,11 +2257,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="fin-patrimonio-rows compact">
           <div class="row"><span>Inmobiliario</span><span id="dash-pat-inmuebles">—</span></div>
           <div class="row"><span>Financiero</span><span id="dash-pat-financiero">—</span></div>
-        </div>
-        <!-- PUNTO 47 (25/08/2026): 33% de Industrias (IGC), en pequeño, solo
-        visible cuando la empresa activa es Patrimer (ver JS en dash_render). -->
-        <div style="display:none;font-size:9.5px;color:var(--silver-dim);text-align:center;margin-top:4px;">
-          Inc IGC <span id="dash-pat-igc"></span>
+          <!-- AJUSTE 25/08/2026 (noche): "Total+IGC" pasa a ser una fila más,
+          con el mismo formato que Inmobiliario/Financiero (antes iba en
+          pequeño debajo) — solo visible cuando la empresa activa es Patrimer
+          (ver JS en dash_render). -->
+          <div class="row" id="dash-pat-igc-row" style="display:none;font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span id="dash-pat-igc">—</span></div>
         </div>
       </div>
     </div>
@@ -12191,7 +12191,11 @@ function fin_calcPatrimonio() {
   // Confirmado con Patry: 1.000.000€ es YA el 33% (no el total de Industrias).
   var PATRIMONIO_IGC_PATRIMER = 1000000;
   var igc = (empresaActivaFin === 'patrimer') ? PATRIMONIO_IGC_PATRIMER : 0;
-  var total = cuentas + fondos + acciones + inmob.total + igc;
+  // AJUSTE 25/08/2026 (noche): a petición de Patry, el número grande de arriba
+  // ("Patrimonio total") vuelve a ser solo lo de esta empresa (sin IGC) — el
+  // 33% de Industrias se muestra aparte, como una fila más (no en pequeño),
+  // con su propia suma "Total+IGC".
+  var total = cuentas + fondos + acciones + inmob.total;
   var el = document.getElementById('fin-patrimonio-total');
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
   var rowsEl = document.getElementById('fin-patrimonio-rows');
@@ -12201,7 +12205,7 @@ function fin_calcPatrimonio() {
       '<div class="row"><span>Cuentas</span><span>' + (cuentas > 0 ? fin_fmt(cuentas) : '-') + '</span></div>' +
       '<div class="row"><span>Acciones</span><span>' + (acciones > 0 ? fin_fmt(acciones) : '-') + '</span></div>' +
       '<div class="row"><span>Fondos</span><span>' + (fondos > 0 ? fin_fmt(fondos) : '-') + '</span></div>' +
-      (igc > 0 ? '<div class="row" style="font-size:10.5px;color:var(--silver-dim);"><span>Inc IGC (33%)</span><span>' + fin_fmt(igc) + '</span></div>' : '');
+      (igc > 0 ? '<div class="row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span>' + fin_fmt(total + igc) + '</span></div>' : '');
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
   if (notaEl) {
@@ -12717,11 +12721,15 @@ function dash_render() {
   // PUNTO 47 (25/08/2026): mismo 33% de Industrias (IGC) que en Finanzas —
   // importe fijo, ver comentario junto a PATRIMONIO_IGC_PATRIMER en fin_render().
   var _igcDash = (_empActivaPat === 'patrimer') ? 1000000 : 0;
-  var total = cuentas + fondos + acciones + _inmobDash.total + _igcDash;
+  // AJUSTE 25/08/2026 (noche): igual que en Finanzas — el número grande ya no
+  // incluye el IGC, se muestra aparte como fila "Total+IGC".
+  var total = cuentas + fondos + acciones + _inmobDash.total;
   var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmt(total) : '—';
   var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmt(_inmobDash.total) : '—';
+  var dPatIgcRow = document.getElementById('dash-pat-igc-row');
   var dPatIgc = document.getElementById('dash-pat-igc');
-  if (dPatIgc) { dPatIgc.textContent = _igcDash > 0 ? fin_fmt(_igcDash) : ''; dPatIgc.parentElement.style.display = _igcDash > 0 ? '' : 'none'; }
+  if (dPatIgcRow) dPatIgcRow.style.display = _igcDash > 0 ? '' : 'none';
+  if (dPatIgc) dPatIgc.textContent = _igcDash > 0 ? fin_fmt(total + _igcDash) : '';
   // AJUSTE 25/08/2026 (tarde): en Inicio ya no se desglosan Cuentas/Acciones/
   // Fondos por separado — se juntan en un único dato "Financiero".
   var _financiero = cuentas + acciones + fondos;
