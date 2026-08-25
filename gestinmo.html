@@ -899,7 +899,8 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
    tarjeta comparte fila con "Reparto" (mitad de ancho), y a 17/18px el texto
    de "Inmuebles" + su importe no cabía en una línea. .compact la reduce un
    poco, al mismo tamaño que ya usa la tarjeta "Reparto" justo al lado. */
-.fin-patrimonio-rows.compact .row{padding:4px 0;}
+.fin-patrimonio-rows.compact{margin-top:6px;}
+.fin-patrimonio-rows.compact .row{padding:2px 0;}
 .fin-patrimonio-rows.compact .row span:first-child{font-size:13px;}
 .fin-patrimonio-rows.compact .row span:last-child{font-size:15px;}
 .ipc-banner{background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.35);border-left:3px solid var(--accent-blue);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;}
@@ -1900,6 +1901,12 @@ const DATA_KEYS = [
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
   'app:notas_mejoras',
+  // BLINDAJE 25/08/2026 (noche): lista de ids ya eliminados del bloc de
+  // ideas, para que una idea borrada no pueda "revivir" si otro aparato
+  // (móvil, ordenador, o el perfil de Mercedes) sincroniza por encima una
+  // copia antigua de la lista completa que todavía la incluía. Ver
+  // notas_load()/notas_eliminar() más abajo.
+  'app:notas_borradas',
   // Fecha de la última copia de seguridad (Exportar) — se sincroniza entre
   // dispositivos para que el futuro aviso de "hace tiempo que no exportas"
   // sepa la fecha real, la hayas exportado desde el móvil de quien sea.
@@ -2209,7 +2216,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
 
     <!-- FILA 2: Reparto + Patrimonio financiero -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-      <div class="kpi" onclick="showModule('cobros')" style="cursor:pointer;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;">
+      <div class="kpi" onclick="showModule('cobros')" style="cursor:pointer;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:center;">
         <div class="kpi-l" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:8px;text-align:center;">REPARTO</div>
         <!-- PUNTO 43 (25/08/2026): letra y números agrandados en las 2 vistas de
         esta tarjeta (Patrimer/Industrias y Patricio) — mismo ajuste que en el
@@ -2261,7 +2268,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           con el mismo formato que Inmobiliario/Financiero (antes iba en
           pequeño debajo) — solo visible cuando la empresa activa es Patrimer
           (ver JS en dash_render). -->
-          <div class="row" id="dash-pat-igc-row" style="display:none;font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span id="dash-pat-igc">—</span></div>
+          <div class="row" id="dash-pat-igc-row" style="display:none;font-weight:700;border-top:1px solid var(--border);margin-top:2px;padding-top:3px;"><span>Total+IGC</span><span id="dash-pat-igc">—</span></div>
         </div>
       </div>
     </div>
@@ -4766,7 +4773,8 @@ const BACKUP_KEYS = [
   'facturacion:historico:patrimer',
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
-  'app:notas_mejoras'
+  'app:notas_mejoras',
+  'app:notas_borradas'
 ];
 // BLINDAJE DE DATOS (Bloque 4): mismo motivo que en DATA_KEYS — proteger
 // también en la copia de seguridad las nóminas/gastos anuales de Renta
@@ -12765,11 +12773,31 @@ function notas_esc(s) {
 }
 
 function notas_load() {
-  try { return JSON.parse(localStorage.getItem('app:notas_mejoras')) || []; }
-  catch (e) { return []; }
+  let arr;
+  try { arr = JSON.parse(localStorage.getItem('app:notas_mejoras')) || []; }
+  catch (e) { arr = []; }
+  // BLINDAJE 25/08/2026 (noche): si alguna idea que ya está en la "papelera"
+  // (notas_loadBorradas) sigue apareciendo en la lista —porque otro
+  // aparato sincronizó por encima una copia vieja que aún la tenía—, se
+  // quita aquí y se vuelve a guardar la lista ya limpia, para que la
+  // corrección se propague también hacia la nube y hacia ese otro aparato.
+  const borradas = notas_loadBorradas();
+  if (borradas.length) {
+    const limpio = arr.filter(function(x) { return borradas.indexOf(x.id) === -1; });
+    if (limpio.length !== arr.length) { notas_save(limpio); }
+    arr = limpio;
+  }
+  return arr;
 }
 function notas_save(arr) {
   localStorage.setItem('app:notas_mejoras', JSON.stringify(arr));
+}
+function notas_loadBorradas() {
+  try { return JSON.parse(localStorage.getItem('app:notas_borradas')) || []; }
+  catch (e) { return []; }
+}
+function notas_saveBorradas(arr) {
+  localStorage.setItem('app:notas_borradas', JSON.stringify(arr));
 }
 
 function notas_toggle() {
@@ -12812,6 +12840,15 @@ function notas_toggleHecho(id) {
 function notas_eliminar(id) {
   const arr = notas_load().filter(x => x.id !== id);
   notas_save(arr);
+  // Se apunta el id en la "papelera" (app:notas_borradas) de forma
+  // permanente, no solo se quita de la lista — así, si otro aparato con
+  // una copia vieja de la lista vuelve a sincronizar esa idea por encima,
+  // notas_load() la reconoce como ya borrada y la vuelve a quitar sola.
+  const borradas = notas_loadBorradas();
+  if (borradas.indexOf(id) === -1) {
+    borradas.push(id);
+    notas_saveBorradas(borradas);
+  }
   notas_render();
 }
 
@@ -13180,6 +13217,7 @@ window._refreshCurrentModule = function(key) {
     'fin:fondos:industrias': 'finanzas',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
+    'app:notas_borradas': 'inicio',
   };
   // Mismo rango de años que en DATA_KEYS, para que Renta Patricio también
   // se refresque en pantalla al recibir un cambio de otro dispositivo.
