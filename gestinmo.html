@@ -2136,13 +2136,13 @@ window.loadFromFirestore().then(() => {
   corregido también los iconos, que estaban cambiados entre sí (📥 de
   "recibir/traer" es el que corresponde a Restaurar, no a Guardar). -->
   <div style="margin-top:16px;display:flex;justify-content:center;gap:20px;">
-    <div onclick="pedirPasswordExportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;display:flex;align-items:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
-      <span style="font-size:14px">💾</span>
-      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase">Guardar copia</span>
+    <div onclick="pedirPasswordExportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;width:168px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
+      <span style="font-size:14px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">💾</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase;white-space:nowrap;">Guardar copia</span>
     </div>
-    <div onclick="pedirPasswordImportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;display:flex;align-items:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
-      <span style="font-size:14px">📥</span>
-      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase">Restaurar copia</span>
+    <div onclick="pedirPasswordImportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;width:168px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
+      <span style="font-size:14px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">📥</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase;white-space:nowrap;">Restaurar copia</span>
     </div>
   </div>
   <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importarDatos(event)">
@@ -2257,6 +2257,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="fin-patrimonio-rows compact">
           <div class="row"><span>Inmobiliario</span><span id="dash-pat-inmuebles">—</span></div>
           <div class="row"><span>Financiero</span><span id="dash-pat-financiero">—</span></div>
+        </div>
+        <!-- PUNTO 47 (25/08/2026): 33% de Industrias (IGC), en pequeño, solo
+        visible cuando la empresa activa es Patrimer (ver JS en dash_render). -->
+        <div style="display:none;font-size:9.5px;color:var(--silver-dim);text-align:center;margin-top:4px;">
+          Inc IGC <span id="dash-pat-igc"></span>
         </div>
       </div>
     </div>
@@ -12178,7 +12183,15 @@ function fin_calcPatrimonio() {
   // mercado actual de los inmuebles de esta empresa) al total.
   var empresaActivaFin = localStorage.getItem('patrimer:empresa') || 'patrimer';
   var inmob = inm_patrimonioInmobiliario(empresaActivaFin);
-  var total = cuentas + fondos + acciones + inmob.total;
+  // PUNTO 47 (25/08/2026): Patrimer tiene el 33% de Industrias (IGC), así que
+  // ese 33% también es patrimonio suyo. No hay datos de Industrias dentro de
+  // esta app (sus inmuebles/activos no están dados de alta aquí), así que
+  // esto NO se calcula solo — es un importe fijo que Patry confirma y
+  // actualiza a mano cuando cambie (como ya hace con las cotizaciones).
+  // Confirmado con Patry: 1.000.000€ es YA el 33% (no el total de Industrias).
+  var PATRIMONIO_IGC_PATRIMER = 1000000;
+  var igc = (empresaActivaFin === 'patrimer') ? PATRIMONIO_IGC_PATRIMER : 0;
+  var total = cuentas + fondos + acciones + inmob.total + igc;
   var el = document.getElementById('fin-patrimonio-total');
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
   var rowsEl = document.getElementById('fin-patrimonio-rows');
@@ -12187,7 +12200,8 @@ function fin_calcPatrimonio() {
       '<div class="row"><span>Inmuebles</span><span>' + (inmob.total > 0 ? fin_fmt(inmob.total) : '-') + '</span></div>' +
       '<div class="row"><span>Cuentas</span><span>' + (cuentas > 0 ? fin_fmt(cuentas) : '-') + '</span></div>' +
       '<div class="row"><span>Acciones</span><span>' + (acciones > 0 ? fin_fmt(acciones) : '-') + '</span></div>' +
-      '<div class="row"><span>Fondos</span><span>' + (fondos > 0 ? fin_fmt(fondos) : '-') + '</span></div>';
+      '<div class="row"><span>Fondos</span><span>' + (fondos > 0 ? fin_fmt(fondos) : '-') + '</span></div>' +
+      (igc > 0 ? '<div class="row" style="font-size:10.5px;color:var(--silver-dim);"><span>Inc IGC (33%)</span><span>' + fin_fmt(igc) + '</span></div>' : '');
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
   if (notaEl) {
@@ -12700,9 +12714,14 @@ function dash_render() {
   // PUNTO 41 (25/08/2026): se suma el patrimonio inmobiliario, igual que en Finanzas.
   var _empActivaPat = localStorage.getItem('patrimer:empresa') || 'patrimer';
   var _inmobDash = inm_patrimonioInmobiliario(_empActivaPat);
-  var total = cuentas + fondos + acciones + _inmobDash.total;
+  // PUNTO 47 (25/08/2026): mismo 33% de Industrias (IGC) que en Finanzas —
+  // importe fijo, ver comentario junto a PATRIMONIO_IGC_PATRIMER en fin_render().
+  var _igcDash = (_empActivaPat === 'patrimer') ? 1000000 : 0;
+  var total = cuentas + fondos + acciones + _inmobDash.total + _igcDash;
   var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmt(total) : '—';
   var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmt(_inmobDash.total) : '—';
+  var dPatIgc = document.getElementById('dash-pat-igc');
+  if (dPatIgc) { dPatIgc.textContent = _igcDash > 0 ? fin_fmt(_igcDash) : ''; dPatIgc.parentElement.style.display = _igcDash > 0 ? '' : 'none'; }
   // AJUSTE 25/08/2026 (tarde): en Inicio ya no se desglosan Cuentas/Acciones/
   // Fondos por separado — se juntan en un único dato "Financiero".
   var _financiero = cuentas + acciones + fondos;
