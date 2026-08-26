@@ -55,6 +55,15 @@
 
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
+  /* AJUSTE 26/08/2026: en Safari de iPhone, cuando el texto vive dentro de
+  cajas estrechas (como las filas de la tarjeta "Patrimonio Total"), el
+  propio navegador puede agrandar la letra por su cuenta para "ayudar a
+  leer" — un comportamiento exclusivo de Safari que no pasa al probar en
+  ordenador. Esto hacía que algunas tarjetas se vieran peor en el iPhone
+  real que en las pruebas hechas aquí. Con esta línea, el tamaño de letra
+  que se fija en el código es siempre el que se ve, en cualquier aparato. */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
   body {
     font-family:'Rajdhani', sans-serif;
     background: var(--navy-deep);
@@ -128,7 +137,8 @@
   .splash-card.industrias:hover .splash-card-inner { border-color:rgba(201,168,76,.4);  background:#201e10; }
 
   .splash-logo-box {
-    width: 42px; height: 42px; border-radius: 12px;
+    /* PUNTO 53 (26/08/2026): agrandado a petición tuya — antes 42px */
+    width: 60px; height: 60px; border-radius: 16px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; border: 1px solid transparent; overflow: hidden;
   }
@@ -339,12 +349,22 @@
 .rent-lbl { font-size: 9px; color: var(--text-secondary); letter-spacing: 0.5px; margin-top: 1px; }
 .rent-green { color: var(--accent-green); }
 .rent-amber { color: var(--accent-amber); }
-.detail-hero { width: 100%; height: 200px; background: linear-gradient(135deg, var(--navy-mid), var(--navy-hover)); display: flex; align-items: center; justify-content: center; font-size: 72px; position: relative; overflow: hidden; }
-.detail-hero-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 30%, var(--navy-deep) 100%); }
-.detail-hero-badges { position: absolute; bottom: 16px; left: 16px; display: flex; gap: 8px; }
-.detail-header-info { padding: 16px 16px 0; margin-bottom: 20px; }
-.detail-address { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+/* REDISEÑO 26/08/2026: la cabecera antigua (.detail-hero) era una caja de
+200px de alto a todo lo ancho, con un único emoji centrado — mucho espacio
+vacío sin aprovechar, según aviso de Patry con foto real. Pasa a ser una
+fila compacta: icono pequeño + nombre del edificio (si lo hay) + dirección
+corta (sin CP ni población, ya los sabe de memoria) + tipo. De propina, los
+"badges" de estado/empresa (antes fijos en el HTML y borrados sin querer
+cada vez que se pintaba el emoji — nunca llegaban a verse en la app real)
+pasan a mostrar el dato de verdad de cada inmueble. */
+.detail-hero-compact { display: flex; align-items: center; gap: 14px; padding: 16px 16px 0; }
+.detail-hero-icon { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, var(--navy-mid), var(--navy-hover)); display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
+.detail-header-info { padding: 0; margin: 0; min-width: 0; flex: 1; }
+.detail-edificio { font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--accent-blue); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-address { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
 .detail-type { font-size: 13px; color: var(--text-secondary); }
+.detail-badges-row { display: flex; gap: 8px; padding: 10px 16px 0; margin-bottom: 16px; }
+.detail-badges-row .card-status-badge, .detail-badges-row .card-owner-badge { position: static; }
 .detail-kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 0 16px 24px; }
 .detail-kpi { background: var(--navy-card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 10px; text-align: center; }
 .detail-kpi-value { font-size: 17px; font-weight: 700; color: var(--silver-bright); }
@@ -1901,12 +1921,7 @@ const DATA_KEYS = [
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
   'app:notas_mejoras',
-  // BLINDAJE 25/08/2026 (noche): lista de ids ya eliminados del bloc de
-  // ideas, para que una idea borrada no pueda "revivir" si otro aparato
-  // (móvil, ordenador, o el perfil de Mercedes) sincroniza por encima una
-  // copia antigua de la lista completa que todavía la incluía. Ver
-  // notas_load()/notas_eliminar() más abajo.
-  'app:notas_borradas',
+  'fin:ultima_actualizacion',
   // Fecha de la última copia de seguridad (Exportar) — se sincroniza entre
   // dispositivos para que el futuro aviso de "hace tiempo que no exportas"
   // sepa la fecha real, la hayas exportado desde el móvil de quien sea.
@@ -1937,6 +1952,27 @@ function keyToDoc(key) {
 // antiguo que esa escritura se ignora en vez de aplicarse.
 const _pendingLocalWrites = {};
 
+// PUNTO 52 (26/08/2026) — BUG REAL ENCONTRADO, mismo origen que el de las
+// ideas pero afectando a CUALQUIER dato (ej. "no guarda el nombre del
+// edificio"): _pendingLocalWrites solo vivía en memoria, así que se
+// vaciaba en cada recarga de página. Si guardabas un cambio y la app se
+// recargaba (cerrar/reabrir la PWA, cambiar de pestaña y volver, quedarse
+// sin cobertura un instante) ANTES de que ese cambio llegara a confirmarse
+// en la nube, la siguiente carga ya no recordaba que acababas de escribir
+// algo — y la copia vieja de la nube pisaba tu cambio recién hecho, sin
+// avisar. Arreglo: guardar también esas marcas de tiempo en una clave de
+// localStorage propia (que NUNCA se sincroniza con la nube, solo sirve
+// como "memoria" local entre recargas) y recuperarlas al arrancar.
+const _PENDING_WRITES_KEY = '_sync:pendientes_local';
+try {
+  const _pendGuardado = JSON.parse(localStorage.getItem(_PENDING_WRITES_KEY) || '{}');
+  Object.assign(_pendingLocalWrites, _pendGuardado);
+} catch (e) { /* si está corrupto, se ignora y se empieza de cero */ }
+function _guardarPendientes() {
+  try { localStorage.setItem(_PENDING_WRITES_KEY, JSON.stringify(_pendingLocalWrites)); }
+  catch (e) { /* localStorage lleno o no disponible: no es crítico, se reintentará en la próxima escritura */ }
+}
+
 // Comprueba que un valor es "de verdad" antes de guardarlo o propagarlo —
 // ni vacío (undefined/null) ni el texto literal "undefined"/"null" (lo que
 // queda en localStorage si algún día se guarda un valor vacío sin querer).
@@ -1946,12 +1982,53 @@ function _valorValido(v) {
   return v !== undefined && v !== null && v !== 'undefined' && v !== 'null';
 }
 
+// FUSIÓN ESPECIAL PARA "IDEAS PARA LA APP" (26/08/2026) ──────────────────
+// Motivo: el resto de las claves de DATA_KEYS se sincronizan "todo o
+// nada" (la copia más reciente sustituye entera a la anterior), y eso
+// funciona bien para datos que rara vez cambian justo a la vez desde 2
+// sitios. Pero el bloc de ideas es la parte que más se toca, y además en
+// el móvil, cerrar y reabrir la PWA (por ejemplo al cambiar de app, o
+// cuando el sistema operativo la descarga de memoria en segundo plano)
+// vuelve a ejecutar loadFromFirestore() desde cero — si justo antes hubo
+// un fallo de red breve (típico en datos móviles) que impidió que un
+// cambio local llegara a subirse a tiempo, la carga siguiente traía la
+// copia vieja de la nube y sustituía a la local entera, "deshaciendo" ese
+// cambio — así se veían ideas que se borraban solas o que nunca llegaban
+// a guardarse, incluso usando un solo aparato.
+// Arreglo: para la clave 'app:notas_mejoras' NUNCA se sustituye la lista
+// entera — se fusiona idea por idea (por su id), quedándose siempre con
+// la versión con el updatedAt más reciente de cada una. Así, un cambio
+// que ya está guardado en este aparato (aunque no haya llegado aún a la
+// nube) nunca desaparece al recibir una copia de la nube más antigua.
+function _notasMerge(localJSON, remoteJSON) {
+  try {
+    const locales = localJSON ? JSON.parse(localJSON) : [];
+    const remotas = remoteJSON ? JSON.parse(remoteJSON) : [];
+    const mapa = {};
+    (locales || []).forEach(function(n) { if (n && n.id) mapa[n.id] = n; });
+    (remotas || []).forEach(function(n) {
+      if (!n || !n.id) return;
+      const actual = mapa[n.id];
+      if (!actual || String(n.updatedAt || '') > String(actual.updatedAt || '')) mapa[n.id] = n;
+    });
+    return JSON.stringify(
+      Object.keys(mapa).map(function(k) { return mapa[k]; })
+        .sort(function(a, b) { return String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')); })
+    );
+  } catch (e) {
+    console.warn('Fusión de ideas fallida, se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._notasMerge = _notasMerge; // expuesta para pruebas automáticas
+
 // ── ESCRIBIR EN FIRESTORE ──────────────────────────────────────────
 window.syncToFirestore = async function(key, value) {
   if (!DATA_KEYS.includes(key)) return;
   if (!_valorValido(value)) { console.warn('Firebase sync: valor vacío/corrupto ignorado para', key); return; }
   const ts = new Date().toISOString();
   _pendingLocalWrites[key] = ts;
+  _guardarPendientes();
   try {
     const docId = keyToDoc(key);
     await setDoc(doc(db, 'gestinmo_data', docId), {
@@ -1974,10 +2051,23 @@ window.loadFromFirestore = async function() {
       if (snap.exists()) {
         const data = snap.data();
         if (_valorValido(data.value)) {
-          const pendiente = _pendingLocalWrites[key];
-          if (!pendiente || !data.updatedAt || data.updatedAt >= pendiente) {
-            localStorage.setItem(key, data.value);
+          if (key === 'app:notas_mejoras') {
+            const actual = localStorage.getItem(key);
+            const fusionado = _notasMerge(actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
+          } else {
+            const pendiente = _pendingLocalWrites[key];
+            if (!pendiente || !data.updatedAt || data.updatedAt >= pendiente) {
+              localStorage.setItem(key, data.value);
+              loaded++;
+            } else {
+              // Nuestra escritura local (de esta sesión o de una anterior, ver
+              // PUNTO 52) es más reciente que lo que hay en la nube — probable
+              // fallo de sincronización previo. No se pisa el dato local, y
+              // además se reenvía para que no se quede huérfano sin subir.
+              window.syncToFirestore(key, localStorage.getItem(key));
+            }
           }
         }
       }
@@ -2001,6 +2091,15 @@ window.startFirebaseSync = function() {
       if (snap.exists() && snap.metadata.hasPendingWrites === false) {
         const data = snap.data();
         if (!_valorValido(data.value)) return; // dato vacío/corrupto en la nube, no se aplica nunca
+        if (key === 'app:notas_mejoras') {
+          const actual = localStorage.getItem(key);
+          const fusionado = _notasMerge(actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
         const pendiente = _pendingLocalWrites[key];
         if (pendiente && data.updatedAt && data.updatedAt < pendiente) return; // dato viejo en camino, ignorar
         const local = localStorage.getItem(key);
@@ -2262,8 +2361,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="kpi-l" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:8px;text-align:center;">PATRIMONIO TOTAL</div>
         <div id="dash-patrimonio-total" style="font-size:22px;font-weight:700;color:var(--accent-gold);text-align:center;">—</div>
         <div class="fin-patrimonio-rows compact">
-          <div class="row"><span>Inmobiliario</span><span id="dash-pat-inmuebles">—</span></div>
-          <div class="row"><span>Financiero</span><span id="dash-pat-financiero">—</span></div>
+          <div class="row"><span>Inmob.</span><span id="dash-pat-inmuebles">—</span></div>
+          <div class="row"><span>Financ.</span><span id="dash-pat-financiero">—</span></div>
           <!-- AJUSTE 25/08/2026 (noche): "Total+IGC" pasa a ser una fila más,
           con el mismo formato que Inmobiliario/Financiero (antes iba en
           pequeño debajo) — solo visible cuando la empresa activa es Patrimer
@@ -2394,10 +2493,17 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div class="header-action"><div class="btn-add" style="font-size:16px">✏️</div></div>
   </header>
-  <div class="detail-hero">🏢<div class="detail-hero-overlay"></div><div class="detail-hero-badges"><div class="card-status-badge badge-alquilado">Alquilado</div><div class="card-owner-badge" style="position:relative;top:auto;right:auto">Empresa</div></div></div>
-  <div class="detail-header-info">
-    <div class="detail-address">C/ Mayor 14, 3º B</div>
-    <div class="detail-type">Piso · 85 m² · 3 hab · 2 baños · Lorca</div>
+  <div class="detail-hero-compact">
+    <div class="detail-hero-icon" id="detail-hero-icon">🏠</div>
+    <div class="detail-header-info">
+      <div class="detail-edificio" id="detail-edificio" style="display:none;"></div>
+      <div class="detail-address">C/ Mayor 14, 3º B</div>
+      <div class="detail-type">Piso · 85 m² · 3 hab · 2 baños</div>
+    </div>
+  </div>
+  <div class="detail-badges-row">
+    <div class="card-status-badge badge-alquilado" id="detail-badge-estado">Alquilado</div>
+    <div class="card-owner-badge" id="detail-badge-owner">Empresa</div>
   </div>
   <div class="detail-kpis">
     <div class="detail-kpi"><div class="detail-kpi-value" id="kpi-renta">—</div><div class="detail-kpi-label">Renta/mes</div></div>
@@ -2524,7 +2630,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="form-group">
           <div class="form-label">Propietario</div>
           <select class="form-select" id="f-propietario" onchange="inm_onPropietarioChange()">
-            <option value="empresa">Patrimer Levante</option>
+            <!-- CORRECCIÓN 26/08/2026 — BUG REAL ENCONTRADO: esta opción usaba
+            value="empresa", pero desde la migración interna que unifica
+            "empresa" → "patrimer" (ver más abajo en el archivo), todos los
+            inmuebles de Patrimer quedan guardados con propietario:"patrimer".
+            Al no existir ninguna opción con ese valor, el desplegable se
+            quedaba en blanco al editar cualquiera de esos inmuebles — y si
+            se guardaba así sin querer, se BORRABA el propietario real. -->
+            <option value="patrimer">Patrimer Levante</option>
             <option value="patricio">Patricio</option>
             <option value="industrias">Industrias G&amp;C</option>
           </select>
@@ -2595,29 +2708,29 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">Precio compra (€)</div>
-          <input class="form-input" id="f-precio" type="text" inputmode="decimal" placeholder="185.000" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-precio" type="text" inputmode="decimal" placeholder="Ej: 185.000" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         </div>
         <div class="form-group">
           <div class="form-label">Gastos compra (€)</div>
-          <input class="form-input" id="f-gastos-compra" type="number" inputmode="decimal" placeholder="16200" oninput="recalcPreview()">
+          <input class="form-input" id="f-gastos-compra" type="text" inputmode="decimal" placeholder="Ej: 16.200" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
           <div class="form-hint">Notaría, ITP, registro…</div>
         </div>
       </div>
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">Reforma / inversión (€)</div>
-          <input class="form-input" id="f-reforma" type="number" inputmode="decimal" placeholder="0" oninput="recalcPreview()">
+          <input class="form-input" id="f-reforma" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
         </div>
         <div class="form-group">
           <div class="form-label">Gastos anuales (€)</div>
-          <input class="form-input" id="f-gastos-anuales" type="number" inputmode="decimal" placeholder="1500" oninput="recalcPreview()">
+          <input class="form-input" id="f-gastos-anuales" type="text" inputmode="decimal" placeholder="Ej: 1.500" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
           <div class="form-hint">IBI + comunidad + seguro…</div>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Valor de mercado actual (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
-          <input class="form-input" id="f-precio-actual" type="text" inputmode="decimal" placeholder="Si no se indica, se usa el precio de compra" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-precio-actual" type="text" inputmode="decimal" placeholder="Si no se indica, no cuenta en el patrimonio total" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint">Lo que valdría hoy, para ver el valor real de tu patrimonio — no afecta al cálculo de rentabilidad</div>
         </div>
       </div>
@@ -3926,6 +4039,20 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   <button onclick="fin_abrirAsistente()" class="fin-add-btn" style="font-size:20px;padding:4px 10px;">&#128257;</button>
 </header>
 <div class="view active main" style="padding:16px;padding-bottom:100px;min-height:100vh;">
+  <!-- PUNTO 41 (25/08/2026): "Patrimonio financiero total" pasa a ser
+  "Patrimonio total" — se añade el valor inmobiliario (Opción B elegida por
+  Patry: todo en una sola tarjeta, con Inmuebles como una línea más). Diseño
+  acordado tras varias rondas de simulación.
+  PUNTO 53 (26/08/2026): movida al PRINCIPIO del módulo (antes iba al final,
+  debajo de Fondos) — a petición tuya, es el dato que más se quiere ver de
+  un vistazo al entrar en Finanzas, sin tener que bajar. -->
+  <div class="fin-patrimonio-card" style="margin-top:0;margin-bottom:14px;">
+    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">Patrimonio total</div>
+    <div style="font-size:26px;font-weight:700;color:var(--accent-gold);" id="fin-patrimonio-total">-</div>
+    <div class="fin-patrimonio-rows" id="fin-patrimonio-rows"></div>
+    <div style="font-size:11px;color:var(--silver-dim);margin-top:8px;" id="fin-patrimonio-nota"></div>
+  </div>
+  <div style="font-size:11px;color:var(--silver-dim);text-align:right;margin:-8px 2px 10px;" id="fin-ultima-actualizacion"></div>
   <div class="fin-section">
     <div class="fin-section-header">
       <div class="fin-section-title">&#127974; Cuentas bancarias</div>
@@ -3963,16 +4090,6 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   </div>
   <div id="fin-resumen-anual" style="display:none;margin-bottom:6px;">
     <div id="fin-resumen-anual-content" style="font-size:12px;color:var(--silver-dim);text-align:center;padding:10px 0;">Sin datos.</div>
-  </div>
-  <!-- PUNTO 41 (25/08/2026): "Patrimonio financiero total" pasa a ser
-  "Patrimonio total" — se añade el valor inmobiliario (Opción B elegida por
-  Patry: todo en una sola tarjeta, con Inmuebles como una línea más). Diseño
-  acordado tras varias rondas de simulación. -->
-  <div class="fin-patrimonio-card">
-    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">Patrimonio total</div>
-    <div style="font-size:26px;font-weight:700;color:var(--accent-gold);" id="fin-patrimonio-total">-</div>
-    <div class="fin-patrimonio-rows" id="fin-patrimonio-rows"></div>
-    <div style="font-size:11px;color:var(--silver-dim);margin-top:8px;" id="fin-patrimonio-nota"></div>
   </div>
 </div>
 </div>
@@ -4774,7 +4891,7 @@ const BACKUP_KEYS = [
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
   'app:notas_mejoras',
-  'app:notas_borradas'
+  'fin:ultima_actualizacion'
 ];
 // BLINDAJE DE DATOS (Bloque 4): mismo motivo que en DATA_KEYS — proteger
 // también en la copia de seguridad las nóminas/gastos anuales de Renta
@@ -5423,19 +5540,50 @@ function inm_showDetail(idx) {
 
   const emojis = { piso:'🏠', local:'🏪', garaje:'🚗', rustico:'🌾', otro:'📦' };
   const propLabels = { empresa:'Patrimer Levante S.L.', patricio:'Patricio Gómez García', industrias:'Industrias G&C' };
+  // CORRECCIÓN 26/08/2026: algunos inmuebles antiguos tienen guardado
+  // propietario:"patrimer" en vez de "empresa" (son sinónimos — normEmpresa()
+  // ya existe en la app justo para esto). Sin pasar por normEmpresa(), la
+  // insignia de propietario de la cabecera se quedaba vacía ("—") para esos
+  // inmuebles aunque sí tuvieran propietario asignado.
+  const propLabelsCortos = { patrimer:'Patrimer', patricio:'Patricio', industrias:'Industrias' };
   const tipoLabels = { piso:'Piso', local:'Local comercial', garaje:'Garaje', rustico:'Rústico', otro:'Otro' };
 
-  document.querySelector('.detail-hero').innerHTML = `${emojis[inm.tipo]||'🏠'}<div class="detail-hero-overlay"></div>`;
-  document.querySelector('.detail-address').textContent = inm.direccion;
+  // REDISEÑO 26/08/2026: cabecera compacta — icono pequeño (ya no la caja de
+  // 200px con el emoji gigante), nombre del edificio si lo hay, y dirección
+  // SIN código postal ni población (se arma a partir de direccionCalle +
+  // piso + letra, sin usar inm.direccion completo, que sí los lleva).
+  document.getElementById('detail-hero-icon').textContent = emojis[inm.tipo] || '🏠';
+  const elEdificioDet = document.getElementById('detail-edificio');
+  if (elEdificioDet) {
+    if (inm.edificio) { elEdificioDet.textContent = inm.edificio; elEdificioDet.style.display = ''; }
+    else { elEdificioDet.textContent = ''; elEdificioDet.style.display = 'none'; }
+  }
+  const direccionCortaDet = [inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ');
+  document.querySelector('.detail-address').textContent = direccionCortaDet || inm.direccion;
   document.querySelector('.detail-type').textContent =
     [tipoLabels[inm.tipo], inm.m2 ? inm.m2+' m²' : '', inm.hab ? inm.hab+' hab' : ''].filter(Boolean).join(' · ');
 
+  // De propina: los badges de estado/empresa de la cabecera antes se
+  // borraban solos (el código de arriba sustituía TODO el contenido de la
+  // caja, badges incluidos) y nunca llegaban a verse en la app real. Ahora
+  // sí muestran el dato real de cada inmueble.
+  const badgeEstadoDet = document.getElementById('detail-badge-estado');
+  if (badgeEstadoDet) {
+    const garajeIncluidoDet = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, inmuebles) : '';
+    const estadoKeyDet = garajeIncluidoDet ? 'alquilado' : (inm.estado || 'vacio');
+    const estadoTextoDet = garajeIncluidoDet ? 'Alquilado' : ({alquilado:'Alquilado', vacio:'Vacío', reforma:'En reforma'}[inm.estado] || 'Vacío');
+    badgeEstadoDet.textContent = estadoTextoDet;
+    badgeEstadoDet.className = 'card-status-badge badge-' + (estadoKeyDet === 'alquilado' ? 'alquilado' : (estadoKeyDet === 'reforma' ? 'reforma' : 'vacio'));
+  }
+  const badgeOwnerDet = document.getElementById('detail-badge-owner');
+  if (badgeOwnerDet) badgeOwnerDet.textContent = propLabelsCortos[normEmpresa(inm.propietario)] || '—';
+
   // KPIs
   const _rentaActivaDetalle = inm_rentaActiva(inm); // PUNTO 33: contrato activo manda
-  const kpiRenta = _rentaActivaDetalle ? fmt(_rentaActivaDetalle)+'€' : (inm.rentaEst ? 'Est. '+fmt(inm.rentaEst)+'€' : '—');
-  const kpiPrecio = inm.precio ? fmt(inm.precio)+'€' : '—';
+  const kpiRenta = _rentaActivaDetalle ? fmt(_rentaActivaDetalle)+' €' : (inm.rentaEst ? 'Est. '+fmt(inm.rentaEst)+' €' : '—');
+  const kpiPrecio = inm.precio ? fmt(inm.precio)+' €' : '—';
   const costeTotal = (parseFloat(inm.precio)||0) + (parseFloat(inm.gastosCompra)||0) + (parseFloat(inm.reforma)||0);
-  const kpiCoste = inm.precio ? fmt(costeTotal)+'€' : '—';
+  const kpiCoste = inm.precio ? fmt(costeTotal)+' €' : '—';
   document.getElementById('kpi-renta').textContent = kpiRenta;
   document.getElementById('kpi-precio').textContent = kpiPrecio;
   document.getElementById('kpi-coste').textContent = kpiCoste;
@@ -5453,10 +5601,10 @@ function inm_showDetail(idx) {
     let amortRowsHtml = '';
     if (amort) {
       if (amort.pendiente <= 0) {
-        amortRowsHtml = `<div class="semaforo-row"><div class="semaforo-row-label">Amortización</div><div class="semaforo-row-value" style="color:var(--accent-green)">✅ Recuperada${amort.superavit > 0 ? ' (+' + fmt(amort.superavit) + '€)' : ''}</div></div>`;
+        amortRowsHtml = `<div class="semaforo-row"><div class="semaforo-row-label">Amortización</div><div class="semaforo-row-value" style="color:var(--accent-green)">✅ Recuperada${amort.superavit > 0 ? ' (+' + fmt(amort.superavit) + ' €)' : ''}</div></div>`;
       } else {
         amortRowsHtml = `
-        <div class="semaforo-row"><div class="semaforo-row-label">Falta por amortizar</div><div class="semaforo-row-value">${fmt(amort.pendiente)}€</div></div>
+        <div class="semaforo-row"><div class="semaforo-row-label">Falta por amortizar</div><div class="semaforo-row-value">${fmt(amort.pendiente)} €</div></div>
         <div class="semaforo-row"><div class="semaforo-row-label">Años para amortizar 100%</div><div class="semaforo-row-value">${amort.aniosFaltan !== null ? '~' + Math.round(amort.aniosFaltan) + ' años' : '—'}</div></div>`;
       }
     }
@@ -5468,8 +5616,8 @@ function inm_showDetail(idx) {
       <div class="semaforo-info">
         <div class="semaforo-title">Rentabilidad del inmueble</div>
         <div class="semaforo-row"><div class="semaforo-row-label">Rentabilidad bruta</div><div class="semaforo-row-value">${fmtPct(rent.bruta)}</div></div>
-        <div class="semaforo-row"><div class="semaforo-row-label">Ingresos anuales</div><div class="semaforo-row-value">${fmt(rent.ingresoAnual)}€</div></div>
-        <div class="semaforo-row"><div class="semaforo-row-label">Gastos anuales</div><div class="semaforo-row-value">${fmt(rent.gastosAnuales)}€</div></div>
+        <div class="semaforo-row"><div class="semaforo-row-label">Ingresos anuales</div><div class="semaforo-row-value">${fmt(rent.ingresoAnual)} €</div></div>
+        <div class="semaforo-row"><div class="semaforo-row-label">Gastos anuales</div><div class="semaforo-row-value">${fmt(rent.gastosAnuales)} €</div></div>
         ${amortRowsHtml}
       </div>`;
   } else {
@@ -5497,14 +5645,14 @@ function inm_showDetail(idx) {
     infoGarajeRow.style.display = 'none';
   }
   document.getElementById('info-propietario').textContent = propLabels[inm.propietario] || '—';
-  document.getElementById('info-precio').textContent = inm.precio ? fmt(inm.precio)+'€' : '—';
-  document.getElementById('info-gastos-compra').textContent = inm.gastosCompra ? fmt(inm.gastosCompra)+'€' : '—';
-  document.getElementById('info-reforma').textContent = inm.reforma ? fmt(inm.reforma)+'€' : '—';
-  document.getElementById('info-coste-total').textContent = inm.precio ? fmt(costeTotal)+'€' : '—';
-  document.getElementById('info-precio-actual').textContent = inm.precioActual ? fmt(inm.precioActual)+'€' : '—';
+  document.getElementById('info-precio').textContent = inm.precio ? fmt(inm.precio)+' €' : '—';
+  document.getElementById('info-gastos-compra').textContent = inm.gastosCompra ? fmt(inm.gastosCompra)+' €' : '—';
+  document.getElementById('info-reforma').textContent = inm.reforma ? fmt(inm.reforma)+' €' : '—';
+  document.getElementById('info-coste-total').textContent = inm.precio ? fmt(costeTotal)+' €' : '—';
+  document.getElementById('info-precio-actual').textContent = inm.precioActual ? fmt(inm.precioActual)+' €' : '—';
   // PUNTO 35 (25/08/2026): punto de partida (a mano) + cobros reales registrados
   const ingresosTotalesInfo = inm_ingresosTotales(idx, inm);
-  document.getElementById('info-ingresos-totales').textContent = ingresosTotalesInfo > 0 ? fmt(ingresosTotalesInfo)+'€' : '—';
+  document.getElementById('info-ingresos-totales').textContent = ingresosTotalesInfo > 0 ? fmt(ingresosTotalesInfo)+' €' : '—';
   document.getElementById('info-notas').textContent = inm.notas || '—';
 
   const btnAsignar = document.getElementById('btn-asignar-inquilino');
@@ -5713,7 +5861,7 @@ function openModal(editIdx) {
     document.getElementById('f-cp').value = inm.cp || '';
     document.getElementById('f-localidad').value = inm.localidad || '';
     document.getElementById('f-tipo').value = inm.tipo || 'piso';
-    document.getElementById('f-propietario').value = inm.propietario || 'patrimer';
+    document.getElementById('f-propietario').value = normEmpresa(inm.propietario);
     document.getElementById('f-m2').value = inm.m2 || '';
     document.getElementById('f-estado').value = inm.estado || 'vacio';
     document.getElementById('f-hab').value = inm.hab || '';
@@ -5735,13 +5883,24 @@ function openModal(editIdx) {
     fRentaEl.style.opacity = _tieneContratoActivoModal ? '0.6' : '';
     fRentaEl.style.cursor = _tieneContratoActivoModal ? 'not-allowed' : '';
     if (fRentaHintEl) fRentaHintEl.style.display = _tieneContratoActivoModal ? '' : 'none';
-    document.getElementById('f-renta-est').value = inm.rentaEst ? fmt(parseFmt(inm.rentaEst)) : '';
-    document.getElementById('f-precio').value = inm.precio ? fmt(parseFmt(inm.precio)) : '';
-    document.getElementById('f-precio-actual').value = inm.precioActual ? fmt(parseFmt(inm.precioActual)) : '';
-    document.getElementById('f-gastos-compra').value = inm.gastosCompra || '';
-    document.getElementById('f-reforma').value = inm.reforma || '';
-    document.getElementById('f-gastos-anuales').value = inm.gastosAnuales || '';
-    document.getElementById('f-ingresos-acum').value = inm.ingresosAcumInicial ? fmt(parseFmt(inm.ingresosAcumInicial)) : '';
+    // CORRECCIÓN 26/08/2026 — BUG REAL ENCONTRADO: estos importes ya se
+    // guardan como número "en limpio" (sin formato) al pulsar Guardar más
+    // abajo (parseFmtGlobal). Volver a pasarlos por parseFmt() aquí, como
+    // hacía el código antes, es aplicar el "quitar puntos, cambiar coma por
+    // punto" una SEGUNDA vez sobre un número que ya no tiene ese formato —
+    // por ejemplo 90624.76 (así se guarda) se convertía en texto "90624.76",
+    // el punto se leía como si fuera de miles y se borraba, quedando
+    // "9062476" → 9.062.476 €, multiplicando el precio por 100 cada vez que
+    // se abría la ficha para editar. Solo pasaba con importes con decimales
+    // (los que son números redondos no se notaba, por eso salía "a veces").
+    // Arreglo: solo fmt(), sin el parseFmt() de más.
+    document.getElementById('f-renta-est').value = inm.rentaEst ? fmt(inm.rentaEst) : '';
+    document.getElementById('f-precio').value = inm.precio ? fmt(inm.precio) : '';
+    document.getElementById('f-precio-actual').value = inm.precioActual ? fmt(inm.precioActual) : '';
+    document.getElementById('f-gastos-compra').value = inm.gastosCompra ? fmt(inm.gastosCompra) : '';
+    document.getElementById('f-reforma').value = inm.reforma ? fmt(inm.reforma) : '';
+    document.getElementById('f-gastos-anuales').value = inm.gastosAnuales ? fmt(inm.gastosAnuales) : '';
+    document.getElementById('f-ingresos-acum').value = inm.ingresosAcumInicial ? fmt(inm.ingresosAcumInicial) : '';
     document.getElementById('f-notas').value = inm.notas || '';
     modal.dataset.editIdx = editIdx;
     // PUNTO 32: sección de garaje asociado, solo para pisos.
@@ -5790,9 +5949,9 @@ function clearForm() {
 function recalcPreview() {
   const renta = parseFmtGlobal(document.getElementById('f-renta').value) || 0;
   const precio = parseFmt(document.getElementById('f-precio').value) || 0;
-  const gastosCompra = parseFloat(document.getElementById('f-gastos-compra').value) || 0;
-  const reforma = parseFloat(document.getElementById('f-reforma').value) || 0;
-  const gastosAnuales = parseFloat(document.getElementById('f-gastos-anuales').value) || 0;
+  const gastosCompra = parseFmtGlobal(document.getElementById('f-gastos-compra').value) || 0;
+  const reforma = parseFmtGlobal(document.getElementById('f-reforma').value) || 0;
+  const gastosAnuales = parseFmtGlobal(document.getElementById('f-gastos-anuales').value) || 0;
   const preview = document.getElementById('rent-preview');
   if (!renta || !precio) { preview.style.display = 'none'; return; }
   const ingresoAnual = renta * 12;
@@ -5843,9 +6002,9 @@ function saveInmueble() {
     rentaEst: parseFmtGlobal(document.getElementById('f-renta-est').value) || '',
     precio: parseFmtGlobal(document.getElementById('f-precio').value) || '',
     precioActual: parseFmtGlobal(document.getElementById('f-precio-actual').value) || '',
-    gastosCompra: document.getElementById('f-gastos-compra').value,
-    reforma: document.getElementById('f-reforma').value,
-    gastosAnuales: document.getElementById('f-gastos-anuales').value,
+    gastosCompra: parseFmtGlobal(document.getElementById('f-gastos-compra').value) || '',
+    reforma: parseFmtGlobal(document.getElementById('f-reforma').value) || '',
+    gastosAnuales: parseFmtGlobal(document.getElementById('f-gastos-anuales').value) || '',
     ingresosAcumInicial: parseFmtGlobal(document.getElementById('f-ingresos-acum').value) || '',
     notas: document.getElementById('f-notas').value.trim(),
     inquilino: _inquilinoNombre,
@@ -8113,7 +8272,7 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 // ─── JS MÓDULO COBROS ───────────────────────────────────────────────
 // ─── UTILIDADES ───────────────────────────────────────────────
 function fmt(n){const v=parseFloat(n||0); return v%1===0 ? v.toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0}) : v.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function fmtE(n){return fmt(n)+'€';}
+function fmtE(n){return fmt(n)+' €';}
 function mesActual(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
 function mesNombre(ym){const [y,m]=ym.split('-');const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];return ms[parseInt(m)-1]+' '+y;}
 function hoy(){return new Date().toISOString().split('T')[0];}
@@ -11731,6 +11890,28 @@ function fin_fmt(v) {
   var n = parseFloat(v) || 0;
   return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' \u20ac';
 }
+// AJUSTE 26/08/2026: igual que fin_fmt(), pero sin el s\u00edmbolo "\u20ac" al final.
+// Se usa solo en las filas estrechas de la tarjeta "Patrimonio Total" de
+// Inicio (comparten hueco con "Reparto", a media pantalla en el m\u00f3vil) \u2014
+// ah\u00ed cada \u20ac que se ahorra en el texto es lo que evita que el importe se
+// corte a una segunda l\u00ednea. El n\u00famero grande de arriba de la tarjeta, que
+// s\u00ed tiene sitio de sobra, sigue mostrando el s\u00edmbolo con normalidad.
+function fin_fmtSinSimbolo(v) {
+  return fin_fmt(v).replace(' \u20ac', '');
+}
+// AJUSTE 26/08/2026: variantes SIN decimales (redondeado al euro), pedidas
+// para las tarjetas "Reparto" y "Patrimonio Total" de Inicio \u2014 as\u00ed ganan
+// a\u00fan m\u00e1s aire adem\u00e1s de quitar el s\u00edmbolo \u20ac. Solo cambia lo que se ve en
+// pantalla; el dato real (con decimales) sigue intacto por dentro, no se
+// pierde precisi\u00f3n en ning\u00fan c\u00e1lculo.
+function fin_fmtEntero(v) {
+  var n = Math.round(parseFloat(v) || 0);
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' \u20ac';
+}
+function fin_fmtEnteroSinSimbolo(v) {
+  var n = Math.round(parseFloat(v) || 0);
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
 // Interpreta un importe escrito a mano admitiendo los dos formatos habituales:
 // "2500.75" (punto decimal) o "2.500,75" (punto de miles + coma decimal).
 // Se usa en los campos de Finanzas que ahora son de texto libre.
@@ -11756,6 +11937,24 @@ var FIN_NOMBRES = {
   'ENG.MC': 'Enagas', 'ACS.MC': 'ACS', 'RMS.PA': 'Hermes'
 };
 
+// PUNTO 51 (26/08/2026): pequeño texto "Última actualización" en Finanzas.
+// Se llama tanto desde fin_render() (al entrar en el módulo) como desde
+// cada fin_renderCuentas()/fin_renderAcciones()/fin_renderFondos() (que se
+// llaman directamente al guardar un cambio, sin pasar por fin_render()),
+// para que la fecha se refresque también justo después de guardar algo.
+function fin_renderUltimaActualizacion() {
+  var elUpd = document.getElementById('fin-ultima-actualizacion');
+  if (!elUpd) return;
+  var iso = localStorage.getItem('fin:ultima_actualizacion');
+  if (iso) {
+    var d = new Date(iso);
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    elUpd.textContent = 'Última actualización: ' + pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  } else {
+    elUpd.textContent = '';
+  }
+}
+
 function fin_render() {
   var emp = fin_emp();
   var names = { empresa: 'Patrimer', patrimer: 'Patrimer', patricio: 'Patricio', industrias: 'Industrias' };
@@ -11764,6 +11963,7 @@ function fin_render() {
   fin_renderCuentas();
   fin_renderAcciones();
   fin_renderFondos();
+  fin_renderUltimaActualizacion();
 }
 
 // --- CUENTAS ---
@@ -11775,7 +11975,7 @@ function fin_renderCuentas() {
   if (data.length === 0) {
     lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin cuentas. Pulsa + para añadir.</div>';
     if (totEl) totEl.style.display = 'none';
-    fin_calcPatrimonio(); return;
+    fin_calcPatrimonio(); fin_renderUltimaActualizacion(); return;
   }
   var total = 0;
   var html = '';
@@ -11799,6 +11999,7 @@ function fin_renderCuentas() {
     if (tv) tv.textContent = fin_fmt(total);
   }
   fin_calcPatrimonio();
+  fin_renderUltimaActualizacion();
 }
 function fin_nuevaCuenta() {
   document.getElementById('fin-cuenta-nombre').value = '';
@@ -11849,7 +12050,7 @@ function fin_renderAcciones() {
   if (ops.length === 0) {
     lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin acciones. Pulsa + para añadir.</div>';
     if (totEl) totEl.style.display = 'none';
-    fin_calcPatrimonio(); return;
+    fin_calcPatrimonio(); fin_renderUltimaActualizacion(); return;
   }
   var pos = {};
   for (var i = 0; i < ops.length; i++) {
@@ -11909,6 +12110,7 @@ function fin_renderAcciones() {
     if (av) av.textContent = fin_fmt(totalValor);
   }
   fin_calcPatrimonio();
+  fin_renderUltimaActualizacion();
 }
 function fin_verHistorico(ticker) {
   var ops = fin_load('fin:acciones');
@@ -12081,7 +12283,7 @@ function fin_renderFondos() {
   if (data.length === 0) {
     lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin fondos. Pulsa + para añadir.</div>';
     if (totEl) totEl.style.display = 'none';
-    fin_calcPatrimonio(); return;
+    fin_calcPatrimonio(); fin_renderUltimaActualizacion(); return;
   }
   var total = 0;
   var html = '';
@@ -12114,6 +12316,7 @@ function fin_renderFondos() {
     if (tv) tv.textContent = fin_fmt(total);
   }
   fin_calcPatrimonio();
+  fin_renderUltimaActualizacion();
 }
 function fin_nuevoFondo() {
   document.getElementById('fin-fondo-nombre').value = '';
@@ -12684,11 +12887,11 @@ function dash_render() {
     var elPatMedia = document.getElementById('dash-pat-media'); if (elPatMedia) elPatMedia.textContent = fmtE(mediaP) + '/mes';
   } else {
     // Vista Patrimer/Industrias: urbano + rústico
-    var dUrbVal = document.getElementById('dash-urbano-val'); if (dUrbVal) dUrbVal.textContent = fmtE(acumActual);
+    var dUrbVal = document.getElementById('dash-urbano-val'); if (dUrbVal) dUrbVal.textContent = fmtE(Math.round(acumActual));
     var dUrbPct = document.getElementById('dash-urbano-pct'); if (dUrbPct) dUrbPct.textContent = pctUrb + '% del total';
     var _rusReal = _esPatrimer ? (function(){ var h=rus_loadHistorico(); return h[String(year)] ? true : false; })() : false;
     var dRusVal = document.getElementById('dash-rustico-val');
-    if (dRusVal) { dRusVal.textContent = _esPatrimer ? fmtE(rentaRustico) : '—'; dRusVal.style.color = _rusReal ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
+    if (dRusVal) { dRusVal.textContent = _esPatrimer ? fmtE(Math.round(rentaRustico)) : '—'; dRusVal.style.color = _rusReal ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
     var dRusPct = document.getElementById('dash-rustico-pct');
     if (dRusPct) { dRusPct.textContent = _esPatrimer ? ((_rusReal ? '' : '~') + pctRus + '% del total') : '—'; }
   }
@@ -12732,16 +12935,16 @@ function dash_render() {
   // AJUSTE 25/08/2026 (noche): igual que en Finanzas — el número grande ya no
   // incluye el IGC, se muestra aparte como fila "Total+IGC".
   var total = cuentas + fondos + acciones + _inmobDash.total;
-  var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmt(total) : '—';
-  var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmt(_inmobDash.total) : '—';
+  var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmtEntero(total) : '—';
+  var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmtEnteroSinSimbolo(_inmobDash.total) : '—';
   var dPatIgcRow = document.getElementById('dash-pat-igc-row');
   var dPatIgc = document.getElementById('dash-pat-igc');
   if (dPatIgcRow) dPatIgcRow.style.display = _igcDash > 0 ? '' : 'none';
-  if (dPatIgc) dPatIgc.textContent = _igcDash > 0 ? fin_fmt(total + _igcDash) : '';
+  if (dPatIgc) dPatIgc.textContent = _igcDash > 0 ? fin_fmtEnteroSinSimbolo(total + _igcDash) : '';
   // AJUSTE 25/08/2026 (tarde): en Inicio ya no se desglosan Cuentas/Acciones/
   // Fondos por separado — se juntan en un único dato "Financiero".
   var _financiero = cuentas + acciones + fondos;
-  var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmt(_financiero) : '—';
+  var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmtEnteroSinSimbolo(_financiero) : '—';
 
   // ── Gráfica mensual del dashboard ────────────────────────────────
   dash_buildChart(year, facturasDash);
@@ -12765,6 +12968,28 @@ function dash_render() {
 // app, sin depender de una app de Notas externa. Guardado en localStorage
 // ('app:notas_mejoras'), protegido en copia de seguridad y sincronizado
 // entre dispositivos como el resto de datos (ver DATA_KEYS / BACKUP_KEYS).
+//
+// REDISEÑO 26/08/2026 (tras 3 avisos de "se borran o no se guardan"):
+// causa real encontrada — el resto de la app sincroniza cada dato como un
+// bloque único: "gana la última copia completa que llega". Eso funciona
+// bien para datos que casi nunca cambian a la vez desde 2 sitios (un
+// contrato, una ficha). Pero el bloc de ideas es justo lo contrario: es lo
+// que más tocas, y es fácil que el móvil y el ordenador (o Mercedes)
+// tengan la app abierta a la vez. Si añades/borras una idea en un sitio
+// justo cuando el otro sitio también sincroniza su copia (aunque sea más
+// vieja), esa copia vieja "gana" y se come tu cambio — a veces se ve como
+// "se borró sola", otras como "no se guardó".
+//
+// Arreglo de fondo: cada idea ahora lleva su propio "sello de tiempo"
+// (updatedAt) que se actualiza cada vez que la tocas (crear/marcar/borrar).
+// Borrar ya NO la quita de la lista — la deja marcada como "deleted:true"
+// (una idea "tachada" para siempre, invisible en pantalla). Cuando llega
+// una copia de otro aparato, en vez de sustituir la lista entera, se
+// FUSIONAN las dos idea por idea, quedándose siempre con la versión más
+// reciente de cada una (ver _notasMerge, en el bloque de Firebase más
+// arriba en el archivo). Así, añadir en un sitio y borrar en otro casi a
+// la vez ya no puede hacer que uno se coma al otro — los dos cambios
+// sobreviven la fusión.
 let _notasAbiertas = false;
 
 function notas_esc(s) {
@@ -12772,32 +12997,28 @@ function notas_esc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Devuelve la lista COMPLETA, incluidas las ideas ya borradas (marcadas
+// deleted:true) — necesarias para que la fusión con otros aparatos sepa
+// que esa idea concreta no debe revivir. Rellena campos que las ideas
+// creadas antes de este rediseño no tenían (updatedAt/deleted), para que
+// se comporten igual que las nuevas.
 function notas_load() {
   let arr;
   try { arr = JSON.parse(localStorage.getItem('app:notas_mejoras')) || []; }
   catch (e) { arr = []; }
-  // BLINDAJE 25/08/2026 (noche): si alguna idea que ya está en la "papelera"
-  // (notas_loadBorradas) sigue apareciendo en la lista —porque otro
-  // aparato sincronizó por encima una copia vieja que aún la tenía—, se
-  // quita aquí y se vuelve a guardar la lista ya limpia, para que la
-  // corrección se propague también hacia la nube y hacia ese otro aparato.
-  const borradas = notas_loadBorradas();
-  if (borradas.length) {
-    const limpio = arr.filter(function(x) { return borradas.indexOf(x.id) === -1; });
-    if (limpio.length !== arr.length) { notas_save(limpio); }
-    arr = limpio;
-  }
+  arr.forEach(function(n) {
+    if (n.updatedAt == null) n.updatedAt = '';
+    if (n.deleted == null) n.deleted = false;
+  });
   return arr;
 }
 function notas_save(arr) {
   localStorage.setItem('app:notas_mejoras', JSON.stringify(arr));
 }
-function notas_loadBorradas() {
-  try { return JSON.parse(localStorage.getItem('app:notas_borradas')) || []; }
-  catch (e) { return []; }
-}
-function notas_saveBorradas(arr) {
-  localStorage.setItem('app:notas_borradas', JSON.stringify(arr));
+// Lista solo de las ideas visibles (sin las borradas) — la que se pinta
+// en pantalla y la que cuenta para "pendientes".
+function notas_loadVisibles() {
+  return notas_load().filter(function(n) { return !n.deleted; });
 }
 
 function notas_toggle() {
@@ -12822,7 +13043,9 @@ function notas_add() {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     texto: texto,
     fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    hecho: false
+    hecho: false,
+    deleted: false,
+    updatedAt: new Date().toISOString()
   });
   notas_save(arr);
   input.value = '';
@@ -12832,23 +13055,22 @@ function notas_add() {
 function notas_toggleHecho(id) {
   const arr = notas_load();
   const n = arr.find(x => x.id === id);
-  if (n) n.hecho = !n.hecho;
+  if (n) { n.hecho = !n.hecho; n.updatedAt = new Date().toISOString(); }
   notas_save(arr);
   notas_render();
 }
 
 function notas_eliminar(id) {
-  const arr = notas_load().filter(x => x.id !== id);
+  // No se quita físicamente del array — se marca "deleted:true" (con su
+  // propio sello de tiempo) y se queda ahí para siempre, invisible en
+  // pantalla. Es lo que permite que, si llega de la nube o de otra sesión
+  // una copia vieja que aún tenía esta idea sin borrar, la fusión (ver
+  // _notasMerge) sepa que la versión "borrada y más reciente" debe ganar,
+  // en vez de que la idea borrada reviva.
+  const arr = notas_load();
+  const n = arr.find(x => x.id === id);
+  if (n) { n.deleted = true; n.updatedAt = new Date().toISOString(); }
   notas_save(arr);
-  // Se apunta el id en la "papelera" (app:notas_borradas) de forma
-  // permanente, no solo se quita de la lista — así, si otro aparato con
-  // una copia vieja de la lista vuelve a sincronizar esa idea por encima,
-  // notas_load() la reconoce como ya borrada y la vuelve a quitar sola.
-  const borradas = notas_loadBorradas();
-  if (borradas.indexOf(id) === -1) {
-    borradas.push(id);
-    notas_saveBorradas(borradas);
-  }
   notas_render();
 }
 
@@ -12883,7 +13105,7 @@ function notas_render() {
   const cont = document.getElementById('notas-lista');
   const contador = document.getElementById('notas-contador');
   if (!cont) return;
-  const arr = notas_load();
+  const arr = notas_loadVisibles();
   const pendientes = arr.filter(n => !n.hecho).length;
   if (contador) contador.textContent = arr.length ? '(' + pendientes + ' pendiente' + (pendientes !== 1 ? 's' : '') + ')' : '';
   if (arr.length === 0) {
@@ -13174,8 +13396,19 @@ document.addEventListener("DOMContentLoaded", loginInit);
 // ─── INTERCEPTOR localStorage → Firebase ────────────────────────────
 (function() {
   const _origSetItem = localStorage.setItem.bind(localStorage);
+  // PUNTO 51 (26/08/2026): cada vez que se guarda algo de Finanzas (cuentas,
+  // acciones o fondos), dejamos constancia de la fecha/hora en
+  // 'fin:ultima_actualizacion' para poder mostrarla en pantalla. Se excluye
+  // esta misma clave del disparador para no entrar en un bucle infinito.
+  const _finKeyRegex = /^fin:(cuentas|acciones|fondos):/;
   localStorage.setItem = function(key, value) {
     _origSetItem(key, value);
+    if (_finKeyRegex.test(key)) {
+      _origSetItem('fin:ultima_actualizacion', new Date().toISOString());
+      if (window.syncToFirestore) {
+        window.syncToFirestore('fin:ultima_actualizacion', localStorage.getItem('fin:ultima_actualizacion'));
+      }
+    }
     // Sincronizar con Firebase si está disponible
     if (window.syncToFirestore) {
       window.syncToFirestore(key, value);
@@ -13217,7 +13450,6 @@ window._refreshCurrentModule = function(key) {
     'fin:fondos:industrias': 'finanzas',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
-    'app:notas_borradas': 'inicio',
   };
   // Mismo rango de años que en DATA_KEYS, para que Renta Patricio también
   // se refresque en pantalla al recibir un cambio de otro dispositivo.
