@@ -2708,11 +2708,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">Precio compra (€)</div>
-          <input class="form-input" id="f-precio" type="text" inputmode="decimal" placeholder="Ej: 185.000" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-precio" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         </div>
         <div class="form-group">
           <div class="form-label">Gastos compra (€)</div>
-          <input class="form-input" id="f-gastos-compra" type="text" inputmode="decimal" placeholder="Ej: 16.200" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
+          <input class="form-input" id="f-gastos-compra" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
           <div class="form-hint">Notaría, ITP, registro…</div>
         </div>
       </div>
@@ -2723,7 +2723,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         </div>
         <div class="form-group">
           <div class="form-label">Gastos anuales (€)</div>
-          <input class="form-input" id="f-gastos-anuales" type="text" inputmode="decimal" placeholder="Ej: 1.500" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
+          <input class="form-input" id="f-gastos-anuales" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
           <div class="form-hint">IBI + comunidad + seguro…</div>
         </div>
       </div>
@@ -2737,7 +2737,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Alquiler cobrado hasta hoy, antes de usar la app (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
-          <input class="form-input" id="f-ingresos-acum" type="text" inputmode="decimal" placeholder="Ej: 45000" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-ingresos-acum" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint">Punto de partida para calcular la amortización real (punto 35): se rellena una sola vez con una estimación de todo lo cobrado desde que compraste el inmueble. A partir de ahí, la app suma sola los cobros que vayas registrando</div>
         </div>
       </div>
@@ -4208,7 +4208,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   </div>
 </header>
 
-<div class="main" style="padding-top:64px;padding-bottom:80px;">
+<div class="main" id="cli-main-wrap" style="padding-top:64px;padding-bottom:80px;">
   <!-- Pestañas -->
   <div class="main-tabs" style="margin-bottom:12px;">
     <div class="mtab active" id="cli-tab-activos" onclick="cli_setTab('activos')">Activos</div>
@@ -4220,10 +4220,10 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
 </div>
 
 <!-- DETALLE CLIENTE -->
-<div id="cli-detalle" style="display:none;padding:64px 16px 80px;">
+<div id="cli-detalle" style="display:none;padding:12px 16px 80px;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
     <button onclick="cli_cerrarDetalle()" style="background:none;border:none;color:var(--silver-mid);font-size:22px;cursor:pointer;padding:0;">&#8249;</button>
-    <div style="font-size:16px;font-weight:700;color:var(--text-primary);flex:1;" id="cli-det-nombre">—</div>
+    <div style="font-size:19px;font-weight:700;color:var(--text-primary);flex:1;text-align:center;" id="cli-det-nombre">—</div>
     <button onclick="cli_abrirEdicion()" style="background:none;border:1px solid var(--border);border-radius:10px;color:var(--silver-mid);font-size:13px;font-weight:600;padding:6px 12px;cursor:pointer;letter-spacing:.5px;">✏️ Editar</button>
   </div>
 
@@ -4832,6 +4832,20 @@ function applyProfile(key) {
 function selectProfile(key) {
   saveProfile(key); applyProfile(key);
   const splash=document.getElementById('splash'), app=document.getElementById('appShell');
+  // CORRECCIÓN 27/08/2026 — BUG REAL ENCONTRADO, mismo motivo que ya se
+  // arregló al revés en abrirEstudios() (24/08/2026), pero aquí sin
+  // corregir todavía: aplicarRol() y showModule('inicio') no se llamaban
+  // hasta el FINAL de los 420ms de la animación — con el appShell ya
+  // visible y en fundido desde el principio, esos milisegundos mostraban
+  // todavía el módulo que se hubiera quedado "activo" de antes (por
+  // ejemplo Estudios, si era lo último que habías abierto), y solo al
+  // final cambiaba a Inicio. Parecía que Estudios "se reabría solo" al
+  // entrar en una empresa. Arreglo: igual que ya hace abrirEstudios(), el
+  // módulo se cambia a Inicio ANTES de hacer visible el appShell, así
+  // nunca se llega a ver el módulo viejo de por medio.
+  aplicarRol();
+  if (typeof showModule === 'function') showModule('inicio');
+  else if (typeof dash_render === 'function') dash_render();
   splash.classList.add('exit');
   app.style.display='block';
   const gnav=document.getElementById('global-bottom-nav');
@@ -4839,16 +4853,6 @@ function selectProfile(key) {
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ app.style.opacity='1'; }));
   setTimeout(()=>{
     splash.style.display='none';
-    aplicarRol();
-    // BLINDAJE: al elegir empresa desde el selector, siempre debe abrirse
-    // Inicio. Antes solo se llamaba a dash_render() (que actualiza los
-    // datos del panel), pero si el módulo que se veía justo antes de
-    // llegar aquí era Estudios (mod-analisis, independiente de la empresa),
-    // ese módulo se quedaba con la clase "active" y seguía en pantalla —
-    // parecía que Estudios "se reabría solo" al cambiar de empresa.
-    // showModule('inicio') ya se encarga de mostrar Inicio y de refrescarlo.
-    if (typeof showModule === 'function') showModule('inicio');
-    else if (typeof dash_render === 'function') dash_render();
   }, 420);
 }
 
@@ -5505,7 +5509,12 @@ function renderLista() {
         vez de un número fijo — así cuadra igual en cualquier dispositivo. -->
         <div style="flex:1;min-width:0;${inm.ref ? 'display:grid;grid-template-columns:auto 1fr;column-gap:6px;align-items:baseline;' : ''}">
           ${inm.ref ? `<span style="font-size:13px;font-weight:700;color:var(--accent-blue);">${inm.ref}</span>` : ''}
-          <div style="font-size:13px;font-weight:700;color:var(--silver-bright);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${inm.direccion}</div>
+          <!-- AJUSTE 27/08/2026: misma dirección corta (sin C.P. ni población)
+          que ya se usa en la cabecera de la ficha (punto 51.5) — a petición
+          tuya, para que la lista de tarjetas quede igual de limpia. El
+          código postal y la población siguen saliendo dentro de la ficha,
+          en la pestaña Info (dato completo, ahí sí tiene sentido). -->
+          <div style="font-size:13px;font-weight:700;color:var(--silver-bright);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${[inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ')}</div>
           ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;${inm.ref ? 'grid-column:2;' : ''}">${inm.edificio}</div>` : ''}
         </div>
       </div>
@@ -5605,7 +5614,7 @@ function inm_showDetail(idx) {
       } else {
         amortRowsHtml = `
         <div class="semaforo-row"><div class="semaforo-row-label">Falta por amortizar</div><div class="semaforo-row-value">${fmt(amort.pendiente)} €</div></div>
-        <div class="semaforo-row"><div class="semaforo-row-label">Años para amortizar 100%</div><div class="semaforo-row-value">${amort.aniosFaltan !== null ? '~' + Math.round(amort.aniosFaltan) + ' años' : '—'}</div></div>`;
+        <div class="semaforo-row"><div class="semaforo-row-label">Años para amortizar 100%</div><div class="semaforo-row-value">${amort.aniosFaltan !== null ? amort.aniosFaltan.toFixed(1).replace('.',',') + ' años' : '—'}</div></div>`;
       }
     }
     semBox.innerHTML = `
@@ -10429,7 +10438,7 @@ function calcEstudio(){
   document.getElementById('r_bruta').textContent = alqAnual > 0 ? fmtE(alqAnual) : '—';
   document.getElementById('r_neta').textContent  = total > 0 ? neta.toFixed(1)+'%'  : '—';
   document.getElementById('r_anual').textContent = beneficio > 0 ? fmtE(beneficio) : '—';
-  document.getElementById('r_amort').textContent = amort > 0 ? '~'+Math.round(amort)+' años' : '—';
+  document.getElementById('r_amort').textContent = amort > 0 ? '~'+amort.toFixed(1).replace('.',',')+' años' : '—';
   document.getElementById('sem1_pct').textContent = total > 0 ? neta.toFixed(1)+'%' : '—';
   const lbl1 = document.getElementById('sem1_label');
   if(lbl1){ lbl1.textContent = total > 0 ? semLabel(neta) : ''; lbl1.className = 'sem-label ' + (total>0?semLabelCls(neta):''); }
@@ -10528,7 +10537,7 @@ function renderPaso3(){
   document.getElementById('nf-beneficio').textContent     = fmtE(beneficio);
   document.getElementById('nf-rb').textContent  = total > 0 ? bruta.toFixed(1)+'%' : '—';
   document.getElementById('nf-rn').textContent  = total > 0 ? neta.toFixed(1)+'%'  : '—';
-  document.getElementById('nf-amort').textContent = amort > 0 ? '~'+amort.toFixed(1)+' años' : '—';
+  document.getElementById('nf-amort').textContent = amort > 0 ? '~'+amort.toFixed(1).replace('.',',')+' años' : '—';
   document.getElementById('nf-sub-not').textContent  = fmtE(subNot);
   document.getElementById('nf-sub-obra').textContent = fmtE(subObra);
   document.getElementById('nf-sub-mob').textContent  = fmtE(subMob);
@@ -10769,7 +10778,17 @@ function cal_renderLista(){
         <div class="ecard-body">
           <div><div class="ecard-stat-l">Total invertido</div><div class="ecard-stat-v">${fmt(e.total)}€</div></div>
           <div><div class="ecard-stat-l">Alquiler/mes</div><div class="ecard-stat-v">${fmt(e.alquiler)}€</div></div>
-          <div><div class="ecard-stat-l">Amortización</div><div class="ecard-stat-v">~${Math.round(e.amort)} años</div></div>
+          <!-- CORRECCIÓN 27/08/2026 — BUG REAL ENCONTRADO: e.amort es un dato
+          guardado en su día con el estudio; si en ese momento el alquiler no
+          llegaba a cubrir los gastos anuales (beneficio negativo), la
+          fórmula "total invertido ÷ beneficio" daba un número negativo, y
+          esta tarjeta lo mostraba tal cual — "~-10 años" ("faltan menos diez
+          años", sin ningún sentido). Con la misma protección que ya usan las
+          otras 2 pantallas de Estudios (Resultado y Números finales), que
+          nunca han mostrado ese fallo: si no hay amortización real posible,
+          se muestra "—" en vez de un número absurdo. De paso, se añade 1
+          decimal, como en el resto de la app. -->
+          <div><div class="ecard-stat-l">Amortización</div><div class="ecard-stat-v">${e.amort > 0 ? '~'+e.amort.toFixed(1).replace('.',',')+' años' : '—'}</div></div>
         </div>
       `;
       card.addEventListener('click', (ev)=>{
@@ -12887,11 +12906,14 @@ function dash_render() {
     var elPatMedia = document.getElementById('dash-pat-media'); if (elPatMedia) elPatMedia.textContent = fmtE(mediaP) + '/mes';
   } else {
     // Vista Patrimer/Industrias: urbano + rústico
-    var dUrbVal = document.getElementById('dash-urbano-val'); if (dUrbVal) dUrbVal.textContent = fmtE(Math.round(acumActual));
+    // AJUSTE 27/08/2026 — a petición tuya, se devuelven los decimales a la
+    // tarjeta "Reparto" (Urbano/Rústico) de Inicio: sí caben bien en una
+    // línea y queda mejor. El Math.round() de antes (26/08/2026) se quita.
+    var dUrbVal = document.getElementById('dash-urbano-val'); if (dUrbVal) dUrbVal.textContent = fmtE(acumActual);
     var dUrbPct = document.getElementById('dash-urbano-pct'); if (dUrbPct) dUrbPct.textContent = pctUrb + '% del total';
     var _rusReal = _esPatrimer ? (function(){ var h=rus_loadHistorico(); return h[String(year)] ? true : false; })() : false;
     var dRusVal = document.getElementById('dash-rustico-val');
-    if (dRusVal) { dRusVal.textContent = _esPatrimer ? fmtE(Math.round(rentaRustico)) : '—'; dRusVal.style.color = _rusReal ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
+    if (dRusVal) { dRusVal.textContent = _esPatrimer ? fmtE(rentaRustico) : '—'; dRusVal.style.color = _rusReal ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
     var dRusPct = document.getElementById('dash-rustico-pct');
     if (dRusPct) { dRusPct.textContent = _esPatrimer ? ((_rusReal ? '' : '~') + pctRus + '% del total') : '—'; }
   }
@@ -13400,10 +13422,17 @@ document.addEventListener("DOMContentLoaded", loginInit);
   // acciones o fondos), dejamos constancia de la fecha/hora en
   // 'fin:ultima_actualizacion' para poder mostrarla en pantalla. Se excluye
   // esta misma clave del disparador para no entrar en un bucle infinito.
+  // CORRECCIÓN 26/08/2026 (misma noche) — BUG REAL ENCONTRADO: al actualizar
+  // cotizaciones de acciones con el asistente "Actualizar valores" (el
+  // icono de arriba a la derecha en Finanzas), el precio se guarda en la
+  // clave 'fin:cotizaciones' directamente, sin pasar por 'fin:acciones:...'
+  // — esta clave no encajaba en el patrón de abajo, así que esas
+  // actualizaciones no dejaban ningún rastro de fecha. Añadida como caso
+  // aparte para que también cuente.
   const _finKeyRegex = /^fin:(cuentas|acciones|fondos):/;
   localStorage.setItem = function(key, value) {
     _origSetItem(key, value);
-    if (_finKeyRegex.test(key)) {
+    if (_finKeyRegex.test(key) || key === 'fin:cotizaciones') {
       _origSetItem('fin:ultima_actualizacion', new Date().toISOString());
       if (window.syncToFirestore) {
         window.syncToFirestore('fin:ultima_actualizacion', localStorage.getItem('fin:ultima_actualizacion'));
@@ -13944,6 +13973,8 @@ function cli_verDetalle(id) {
 
   document.getElementById('cli-lista').style.display = 'none';
   document.getElementById('cli-detalle').style.display = 'block';
+  const cliMainWrap = document.getElementById('cli-main-wrap');
+  if (cliMainWrap) cliMainWrap.style.paddingBottom = '0';
 
   document.getElementById('cli-det-nombre').textContent = c.nombre || '—';
   document.getElementById('cli-det-dni').textContent = c.dni || '—';
@@ -13984,6 +14015,8 @@ function cli_cerrarDetalle() {
   cli_clienteActivo = null;
   document.getElementById('cli-detalle').style.display = 'none';
   document.getElementById('cli-lista').style.display = 'block';
+  const cliMainWrap = document.getElementById('cli-main-wrap');
+  if (cliMainWrap) cliMainWrap.style.paddingBottom = '80px';
 }
 
 function cli_marcarAntiguo() {
