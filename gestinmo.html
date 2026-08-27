@@ -5192,9 +5192,21 @@ function inm_patrimonioInmobiliario(empresa) {
   var todos = loadInmuebles();
   var propBuscado = normEmpresa(empresa);
   var deEstaEmpresa = todos.filter(function(inm) { return normEmpresa(inm.propietario || 'patrimer') === propBuscado; });
-  var conValor = deEstaEmpresa.filter(function(inm) { return (parseFloat(inm.precioActual) || 0) > 0; });
-  var total = conValor.reduce(function(s, inm) { return s + (parseFloat(inm.precioActual) || 0); }, 0);
-  return { total: total, contados: conValor.length, sinValor: deEstaEmpresa.length - conValor.length, totalInmuebles: deEstaEmpresa.length };
+  var total = 0, contados = 0, usandoCompra = 0;
+  deEstaEmpresa.forEach(function(inm) {
+    var valorMercado = parseFloat(inm.precioActual) || 0;
+    // PUNTO 62 (27/08/2026): si no hay "valor de mercado actual", se usa el
+    // "Precio de compra" como respaldo — mejor una estimación con el coste
+    // real que dejar el inmueble totalmente fuera del Patrimonio Total.
+    var precioCompra = parseFloat(inm.precio) || 0;
+    var valor = valorMercado > 0 ? valorMercado : precioCompra;
+    if (valor > 0) {
+      total += valor;
+      contados++;
+      if (valorMercado <= 0) usandoCompra++;
+    }
+  });
+  return { total: total, contados: contados, sinValor: deEstaEmpresa.length - contados, totalInmuebles: deEstaEmpresa.length, usandoCompra: usandoCompra };
 }
 
 // PUNTO 32: enlace piso↔garaje. El vínculo se guarda solo en el lado del
@@ -12439,9 +12451,14 @@ function fin_calcPatrimonio() {
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
   if (notaEl) {
-    notaEl.textContent = inmob.sinValor > 0
-      ? inmob.sinValor + ' inmueble' + (inmob.sinValor === 1 ? '' : 's') + ' sin "valor de mercado actual" — no cuenta' + (inmob.sinValor === 1 ? '' : 'n') + ' en el total'
-      : '';
+    var notaPartes = [];
+    if (inmob.sinValor > 0) {
+      notaPartes.push(inmob.sinValor + ' inmueble' + (inmob.sinValor === 1 ? '' : 's') + ' sin ningún precio registrado — no cuenta' + (inmob.sinValor === 1 ? '' : 'n') + ' en el total');
+    }
+    if (inmob.usandoCompra > 0) {
+      notaPartes.push(inmob.usandoCompra + ' inmueble' + (inmob.usandoCompra === 1 ? '' : 's') + ' sin "valor de mercado actual" — cuenta' + (inmob.usandoCompra === 1 ? '' : 'n') + ' con su precio de compra en su lugar');
+    }
+    notaEl.textContent = notaPartes.join(' · ');
   }
 }
 
