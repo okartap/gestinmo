@@ -12309,7 +12309,7 @@ function fin_renderAcciones() {
     html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: ' + plHtml + '</div>';
     if (totalDivs > 0) {
       html += '<div class="fin-meta-item">Dividendos cobrados: <span class="fin-meta-val fin-plus">' + fin_fmt(totalDivs) + '</span></div>';
-      if (dpa !== null) html += '<div class="fin-meta-item">Total por accion: <span class="fin-meta-val">' + dpa.toFixed(4).replace(/\.?0+$/, '') + ' \u20ac/acc</span></div>';
+      if (dpa !== null) html += '<div class="fin-meta-item">Dividendos cobrados/acc.: <span class="fin-meta-val">' + dpa.toFixed(4).replace(/\.?0+$/, '') + ' \u20ac/acc</span></div>';
       // PUNTO 75 (28/08/2026): coste neto por accion = precio medio de compra
       // menos lo ya cobrado en dividendos por accion (cuanto queda "en juego" de verdad).
       if (dpa !== null && pm > 0) html += '<div class="fin-meta-item">Coste neto/acc.: <span class="fin-meta-val">' + (pm - dpa).toFixed(4).replace(/\.?0+$/, '') + ' \u20ac/acc</span></div>';
