@@ -13438,7 +13438,7 @@ function pend_gestionar(i) {
   }
 }
 
-function dash_buildChart(year, facturas) {
+function dash_buildChart(year, facturas, _reintentado) {
   // BLINDAJE DE DATOS: igual que en fac_resumenAnual, hay que mirar
   // primero las facturas REALES del mes (facturacion:facturas) y solo
   // usar el histórico como respaldo cuando no hay factura real — si no,
@@ -13461,6 +13461,22 @@ function dash_buildChart(year, facturas) {
   var dAcum = d.map(function(v){ if(v.cur>0)acumCur+=v.cur; if(v.prv>0)acumPrv+=v.prv; return{cur:v.cur>0?acumCur:0,prv:v.prv>0?acumPrv:0}; });
   var mx = Math.max.apply(null, dAcum.map(function(v){return Math.max(v.cur,v.prv);})); if(mx<1)mx=1;
   var ch = document.getElementById('dash-bar-chart'); if(!ch)return;
+  // PUNTO 64 (28/08/2026) — BUG REAL ENCONTRADO: al elegir empresa, Inicio se
+  // pinta (PUNTO 56, 27/08/2026) justo ANTES de que el appShell se haga
+  // visible, para evitar que se viera el módulo anterior de refilón. Efecto
+  // secundario no querido: en ese instante el contenedor de esta gráfica
+  // todavía mide 0px de ancho (su padre sigue oculto), así que el grosor de
+  // las barras se calculaba sobre 0 y se quedaban todas en el mínimo (4px) —
+  // se veían finas nada más abrir la app. Al salir y volver a Inicio, el
+  // appShell ya estaba visible de antes, así que el cálculo salía bien y las
+  // barras se veían con su grosor normal. Arreglo: si el contenedor mide 0,
+  // esperamos a que el navegador termine de pintar (dos requestAnimationFrame
+  // seguidos, mismo patrón que ya se usa en selectProfile()) y se vuelve a
+  // calcular una sola vez — así nunca se puede quedar en bucle.
+  if (ch.offsetWidth === 0 && !_reintentado) {
+    requestAnimationFrame(function() { requestAnimationFrame(function() { dash_buildChart(year, facturas, true); }); });
+    return;
+  }
   ch.innerHTML='';
   var barW = Math.max(4, Math.floor(ch.offsetWidth / meses.length / 2) - 2);
   meses.forEach(function(m,i){
