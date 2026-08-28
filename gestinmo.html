@@ -2432,6 +2432,10 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="fin-patrimonio-rows compact">
           <div class="row"><span>Inmob.</span><span id="dash-pat-inmuebles">—</span></div>
           <div class="row"><span>Financ.</span><span id="dash-pat-financiero">—</span></div>
+          <!-- PUNTO 72 (28/08/2026): "Cuentas + Fondos" — misma liquidez para
+          inversión que en Finanzas, a modo de prueba en Inicio. Solo visible
+          con Patrimer activo. -->
+          <div class="row" id="dash-pat-liquidez-row" style="display:none;"><span>Cuentas+Fondos</span><span id="dash-pat-liquidez" style="color:var(--accent-green);">—</span></div>
           <!-- AJUSTE 25/08/2026 (noche): "Total+IGC" pasa a ser una fila más,
           con el mismo formato que Inmobiliario/Financiero (antes iba en
           pequeño debajo) — solo visible cuando la empresa activa es Patrimer
@@ -4116,10 +4120,10 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   debajo de Fondos) — a petición tuya, es el dato que más se quiere ver de
   un vistazo al entrar en Finanzas, sin tener que bajar. -->
   <div class="fin-patrimonio-card" style="margin-top:0;margin-bottom:14px;">
-    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">Patrimonio total</div>
+    <div style="font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-bright);margin-bottom:8px;">Patrimonio total</div>
     <div style="font-size:26px;font-weight:700;color:var(--accent-gold);" id="fin-patrimonio-total">-</div>
     <div class="fin-patrimonio-rows" id="fin-patrimonio-rows"></div>
-    <div style="font-size:11px;color:var(--silver-dim);margin-top:8px;" id="fin-patrimonio-nota"></div>
+    <div style="font-size:12px;color:var(--silver-dim);margin-top:8px;" id="fin-patrimonio-nota"></div>
   </div>
   <div style="font-size:11px;color:var(--silver-dim);text-align:right;margin:-8px 2px 10px;" id="fin-ultima-actualizacion"></div>
   <div class="fin-section">
@@ -12642,8 +12646,39 @@ function fin_calcPatrimonio() {
     if (inmob.usandoCompra > 0) {
       notaPartes.push(inmob.usandoCompra + ' inmueble' + (inmob.usandoCompra === 1 ? '' : 's') + ' sin "valor de mercado actual" (' + inmob.refsUsandoCompra.join(', ') + ') — cuenta' + (inmob.usandoCompra === 1 ? '' : 'n') + ' con su precio de compra en su lugar');
     }
-    notaEl.textContent = notaPartes.join(' · ');
+    var notaTexto = notaPartes.join(' · ');
+    // PUNTO 72 (28/08/2026): "Cuentas + Fondos" — la liquidez que Patry usa
+    // de verdad para decidir si puede meterse en una inversión inmobiliaria
+    // (las Acciones las deja fuera salvo necesidad extrema; los Fondos sí
+    // cuentan porque desde que se acuerda una compra hasta que se firman las
+    // arras hay margen de sobra para venderlos). Solo tiene sentido con
+    // Patrimer activo — es la empresa desde la que se decide este tipo de
+    // inversión, igual que "Total+IGC". El aviso de inmuebles sin valor, que
+    // antes iba siempre visible en texto completo, pasa a un icono ⚠️
+    // plegado — se despliega al tocarlo, mismo texto de siempre, para dejar
+    // sitio a este dato nuevo sin que la tarjeta crezca por defecto.
+    var liquidezHtml = '';
+    if (empresaActivaFin === 'patrimer') {
+      var liquidezInversion = cuentas + fondos;
+      liquidezHtml = '<span>Cuentas + Fondos = <b style="color:var(--accent-green);">' + fin_fmt(liquidezInversion) + '</b></span>';
+    }
+    var avisoHtml = notaTexto
+      ? '<span onclick="fin_toggleAvisoPatrimonio()" style="cursor:pointer;font-size:15px;line-height:1;" title="Ver aviso de inmuebles">&#9888;&#65039;</span>'
+      : '';
+    if (liquidezHtml || avisoHtml) {
+      notaEl.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+          (liquidezHtml || '<span></span>') + avisoHtml +
+        '</div>' +
+        (notaTexto ? '<div id="fin-patrimonio-aviso-texto" style="display:none;margin-top:6px;">' + notaTexto + '</div>' : '');
+    } else {
+      notaEl.innerHTML = '';
+    }
   }
+}
+function fin_toggleAvisoPatrimonio() {
+  var el = document.getElementById('fin-patrimonio-aviso-texto');
+  if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
 }
 
 // --- RESUMEN ANUAL DIVIDENDOS ---
@@ -13168,6 +13203,12 @@ function dash_render() {
   // Fondos por separado — se juntan en un único dato "Financiero".
   var _financiero = cuentas + acciones + fondos;
   var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmtEnteroSinSimbolo(_financiero) : '—';
+  // PUNTO 72 (28/08/2026): "Cuentas + Fondos", misma liquidez para inversión
+  // que en Finanzas — ver comentario junto a fin_calcPatrimonio().
+  var dPatLiqRow = document.getElementById('dash-pat-liquidez-row');
+  var dPatLiq = document.getElementById('dash-pat-liquidez');
+  if (dPatLiqRow) dPatLiqRow.style.display = (_empActivaPat === 'patrimer') ? '' : 'none';
+  if (dPatLiq) dPatLiq.textContent = (_empActivaPat === 'patrimer') ? fin_fmtEnteroSinSimbolo(cuentas + fondos) : '—';
 
   // ── Gráfica mensual del dashboard ────────────────────────────────
   dash_buildChart(year, facturasDash);
