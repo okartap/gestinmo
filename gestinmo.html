@@ -2592,17 +2592,17 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <div class="form-row">
         <div class="form-group">
-          <div class="form-label">Nombre del edificio (opcional)</div>
+          <div class="form-label" id="f-edificio-label">Nombre del edificio (opcional)</div>
           <input class="form-input" id="f-edificio" type="text" placeholder="Ej: Edificio Paris">
         </div>
       </div>
-      <div class="form-row two">
-        <div class="form-group">
+      <div class="form-row two" id="f-piso-letra-row">
+        <div class="form-group" id="f-piso-group">
           <div class="form-label">Piso</div>
           <input class="form-input" id="f-piso" type="text" placeholder="3º">
         </div>
         <div class="form-group">
-          <div class="form-label">Letra / puerta</div>
+          <div class="form-label" id="f-letra-label">Letra / puerta</div>
           <input class="form-input" id="f-letra" type="text" placeholder="B">
         </div>
       </div>
@@ -2645,7 +2645,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <div class="form-row two">
         <div class="form-group">
-          <div class="form-label">Superficie (m²)</div>
+          <div class="form-label" id="f-m2-label">Superficie (m²)</div>
           <input class="form-input" id="f-m2" type="number" inputmode="decimal" placeholder="85">
         </div>
         <div class="form-group">
@@ -2657,7 +2657,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           </select>
         </div>
       </div>
-      <div class="form-row two">
+      <div class="form-row two" id="f-hab-banos-row">
         <div class="form-group">
           <div class="form-label">Habitaciones</div>
           <input class="form-input" id="f-hab" type="number" inputmode="decimal" placeholder="3" min="0">
@@ -2716,8 +2716,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           <div class="form-hint">Notaría, ITP, registro…</div>
         </div>
       </div>
-      <div class="form-row two">
-        <div class="form-group">
+      <div class="form-row two" id="f-reforma-gastosanu-row">
+        <div class="form-group" id="f-reforma-group">
           <div class="form-label">Reforma / inversión (€)</div>
           <input class="form-input" id="f-reforma" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
         </div>
@@ -5844,8 +5844,51 @@ function inm_onGarajeSeleccionado() {
   }
 }
 
+// PUNTO 63 (27/08/2026): en una finca rústica no tiene sentido pedir Piso,
+// Letra/puerta, Habitaciones ni Baños — y "Nombre del edificio" y "Reforma"
+// tampoco encajan. Este formulario es el mismo para todos los tipos de
+// inmueble (piso/local/garaje/rústico/otro), así que en vez de duplicarlo,
+// se ocultan y renombran sobre la marcha según el Tipo elegido. Los campos
+// ocultos para rústico (piso, hab, baños, reforma) se limpian a la vez para
+// que no se guarde un dato antiguo escondido sin que se note.
+function inm_actualizarCamposPorTipo(tipo) {
+  const esRustico = tipo === 'rustico';
+  const edificioLabel = document.getElementById('f-edificio-label');
+  const edificioInput = document.getElementById('f-edificio');
+  if (edificioLabel) edificioLabel.textContent = esRustico ? 'Nombre de la finca (opcional)' : 'Nombre del edificio (opcional)';
+  if (edificioInput) edificioInput.placeholder = esRustico ? 'Ej: Finca La Hoya' : 'Ej: Edificio Paris';
+
+  const pisoGroup = document.getElementById('f-piso-group');
+  const pisoLetraRow = document.getElementById('f-piso-letra-row');
+  if (pisoGroup) pisoGroup.style.display = esRustico ? 'none' : '';
+  if (pisoLetraRow) pisoLetraRow.style.gridTemplateColumns = esRustico ? '1fr' : '1fr 1fr';
+  if (esRustico) { const pisoInput = document.getElementById('f-piso'); if (pisoInput) pisoInput.value = ''; }
+
+  const letraLabel = document.getElementById('f-letra-label');
+  const letraInput = document.getElementById('f-letra');
+  if (letraLabel) letraLabel.textContent = esRustico ? 'Número de finca' : 'Letra / puerta';
+  if (letraInput) letraInput.placeholder = esRustico ? 'Ej: 3' : 'B';
+
+  const m2Label = document.getElementById('f-m2-label');
+  if (m2Label) m2Label.textContent = esRustico ? 'Superficie (m² o ha)' : 'Superficie (m²)';
+
+  const habBanosRow = document.getElementById('f-hab-banos-row');
+  if (habBanosRow) habBanosRow.style.display = esRustico ? 'none' : '';
+  if (esRustico) {
+    const habInput = document.getElementById('f-hab'); if (habInput) habInput.value = '';
+    const banosInput = document.getElementById('f-banos'); if (banosInput) banosInput.value = '';
+  }
+
+  const reformaGroup = document.getElementById('f-reforma-group');
+  const reformaRow = document.getElementById('f-reforma-gastosanu-row');
+  if (reformaGroup) reformaGroup.style.display = esRustico ? 'none' : '';
+  if (reformaRow) reformaRow.style.gridTemplateColumns = esRustico ? '1fr' : '1fr 1fr';
+  if (esRustico) { const reformaInput = document.getElementById('f-reforma'); if (reformaInput) reformaInput.value = ''; }
+}
+
 function inm_onTipoChange() {
   const tipo = document.getElementById('f-tipo').value;
+  inm_actualizarCamposPorTipo(tipo);
   const sec = document.getElementById('garaje-asociado-section');
   if (sec) sec.style.display = (tipo === 'piso') ? 'block' : 'none';
   if (tipo !== 'piso') {
@@ -5924,6 +5967,9 @@ function openModal(editIdx) {
     document.getElementById('f-ingresos-acum').value = inm.ingresosAcumInicial ? fmt(inm.ingresosAcumInicial) : '';
     document.getElementById('f-notas').value = inm.notas || '';
     modal.dataset.editIdx = editIdx;
+    // PUNTO 63: ocultar/renombrar campos que no aplican según el tipo
+    // (rústico), después de rellenar el formulario con los datos guardados.
+    inm_actualizarCamposPorTipo(inm.tipo || 'piso');
     // PUNTO 32: sección de garaje asociado, solo para pisos.
     const garajeSecEl = document.getElementById('garaje-asociado-section');
     if (garajeSecEl) garajeSecEl.style.display = (inm.tipo === 'piso') ? 'block' : 'none';
@@ -5938,6 +5984,10 @@ function openModal(editIdx) {
     document.getElementById('modal-title-text').textContent = 'Nuevo inmueble';
     delete modal.dataset.editIdx;
     setTimeout(sugerirRef, 50);
+    // PUNTO 63: f-tipo queda en "piso" (primera opción) tras clearForm() —
+    // hay que restaurar las etiquetas normales por si el formulario se quedó
+    // en modo "rústico" de una edición anterior en esta misma sesión.
+    inm_actualizarCamposPorTipo('piso');
     // PUNTO 32: tras clearForm(), f-tipo queda en "piso" (primera opción) por
     // defecto — se muestra la sección de garaje asociado desde el principio.
     const garajeSecEl2 = document.getElementById('garaje-asociado-section');
