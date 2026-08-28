@@ -1925,11 +1925,7 @@ const DATA_KEYS = [
   // Fecha de la última copia de seguridad (Exportar) — se sincroniza entre
   // dispositivos para que el futuro aviso de "hace tiempo que no exportas"
   // sepa la fecha real, la hayas exportado desde el móvil de quien sea.
-  'app:ultimo_backup',
-  // PUNTO 69 (28/08/2026): resultado del último intento de actualización
-  // automática de cotizaciones (semáforo verde/rojo), para que se vea igual
-  // en cualquier dispositivo aunque el intento se haya hecho desde otro.
-  'fin:auto_cotiz_estado'
+  'app:ultimo_backup'
 ];
 // BLINDAJE DE DATOS (Bloque 4): las nóminas y gastos de "Renta Patricio" se
 // guardan en una clave por año (renta:gastos:2026, renta:nominas:2026...).
@@ -2055,7 +2051,19 @@ function _inmueblesMerge(localJSON, remoteJSON) {
       if (!inm || !inm.ref) return;
       const actual = mapa[inm.ref];
       if (!actual) { orden.push(inm.ref); mapa[inm.ref] = inm; }
-      else if (String(inm.updatedAt || '') > String(actual.updatedAt || '')) mapa[inm.ref] = inm;
+      // PUNTO 71 (28/08/2026): si la copia LOCAL de este inmueble no tiene
+      // fecha de sello ("updatedAt") — caso real de las rústicas: fueron
+      // inyectadas por inyectarFincasRusticas() o restauradas desde una
+      // copia de seguridad, ninguna de las dos vías pasa por saveInmueble(),
+      // que es donde se pone el sello — NO se deja sustituir por la copia de
+      // la nube, tenga esta la fecha que tenga. Antes, "con fecha" ganaba
+      // siempre a "sin fecha" aunque la de la nube fuera vieja y estuviera
+      // vacía — así es como una copia antigua de la nube podía borrar en
+      // silencio un precio recién restaurado a mano. Ahora solo se decide
+      // por fecha cuando LAS DOS versiones ya tienen sello; si la local no
+      // lo tiene, se queda como está hasta que se guarde una vez de verdad
+      // (momento en el que ya queda sellada y protegida con normalidad).
+      else if (actual.updatedAt && String(inm.updatedAt || '') > String(actual.updatedAt)) mapa[inm.ref] = inm;
     });
     return JSON.stringify(orden.map(function(r) { return mapa[r]; }));
   } catch (e) {
@@ -4129,7 +4137,6 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="fin-section-title">&#128200; Acciones</div>
       <button class="fin-add-btn" onclick="fin_nuevaAccion()">&#xFF0B;</button>
     </div>
-    <div id="fin-cotiz-estado" style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--silver-dim);margin:-4px 2px 10px;"></div>
     <div id="fin-acciones-lista"></div>
     <div class="fin-total-row" id="fin-acciones-total" style="display:none">
       <span>Total acciones</span><span id="fin-acciones-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
@@ -4957,8 +4964,7 @@ const BACKUP_KEYS = [
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
   'app:notas_mejoras',
-  'fin:ultima_actualizacion',
-  'fin:auto_cotiz_estado'
+  'fin:ultima_actualizacion'
 ];
 // BLINDAJE DE DATOS (Bloque 4): mismo motivo que en DATA_KEYS — proteger
 // también en la copia de seguridad las nóminas/gastos anuales de Renta
@@ -10383,6 +10389,26 @@ document.addEventListener('firebaseLoaded', function() {
     inms.forEach(function(i) { if (rusRefs.indexOf(i.ref) >= 0 && i.estado === 'ocupado') { i.estado = 'alquilado'; cambios++; } });
     if (cambios > 0) { localStorage.setItem('inmuebles:lista', JSON.stringify(inms)); console.log('[Migración] ' + cambios + ' fincas corregidas a alquilado'); }
   })();
+  // PUNTO 71 (28/08/2026): sellar con fecha ("updatedAt") los inmuebles que
+  // nunca la tuvieron — las rústicas inyectadas automáticamente y cualquier
+  // inmueble restaurado alguna vez desde una copia de seguridad no pasan
+  // por saveInmueble() (que es donde se pone el sello desde el punto 67),
+  // así que se quedaban sin fecha para siempre y expuestos al fallo real
+  // corregido en _inmueblesMerge (ver comentario ahí). Se sellan aquí con
+  // la fecha de ahora, una sola vez cada uno, y se suben a la nube al
+  // momento — así quedan protegidos igual que cualquier inmueble guardado
+  // a mano desde hoy, sin depender ya de ningún caso especial.
+  (function() {
+    var inms = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+    var cambios = 0;
+    inms.forEach(function(i) { if (!i.updatedAt) { i.updatedAt = new Date().toISOString(); cambios++; } });
+    if (cambios > 0) {
+      var val = JSON.stringify(inms);
+      localStorage.setItem('inmuebles:lista', val);
+      if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', val);
+      console.log('[Migración] ' + cambios + ' inmuebles sellados con fecha por primera vez');
+    }
+  })();
   // Inicializar histórico rústico si no existe aún en localStorage
   if (!localStorage.getItem(RUS_HIST_KEY)) {
     localStorage.setItem(RUS_HIST_KEY, JSON.stringify(RUS_HIST_INICIAL));
@@ -12151,8 +12177,6 @@ function fin_render() {
   fin_renderAcciones();
   fin_renderFondos();
   fin_renderUltimaActualizacion();
-  fin_renderCotizStatus();
-  fin_autoActualizarCotizaciones();
 }
 
 // --- CUENTAS ---
@@ -12692,94 +12716,6 @@ function fin_loadCotizaciones() {
   for (var i = 0; i < keys.length; i++) {
     _finCotizaciones[keys[i]] = cache[keys[i]].precio;
   }
-}
-
-// PUNTO 69 (28/08/2026): actualización automática (best-effort) de las
-// cotizaciones de Acciones al entrar en Finanzas. Usa una fuente gratuita
-// no oficial (Yahoo Finance) a través de un proxy CORS público gratuito
-// (allorigins.win) — puede fallar cualquier día sin previo aviso (proxy
-// caído, Yahoo cambia algo, sin conexión...), así que NUNCA sustituye al
-// botón manual "[actualizar]" de toda la vida, solo lo complementa. El
-// punto verde/rojo junto a "Acciones" y la hora del último intento son la
-// forma de saber, de un vistazo, si te puedes fiar del precio que ves o
-// si es mejor comprobarlo a mano. Como mucho un intento automático al día
-// por dispositivo (para no abusar del proxy gratuito); el icono 🔄 fuerza
-// un nuevo intento inmediato cuando se pulsa.
-function fin_renderCotizStatus() {
-  var el = document.getElementById('fin-cotiz-estado');
-  if (!el) return;
-  var raw = localStorage.getItem('fin:auto_cotiz_estado');
-  if (!raw) {
-    el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:var(--silver-dim);flex-shrink:0;"></span><span>Cotizaciones: aún sin intentos automáticos</span>';
-    return;
-  }
-  var st;
-  try { st = JSON.parse(raw); } catch (e) { st = null; }
-  if (!st || !st.fecha) { el.innerHTML = ''; return; }
-  var d = new Date(st.fecha);
-  var pad = function(n){ return String(n).padStart(2,'0'); };
-  var fechaTxt = pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-  var color = st.ok ? 'var(--accent-green)' : 'var(--accent-red)';
-  var texto = st.ok
-    ? ('Cotizaciones actualizadas automáticamente: ' + fechaTxt)
-    : ('No se pudieron actualizar automáticamente (' + fechaTxt + ') — usando el último precio guardado');
-  var fallidos = [];
-  if (st.detalle) {
-    Object.keys(st.detalle).forEach(function(t) { if (!st.detalle[t]) fallidos.push(FIN_NOMBRES[t] || t); });
-  }
-  var titleAttr = fallidos.length ? (' title="Fallaron: ' + fallidos.join(', ') + '"') : '';
-  el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:' + color + ';flex-shrink:0;"' + titleAttr + '></span>' +
-    '<span' + titleAttr + '>' + texto + '</span>' +
-    '<span onclick="fin_autoActualizarCotizaciones(true)" style="cursor:pointer;color:var(--accent-blue);margin-left:2px;" title="Forzar un nuevo intento ahora">&#128260;</span>';
-}
-
-var _finAutoActualizando = false;
-function fin_autoActualizarCotizaciones(forzar) {
-  if (_finAutoActualizando) return;
-  var raw = localStorage.getItem('fin:auto_cotiz_estado');
-  var st = null;
-  try { st = raw ? JSON.parse(raw) : null; } catch (e) { st = null; }
-  var hoy = new Date().toISOString().slice(0, 10);
-  if (!forzar && st && st.fecha && st.fecha.slice(0, 10) === hoy) {
-    // Ya se intentó hoy: solo refrescamos el punto con lo que ya sabemos.
-    fin_renderCotizStatus();
-    return;
-  }
-  _finAutoActualizando = true;
-  var tickers = Object.keys(FIN_NOMBRES);
-  var detalle = {};
-  var cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}');
-  var pendientes = tickers.length;
-  var terminar = function() {
-    pendientes--;
-    if (pendientes > 0) return;
-    _finAutoActualizando = false;
-    localStorage.setItem('fin:cotizaciones', JSON.stringify(cache));
-    var todosOk = tickers.every(function(t) { return detalle[t]; });
-    localStorage.setItem('fin:auto_cotiz_estado', JSON.stringify({ ok: todosOk, fecha: new Date().toISOString(), detalle: detalle }));
-    fin_loadCotizaciones();
-    fin_renderAcciones();
-    fin_renderCotizStatus();
-  };
-  tickers.forEach(function(ticker) {
-    var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(ticker) + '?interval=1d&range=1d';
-    var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(yahooUrl);
-    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    var timer = ctrl ? setTimeout(function() { ctrl.abort(); }, 8000) : null;
-    fetch(proxyUrl, ctrl ? { signal: ctrl.signal } : {})
-      .then(function(resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
-      .then(function(data) {
-        var precio = (data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta) ? data.chart.result[0].meta.regularMarketPrice : null;
-        if (typeof precio === 'number' && precio > 0) {
-          cache[ticker] = { precio: precio, fecha: hoy };
-          detalle[ticker] = true;
-        } else {
-          detalle[ticker] = false;
-        }
-      })
-      .catch(function() { detalle[ticker] = false; })
-      .finally(function() { if (timer) clearTimeout(timer); terminar(); });
-  });
 }
 
 // =========================================================
