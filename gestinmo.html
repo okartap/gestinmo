@@ -2022,6 +2022,45 @@ function _notasMerge(localJSON, remoteJSON) {
 }
 window._notasMerge = _notasMerge; // expuesta para pruebas automáticas
 
+// PUNTO 67 (28/08/2026) — BUG REAL ENCONTRADO Y CONFIRMADO CON DATOS REALES:
+// "inmuebles:lista" se guardaba como UN SOLO BLOQUE con todos los inmuebles
+// dentro. Si Patry tiene la app abierta en dos sitios a la vez (ej. móvil y
+// Chrome del ordenador), el segundo sitio, aunque no toque nada de las
+// rústicas, sigue teniendo en su memoria la versión ANTIGUA de la lista
+// completa (desde que se abrió esa pestaña). En cuanto ese segundo sitio
+// guarda CUALQUIER cambio — aunque sea en otra ficha totalmente distinta —
+// sube su copia entera, antigua, y pisa sin avisar los precios que se
+// acababan de meter en el móvil. Mismo fallo de fondo que ya se resolvió
+// para "Ideas para la app" (arriba) y para cualquier dato sencillo (PUNTO
+// 51.7/52), pero ninguno de esos dos arreglos protege listas completas como
+// esta — hacía falta el mismo tipo de fusión "campo a campo", aquí aplicada
+// inmueble a inmueble (por su referencia, que es el dato que nunca cambia,
+// a diferencia del id interno que se regenera en cada edición).
+function _inmueblesMerge(localJSON, remoteJSON) {
+  try {
+    const locales = localJSON ? JSON.parse(localJSON) : [];
+    const remotas = remoteJSON ? JSON.parse(remoteJSON) : [];
+    const mapa = {};
+    const orden = [];
+    (locales || []).forEach(function(inm) {
+      if (!inm || !inm.ref) return;
+      if (!(inm.ref in mapa)) orden.push(inm.ref);
+      mapa[inm.ref] = inm;
+    });
+    (remotas || []).forEach(function(inm) {
+      if (!inm || !inm.ref) return;
+      const actual = mapa[inm.ref];
+      if (!actual) { orden.push(inm.ref); mapa[inm.ref] = inm; }
+      else if (String(inm.updatedAt || '') > String(actual.updatedAt || '')) mapa[inm.ref] = inm;
+    });
+    return JSON.stringify(orden.map(function(r) { return mapa[r]; }));
+  } catch (e) {
+    console.warn('Fusión de inmuebles fallida, se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._inmueblesMerge = _inmueblesMerge; // expuesta para pruebas automáticas
+
 // ── ESCRIBIR EN FIRESTORE ──────────────────────────────────────────
 window.syncToFirestore = async function(key, value) {
   if (!DATA_KEYS.includes(key)) return;
@@ -2054,6 +2093,12 @@ window.loadFromFirestore = async function() {
           if (key === 'app:notas_mejoras') {
             const actual = localStorage.getItem(key);
             const fusionado = _notasMerge(actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
+          } else if (key === 'inmuebles:lista') {
+            // PUNTO 67: fusión inmueble a inmueble, nunca sustitución en bloque.
+            const actual = localStorage.getItem(key);
+            const fusionado = _inmueblesMerge(actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
           } else {
@@ -2094,6 +2139,18 @@ window.startFirebaseSync = function() {
         if (key === 'app:notas_mejoras') {
           const actual = localStorage.getItem(key);
           const fusionado = _notasMerge(actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (key === 'inmuebles:lista') {
+          // PUNTO 67: fusión inmueble a inmueble, nunca sustitución en bloque
+          // — así una pestaña olvidada abierta en otro sitio, con datos
+          // antiguos, ya no puede pisar un cambio reciente de otra.
+          const actual = localStorage.getItem(key);
+          const fusionado = _inmueblesMerge(actual, data.value);
           if (fusionado !== actual) {
             localStorage.setItem(key, fusionado);
             window._refreshCurrentModule && window._refreshCurrentModule(key);
@@ -5485,14 +5542,35 @@ function renderLista() {
       : '';
     const proxTxt = contratoActivo ? (inm_proximaRenovacion(contratoActivo) || '') : '';
     const rentaActTxt = contratoActivo ? (inm_fechaRentaActualizada(inm, contratoActivo) || '') : '';
+    // PUNTO 68 (28/08/2026, retocado dos veces el mismo día a petición tuya):
+    // precio de compra y valor actual, en su propia columna a la derecha,
+    // en dos líneas que emparejan con las dos líneas de la izquierda
+    // (nombre del inquilino arriba, datos del contrato debajo) — "Precio
+    // compra" a la altura del nombre, "Valor actual" a la altura de los
+    // datos del contrato.
+    // Las dos líneas (compra/actual) al mismo tamaño entre ellas. Se probó
+    // igualarlas también al tamaño de su línea de la izquierda (nombre/
+    // datos del contrato), pero al ser más ancho el texto de la derecha
+    // empujaba "Fin/IPC" a partirse en dos líneas y la tarjeta volvía a
+    // crecer — se deja compacto para que nada se mueva de sitio.
+    const precioMiniBlock = (inm.precio || inm.precioActual)
+      ? `<div style="text-align:right;flex-shrink:0;">
+          ${inm.precio ? `<div style="font-size:11px;font-weight:700;color:var(--silver-bright);white-space:nowrap;">${fmt(inm.precio)} € <span style="font-size:9px;font-weight:400;color:var(--silver-dim);">compra</span></div>` : '<div>&nbsp;</div>'}
+          ${inm.precioActual ? `<div style="font-size:11px;font-weight:700;color:var(--accent-blue);white-space:nowrap;margin-top:4px;">${fmt(inm.precioActual)} € <span style="font-size:9px;font-weight:400;color:var(--silver-dim);">actual</span></div>` : ''}
+        </div>`
+      : '';
+
     const contratoBlock = contratoActivo
-      ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
-          <div style="font-size:13px;color:var(--silver-mid);margin-bottom:4px;">&#128100; ${contratoActivo.inqNombre || '—'}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:var(--silver-dim);">
-            ${finTxt ? `<span>&#128197; Fin: ${finTxt}</span>` : ''}
-            ${proxTxt ? `<span>&#128260; IPC/renov.: ${proxTxt}</span>` : ''}
-            ${rentaActTxt ? `<span>&#128176; Renta: ${rentaActTxt}</span>` : ''}
+      ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;gap:10px;">
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:13px;color:var(--silver-mid);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">&#128100; ${contratoActivo.inqNombre || '—'}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:var(--silver-dim);">
+              ${finTxt ? `<span>&#128197; Fin: ${finTxt}</span>` : ''}
+              ${proxTxt ? `<span>&#128260; IPC/renov.: ${proxTxt}</span>` : ''}
+              ${rentaActTxt ? `<span>&#128176; Renta: ${rentaActTxt}</span>` : ''}
+            </div>
           </div>
+          ${precioMiniBlock}
         </div>`
       : '';
 
@@ -5501,6 +5579,16 @@ function renderLista() {
     // lleva aparte.
     const garajeAsocBlock = (inm.tipo === 'piso' && inm.garajeRef)
       ? `<div style="font-size:10.5px;color:var(--silver-dim);margin-top:6px;">🚗 ${inm.garajeRef}${inm.garajeIncluido ? ' · incluida en el alquiler' : ' · se alquila aparte'}</div>`
+      : '';
+
+    // Sin contrato activo (inmueble vacío) no hay línea de inquilino donde
+    // colgar el precio — se mantiene entonces como fila propia al final,
+    // para que el dato no desaparezca en esos casos.
+    const precioBlock = (!contratoActivo && (inm.precio || inm.precioActual))
+      ? `<div style="display:flex;justify-content:flex-end;gap:18px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+          ${inm.precio ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Precio compra</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(inm.precio)} €</div></div>` : ''}
+          ${inm.precioActual ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Valor actual</div><div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${fmt(inm.precioActual)} €</div></div>` : ''}
+        </div>`
       : '';
 
     // PUNTO 19: con la lista ahora reordenada, "idx" (posición dentro de
@@ -5548,7 +5636,8 @@ function renderLista() {
         </div>
       </div>
       ${contratoBlock}
-      ${garajeAsocBlock}`;
+      ${garajeAsocBlock}
+      ${precioBlock}`;
     container.appendChild(div);
   });
 
@@ -6091,6 +6180,10 @@ function saveInmueble() {
     // el resto de tipos, ver inm_onTipoChange()).
     garajeRef: document.getElementById('f-garaje-ref') ? document.getElementById('f-garaje-ref').value : '',
     garajeIncluido: document.getElementById('f-garaje-incluido') ? document.getElementById('f-garaje-incluido').checked : false,
+    // PUNTO 67 (28/08/2026): marca de tiempo propia de ESTE inmueble, para
+    // poder fusionar inmueble a inmueble en vez de sustituir la lista
+    // entera cuando llega un cambio de la nube (ver _inmueblesMerge).
+    updatedAt: new Date().toISOString(),
   };
   const modal = document.getElementById('inm-modal-inmueble');
   const arr = loadInmuebles();
