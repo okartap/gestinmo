@@ -5193,6 +5193,11 @@ function inm_patrimonioInmobiliario(empresa) {
   var propBuscado = normEmpresa(empresa);
   var deEstaEmpresa = todos.filter(function(inm) { return normEmpresa(inm.propietario || 'patrimer') === propBuscado; });
   var total = 0, contados = 0, usandoCompra = 0;
+  // PUNTO 66 (28/08/2026): además de contar cuántos inmuebles faltan, se
+  // guarda también SU REFERENCIA (ej. "RUS05", "PG07") — así el aviso de
+  // Finanzas/Inicio puede decir exactamente cuáles son, en vez de solo un
+  // número, para no tener que adivinar de qué inmuebles se trata.
+  var refsSinValor = [], refsUsandoCompra = [];
   deEstaEmpresa.forEach(function(inm) {
     var valorMercado = parseFloat(inm.precioActual) || 0;
     // PUNTO 62 (27/08/2026): si no hay "valor de mercado actual", se usa el
@@ -5203,10 +5208,12 @@ function inm_patrimonioInmobiliario(empresa) {
     if (valor > 0) {
       total += valor;
       contados++;
-      if (valorMercado <= 0) usandoCompra++;
+      if (valorMercado <= 0) { usandoCompra++; refsUsandoCompra.push(inm.ref || '?'); }
+    } else {
+      refsSinValor.push(inm.ref || '?');
     }
   });
-  return { total: total, contados: contados, sinValor: deEstaEmpresa.length - contados, totalInmuebles: deEstaEmpresa.length, usandoCompra: usandoCompra };
+  return { total: total, contados: contados, sinValor: deEstaEmpresa.length - contados, totalInmuebles: deEstaEmpresa.length, usandoCompra: usandoCompra, refsSinValor: refsSinValor, refsUsandoCompra: refsUsandoCompra };
 }
 
 // PUNTO 32: enlace piso↔garaje. El vínculo se guarda solo en el lado del
@@ -12502,11 +12509,13 @@ function fin_calcPatrimonio() {
   var notaEl = document.getElementById('fin-patrimonio-nota');
   if (notaEl) {
     var notaPartes = [];
+    // PUNTO 66 (28/08/2026): se añaden las referencias concretas entre
+    // paréntesis, para no dejar la duda de "¿cuáles son?".
     if (inmob.sinValor > 0) {
-      notaPartes.push(inmob.sinValor + ' inmueble' + (inmob.sinValor === 1 ? '' : 's') + ' sin ningún precio registrado — no cuenta' + (inmob.sinValor === 1 ? '' : 'n') + ' en el total');
+      notaPartes.push(inmob.sinValor + ' inmueble' + (inmob.sinValor === 1 ? '' : 's') + ' sin ningún precio registrado (' + inmob.refsSinValor.join(', ') + ') — no cuenta' + (inmob.sinValor === 1 ? '' : 'n') + ' en el total');
     }
     if (inmob.usandoCompra > 0) {
-      notaPartes.push(inmob.usandoCompra + ' inmueble' + (inmob.usandoCompra === 1 ? '' : 's') + ' sin "valor de mercado actual" — cuenta' + (inmob.usandoCompra === 1 ? '' : 'n') + ' con su precio de compra en su lugar');
+      notaPartes.push(inmob.usandoCompra + ' inmueble' + (inmob.usandoCompra === 1 ? '' : 's') + ' sin "valor de mercado actual" (' + inmob.refsUsandoCompra.join(', ') + ') — cuenta' + (inmob.usandoCompra === 1 ? '' : 'n') + ' con su precio de compra en su lugar');
     }
     notaEl.textContent = notaPartes.join(' · ');
   }
