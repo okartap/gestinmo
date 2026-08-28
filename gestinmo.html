@@ -12493,10 +12493,10 @@ function fin_calcPatrimonio() {
   var rowsEl = document.getElementById('fin-patrimonio-rows');
   if (rowsEl) {
     rowsEl.innerHTML =
-      '<div class="row"><span>Inmuebles</span><span>' + (inmob.total > 0 ? fin_fmt(inmob.total) : '-') + '</span></div>' +
       '<div class="row"><span>Cuentas</span><span>' + (cuentas > 0 ? fin_fmt(cuentas) : '-') + '</span></div>' +
-      '<div class="row"><span>Acciones</span><span>' + (acciones > 0 ? fin_fmt(acciones) : '-') + '</span></div>' +
       '<div class="row"><span>Fondos</span><span>' + (fondos > 0 ? fin_fmt(fondos) : '-') + '</span></div>' +
+      '<div class="row"><span>Acciones</span><span>' + (acciones > 0 ? fin_fmt(acciones) : '-') + '</span></div>' +
+      '<div class="row"><span>Inmuebles</span><span>' + (inmob.total > 0 ? fin_fmt(inmob.total) : '-') + '</span></div>' +
       (igc > 0 ? '<div class="row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span>' + fin_fmt(total + igc) + '</span></div>' : '');
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
