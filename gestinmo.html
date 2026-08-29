@@ -6127,6 +6127,18 @@ function openModal(editIdx) {
   } else {
     document.getElementById('modal-title-text').textContent = 'Nuevo inmueble';
     delete modal.dataset.editIdx;
+    // PUNTO 79b (29/08/2026): clearForm() deja el desplegable de Propietario
+    // siempre en la primera opción (Patrimer), sin mirar qué empresa tienes
+    // activa en ese momento en la app — por eso la referencia sugerida
+    // seguía saliendo VIV21 al dar de alta el primer inmueble de Patricio,
+    // aunque el arreglo del punto 79 ya calculaba bien por propietario: el
+    // propietario de partida era el equivocado. Ahora el formulario arranca
+    // ya con la empresa que tienes activa en la app.
+    const fPropietarioNuevo = document.getElementById('f-propietario');
+    const empresaActivaNuevo = localStorage.getItem('patrimer:empresa') || 'patrimer';
+    if (fPropietarioNuevo && ['patrimer','patricio','industrias'].includes(empresaActivaNuevo)) {
+      fPropietarioNuevo.value = empresaActivaNuevo;
+    }
     setTimeout(sugerirRef, 50);
     // PUNTO 63: f-tipo queda en "piso" (primera opción) tras clearForm() —
     // hay que restaurar las etiquetas normales por si el formulario se quedó
