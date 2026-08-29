@@ -2653,7 +2653,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Referencia</div>
-          <input class="form-input" id="f-ref-inm" type="text" placeholder="VIV02" oninput="this.value=this.value.toUpperCase()">
+          <input class="form-input" id="f-ref-inm" type="text" placeholder="VIV02" oninput="this.value=this.value.toUpperCase();this.dataset.auto=''">
           <div class="form-hint">Ej: VIV02, RUS01, PG03</div>
         </div>
       </div>
@@ -5909,16 +5909,46 @@ function setDetailTab(el, tabId) {
 // ─── MODAL ─────────────────────────────────────────────────────────────────
 function sugerirRef() {
   const refField = document.getElementById('f-ref-inm');
-  if (!refField || refField.value.trim()) return;
+  // PUNTO 79 (28/08/2026): antes esta función solo rellenaba si el campo
+  // estaba vacío, así que un cambio posterior de Tipo o Propietario nunca
+  // recalculaba la referencia sugerida. Se marca con data-auto="1" cada vez
+  // que ESTA función pone el valor sola — si el campo lleva esa marca, sí se
+  // puede recalcular (tipo/propietario cambiados); si el usuario ha escrito
+  // algo a mano, el oninput del campo borra la marca y aquí ya no se toca.
+  if (!refField || (refField.value.trim() && refField.dataset.auto !== '1')) return;
   const tipo = document.getElementById('f-tipo') ? document.getElementById('f-tipo').value : 'piso';
-  const prefixMap = { piso:'VIV', local:'LOC', garaje:'PG', rustico:'RUS', otro:'OTR' };
-  const prefix = prefixMap[tipo] || 'INM';
+  const propietarioSel = document.getElementById('f-propietario') ? document.getElementById('f-propietario').value : 'patrimer';
+  // PUNTO 79 (28/08/2026): la referencia sugerida contaba TODOS los inmuebles
+  // de todas las empresas con el mismo prefijo, sin mirar el propietario del
+  // formulario — así, el primer piso de Patricio salía como "VIV21" (seguía
+  // la numeración de Patrimer) en vez de "VIV01". La referencia no es solo
+  // una etiqueta: contratos, facturas, etc. buscan el inmueble SOLO por su
+  // ref, sin mirar la empresa — así que dos inmuebles de empresas distintas
+  // NUNCA pueden compartir la misma ref, o se podrían llegar a mezclar sus
+  // datos. Por eso Patricio (e Industrias, previendo que algún día tenga
+  // inmuebles) usan un prefijo propio para TODo, distinto del de Patrimer,
+  // en vez de repetir VIV/BAJ/PG/RUS con numeración aparte.
+  const empresaSel = normEmpresa(propietarioSel);
+  let prefix;
+  if (empresaSel === 'patrimer') {
+    const prefixMapPatrimer = { piso:'VIV', local:'BAJ', garaje:'PG', rustico:'RUS', otro:'OTR' };
+    prefix = prefixMapPatrimer[tipo] || 'OTR';
+  } else {
+    // Patricio → "VIV-P", Industrias → "IGC": un único prefijo para todos
+    // sus inmuebles sea cual sea el tipo, tal como ya estaba previsto en la
+    // configuración de cada empresa (PROFILES.refPrefix) aunque nunca se
+    // había llegado a usar.
+    const perfil = PROFILES[empresaSel];
+    prefix = (perfil && perfil.refPrefix && perfil.refPrefix[0]) || 'INM';
+  }
   const existentes = loadInmuebles()
     .filter(i => i.ref && i.ref.startsWith(prefix))
+    .filter(i => normEmpresa(i.propietario || 'patrimer') === empresaSel)
     .map(i => parseInt(i.ref.replace(prefix,'')) || 0)
     .filter(n => !isNaN(n));
   const siguiente = existentes.length > 0 ? Math.max(...existentes) + 1 : 1;
   refField.value = prefix + String(siguiente).padStart(2,'0');
+  refField.dataset.auto = '1';
 }
 
 // PUNTO 32: formulario de enlace piso↔garaje.
@@ -6000,6 +6030,7 @@ function inm_actualizarCamposPorTipo(tipo) {
 
 function inm_onTipoChange() {
   const tipo = document.getElementById('f-tipo').value;
+  sugerirRef(); // PUNTO 79: recalcula la referencia sugerida si el tipo cambia (solo si sigue siendo la sugerencia automática, no si el usuario ya escribió una a mano)
   inm_actualizarCamposPorTipo(tipo);
   const sec = document.getElementById('garaje-asociado-section');
   if (sec) sec.style.display = (tipo === 'piso') ? 'block' : 'none';
@@ -6016,6 +6047,7 @@ function inm_onTipoChange() {
 }
 
 function inm_onPropietarioChange() {
+  sugerirRef(); // PUNTO 79: recalcula la referencia sugerida si el propietario cambia (solo si sigue siendo la sugerencia automática, no si el usuario ya escribió una a mano)
   if (document.getElementById('f-tipo').value !== 'piso') return;
   const modal = document.getElementById('inm-modal-inmueble');
   const refPropio = modal && modal.dataset.editIdx !== undefined ? document.getElementById('f-ref-inm').value.trim().toUpperCase() : '';
