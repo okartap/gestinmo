@@ -2435,7 +2435,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           <!-- PUNTO 72 (28/08/2026): "Cuentas + Fondos" — misma liquidez para
           inversión que en Finanzas, a modo de prueba en Inicio. Solo visible
           con Patrimer activo. -->
-          <div class="row" id="dash-pat-liquidez-row" style="display:none;"><span>Cuentas+Fondos</span><span id="dash-pat-liquidez" style="color:var(--accent-green);">—</span></div>
+          <div class="row" id="dash-pat-liquidez-row" style="display:none;"><span>CC+F</span><span id="dash-pat-liquidez" style="color:var(--accent-green);">—</span></div>
           <!-- AJUSTE 25/08/2026 (noche): "Total+IGC" pasa a ser una fila más,
           con el mismo formato que Inmobiliario/Financiero (antes iba en
           pequeño debajo) — solo visible cuando la empresa activa es Patrimer
@@ -4873,6 +4873,28 @@ function focusInputEl(el){
   // Seleccionar todo el texto para facilitar sobreescribir
   el.select();
 }
+
+// PUNTO 80 (29/08/2026): en los campos de importe (Precio compra, Valor
+// actual, Alquiler cobrado, Renta, etc. — cualquier campo con
+// inputmode="decimal" de tipo texto, en cualquier módulo de la app), el
+// teclado numérico del móvil a veces ofrece un punto "." en vez de una coma
+// "," como tecla de decimales, según el idioma/región configurado en el
+// propio teléfono — y la app no lo interpretaba como decimal, forzando a
+// cambiar al teclado normal para poner la coma a mano. Con este listener,
+// en CUALQUIER campo de este tipo, un punto escrito con el teclado se
+// convierte solo, al momento, en coma — así valga el punto o la coma que
+// ofrezca el teclado de cada móvil, siempre funciona igual. Se engancha una
+// sola vez aquí y cubre todos los formularios de la app (Inmuebles, para
+// los 5 tipos y las 2 empresas; también Contratos, Finanzas, Cobros y
+// Estudios de rentabilidad, que usan el mismo tipo de campo).
+document.addEventListener('input', function(e) {
+  var el = e.target;
+  if (el && el.tagName === 'INPUT' && el.type === 'text' && el.inputMode === 'decimal' && el.value.indexOf('.') !== -1) {
+    var pos = el.selectionStart, largoAntes = el.value.length;
+    el.value = el.value.replace(/\./g, ',');
+    if (pos !== null) { var delta = el.value.length - largoAntes; el.setSelectionRange(pos + delta, pos + delta); }
+  }
+}, true);
 
 // ─── ESTADO ──────────────────────────────────────────────────────
 window.PATRIMER_PROFILE  = null;
@@ -13255,7 +13277,11 @@ function dash_render() {
   var dPatLiqRow = document.getElementById('dash-pat-liquidez-row');
   var dPatLiq = document.getElementById('dash-pat-liquidez');
   if (dPatLiqRow) dPatLiqRow.style.display = (_empActivaPat === 'patrimer') ? '' : 'none';
-  if (dPatLiq) dPatLiq.textContent = (_empActivaPat === 'patrimer') ? fin_fmtEnteroSinSimbolo(cuentas + fondos) : '—';
+  // PRUEBA 29/08/2026: al acortar la etiqueta a "C.C. + Fondos" queda hueco
+  // de sobra en la fila, así que esta sí vuelve a mostrar decimales
+  // (fin_fmtSinSimbolo) — las otras 3 filas de la tarjeta siguen en entero,
+  // que es donde de verdad hacía falta el ahorro de espacio.
+  if (dPatLiq) dPatLiq.textContent = (_empActivaPat === 'patrimer') ? fin_fmtSinSimbolo(cuentas + fondos) : '—';
 
   // ── Gráfica mensual del dashboard ────────────────────────────────
   dash_buildChart(year, facturasDash);
@@ -14162,7 +14188,64 @@ function cli_guardarEdicion() {
 }
 
 function cli_cargar() {
-  return JSON.parse(localStorage.getItem('clientes:lista') || '[]');
+  const clientes = JSON.parse(localStorage.getItem('clientes:lista') || '[]');
+  cli_migrarPropietarios(clientes);
+  return clientes;
+}
+
+// Deduce a qué empresa pertenece un contrato a partir del texto guardado en
+// su campo "arrendador" (que no siempre es idéntico al de ARRENDADORES[].label
+// — contratos antiguos lo guardaron con otra redacción). Se mira "industrias"
+// antes que "patricio" porque el texto legal de Industrias también nombra a
+// "Patricio" como administrador, y no debe confundirse con un contrato suyo
+// a título personal.
+function cli_empresaDesdeArrendador(txt) {
+  if (!txt) return null;
+  const t = txt.toLowerCase();
+  // "mancomunad" (administradores mancomunados) y "mercedes" son marcas
+  // exclusivas de Industrias en cualquier redacción del texto, aunque esa
+  // versión concreta no incluya literalmente la palabra "industrias".
+  if (t.indexOf('industrias') !== -1 || t.indexOf('mancomunad') !== -1 || t.indexOf('mercedes') !== -1) return 'industrias';
+  if (t.indexOf('patrimer') !== -1) return 'patrimer';
+  if (t.indexOf('patricio') !== -1) return 'patricio';
+  return null;
+}
+
+// PUNTO 82 (29/08/2026): BLINDAJE DE DATOS — los clientes creados antes del
+// punto 51/66 (blindaje de Clientes) se guardaron sin "propietario", así que
+// hasta ahora se veían mezclados en las 3 empresas sin distinción. Aquí se
+// rellena ese dato, una sola vez por cliente y de forma automática, mirando
+// con qué empresa (arrendador) tiene contratos firmados ese mismo DNI. Si un
+// cliente no tiene ningún contrato con ese DNI, o tiene contratos de más de
+// una empresa distinta, se deja tal cual estaba (sigue viéndose en todas,
+// que es el comportamiento seguro de siempre) — no se inventa un dato que no
+// se puede deducir con seguridad. No borra ni toca nada más del cliente.
+function cli_migrarPropietarios(clientes) {
+  if (!clientes || !clientes.length) return;
+  const sinPropietario = clientes.filter(c => !c.propietario);
+  if (!sinPropietario.length) return;
+  let contratos;
+  try { contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]'); }
+  catch (e) { contratos = []; }
+  let huboCambios = false;
+  sinPropietario.forEach(c => {
+    const dniNorm = normalizarDocId(c.dni);
+    if (!dniNorm) return;
+    const empresas = new Set();
+    contratos.forEach(ct => {
+      if (normalizarDocId(ct.inqDNI) === dniNorm) {
+        const emp = cli_empresaDesdeArrendador(ct.arrendador);
+        if (emp) empresas.add(emp);
+      }
+    });
+    if (empresas.size === 1) {
+      c.propietario = [...empresas][0];
+      huboCambios = true;
+    }
+  });
+  if (huboCambios) {
+    localStorage.setItem('clientes:lista', JSON.stringify(clientes));
+  }
 }
 
 function cli_abrirNuevo() {
@@ -14232,14 +14315,14 @@ function cli_setTab(tab) {
   cli_renderLista();
 }
 
+// PUNTO 82 (29/08/2026): antes esta pantalla ocultaba del todo los clientes
+// de otras empresas. A petición tuya, ya no se ocultan — se ordenan: primero
+// los de la empresa activa (y los que aún no tienen propietario asignado,
+// que siguen sin poder clasificarse con seguridad), y debajo, agrupados y
+// con su propio división con el nombre de la empresa, el resto.
 function cli_renderLista() {
-  // BLINDAJE DE DATOS: acotar a los clientes de la empresa activa — antes
-  // Clientes mostraba mezclados los inquilinos de Patrimer/Patricio/
-  // Industrias sin importar cuál estuviera seleccionada. Un cliente sin
-  // "propietario" guardado (creado antes de este arreglo) sigue viéndose
-  // en cualquier empresa, para no ocultar datos ya existentes.
-  var _cliEmp = localStorage.getItem('patrimer:empresa') || 'patrimer';
-  const clientes = cli_cargar().filter(c => !c.propietario || normEmpresa(c.propietario) === normEmpresa(_cliEmp));
+  var _cliEmp = normEmpresa(localStorage.getItem('patrimer:empresa') || 'patrimer');
+  const clientes = cli_cargar();
   const lista = document.getElementById('cli-lista');
   if (!lista) return;
 
@@ -14256,7 +14339,15 @@ function cli_renderLista() {
     return;
   }
 
-  lista.innerHTML = filtrados.map(c => {
+  const deLaActiva = filtrados.filter(c => !c.propietario || normEmpresa(c.propietario) === _cliEmp);
+  const otrasEmpresas = ['patrimer', 'patricio', 'industrias'].filter(k => k !== _cliEmp);
+  const grupos = [{ titulo: null, clientes: deLaActiva }];
+  otrasEmpresas.forEach(function(k) {
+    const deEsta = filtrados.filter(c => c.propietario && normEmpresa(c.propietario) === k);
+    if (deEsta.length) grupos.push({ titulo: 'Clientes de ' + (PROFILES[k] ? PROFILES[k].name : k), clientes: deEsta });
+  });
+
+  const tarjetaCliente = (c) => {
     const ini = (c.nombre || '?').trim().split(/\s+/).slice(0,2).map(w => w[0]||'').join('').toUpperCase();
     const fecha = c.ultimoContrato ? new Date(c.ultimoContrato).toLocaleDateString('es-ES', {day:'2-digit', month:'short', year:'numeric'}) : '—';
     return `<div onclick="cli_verDetalle('${c.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer;transition:background .15s;" onmouseenter="this.style.background='var(--navy-hover)'" onmouseleave="this.style.background='var(--navy-card)'">
@@ -14267,6 +14358,11 @@ function cli_renderLista() {
       </div>
       <div style="font-size:10px;color:var(--silver-dim);text-align:right;flex-shrink:0;">${fecha}</div>
     </div>`;
+  };
+
+  lista.innerHTML = grupos.map(function(g) {
+    const cabecera = g.titulo ? `<div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px;"><div style="flex:1;height:1px;background:var(--border);"></div><div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-secondary);white-space:nowrap;">${g.titulo.toUpperCase()}</div><div style="flex:1;height:1px;background:var(--border);"></div></div>` : '';
+    return cabecera + g.clientes.map(tarjetaCliente).join('');
   }).join('');
 }
 
