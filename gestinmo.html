@@ -848,10 +848,10 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .litem{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);}
 .ldot{width:8px;height:8px;border-radius:50%;}
 .mtable{background:var(--navy-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;}
-.mth-row{display:grid;grid-template-columns:1.5fr 1fr 1fr .8fr;padding:9px 14px;border-bottom:1px solid var(--border);}
+.mth-row{display:grid;grid-template-columns:2fr 1fr;padding:9px 14px;border-bottom:1px solid var(--border);}
 .mth{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);}
 .mth:not(:first-child){text-align:right;}
-.mtr{display:grid;grid-template-columns:1.5fr 1fr 1fr .8fr;padding:10px 14px;border-bottom:1px solid rgba(45,61,110,.4);cursor:pointer;transition:background .2s;}
+.mtr{display:grid;grid-template-columns:2fr 1fr;padding:10px 14px;border-bottom:1px solid rgba(45,61,110,.4);cursor:pointer;transition:background .2s;}
 .mtr:last-child{border-bottom:none;}
 .mtr:active{background:var(--navy-hover);}
 .mtd{font-size:13px;color:var(--text);}
@@ -3444,7 +3444,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div id="cob-rustico-aviso" style="display:none;margin-bottom:16px;"></div>
       <div class="slabel" style="margin-bottom:12px">Historial de facturas</div>
       <div class="mtable" id="historial-table">
-        <div class="mth-row"><div class="mth">Mes</div><div class="mth">Facturado</div><div class="mth">Cobrado</div><div class="mth">Estado</div></div>
+        <div class="mth-row"><div class="mth">Mes</div><div class="mth">Facturado</div></div>
         <div id="historial-rows"><div class="empty-state">Sin facturas registradas aún.<br>Añade el total del mes desde la pestaña "Histórico".</div></div>
       </div>
     </div>
@@ -9532,18 +9532,26 @@ function renderAnalisis(){
   // incluye tanto los totales metidos a mano como los de la antigua factura
   // desglosada (esta última ya sincronizaba ahí también) — así el historial
   // no vuelve a quedarse vacío solo por haber cambiado la forma de facturar.
+  // PUNTO 90 (30/08/2026): simplificada a petición tuya — "Cobrado" y "Estado"
+  // se quitan (esa pareja comparaba el total del mes contra los apuntes sueltos
+  // de KEYS.cobros, que ahora son para saldos pendientes por cliente, no un
+  // registro fiable de cobro global — por eso siempre salía "0€ Pendiente"
+  // aunque sí hubieras cobrado, y confundía más que ayudaba). Solo Mes e
+  // Importe. De paso, encontrado y corregido el motivo por el que la gráfica
+  // de arriba y esta tabla no cuadraban: la gráfica sí suma el rústico de cada
+  // mes (rus_totalMes, solo Patrimer) y esta tabla no lo hacía — ahora los dos
+  // sitios muestran la misma cifra.
   const rows = document.getElementById('historial-rows');
+  const _empHist = localStorage.getItem('patrimer:empresa') || 'patrimer';
+  const _esPatrimerHist = (_empHist === 'patrimer');
   const facYear = hist.filter(f=>f.mes&&f.mes.startsWith(year+'')).sort((a,b)=>b.mes.localeCompare(a.mes));
   if (facYear.length === 0) {
     rows.innerHTML = '<div class="empty-state">Sin facturación registrada este año aún.</div>';
   } else {
-    const cobros = load(KEYS.cobros);
     rows.innerHTML = facYear.map(f=>{
-      const cobradoMes = cobros.filter(c=>c.fecha&&c.fecha.startsWith(f.mes)).reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
-      const pct = f.importe>0 ? Math.round(cobradoMes/f.importe*100) : 0;
-      const estadoCls = pct>=100?'up':pct>0?'':'dn';
-      const estadoTxt = pct>=100?'✓ Cobrado':pct>0?pct+'% cobrado':'Pendiente';
-      return `<div class="mtr"><div class="mtd">${mesNombre(f.mes)}</div><div class="mtd">${fmtE(f.importe)}</div><div class="mtd">${fmtE(cobradoMes)}</div><div class="mtd ${estadoCls}">${estadoTxt}</div></div>`;
+      var mesNum = parseInt(f.mes.split('-')[1], 10);
+      var importeTotal = f.importe + (_esPatrimerHist ? rus_totalMes(year, mesNum) : 0);
+      return `<div class="mtr"><div class="mtd">${mesNombre(f.mes)}</div><div class="mtd">${fmtE(importeTotal)}</div></div>`;
     }).join('');
   }
 
