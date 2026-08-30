@@ -23,8 +23,8 @@
     --navy-card:    #1a2440;
     --navy-hover:   #202d50;
     --silver-bright:#c8d4e8;
-    --silver-mid:   #a8b4c8;
-    --silver-dim:   #a8b4c8;
+    --silver-mid:   #b8c4d8; /* PUNTO 18 (30/08/2026): un punto más claro (antes #a8b4c8) — seguía viéndose apagado en etiquetas pequeñas en mayúsculas */
+    --silver-dim:   #b8c4d8; /* ídem — se mantienen iguales entre sí, como ya quedó decidido en el ajuste anterior (punto 16) */
     --border:       #253050;
     --accent-gold:  #c9a84c;
     --gold:         #c9a84c;
@@ -33,7 +33,7 @@
     --accent-amber: #e09c3a;
     --accent-blue:  #5b8dee;
     --text-primary: #e8eef8;
-    --text-secondary:#7a8db0;
+    --text-secondary:#96a8c8; /* PUNTO 18 (30/08/2026): aclarado desde #7a8db0 — era el gris más apagado de toda la app, usado en ~170 sitios (etiquetas pequeñas: "Renta/mes", "Piso · X hab", cabeceras de tabla, pestañas...) */
     --patrimer-color:   #5b8dee;
     --patricio-color:   #4caf82;
     --industrias-color: #c9a84c;
@@ -47,8 +47,8 @@
     --red:       #e05555;  /* = --accent-red */
     --blue:      #5b8dee;  /* = --accent-blue */
     --text:      #e8eef8;  /* = --text-primary */
-    --text2:     #7a8db0;  /* = --text-secondary */
-    --silver:    #a8b4c8;  /* = --silver-mid */
+    --text2:     #96a8c8;  /* = --text-secondary */
+    --silver:    #b8c4d8;  /* = --silver-mid */
     --navy-dark: #1a2440;  /* = --navy-card */
     --purple:    #9b72e8;
   }
@@ -4156,15 +4156,60 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <span>Total fondos</span><span id="fin-fondos-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
     </div>
   </div>
-  <!-- RESUMEN ANUAL DIVIDENDOS -->
-  <div class="fin-section-header" style="margin-top:10px;">
-    <span class="fin-section-title" style="text-transform:none;">&#128197; Resumen anual dividendos</span>
-    <button class="fin-add-btn" onclick="fin_toggleResumenAnual()" id="fin-resumen-toggle" style="font-size:14px;padding:0 10px;">&#9654;</button>
+  <!-- DIVIDENDOS: dos tarjetas pequeñas (PUNTO 70, 30/08/2026) — sustituyen
+       a la única línea "Resumen anual dividendos" que había antes. Una abre
+       la misma tabla resumen de siempre; la otra abre el módulo nuevo con
+       los gráficos (mod-dividendos). -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+    <div class="fin-card" style="cursor:pointer;text-align:center;padding:14px 10px;" onclick="fin_toggleResumenAnual()" id="fin-resumen-card">
+      <div style="font-size:20px;">&#128197;</div>
+      <div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-top:4px;">Resumen anual</div>
+      <div style="font-size:10px;color:var(--text-secondary);margin-top:1px;" id="fin-resumen-toggle-txt">Ver tabla &#9654;</div>
+    </div>
+    <div class="fin-card" style="cursor:pointer;text-align:center;padding:14px 10px;" onclick="div_abrirModulo()">
+      <div style="font-size:20px;">&#128200;</div>
+      <div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-top:4px;">Gráficos de dividendos</div>
+      <div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">Por año y por empresa &#8250;</div>
+    </div>
   </div>
-  <div id="fin-resumen-anual" style="display:none;margin-bottom:6px;">
+  <div id="fin-resumen-anual" style="display:none;margin-top:8px;">
     <div id="fin-resumen-anual-content" style="font-size:12px;color:var(--silver-dim);text-align:center;padding:10px 0;">Sin datos.</div>
   </div>
 </div>
+</div>
+
+<!-- ═══ MÓDULO: ANÁLISIS DE DIVIDENDOS (PUNTO 70, 30/08/2026) ═══ -->
+<div id="mod-dividendos" class="module-view">
+  <header class="header">
+    <div class="header-back" onclick="div_cerrarModulo()">&#8249;</div>
+    <div class="header-identity">
+      <div class="header-single-row">
+        <span class="header-module-name">Dividendos</span>
+      </div>
+    </div>
+  </header>
+  <div style="padding:14px;">
+    <div class="fin-section" id="div-section-barras">
+      <div class="fin-section-header">
+        <div class="fin-section-title">&#128202; Total cobrado por año</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Todas las empresas juntas — efectivo y ampliaciones (scrip) sumados como un único dividendo cobrado.</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="div-chart-barras"></div>
+      </div>
+    </div>
+    <div class="fin-section" id="div-section-lineas">
+      <div class="fin-section-header">
+        <div class="fin-section-title">&#128201; Evolución por empresa</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Toca una etiqueta para mostrar u ocultar esa línea.</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="div-chart-lineas"></div>
+      </div>
+      <div id="div-leyenda" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+    </div>
+    <div id="div-sin-datos" style="display:none;text-align:center;padding:30px 10px;color:var(--silver-dim);font-size:13px;">Sin dividendos registrados todavía para esta empresa.</div>
+  </div>
 </div>
 
 
@@ -4251,6 +4296,12 @@ abierto. -->
     <!-- Campos scrip dividend -->
     <div id="fin-campos-scrip" style="display:none">
       <div class="mfield"><div class="mflabel">Acciones recibidas</div><input class="minput" id="fin-scrip-acciones" type="number" inputmode="decimal" step="0.0001" placeholder="0"></div>
+      <!-- PUNTO 70 (30/08/2026): valor real en euros de las acciones recibidas
+           (acciones × cotización de apertura ese día) — antes solo quedaba
+           anotado como texto en la Observación, y no contaba ni en "Dividendos
+           cobrados" ni en el Resumen anual ni en Análisis de Dividendos. -->
+      <div class="mfield"><div class="mflabel">Valor real de esas acciones (euros)</div><input class="minput" id="fin-scrip-valor-real" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Acciones recibidas × cotización de apertura ese día. Si lo dejas en blanco, se aproxima con la cotización actual (menos exacto).</div>
       <div class="mfield"><div class="mflabel">Efectivo por derechos sobrantes (euros)</div><input class="minput" id="fin-scrip-sobrantes" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
       <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-scrip-obs" placeholder="Opcional"></div>
     </div>
@@ -10561,6 +10612,42 @@ document.addEventListener('firebaseLoaded', function() {
   fac_loadHistorico();
   if (typeof fac_renderGraficas === 'function') fac_renderGraficas();
   if (typeof dash_render === 'function') dash_render();
+  // PUNTO 70 (30/08/2026): las 8 ampliaciones de ACS (dividendo flexible,
+  // punto 76) llevaban su valor real en euros solo como una frase de texto
+  // (scripObs), sin ningún número que la app pudiera sumar o graficar — así
+  // que la tarjeta de ACS, el "Resumen anual dividendos" y el nuevo módulo
+  // de Análisis de Dividendos se quedaban sin contar esos ~33.765€ reales.
+  // Se rellena aquí, una sola vez, el número limpio ("scripValorReal") para
+  // esas 8 fechas exactas — los mismos importes que ya estaban anotados en
+  // el texto, solo que ahora también como número. Idempotente: si algún
+  // registro ya lo tiene, no se toca.
+  (function() {
+    var VALORES_REALES_ACS_SCRIP = {
+      '2023-02-15': 1725.57,
+      '2023-07-26': 5837.40,
+      '2024-02-14': 1637.55,
+      '2024-07-24': 6232.80,
+      '2025-02-14': 1870.83,
+      '2025-07-23': 6991.25,
+      '2026-02-13': 2047.50,
+      '2026-07-22': 7309.80
+    };
+    var acc = JSON.parse(localStorage.getItem('fin:acciones:patrimer') || '[]');
+    var cambios = 0;
+    acc.forEach(function(op) {
+      if (op.tipo === 'scrip' && op.ticker === 'ACS.MC' && !op.scripValorReal && VALORES_REALES_ACS_SCRIP[op.fecha]) {
+        op.scripValorReal = VALORES_REALES_ACS_SCRIP[op.fecha];
+        cambios++;
+      }
+    });
+    if (cambios > 0) {
+      var val = JSON.stringify(acc);
+      localStorage.setItem('fin:acciones:patrimer', val);
+      if (window.syncToFirestore) window.syncToFirestore('fin:acciones:patrimer', val);
+      console.log('[Migración] ' + cambios + ' ampliaciones de ACS con valor real numérico añadido');
+      if (typeof fin_renderAcciones === 'function') fin_renderAcciones();
+    }
+  })();
 });
 
 // ─────────────────────────────────────────
@@ -12386,11 +12473,22 @@ function fin_renderAcciones() {
   for (var i = 0; i < ops.length; i++) {
     var op = ops[i];
     var t = op.ticker;
-    if (!pos[t]) pos[t] = { ticker: t, nombre: FIN_NOMBRES[t] || t, num: 0, coste: 0, divsEfectivo: 0, divsSobrantes: 0 };
+    if (!pos[t]) pos[t] = { ticker: t, nombre: FIN_NOMBRES[t] || t, num: 0, coste: 0, divsEfectivo: 0, divsScrip: 0, divsSobrantes: 0 };
     if (op.tipo === 'compra') { pos[t].num += parseFloat(op.cantidad) || 0; pos[t].coste += (parseFloat(op.cantidad) || 0) * (parseFloat(op.precio) || 0); }
     else if (op.tipo === 'venta') { pos[t].num -= parseFloat(op.cantidad) || 0; }
     else if (op.tipo === 'dividendo') { pos[t].divsEfectivo += parseFloat(op.divImporte) || parseFloat(op.precio) || 0; }
-    else if (op.tipo === 'scrip') { pos[t].num += parseFloat(op.scripAcciones) || 0; pos[t].divsSobrantes += parseFloat(op.scripSobrantes) || 0; }
+    else if (op.tipo === 'scrip') {
+      pos[t].num += parseFloat(op.scripAcciones) || 0;
+      pos[t].divsSobrantes += parseFloat(op.scripSobrantes) || 0;
+      // PUNTO 70 (30/08/2026): el valor real de las acciones recibidas (a la
+      // cotización del día que se recibieron) ya cuenta como dividendo cobrado,
+      // igual que el efectivo — antes solo se contaban los sobrantes en dinero.
+      // Si el movimiento no trae valor real (scrip antiguo sin rellenar), se
+      // aproxima con la cotización actual, igual que hacía antes toda la app.
+      var scripVR = parseFloat(op.scripValorReal) || 0;
+      if (!scripVR && _finCotizaciones[t]) scripVR = (parseFloat(op.scripAcciones) || 0) * _finCotizaciones[t];
+      pos[t].divsScrip += scripVR;
+    }
   }
   var totalValor = 0;
   var html = '';
@@ -12411,7 +12509,7 @@ function fin_renderAcciones() {
     var cotBtn = '<span style="font-size:10px;color:var(--accent-blue);cursor:pointer;margin-left:6px;" onclick="fin_setCotizacion(\'' + p.ticker + '\')">' + (cot ? '[' + cotTxt + 'actualizar]' : '[+ cotizacion]') + '</span>';
     var plHtml = pl !== null ? ('<span class="fin-meta-val ' + (pl >= 0 ? 'fin-plus' : 'fin-minus') + '">' + fin_fmt(pl) + ' (' + fin_fmtPct(plp) + ')</span>') : '<span class="fin-meta-val">-</span>';
     // Calculos dividendos
-    var totalDivs = p.divsEfectivo + p.divsSobrantes;
+    var totalDivs = p.divsEfectivo + p.divsScrip + p.divsSobrantes;
     var dpa = p.num > 0 && totalDivs > 0 ? totalDivs / p.num : null;
     var yoc = pm > 0 && dpa !== null ? (dpa / pm) * 100 : null;
     html += '<div class="fin-card">';
@@ -12513,13 +12611,20 @@ function fin_verHistorico(ticker) {
       } else if (d.tipo === 'scrip') {
         var sacc = parseFloat(d.scripAcciones) || 0;
         var ssob = parseFloat(d.scripSobrantes) || 0;
-        var scripVal = cot ? sacc * cot + ssob : ssob;
+        // PUNTO 70 (30/08/2026): usar el valor real del día (scripValorReal),
+        // igual que en la tarjeta de Acciones y el Resumen anual — solo si
+        // no lo tiene guardado (ampliación futura sin rellenar) se aproxima
+        // con la cotización actual, como se hacía antes.
+        var scripVR = parseFloat(d.scripValorReal) || 0;
+        var esAprox = !scripVR;
+        if (esAprox && cot) scripVR = sacc * cot;
+        var scripVal = scripVR + ssob;
         totalDivAnio += scripVal; totalDivHist += scripVal;
         html += '<div style="font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' + iconos;
         html += '<span style="color:var(--silver-dim);">' + (d.fecha || '-') + '</span>';
         html += ' &nbsp; Scrip &nbsp; +' + sacc + ' acc';
         if (ssob > 0) html += ' + ' + fin_fmt(ssob) + ' sobrantes';
-        html += ' &nbsp; <span style="color:#4caf82;font-weight:600;">' + fin_fmt(scripVal) + (cot ? ' (cot. actual)' : '') + '</span>';
+        html += ' &nbsp; <span style="color:#4caf82;font-weight:600;">' + fin_fmt(scripVal) + (esAprox && cot ? ' (cot. actual, aprox.)' : '') + '</span>';
         if (d.scripObs) html += '<br>&nbsp; <span style="font-size:10px;color:var(--silver-dim);">' + d.scripObs + '</span>';
         html += '</div>';
       } else if (d.tipo === 'compra' || d.tipo === 'venta') {
@@ -12578,6 +12683,7 @@ function fin_nuevaAccion() {
   document.getElementById('fin-div-importe').value = '';
   document.getElementById('fin-div-obs').value = '';
   document.getElementById('fin-scrip-acciones').value = '';
+  document.getElementById('fin-scrip-valor-real').value = '';
   document.getElementById('fin-scrip-sobrantes').value = '';
   document.getElementById('fin-scrip-obs').value = '';
   document.getElementById('fin-campos-compraventa').style.display = 'block';
@@ -12624,6 +12730,7 @@ function fin_editarAccion(idx) {
     document.getElementById('fin-div-obs').value = op.divObs || '';
   } else if (op.tipo === 'scrip') {
     document.getElementById('fin-scrip-acciones').value = op.scripAcciones != null ? op.scripAcciones : '';
+    document.getElementById('fin-scrip-valor-real').value = op.scripValorReal != null ? op.scripValorReal : '';
     document.getElementById('fin-scrip-sobrantes').value = op.scripSobrantes != null ? op.scripSobrantes : '';
     document.getElementById('fin-scrip-obs').value = op.scripObs || '';
   }
@@ -12668,9 +12775,10 @@ function fin_guardarAccion() {
   } else if (tipo === 'scrip') {
     var scripAcc = parseFloat(document.getElementById('fin-scrip-acciones').value) || 0;
     if (scripAcc <= 0) { alert('Introduce las acciones recibidas.'); return; }
+    var scripValorReal = parseFloat(document.getElementById('fin-scrip-valor-real').value) || 0;
     var scripSob = parseFloat(document.getElementById('fin-scrip-sobrantes').value) || 0;
     var scripObs = document.getElementById('fin-scrip-obs').value.trim();
-    nuevoOp = { ticker: ticker, nombre: FIN_NOMBRES[ticker] || ticker, tipo: 'scrip', fecha: fecha, scripAcciones: scripAcc, scripSobrantes: scripSob, scripObs: scripObs };
+    nuevoOp = { ticker: ticker, nombre: FIN_NOMBRES[ticker] || ticker, tipo: 'scrip', fecha: fecha, scripAcciones: scripAcc, scripValorReal: scripValorReal, scripSobrantes: scripSob, scripObs: scripObs };
   }
   if (!nuevoOp) return;
   // PUNTO 84 (29/08/2026): si venimos de "Editar" (fin_editarAccion puso un
@@ -13039,15 +13147,15 @@ function fin_toggleAvisoPatrimonio() {
 // --- RESUMEN ANUAL DIVIDENDOS ---
 function fin_toggleResumenAnual() {
   var div = document.getElementById('fin-resumen-anual');
-  var btn = document.getElementById('fin-resumen-toggle');
+  var txt = document.getElementById('fin-resumen-toggle-txt');
   if (!div) return;
   if (div.style.display === 'none') {
     fin_renderResumenAnual();
     div.style.display = 'block';
-    if (btn) btn.innerHTML = '&#9660;';
+    if (txt) txt.innerHTML = 'Ocultar tabla &#9660;';
   } else {
     div.style.display = 'none';
-    if (btn) btn.innerHTML = '&#9654;';
+    if (txt) txt.innerHTML = 'Ver tabla &#9654;';
   }
 }
 function fin_renderResumenAnual() {
@@ -13064,10 +13172,14 @@ function fin_renderResumenAnual() {
     if (op.tipo === 'dividendo') {
       porAnio[anio].efectivo += parseFloat(op.divImporte) || parseFloat(op.precio) || 0;
     } else if (op.tipo === 'scrip') {
-      var cot = _finCotizaciones[op.ticker] || null;
-      var sacc = parseFloat(op.scripAcciones) || 0;
+      // PUNTO 70 (30/08/2026): usar el valor real del día (scripValorReal) en
+      // vez de la cotización actual, para que este resumen cuadre siempre con
+      // la tarjeta de Acciones y con el módulo de Análisis de Dividendos.
       var ssob = parseFloat(op.scripSobrantes) || 0;
-      porAnio[anio].scrip += cot ? sacc * cot + ssob : ssob;
+      var sacc = parseFloat(op.scripAcciones) || 0;
+      var scripVR = parseFloat(op.scripValorReal) || 0;
+      if (!scripVR) { var cot = _finCotizaciones[op.ticker] || null; scripVR = cot ? sacc * cot : 0; }
+      porAnio[anio].scrip += scripVR + ssob;
     }
   }
   var anios = Object.keys(porAnio).sort();
@@ -13096,8 +13208,199 @@ function fin_renderResumenAnual() {
     totalAnterior = total;
   }
   html += '</table>';
-  html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:6px;">* Scrip valorado a cotizacion actual introducida</div>';
+  html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:6px;">* Scrip valorado a la cotizacion real del dia que se recibio (o a la actual, si esa ampliacion no la tiene guardada)</div>';
   el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 70 (30/08/2026): MÓDULO ANÁLISIS DE DIVIDENDOS
+// Vive dentro de Finanzas (respeta la empresa activa, igual que Acciones y
+// Fondos — si algún día Patricio o Industrias tienen sus propias acciones,
+// funciona igual sin tocar nada). Dos gráficos, sin Yield on Cost (a
+// petición expresa de Patry): (1) barras con el total cobrado cada año,
+// sumando TODAS las empresas y tratando el scrip como un dividendo normal
+// en efectivo (ya no se distingue Efectivo/Scrip como categorías, solo se
+// usa el valor real para que la cifra sea correcta); (2) líneas con una
+// leyenda debajo, con una etiqueta por empresa + "Total", donde se puede
+// tocar cada una para mostrarla u ocultarla del gráfico. Al abrir por
+// primera vez, solo "Total" sale seleccionado (decidido con Patry).
+// ═══════════════════════════════════════════════════════════════════════
+var _divSeleccion = null; // {ticker o 'TOTAL': true/false} — qué líneas se ven
+
+function div_calcularDatos() {
+  var ops = fin_load('fin:acciones');
+  var porEmpresa = {};
+  var totalPorAnio = {};
+  var anios = [];
+  for (var i = 0; i < ops.length; i++) {
+    var op = ops[i];
+    if (op.tipo !== 'dividendo' && op.tipo !== 'scrip') continue;
+    var anio = (op.fecha || '????').slice(0, 4);
+    if (anio === '????' || anio.length !== 4) continue;
+    if (anios.indexOf(anio) < 0) anios.push(anio);
+    var t = op.ticker;
+    if (!porEmpresa[t]) porEmpresa[t] = { ticker: t, nombre: FIN_NOMBRES[t] || t, valores: {} };
+    var val = 0;
+    if (op.tipo === 'dividendo') {
+      val = parseFloat(op.divImporte) || parseFloat(op.precio) || 0;
+    } else if (op.tipo === 'scrip') {
+      var ssob = parseFloat(op.scripSobrantes) || 0;
+      var scripVR = parseFloat(op.scripValorReal) || 0;
+      if (!scripVR) { var cot = _finCotizaciones[t] || null; scripVR = cot ? (parseFloat(op.scripAcciones) || 0) * cot : 0; }
+      val = scripVR + ssob;
+    }
+    porEmpresa[t].valores[anio] = (porEmpresa[t].valores[anio] || 0) + val;
+    totalPorAnio[anio] = (totalPorAnio[anio] || 0) + val;
+  }
+  anios.sort();
+  return { anios: anios, porEmpresa: porEmpresa, totalPorAnio: totalPorAnio };
+}
+
+function div_renderBarras(datos) {
+  var el = document.getElementById('div-chart-barras');
+  if (!el) return;
+  var anios = datos.anios;
+  var n = anios.length;
+  if (n === 0) { el.innerHTML = ''; return; }
+  var maxVal = 0;
+  for (var i = 0; i < n; i++) { if ((datos.totalPorAnio[anios[i]] || 0) > maxVal) maxVal = datos.totalPorAnio[anios[i]]; }
+  if (maxVal === 0) maxVal = 1;
+  var PX_POR_ANIO = 40;
+  var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
+  var W = Math.max(contenedorAncho, n * PX_POR_ANIO + 50);
+  var H = 160;
+  var PAD_L = 44, PAD_R = 10, PAD_T = 22, PAD_B = 24;
+  var gW = W - PAD_L - PAD_R;
+  var gH = H - PAD_T - PAD_B;
+  var barW = Math.max(14, Math.floor(gW / n) - 10);
+  var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
+  for (var r = 0; r <= 4; r++) {
+    var ry = PAD_T + gH - Math.round(gH * r / 4);
+    var rv = Math.round(maxVal * r / 4);
+    var rvL = rv >= 1000 ? (rv / 1000).toFixed(0) + 'k' : rv;
+    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W - PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+    svg += '<text x="' + (PAD_L - 6) + '" y="' + (ry + 4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">' + rvL + '</text>';
+  }
+  for (var i = 0; i < n; i++) {
+    var yr = anios[i];
+    var val = datos.totalPorAnio[yr] || 0;
+    var cx = PAD_L + (gW / n) * i + (gW / n) / 2;
+    var bh = Math.max(2, Math.round(gH * val / maxVal));
+    var bx = cx - barW / 2;
+    var by = PAD_T + gH - bh;
+    svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="3" fill="#5b8dee" opacity="0.85"/>';
+    if (val > 0) {
+      var lbl = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : Math.round(val);
+      svg += '<text x="' + Math.round(cx) + '" y="' + (by - 5) + '" text-anchor="middle" font-size="8" font-weight="600" fill="rgba(255,255,255,0.8)">' + lbl + '</text>';
+    }
+    svg += '<text x="' + Math.round(cx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function div_renderLineas(datos) {
+  var el = document.getElementById('div-chart-lineas');
+  var leyEl = document.getElementById('div-leyenda');
+  if (!el || !leyEl) return;
+  var anios = datos.anios;
+  var n = anios.length;
+  if (n === 0) { el.innerHTML = ''; leyEl.innerHTML = ''; return; }
+  var tickers = Object.keys(datos.porEmpresa).sort();
+  var series = [];
+  for (var i = 0; i < tickers.length; i++) {
+    var t = tickers[i];
+    var p = datos.porEmpresa[t];
+    var valores = [];
+    for (var a = 0; a < n; a++) { valores.push(p.valores[anios[a]] || 0); }
+    series.push({ id: t, nombre: p.nombre, color: FAC_COLORES[i % FAC_COLORES.length], valores: valores });
+  }
+  var totalValores = [];
+  for (var a2 = 0; a2 < n; a2++) { totalValores.push(datos.totalPorAnio[anios[a2]] || 0); }
+  series.push({ id: 'TOTAL', nombre: 'Total', color: '#c8d4e8', valores: totalValores });
+
+  if (!_divSeleccion) _divSeleccion = { 'TOTAL': true };
+  var leyHtml = '';
+  for (var s = 0; s < series.length; s++) {
+    var ser = series[s];
+    var activo = !!_divSeleccion[ser.id];
+    leyHtml += '<div onclick="div_toggleLegend(\'' + ser.id + '\')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:16px;cursor:pointer;font-size:11px;font-weight:600;border:1px solid ' + (activo ? ser.color : 'var(--border)') + ';background:' + (activo ? ser.color + '22' : 'transparent') + ';color:' + (activo ? ser.color : 'var(--text-secondary)') + ';">' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:' + ser.color + ';opacity:' + (activo ? '1' : '.35') + ';"></span>' + ser.nombre + '</div>';
+  }
+  leyEl.innerHTML = leyHtml;
+
+  var seriesVisibles = [];
+  for (var sv = 0; sv < series.length; sv++) { if (_divSeleccion[series[sv].id]) seriesVisibles.push(series[sv]); }
+
+  var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
+  var W = Math.max(contenedorAncho, n * 34 + 50);
+  var H = 170;
+  var PAD_L = 44, PAD_R = 10, PAD_T = 14, PAD_B = 24;
+  var gW = W - PAD_L - PAD_R;
+  var gH = H - PAD_T - PAD_B;
+  var maxVal = 0;
+  for (var m = 0; m < seriesVisibles.length; m++) {
+    for (var v = 0; v < seriesVisibles[m].valores.length; v++) { if (seriesVisibles[m].valores[v] > maxVal) maxVal = seriesVisibles[m].valores[v]; }
+  }
+  if (maxVal === 0) maxVal = 1;
+  var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
+  for (var r2 = 0; r2 <= 4; r2++) {
+    var ry2 = PAD_T + gH - Math.round(gH * r2 / 4);
+    var rv2 = Math.round(maxVal * r2 / 4);
+    var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
+    svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+    svg += '<text x="' + (PAD_L - 6) + '" y="' + (ry2 + 4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
+  }
+  for (var ix = 0; ix < n; ix++) {
+    var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+  }
+  for (var sq = 0; sq < seriesVisibles.length; sq++) {
+    var serie = seriesVisibles[sq];
+    var pts = [];
+    for (var p2 = 0; p2 < n; p2++) {
+      var px = PAD_L + (n > 1 ? (gW / (n - 1)) * p2 : gW / 2);
+      var py = PAD_T + gH - Math.round(gH * serie.valores[p2] / maxVal);
+      pts.push(Math.round(px) + ',' + Math.round(py));
+    }
+    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="2"/>';
+    for (var p3 = 0; p3 < n; p3++) {
+      if (serie.valores[p3] <= 0) continue;
+      var px2 = PAD_L + (n > 1 ? (gW / (n - 1)) * p3 : gW / 2);
+      var py2 = PAD_T + gH - Math.round(gH * serie.valores[p3] / maxVal);
+      svg += '<circle cx="' + Math.round(px2) + '" cy="' + Math.round(py2) + '" r="2.5" fill="' + serie.color + '"/>';
+    }
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function div_toggleLegend(id) {
+  if (!_divSeleccion) _divSeleccion = {};
+  _divSeleccion[id] = !_divSeleccion[id];
+  div_renderLineas(div_calcularDatos());
+}
+
+function div_render() {
+  var datos = div_calcularDatos();
+  var hayDatos = datos.anios.length > 0;
+  var elSin = document.getElementById('div-sin-datos');
+  var elBarras = document.getElementById('div-section-barras');
+  var elLineas = document.getElementById('div-section-lineas');
+  if (elSin) elSin.style.display = hayDatos ? 'none' : 'block';
+  if (elBarras) elBarras.style.display = hayDatos ? '' : 'none';
+  if (elLineas) elLineas.style.display = hayDatos ? '' : 'none';
+  if (!hayDatos) return;
+  div_renderBarras(datos);
+  div_renderLineas(datos);
+}
+
+function div_abrirModulo() {
+  showModule('dividendos');
+  div_render();
+}
+function div_cerrarModulo() {
+  showModule('finanzas');
 }
 
 function fin_loadCotizaciones() {
