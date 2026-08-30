@@ -4268,8 +4268,31 @@ abierto. -->
     <div class="mfield"><div class="mflabel">Total aportado (euros)</div><input class="minput" id="fin-fondo-aportado" type="number" inputmode="decimal" placeholder="0"></div>
     <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-fondo-valor" type="text" inputmode="decimal" placeholder="0"></div>
     <input type="hidden" id="fin-fondo-idx" value="">
+    <!-- PUNTO 86 (30/08/2026): aportación periódica automática (DCA). -->
+    <div class="mfield" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="fin-fondo-dca-activo" onchange="fin_toggleDcaCampos()" style="width:18px;height:18px;flex-shrink:0;">
+      <label for="fin-fondo-dca-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Aportación periódica automática (DCA)</label>
+    </div>
+    <div id="fin-fondo-dca-campos" style="display:none;">
+      <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-fondo-dca-importe" type="text" inputmode="decimal" placeholder="Ej: 100"></div>
+      <div class="mfield"><div class="mflabel">Cada cuántos días</div><input class="minput" id="fin-fondo-dca-periodicidad" type="number" inputmode="numeric" placeholder="Ej: 15"></div>
+      <div class="mfield"><div class="mflabel">Fecha de inicio del DCA</div><input class="minput" id="fin-fondo-dca-fecha-inicio" type="date"></div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Al entrar en Finanzas, si toca aportar, se te avisará para confirmarlo — el "Valor actual" se sigue actualizando siempre a mano.</div>
+    </div>
     <button class="btn1" onclick="fin_guardarFondo()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-fondo')" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL DCA — aportación pendiente (PUNTO 86, 30/08/2026) -->
+<div class="moverlay" id="fin-modal-dca">
+  <div class="modal">
+    <div class="mtitle">&#128260; Aportación pendiente<span class="mclose" onclick="fin_dcaCerrar()">&#10005;</span></div>
+    <div id="fin-dca-progreso" style="font-size:11px;color:var(--silver-dim);margin-bottom:8px;"></div>
+    <div id="fin-dca-mensaje" style="font-size:14px;color:var(--silver-bright);line-height:1.5;margin-bottom:14px;"></div>
+    <div class="mfield"><div class="mflabel">Importe a aplicar (euros)</div><input class="minput" id="fin-dca-importe-input" type="text" inputmode="decimal"></div>
+    <button class="btn1" onclick="fin_dcaAplicar()">Aplicar</button>
+    <button class="btn2" onclick="fin_dcaSaltar()" style="margin-top:8px;">Ahora no</button>
   </div>
 </div>
 
@@ -5230,6 +5253,9 @@ function showModule(name) {
   if (name === 'finanzas' && typeof fin_render === 'function') {
     fin_loadCotizaciones();
     fin_render();
+    // PUNTO 86 (30/08/2026): comprobar aportaciones DCA pendientes solo al
+    // entrar de verdad en Finanzas (no en cada refresco por sincronización).
+    if (typeof fin_dcaComprobarPendientes === 'function') fin_dcaComprobarPendientes();
   }
   // Renderizar renta al abrir el módulo
   if (name === 'renta' && typeof renta_render === 'function') {
@@ -12697,6 +12723,11 @@ function fin_renderFondos() {
     html += '<div class="fin-card-meta">';
     html += '<div class="fin-meta-item">Aportado: <span class="fin-meta-val">' + fin_fmt(ap) + '</span></div>';
     html += '<div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (pl >= 0 ? 'fin-plus' : 'fin-minus') + '">' + fin_fmt(pl) + ' (' + fin_fmtPct(plp) + ')</span></div>';
+    // PUNTO 86 (30/08/2026): aviso discreto de que este fondo tiene DCA
+    // configurado, y con qué importe/periodicidad.
+    if (f.dcaActivo && (parseFloat(f.dcaImporte) || 0) > 0 && (parseInt(f.dcaPeriodicidad) || 0) > 0) {
+      html += '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">&#128260; DCA activo: ' + fin_fmt(f.dcaImporte) + ' cada ' + f.dcaPeriodicidad + ' días</div>';
+    }
     html += '</div>';
     html += '<div class="fin-card-actions">';
     html += '<div class="fin-action-btn" onclick="fin_editarFondo(' + i + ')">Actualizar valor</div>';
@@ -12719,6 +12750,11 @@ function fin_nuevoFondo() {
   document.getElementById('fin-fondo-aportado').value = '';
   document.getElementById('fin-fondo-valor').value = '';
   document.getElementById('fin-fondo-idx').value = '';
+  document.getElementById('fin-fondo-dca-activo').checked = false;
+  document.getElementById('fin-fondo-dca-importe').value = '';
+  document.getElementById('fin-fondo-dca-periodicidad').value = '';
+  document.getElementById('fin-fondo-dca-fecha-inicio').value = '';
+  fin_toggleDcaCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
 }
 function fin_editarFondo(idx) {
@@ -12729,12 +12765,26 @@ function fin_editarFondo(idx) {
   document.getElementById('fin-fondo-aportado').value = f.aportado || '';
   document.getElementById('fin-fondo-valor').value = f.valor || '';
   document.getElementById('fin-fondo-idx').value = idx;
+  document.getElementById('fin-fondo-dca-activo').checked = !!f.dcaActivo;
+  document.getElementById('fin-fondo-dca-importe').value = f.dcaImporte || '';
+  document.getElementById('fin-fondo-dca-periodicidad').value = f.dcaPeriodicidad || '';
+  document.getElementById('fin-fondo-dca-fecha-inicio').value = f.dcaFechaInicio || '';
+  fin_toggleDcaCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
   setTimeout(function() { var el = document.getElementById('fin-fondo-valor'); if (el) { el.focus(); el.select(); } }, 150);
 }
 function fin_editarFondoNombre(idx) {
   fin_editarFondo(idx);
   setTimeout(function() { var el = document.getElementById('fin-fondo-nombre'); if (el) { el.focus(); el.select(); } }, 200);
+}
+// PUNTO 86 (30/08/2026): muestra/oculta los 3 campos de configuración del
+// DCA según el interruptor "Aportación periódica automática" — los valores
+// escritos no se pierden al ocultarlos, solo se dejan de usar si el
+// interruptor está desactivado al guardar.
+function fin_toggleDcaCampos() {
+  var chk = document.getElementById('fin-fondo-dca-activo');
+  var campos = document.getElementById('fin-fondo-dca-campos');
+  if (campos) campos.style.display = (chk && chk.checked) ? 'block' : 'none';
 }
 function fin_guardarFondo() {
   var nombre = document.getElementById('fin-fondo-nombre').value.trim();
@@ -12745,8 +12795,26 @@ function fin_guardarFondo() {
   // así que aceptamos tanto "2500.75" como "2.500,75".
   var valor = parseImporteFlexible(document.getElementById('fin-fondo-valor').value);
   var idx = document.getElementById('fin-fondo-idx').value;
+  // PUNTO 86 (30/08/2026): configuración del DCA. Si está activo, exige los
+  // 3 datos necesarios para poder calcular ciclos vencidos más adelante.
+  var dcaActivo = document.getElementById('fin-fondo-dca-activo').checked;
+  var dcaImporte = parseImporteFlexible(document.getElementById('fin-fondo-dca-importe').value);
+  var dcaPeriodicidad = parseInt(document.getElementById('fin-fondo-dca-periodicidad').value) || 0;
+  var dcaFechaInicio = document.getElementById('fin-fondo-dca-fecha-inicio').value || '';
+  if (dcaActivo && (dcaImporte <= 0 || dcaPeriodicidad <= 0 || !dcaFechaInicio)) {
+    alert('Para activar la aportación periódica, rellena el importe, la periodicidad en días y la fecha de inicio.');
+    return;
+  }
   var data = fin_load('fin:fondos');
-  var obj = { nombre: nombre, gestora: gestora, aportado: aportado, valor: valor };
+  // "Última aportación aplicada" la gestiona la app sola (nunca se edita a
+  // mano) — se conserva del fondo existente si ya la tenía, para no perder
+  // la cuenta de los ciclos ya aplicados si solo se está editando otro dato.
+  var dcaUltimaAplicada = (idx !== '' && data[parseInt(idx)]) ? (data[parseInt(idx)].dcaUltimaAplicada || '') : '';
+  var obj = {
+    nombre: nombre, gestora: gestora, aportado: aportado, valor: valor,
+    dcaActivo: dcaActivo, dcaImporte: dcaImporte, dcaPeriodicidad: dcaPeriodicidad,
+    dcaFechaInicio: dcaFechaInicio, dcaUltimaAplicada: dcaUltimaAplicada
+  };
   if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
   fin_save('fin:fondos', data);
   closeModalById('fin-modal-fondo');
@@ -12757,6 +12825,115 @@ function fin_borrarFondo(idx) {
   var data = fin_load('fin:fondos');
   data.splice(idx, 1);
   fin_save('fin:fondos', data);
+  fin_renderFondos();
+}
+
+// ─── PUNTO 86 (30/08/2026): DCA AUTOMÁTICO EN FONDOS ────────────────────
+// Al entrar en Finanzas, se comprueba si algún fondo con DCA activo tiene
+// ciclos vencidos desde la última aportación aplicada (o desde la fecha de
+// inicio, si nunca se ha aplicado ninguna). Si los hay, se propone
+// aplicarlos — uno por fondo, con el importe editable por si ese ciclo
+// aportaste una cantidad distinta a la habitual. SOLO toca "Aportado";
+// "Valor actual" sigue siendo 100% manual, como siempre.
+var _finDcaPendientes = [];
+var _finDcaIdx = 0;
+
+function fin_dcaComprobarPendientes() {
+  // No interrumpir si ya hay otro aviso o modal abierto en pantalla.
+  var yaAbierto = document.querySelector('.moverlay.open, .moverlay[style*="flex"]');
+  if (yaAbierto) return;
+  var data = fin_load('fin:fondos');
+  var hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  var pendientes = [];
+  for (var i = 0; i < data.length; i++) {
+    var f = data[i];
+    if (!f.dcaActivo) continue;
+    var importe = parseFloat(f.dcaImporte) || 0;
+    var periodo = parseInt(f.dcaPeriodicidad) || 0;
+    var base = f.dcaUltimaAplicada || f.dcaFechaInicio;
+    if (importe <= 0 || periodo <= 0 || !base) continue;
+    var baseDate = new Date(base + 'T00:00:00');
+    if (isNaN(baseDate.getTime())) continue;
+    var diasPasados = Math.floor((hoy - baseDate) / 86400000);
+    var ciclos = Math.floor(diasPasados / periodo);
+    if (ciclos < 1) continue;
+    var nuevaFecha = new Date(baseDate.getTime() + ciclos * periodo * 86400000);
+    pendientes.push({
+      idx: i,
+      nombre: f.nombre || 'Fondo',
+      ciclos: ciclos,
+      importeUnitario: importe,
+      total: Math.round(ciclos * importe * 100) / 100,
+      desde: base,
+      nuevaFechaAplicada: nuevaFecha.toISOString().slice(0, 10)
+    });
+  }
+  if (pendientes.length === 0) return;
+  _finDcaPendientes = pendientes;
+  _finDcaIdx = 0;
+  fin_dcaMostrarPaso();
+}
+
+function fin_dcaFechaLegible(iso) {
+  var partes = (iso || '').split('-');
+  return partes.length === 3 ? (partes[2] + '/' + partes[1] + '/' + partes[0]) : (iso || '');
+}
+
+function fin_dcaMostrarPaso() {
+  var p = _finDcaPendientes[_finDcaIdx];
+  if (!p) { fin_dcaCerrar(); return; }
+  var total = _finDcaPendientes.length;
+  var prog = document.getElementById('fin-dca-progreso');
+  if (prog) prog.textContent = total > 1 ? ('Aportación ' + (_finDcaIdx + 1) + ' de ' + total) : '';
+  var msg = document.getElementById('fin-dca-mensaje');
+  if (msg) {
+    msg.innerHTML = '<strong>' + p.nombre + '</strong><br>Han pasado ' + p.ciclos + ' ' + (p.ciclos === 1 ? 'aportación' : 'aportaciones') +
+      ' de ' + fin_fmt(p.importeUnitario) + (p.ciclos > 1 ? (' = ' + fin_fmt(p.total)) : '') +
+      ' desde el ' + fin_dcaFechaLegible(p.desde) + '.<br>¿Las aplico al "Aportado"?';
+  }
+  var inputEl = document.getElementById('fin-dca-importe-input');
+  if (inputEl) inputEl.value = p.total.toFixed(2).replace('.', ',');
+  openModalById('fin-modal-dca');
+}
+
+function fin_dcaAplicar() {
+  var p = _finDcaPendientes[_finDcaIdx];
+  if (!p) return;
+  var totalAplicado = parseImporteFlexible(document.getElementById('fin-dca-importe-input').value);
+  if (totalAplicado < 0) { alert('Introduce un importe válido.'); return; }
+  var data = fin_load('fin:fondos');
+  var f = data[p.idx];
+  if (f) {
+    f.aportado = (parseFloat(f.aportado) || 0) + totalAplicado;
+    f.dcaUltimaAplicada = p.nuevaFechaAplicada;
+    // El importe usado esta vez queda como el nuevo "importe programado" para
+    // la próxima vez (si se aplicaron varios ciclos a la vez, se reparte a
+    // partes iguales entre ellos).
+    f.dcaImporte = Math.round((totalAplicado / p.ciclos) * 100) / 100;
+    data[p.idx] = f;
+    fin_save('fin:fondos', data);
+  }
+  fin_dcaSiguiente();
+}
+
+function fin_dcaSaltar() {
+  // No se aplica nada de este fondo — no se toca dcaUltimaAplicada, así que
+  // se volverá a proponer, con los mismos ciclos acumulados, la próxima vez
+  // que se entre en Finanzas.
+  fin_dcaSiguiente();
+}
+
+function fin_dcaSiguiente() {
+  _finDcaIdx++;
+  if (_finDcaIdx >= _finDcaPendientes.length) { fin_dcaCerrar(); return; }
+  fin_dcaMostrarPaso();
+}
+
+function fin_dcaCerrar() {
+  closeModalById('fin-modal-dca');
+  _finDcaPendientes = [];
+  _finDcaIdx = 0;
   fin_renderFondos();
 }
 
