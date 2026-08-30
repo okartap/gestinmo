@@ -4208,6 +4208,15 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <div id="div-leyenda" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
     </div>
+    <div class="fin-section" id="div-section-acumulado">
+      <div class="fin-section-header">
+        <div class="fin-section-title">&#128200; Total histórico acumulado</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Suma acumulada año a año — usa la misma selección de empresas del gráfico de arriba.</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="div-chart-acumulado"></div>
+      </div>
+    </div>
     <div id="div-sin-datos" style="display:none;text-align:center;padding:30px 10px;color:var(--silver-dim);font-size:13px;">Sin dividendos registrados todavía para esta empresa.</div>
   </div>
 </div>
@@ -13265,14 +13274,14 @@ function div_renderBarras(datos) {
   var maxVal = 0;
   for (var i = 0; i < n; i++) { if ((datos.totalPorAnio[anios[i]] || 0) > maxVal) maxVal = datos.totalPorAnio[anios[i]]; }
   if (maxVal === 0) maxVal = 1;
-  var PX_POR_ANIO = 40;
+  var PX_POR_ANIO = 26;
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(contenedorAncho, n * PX_POR_ANIO + 50);
   var H = 160;
-  var PAD_L = 44, PAD_R = 10, PAD_T = 22, PAD_B = 24;
+  var PAD_L = 40, PAD_R = 8, PAD_T = 22, PAD_B = 24;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
-  var barW = Math.max(14, Math.floor(gW / n) - 10);
+  var barW = Math.max(9, Math.floor(gW / n) - 6);
   var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
   for (var r = 0; r <= 4; r++) {
     var ry = PAD_T + gH - Math.round(gH * r / 4);
@@ -13291,9 +13300,9 @@ function div_renderBarras(datos) {
     svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="3" fill="#5b8dee" opacity="0.85"/>';
     if (val > 0) {
       var lbl = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : Math.round(val);
-      svg += '<text x="' + Math.round(cx) + '" y="' + (by - 5) + '" text-anchor="middle" font-size="8" font-weight="600" fill="rgba(255,255,255,0.8)">' + lbl + '</text>';
+      svg += '<text x="' + Math.round(cx) + '" y="' + (by - 4) + '" text-anchor="middle" font-size="7" font-weight="600" fill="rgba(255,255,255,0.8)">' + lbl + '</text>';
     }
-    svg += '<text x="' + Math.round(cx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
+    svg += '<text x="' + Math.round(cx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
   }
   svg += '</svg>';
   el.innerHTML = svg;
@@ -13333,9 +13342,9 @@ function div_renderLineas(datos) {
   for (var sv = 0; sv < series.length; sv++) { if (_divSeleccion[series[sv].id]) seriesVisibles.push(series[sv]); }
 
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
-  var W = Math.max(contenedorAncho, n * 34 + 50);
+  var W = Math.max(contenedorAncho, n * 24 + 50);
   var H = 170;
-  var PAD_L = 44, PAD_R = 10, PAD_T = 14, PAD_B = 24;
+  var PAD_L = 40, PAD_R = 8, PAD_T = 14, PAD_B = 24;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var maxVal = 0;
@@ -13353,7 +13362,7 @@ function div_renderLineas(datos) {
   }
   for (var ix = 0; ix < n; ix++) {
     var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
-    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
   }
   for (var sq = 0; sq < seriesVisibles.length; sq++) {
     var serie = seriesVisibles[sq];
@@ -13363,13 +13372,102 @@ function div_renderLineas(datos) {
       var py = PAD_T + gH - Math.round(gH * serie.valores[p2] / maxVal);
       pts.push(Math.round(px) + ',' + Math.round(py));
     }
-    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="2"/>';
+    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.6"/>';
     for (var p3 = 0; p3 < n; p3++) {
       if (serie.valores[p3] <= 0) continue;
       var px2 = PAD_L + (n > 1 ? (gW / (n - 1)) * p3 : gW / 2);
       var py2 = PAD_T + gH - Math.round(gH * serie.valores[p3] / maxVal);
-      svg += '<circle cx="' + Math.round(px2) + '" cy="' + Math.round(py2) + '" r="2.5" fill="' + serie.color + '"/>';
+      svg += '<circle cx="' + Math.round(px2) + '" cy="' + Math.round(py2) + '" r="2" fill="' + serie.color + '"/>';
     }
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function div_renderAcumulado(datos) {
+  var el = document.getElementById('div-chart-acumulado');
+  if (!el) return;
+  var anios = datos.anios;
+  var n = anios.length;
+  if (n === 0) { el.innerHTML = ''; return; }
+  var tickers = Object.keys(datos.porEmpresa).sort();
+  var series = [];
+  for (var i = 0; i < tickers.length; i++) {
+    var t = tickers[i];
+    var p = datos.porEmpresa[t];
+    var acumulado = 0;
+    var valores = [];
+    for (var a = 0; a < n; a++) { acumulado += (p.valores[anios[a]] || 0); valores.push(acumulado); }
+    series.push({ id: t, nombre: p.nombre, color: FAC_COLORES[i % FAC_COLORES.length], valores: valores });
+  }
+  var totalAcum = 0;
+  var totalValores = [];
+  for (var a2 = 0; a2 < n; a2++) { totalAcum += (datos.totalPorAnio[anios[a2]] || 0); totalValores.push(totalAcum); }
+  series.push({ id: 'TOTAL', nombre: 'Total', color: '#c8d4e8', valores: totalValores });
+
+  if (!_divSeleccion) _divSeleccion = { 'TOTAL': true };
+  var seriesVisibles = [];
+  for (var sv = 0; sv < series.length; sv++) { if (_divSeleccion[series[sv].id]) seriesVisibles.push(series[sv]); }
+
+  var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
+  var W = Math.max(contenedorAncho, n * 24 + 50);
+  var H = 170;
+  var PAD_L = 44, PAD_R = 8, PAD_T = 14, PAD_B = 24;
+  var gW = W - PAD_L - PAD_R;
+  var gH = H - PAD_T - PAD_B;
+  var maxVal = 0;
+  for (var m = 0; m < seriesVisibles.length; m++) {
+    var ultimo = seriesVisibles[m].valores[seriesVisibles[m].valores.length - 1];
+    if (ultimo > maxVal) maxVal = ultimo;
+  }
+  if (maxVal === 0) maxVal = 1;
+  var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
+  for (var r2 = 0; r2 <= 4; r2++) {
+    var ry2 = PAD_T + gH - Math.round(gH * r2 / 4);
+    var rv2 = Math.round(maxVal * r2 / 4);
+    var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
+    svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+    svg += '<text x="' + (PAD_L - 6) + '" y="' + (ry2 + 4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
+  }
+  for (var ix = 0; ix < n; ix++) {
+    var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+  }
+  var etiquetasFinales = [];
+  for (var sq = 0; sq < seriesVisibles.length; sq++) {
+    var serie = seriesVisibles[sq];
+    var pts = [];
+    for (var p2 = 0; p2 < n; p2++) {
+      var px = PAD_L + (n > 1 ? (gW / (n - 1)) * p2 : gW / 2);
+      var py = PAD_T + gH - Math.round(gH * serie.valores[p2] / maxVal);
+      pts.push(Math.round(px) + ',' + Math.round(py));
+    }
+    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.6"/>';
+    var ultimoVal = serie.valores[n - 1];
+    var ultimaLbl = ultimoVal >= 1000 ? (ultimoVal / 1000).toFixed(1) + 'k' : Math.round(ultimoVal);
+    var ultX = PAD_L + gW;
+    var ultY = PAD_T + gH - Math.round(gH * ultimoVal / maxVal);
+    svg += '<circle cx="' + Math.round(ultX) + '" cy="' + Math.round(ultY) + '" r="2.5" fill="' + serie.color + '"/>';
+    etiquetasFinales.push({ x: Math.round(ultX), y: ultY, texto: ultimaLbl, color: serie.color });
+  }
+  // Evita que las etiquetas del final de línea se solapen cuando dos empresas
+  // terminan con importes muy parecidos: las reordena de arriba a abajo y
+  // separa las que quedan demasiado juntas (mínimo 11px entre ellas).
+  etiquetasFinales.sort(function(a, b) { return a.y - b.y; });
+  for (var e = 1; e < etiquetasFinales.length; e++) {
+    var minY = etiquetasFinales[e - 1].y + 11;
+    if (etiquetasFinales[e].y < minY) etiquetasFinales[e].y = minY;
+  }
+  // Si al separarlas se salen por abajo (chocando con el "0" del eje),
+  // se reajustan de abajo a arriba para que quepan todas dentro del gráfico.
+  var maxYPermitido = PAD_T + gH - 6;
+  for (var e3 = etiquetasFinales.length - 1; e3 >= 0; e3--) {
+    if (etiquetasFinales[e3].y > maxYPermitido) etiquetasFinales[e3].y = maxYPermitido;
+    maxYPermitido = etiquetasFinales[e3].y - 11;
+  }
+  for (var e2 = 0; e2 < etiquetasFinales.length; e2++) {
+    var et = etiquetasFinales[e2];
+    svg += '<text x="' + et.x + '" y="' + (et.y - 4) + '" text-anchor="end" font-size="8" font-weight="600" fill="' + et.color + '">' + et.texto + '</text>';
   }
   svg += '</svg>';
   el.innerHTML = svg;
@@ -13378,7 +13476,9 @@ function div_renderLineas(datos) {
 function div_toggleLegend(id) {
   if (!_divSeleccion) _divSeleccion = {};
   _divSeleccion[id] = !_divSeleccion[id];
-  div_renderLineas(div_calcularDatos());
+  var datos = div_calcularDatos();
+  div_renderLineas(datos);
+  div_renderAcumulado(datos);
 }
 
 function div_render() {
@@ -13387,12 +13487,15 @@ function div_render() {
   var elSin = document.getElementById('div-sin-datos');
   var elBarras = document.getElementById('div-section-barras');
   var elLineas = document.getElementById('div-section-lineas');
+  var elAcum = document.getElementById('div-section-acumulado');
   if (elSin) elSin.style.display = hayDatos ? 'none' : 'block';
   if (elBarras) elBarras.style.display = hayDatos ? '' : 'none';
   if (elLineas) elLineas.style.display = hayDatos ? '' : 'none';
+  if (elAcum) elAcum.style.display = hayDatos ? '' : 'none';
   if (!hayDatos) return;
   div_renderBarras(datos);
   div_renderLineas(datos);
+  div_renderAcumulado(datos);
 }
 
 function div_abrirModulo() {
