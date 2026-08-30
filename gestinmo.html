@@ -2471,9 +2471,6 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
 
     <!-- ACCIONES RÁPIDAS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div onclick="showModule('cobros');showFacturar();" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">FACTURAR MES</div>
-      </div>
       <div onclick="showModule('finanzas');fin_abrirAsistente();" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">ACTUALIZAR FINANZAS</div>
       </div>
@@ -3370,7 +3367,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <span class="header-company-name" id="hdr-name">Patrimer</span>
     </div>
   </div>
-  <div class="header-action"><button class="hbtn" onclick="showFacturar()">Facturar</button></div>
+  <!-- PUNTO 71 (30/08/2026): botón "Facturar" (mes por inmueble, desglosado) retirado
+       de la interfaz — se sustituye por la introducción del total mensual desde la
+       pestaña "Histórico" (＋ Añadir mes manual). Las funciones showFacturar()/
+       renderFacturar()/confirmFactura() se dejan intactas en el código por si se
+       necesitan en el futuro, simplemente no hay forma de llegar a ellas desde la app. -->
 </header>
 <div class="view active" id="cob-view-main">
 
@@ -3444,7 +3445,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="slabel" style="margin-bottom:12px">Historial de facturas</div>
       <div class="mtable" id="historial-table">
         <div class="mth-row"><div class="mth">Mes</div><div class="mth">Facturado</div><div class="mth">Cobrado</div><div class="mth">Estado</div></div>
-        <div id="historial-rows"><div class="empty-state">Sin facturas registradas aún.<br>Pulsa "Facturar mes" para empezar.</div></div>
+        <div id="historial-rows"><div class="empty-state">Sin facturas registradas aún.<br>Añade el total del mes desde la pestaña "Histórico".</div></div>
       </div>
     </div>
     <!-- HISTÓRICO GLOBAL -->
@@ -9257,7 +9258,7 @@ function fac_guardarHistorico() {
   // a través de la pantalla "Facturar"), no se deja meter también un total a mano
   // — se pisarían entre sí sin avisar. Hay que borrar antes la factura desglosada.
   var facturasItemizadas = load(KEYS.facturas);
-  if (facturasItemizadas.some(function(f){ return f.mes === mes; })) {
+  if (facturasItemizadas.some(function(f){ return f.mes === mes && !f.manual; })) {
     closeModalById('fac-modal-historico');
     showConfirm('🔒','Este mes ya está facturado por inmueble',
       mesNombre(mes) + ' ya tiene una factura desglosada por inmueble (hecha desde "Facturar"). No se puede añadir también un total a mano para el mismo mes — se pisarían entre sí. Si quieres cambiar el importe, hazlo desde "Facturar", no aquí.',
@@ -9384,7 +9385,7 @@ function fac_resumenAnual(year, facturas) {
   var acumActualUrbano = 0, ultimoMes = 0;
   for (var m = 1; m <= 12; m++) {
     var mesKey = year + '-' + String(m).padStart(2,'0');
-    var val = facturas.filter(function(f){return f.mes===mesKey;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var val = facturas.filter(function(f){return f.mes===mesKey && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (val === 0) { var hc = hist.find(function(h){return h.mes===mesKey;}); if (hc) val = hc.importe; }
     if (val > 0) { acumActualUrbano += val; ultimoMes = m; }
   }
@@ -9393,7 +9394,7 @@ function fac_resumenAnual(year, facturas) {
   var acumAnteriorMismoPeriodoUrbano = 0;
   for (var m2 = 1; m2 <= ultimoMes; m2++) {
     var mesKeyP = (year-1) + '-' + String(m2).padStart(2,'0');
-    var valP = facturas.filter(function(f){return f.mes===mesKeyP;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var valP = facturas.filter(function(f){return f.mes===mesKeyP && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (valP === 0) { var hp = hist.find(function(h){return h.mes===mesKeyP;}); if (hp) valP = hp.importe; }
     acumAnteriorMismoPeriodoUrbano += valP;
   }
@@ -9402,7 +9403,7 @@ function fac_resumenAnual(year, facturas) {
   var totalAnteriorUrbanoCompleto = 0;
   for (var m3 = 1; m3 <= 12; m3++) {
     var mesKeyT = (year-1) + '-' + String(m3).padStart(2,'0');
-    var valT = facturas.filter(function(f){return f.mes===mesKeyT;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var valT = facturas.filter(function(f){return f.mes===mesKeyT && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (valT === 0) { var ht = hist.find(function(h){return h.mes===mesKeyT;}); if (ht) valT = ht.importe; }
     totalAnteriorUrbanoCompleto += valT;
   }
@@ -9429,7 +9430,7 @@ function fac_resumenAnual(year, facturas) {
   var ultimos4 = [];
   for (var m4 = ultimoMes; m4 >= 1 && ultimos4.length < 4; m4--) {
     var mesK4 = year + '-' + String(m4).padStart(2,'0');
-    var v4 = facturas.filter(function(f){return f.mes===mesK4;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var v4 = facturas.filter(function(f){return f.mes===mesK4 && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (v4 === 0) { var h4 = hist.find(function(h){return h.mes===mesK4;}); if (h4) v4 = h4.importe; }
     if (v4 > 0) ultimos4.push(v4);
   }
@@ -9523,18 +9524,26 @@ function renderAnalisis(){
   if (elRusPct) elRusPct.textContent = pctRus + '% del total';
 
   // Historial
+  // PUNTO 89 (30/08/2026): esta tabla leía solo de KEYS.facturas (las facturas
+  // desglosadas por inmueble de "Facturar mes", ya retirado en el punto 88) —
+  // así que se quedaba vacía en cuanto dejabas de usar esa pantalla, aunque
+  // sí estuvieras metiendo el total del mes desde "Histórico". Ahora lee del
+  // mismo registro que ya usa la pestaña Histórico (fac_loadHistorico), que
+  // incluye tanto los totales metidos a mano como los de la antigua factura
+  // desglosada (esta última ya sincronizaba ahí también) — así el historial
+  // no vuelve a quedarse vacío solo por haber cambiado la forma de facturar.
   const rows = document.getElementById('historial-rows');
-  const facYear = facturas.filter(f=>f.mes&&f.mes.startsWith(year+'')).sort((a,b)=>b.mes.localeCompare(a.mes));
+  const facYear = hist.filter(f=>f.mes&&f.mes.startsWith(year+'')).sort((a,b)=>b.mes.localeCompare(a.mes));
   if (facYear.length === 0) {
-    rows.innerHTML = '<div class="empty-state">Sin facturas este año aún.</div>';
+    rows.innerHTML = '<div class="empty-state">Sin facturación registrada este año aún.</div>';
   } else {
     const cobros = load(KEYS.cobros);
     rows.innerHTML = facYear.map(f=>{
       const cobradoMes = cobros.filter(c=>c.fecha&&c.fecha.startsWith(f.mes)).reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
-      const pct = f.total>0 ? Math.round(cobradoMes/f.total*100) : 0;
+      const pct = f.importe>0 ? Math.round(cobradoMes/f.importe*100) : 0;
       const estadoCls = pct>=100?'up':pct>0?'':'dn';
       const estadoTxt = pct>=100?'✓ Cobrado':pct>0?pct+'% cobrado':'Pendiente';
-      return `<div class="mtr"><div class="mtd">${mesNombre(f.mes)}</div><div class="mtd">${fmtE(f.total)}</div><div class="mtd">${fmtE(cobradoMes)}</div><div class="mtd ${estadoCls}">${estadoTxt}</div></div>`;
+      return `<div class="mtr"><div class="mtd">${mesNombre(f.mes)}</div><div class="mtd">${fmtE(f.importe)}</div><div class="mtd">${fmtE(cobradoMes)}</div><div class="mtd ${estadoCls}">${estadoTxt}</div></div>`;
     }).join('');
   }
 
@@ -9553,9 +9562,9 @@ function buildChart(facturas,cobros,year){
   var d=meses.map(function(_,i){
     var ym=year+'-'+String(i+1).padStart(2,'0');
     var ymPrev=(year-1)+'-'+String(i+1).padStart(2,'0');
-    var cur = facturas.filter(function(f){return f.mes===ym;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var cur = facturas.filter(function(f){return f.mes===ym && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (cur === 0) { var hc = hist.find(function(h){return h.mes===ym;}); if(hc) cur = hc.importe; }
-    var prv = facturas.filter(function(f){return f.mes===ymPrev;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var prv = facturas.filter(function(f){return f.mes===ymPrev && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (prv === 0) { var hp = hist.find(function(h){return h.mes===ymPrev;}); if(hp) prv = hp.importe; }
     // Sumar rústico en el mes real de cobro de cada finca — solo para Patrimer
     var mesNum = i + 1;
@@ -14389,9 +14398,9 @@ function dash_buildChart(year, facturas, _reintentado) {
   var d = meses.map(function(_,i) {
     var ym = year + '-' + String(i+1).padStart(2,'0');
     var ymPrev = (year-1) + '-' + String(i+1).padStart(2,'0');
-    var cur = facturas.filter(function(f){return f.mes===ym;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var cur = facturas.filter(function(f){return f.mes===ym && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (cur === 0) { var hc = hist.find(function(h){return h.mes===ym;}); if (hc) cur = hc.importe; }
-    var prv = facturas.filter(function(f){return f.mes===ymPrev;}).reduce(function(s,f){return s+(f.total||0);},0);
+    var prv = facturas.filter(function(f){return f.mes===ymPrev && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (prv === 0) { var hp = hist.find(function(h){return h.mes===ymPrev;}); if (hp) prv = hp.importe; }
     var _empChart = localStorage.getItem('patrimer:empresa') || 'patrimer'; var _esPatrimerChart = (_empChart === 'patrimer'); if (_esPatrimerChart) { var _rusReal=(function(){var h=rus_loadHistorico();return h[String(year)]?true:false;})(); if(_rusReal) cur += rus_totalMes(year, i+1); prv += rus_totalMes(year-1, i+1); }
     return {cur:cur,prv:prv};
