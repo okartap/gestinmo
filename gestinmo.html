@@ -4194,28 +4194,22 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="fin-section-title">&#128202; Total cobrado por año</div>
       </div>
       <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Todas las empresas juntas — efectivo y ampliaciones (scrip) sumados como un único dividendo cobrado.</div>
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-        <div id="div-chart-barras"></div>
-      </div>
-    </div>
-    <div class="fin-section" id="div-section-lineas">
-      <div class="fin-section-header">
-        <div class="fin-section-title">&#128201; Evolución por empresa</div>
-      </div>
-      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Toca una etiqueta para mostrar u ocultar esa línea.</div>
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-        <div id="div-chart-lineas"></div>
-      </div>
-      <div id="div-leyenda" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+      <div id="div-chart-barras"></div>
     </div>
     <div class="fin-section" id="div-section-acumulado">
       <div class="fin-section-header">
         <div class="fin-section-title">&#128200; Total histórico acumulado</div>
       </div>
-      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Suma acumulada año a año — usa la misma selección de empresas del gráfico de arriba.</div>
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-        <div id="div-chart-acumulado"></div>
+      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Suma acumulada año a año. Toca una etiqueta para mostrar u ocultar esa empresa (afecta también al gráfico de abajo).</div>
+      <div id="div-chart-acumulado"></div>
+      <div id="div-leyenda" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+    </div>
+    <div class="fin-section" id="div-section-lineas">
+      <div class="fin-section-header">
+        <div class="fin-section-title">&#128201; Evolución por empresa</div>
       </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;">Importe cobrado cada año — misma selección de empresas de arriba.</div>
+      <div id="div-chart-lineas"></div>
     </div>
     <div id="div-sin-datos" style="display:none;text-align:center;padding:30px 10px;color:var(--silver-dim);font-size:13px;">Sin dividendos registrados todavía para esta empresa.</div>
   </div>
@@ -13265,6 +13259,13 @@ function div_calcularDatos() {
   return { anios: anios, porEmpresa: porEmpresa, totalPorAnio: totalPorAnio };
 }
 
+// Con muchos años, no caben todas las etiquetas del eje X sin solaparse.
+// Esto calcula cada cuántos años se muestra una (siempre se muestra el último).
+function div_pasoEtiquetas(n, gW) {
+  var maxEtiquetas = Math.max(1, Math.floor(gW / 26));
+  return Math.max(1, Math.ceil(n / maxEtiquetas));
+}
+
 function div_renderBarras(datos) {
   var el = document.getElementById('div-chart-barras');
   if (!el) return;
@@ -13274,35 +13275,33 @@ function div_renderBarras(datos) {
   var maxVal = 0;
   for (var i = 0; i < n; i++) { if ((datos.totalPorAnio[anios[i]] || 0) > maxVal) maxVal = datos.totalPorAnio[anios[i]]; }
   if (maxVal === 0) maxVal = 1;
-  var PX_POR_ANIO = 26;
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
-  var W = Math.max(contenedorAncho, n * PX_POR_ANIO + 50);
-  var H = 160;
-  var PAD_L = 40, PAD_R = 8, PAD_T = 22, PAD_B = 24;
+  var W = Math.max(60, contenedorAncho - 30);
+  var H = 150;
+  var PAD_L = 34, PAD_R = 4, PAD_T = 14, PAD_B = 18;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
-  var barW = Math.max(9, Math.floor(gW / n) - 6);
+  var barW = Math.max(1, Math.floor(gW / n) - 1);
+  var paso = div_pasoEtiquetas(n, gW);
   var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
-  for (var r = 0; r <= 4; r++) {
-    var ry = PAD_T + gH - Math.round(gH * r / 4);
-    var rv = Math.round(maxVal * r / 4);
+  for (var r = 0; r <= 3; r++) {
+    var ry = PAD_T + gH - Math.round(gH * r / 3);
+    var rv = Math.round(maxVal * r / 3);
     var rvL = rv >= 1000 ? (rv / 1000).toFixed(0) + 'k' : rv;
     svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W - PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
-    svg += '<text x="' + (PAD_L - 6) + '" y="' + (ry + 4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">' + rvL + '</text>';
+    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry + 3) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)">' + rvL + '</text>';
   }
   for (var i = 0; i < n; i++) {
     var yr = anios[i];
     var val = datos.totalPorAnio[yr] || 0;
     var cx = PAD_L + (gW / n) * i + (gW / n) / 2;
-    var bh = Math.max(2, Math.round(gH * val / maxVal));
+    var bh = Math.max(1, Math.round(gH * val / maxVal));
     var bx = cx - barW / 2;
     var by = PAD_T + gH - bh;
-    svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="3" fill="#5b8dee" opacity="0.85"/>';
-    if (val > 0) {
-      var lbl = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : Math.round(val);
-      svg += '<text x="' + Math.round(cx) + '" y="' + (by - 4) + '" text-anchor="middle" font-size="7" font-weight="600" fill="rgba(255,255,255,0.8)">' + lbl + '</text>';
+    svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" fill="#5b8dee" opacity="0.85"/>';
+    if (i % paso === 0 || i === n - 1) {
+      svg += '<text x="' + Math.round(cx) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
     }
-    svg += '<text x="' + Math.round(cx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
   }
   svg += '</svg>';
   el.innerHTML = svg;
@@ -13310,11 +13309,10 @@ function div_renderBarras(datos) {
 
 function div_renderLineas(datos) {
   var el = document.getElementById('div-chart-lineas');
-  var leyEl = document.getElementById('div-leyenda');
-  if (!el || !leyEl) return;
+  if (!el) return;
   var anios = datos.anios;
   var n = anios.length;
-  if (n === 0) { el.innerHTML = ''; leyEl.innerHTML = ''; return; }
+  if (n === 0) { el.innerHTML = ''; return; }
   var tickers = Object.keys(datos.porEmpresa).sort();
   var series = [];
   for (var i = 0; i < tickers.length; i++) {
@@ -13329,40 +13327,34 @@ function div_renderLineas(datos) {
   series.push({ id: 'TOTAL', nombre: 'Total', color: '#c8d4e8', valores: totalValores });
 
   if (!_divSeleccion) _divSeleccion = { 'TOTAL': true };
-  var leyHtml = '';
-  for (var s = 0; s < series.length; s++) {
-    var ser = series[s];
-    var activo = !!_divSeleccion[ser.id];
-    leyHtml += '<div onclick="div_toggleLegend(\'' + ser.id + '\')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:16px;cursor:pointer;font-size:11px;font-weight:600;border:1px solid ' + (activo ? ser.color : 'var(--border)') + ';background:' + (activo ? ser.color + '22' : 'transparent') + ';color:' + (activo ? ser.color : 'var(--text-secondary)') + ';">' +
-      '<span style="width:8px;height:8px;border-radius:50%;background:' + ser.color + ';opacity:' + (activo ? '1' : '.35') + ';"></span>' + ser.nombre + '</div>';
-  }
-  leyEl.innerHTML = leyHtml;
-
   var seriesVisibles = [];
   for (var sv = 0; sv < series.length; sv++) { if (_divSeleccion[series[sv].id]) seriesVisibles.push(series[sv]); }
 
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
-  var W = Math.max(contenedorAncho, n * 24 + 50);
-  var H = 170;
-  var PAD_L = 40, PAD_R = 8, PAD_T = 14, PAD_B = 24;
+  var W = Math.max(60, contenedorAncho - 30);
+  var H = 150;
+  var PAD_L = 34, PAD_R = 4, PAD_T = 10, PAD_B = 18;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
+  var paso = div_pasoEtiquetas(n, gW);
   var maxVal = 0;
   for (var m = 0; m < seriesVisibles.length; m++) {
     for (var v = 0; v < seriesVisibles[m].valores.length; v++) { if (seriesVisibles[m].valores[v] > maxVal) maxVal = seriesVisibles[m].valores[v]; }
   }
   if (maxVal === 0) maxVal = 1;
   var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
-  for (var r2 = 0; r2 <= 4; r2++) {
-    var ry2 = PAD_T + gH - Math.round(gH * r2 / 4);
-    var rv2 = Math.round(maxVal * r2 / 4);
+  for (var r2 = 0; r2 <= 3; r2++) {
+    var ry2 = PAD_T + gH - Math.round(gH * r2 / 3);
+    var rv2 = Math.round(maxVal * r2 / 3);
     var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
     svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
-    svg += '<text x="' + (PAD_L - 6) + '" y="' + (ry2 + 4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
+    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
   }
   for (var ix = 0; ix < n; ix++) {
+    if (ix % paso !== 0 && ix !== n - 1) continue;
     var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
-    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+    var ancla = (ix === n - 1) ? 'end' : (ix === 0 ? 'start' : 'middle');
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 4) + '" text-anchor="' + ancla + '" font-size="7" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
   }
   for (var sq = 0; sq < seriesVisibles.length; sq++) {
     var serie = seriesVisibles[sq];
@@ -13372,13 +13364,7 @@ function div_renderLineas(datos) {
       var py = PAD_T + gH - Math.round(gH * serie.valores[p2] / maxVal);
       pts.push(Math.round(px) + ',' + Math.round(py));
     }
-    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.6"/>';
-    for (var p3 = 0; p3 < n; p3++) {
-      if (serie.valores[p3] <= 0) continue;
-      var px2 = PAD_L + (n > 1 ? (gW / (n - 1)) * p3 : gW / 2);
-      var py2 = PAD_T + gH - Math.round(gH * serie.valores[p3] / maxVal);
-      svg += '<circle cx="' + Math.round(px2) + '" cy="' + Math.round(py2) + '" r="2" fill="' + serie.color + '"/>';
-    }
+    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.4"/>';
   }
   svg += '</svg>';
   el.innerHTML = svg;
@@ -13386,10 +13372,11 @@ function div_renderLineas(datos) {
 
 function div_renderAcumulado(datos) {
   var el = document.getElementById('div-chart-acumulado');
-  if (!el) return;
+  var leyEl = document.getElementById('div-leyenda');
+  if (!el || !leyEl) return;
   var anios = datos.anios;
   var n = anios.length;
-  if (n === 0) { el.innerHTML = ''; return; }
+  if (n === 0) { el.innerHTML = ''; leyEl.innerHTML = ''; return; }
   var tickers = Object.keys(datos.porEmpresa).sort();
   var series = [];
   for (var i = 0; i < tickers.length; i++) {
@@ -13406,15 +13393,25 @@ function div_renderAcumulado(datos) {
   series.push({ id: 'TOTAL', nombre: 'Total', color: '#c8d4e8', valores: totalValores });
 
   if (!_divSeleccion) _divSeleccion = { 'TOTAL': true };
+  var leyHtml = '';
+  for (var s = 0; s < series.length; s++) {
+    var ser = series[s];
+    var activo = !!_divSeleccion[ser.id];
+    leyHtml += '<div onclick="div_toggleLegend(\'' + ser.id + '\')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:16px;cursor:pointer;font-size:11px;font-weight:600;border:1px solid ' + (activo ? ser.color : 'var(--border)') + ';background:' + (activo ? ser.color + '22' : 'transparent') + ';color:' + (activo ? ser.color : 'var(--text-secondary)') + ';">' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:' + ser.color + ';opacity:' + (activo ? '1' : '.35') + ';"></span>' + ser.nombre + '</div>';
+  }
+  leyEl.innerHTML = leyHtml;
+
   var seriesVisibles = [];
   for (var sv = 0; sv < series.length; sv++) { if (_divSeleccion[series[sv].id]) seriesVisibles.push(series[sv]); }
 
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
-  var W = Math.max(contenedorAncho, n * 24 + 50);
-  var H = 170;
-  var PAD_L = 44, PAD_R = 8, PAD_T = 14, PAD_B = 24;
+  var W = Math.max(60, contenedorAncho - 30);
+  var H = 150;
+  var PAD_L = 38, PAD_R = 4, PAD_T = 10, PAD_B = 18;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
+  var paso = div_pasoEtiquetas(n, gW);
   var maxVal = 0;
   for (var m = 0; m < seriesVisibles.length; m++) {
     var ultimo = seriesVisibles[m].valores[seriesVisibles[m].valores.length - 1];
@@ -13422,16 +13419,18 @@ function div_renderAcumulado(datos) {
   }
   if (maxVal === 0) maxVal = 1;
   var svg = '<svg width="' + W + '" height="' + H + '" style="display:block;">';
-  for (var r2 = 0; r2 <= 4; r2++) {
-    var ry2 = PAD_T + gH - Math.round(gH * r2 / 4);
-    var rv2 = Math.round(maxVal * r2 / 4);
+  for (var r2 = 0; r2 <= 3; r2++) {
+    var ry2 = PAD_T + gH - Math.round(gH * r2 / 3);
+    var rv2 = Math.round(maxVal * r2 / 3);
     var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
     svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
-    svg += '<text x="' + (PAD_L - 6) + '" y="' + (ry2 + 4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
+    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
   }
   for (var ix = 0; ix < n; ix++) {
+    if (ix % paso !== 0 && ix !== n - 1) continue;
     var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
-    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+    var ancla = (ix === n - 1) ? 'end' : (ix === 0 ? 'start' : 'middle');
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 4) + '" text-anchor="' + ancla + '" font-size="7" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
   }
   var etiquetasFinales = [];
   for (var sq = 0; sq < seriesVisibles.length; sq++) {
@@ -13442,32 +13441,32 @@ function div_renderAcumulado(datos) {
       var py = PAD_T + gH - Math.round(gH * serie.valores[p2] / maxVal);
       pts.push(Math.round(px) + ',' + Math.round(py));
     }
-    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.6"/>';
+    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.4"/>';
     var ultimoVal = serie.valores[n - 1];
     var ultimaLbl = ultimoVal >= 1000 ? (ultimoVal / 1000).toFixed(1) + 'k' : Math.round(ultimoVal);
     var ultX = PAD_L + gW;
     var ultY = PAD_T + gH - Math.round(gH * ultimoVal / maxVal);
-    svg += '<circle cx="' + Math.round(ultX) + '" cy="' + Math.round(ultY) + '" r="2.5" fill="' + serie.color + '"/>';
+    svg += '<circle cx="' + Math.round(ultX) + '" cy="' + Math.round(ultY) + '" r="2" fill="' + serie.color + '"/>';
     etiquetasFinales.push({ x: Math.round(ultX), y: ultY, texto: ultimaLbl, color: serie.color });
   }
   // Evita que las etiquetas del final de línea se solapen cuando dos empresas
   // terminan con importes muy parecidos: las reordena de arriba a abajo y
-  // separa las que quedan demasiado juntas (mínimo 11px entre ellas).
+  // separa las que quedan demasiado juntas (mínimo 10px entre ellas).
   etiquetasFinales.sort(function(a, b) { return a.y - b.y; });
   for (var e = 1; e < etiquetasFinales.length; e++) {
-    var minY = etiquetasFinales[e - 1].y + 11;
+    var minY = etiquetasFinales[e - 1].y + 10;
     if (etiquetasFinales[e].y < minY) etiquetasFinales[e].y = minY;
   }
   // Si al separarlas se salen por abajo (chocando con el "0" del eje),
   // se reajustan de abajo a arriba para que quepan todas dentro del gráfico.
-  var maxYPermitido = PAD_T + gH - 6;
+  var maxYPermitido = PAD_T + gH - 5;
   for (var e3 = etiquetasFinales.length - 1; e3 >= 0; e3--) {
     if (etiquetasFinales[e3].y > maxYPermitido) etiquetasFinales[e3].y = maxYPermitido;
-    maxYPermitido = etiquetasFinales[e3].y - 11;
+    maxYPermitido = etiquetasFinales[e3].y - 10;
   }
   for (var e2 = 0; e2 < etiquetasFinales.length; e2++) {
     var et = etiquetasFinales[e2];
-    svg += '<text x="' + et.x + '" y="' + (et.y - 4) + '" text-anchor="end" font-size="8" font-weight="600" fill="' + et.color + '">' + et.texto + '</text>';
+    svg += '<text x="' + et.x + '" y="' + (et.y - 3) + '" text-anchor="end" font-size="7.5" font-weight="600" fill="' + et.color + '">' + et.texto + '</text>';
   }
   svg += '</svg>';
   el.innerHTML = svg;
@@ -13477,8 +13476,8 @@ function div_toggleLegend(id) {
   if (!_divSeleccion) _divSeleccion = {};
   _divSeleccion[id] = !_divSeleccion[id];
   var datos = div_calcularDatos();
-  div_renderLineas(datos);
   div_renderAcumulado(datos);
+  div_renderLineas(datos);
 }
 
 function div_render() {
@@ -13494,8 +13493,8 @@ function div_render() {
   if (elAcum) elAcum.style.display = hayDatos ? '' : 'none';
   if (!hayDatos) return;
   div_renderBarras(datos);
-  div_renderLineas(datos);
   div_renderAcumulado(datos);
+  div_renderLineas(datos);
 }
 
 function div_abrirModulo() {
