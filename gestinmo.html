@@ -4188,7 +4188,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
     </div>
   </header>
-  <div style="padding:14px;">
+  <div style="padding:14px 14px 100px;">
     <div class="fin-section" id="div-section-barras">
       <div class="fin-section-header">
         <div class="fin-section-title">&#128202; Total cobrado por año</div>
@@ -13278,7 +13278,7 @@ function div_renderBarras(datos) {
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(60, contenedorAncho - 30);
   var H = 150;
-  var PAD_L = 34, PAD_R = 4, PAD_T = 14, PAD_B = 18;
+  var PAD_L = 24, PAD_R = 4, PAD_T = 14, PAD_B = 18;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var barW = Math.max(1, Math.floor(gW / n) - 1);
@@ -13333,7 +13333,7 @@ function div_renderLineas(datos) {
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(60, contenedorAncho - 30);
   var H = 150;
-  var PAD_L = 34, PAD_R = 4, PAD_T = 10, PAD_B = 18;
+  var PAD_L = 24, PAD_R = 4, PAD_T = 10, PAD_B = 18;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var paso = div_pasoEtiquetas(n, gW);
@@ -13408,7 +13408,7 @@ function div_renderAcumulado(datos) {
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(60, contenedorAncho - 30);
   var H = 150;
-  var PAD_L = 38, PAD_R = 4, PAD_T = 10, PAD_B = 18;
+  var PAD_L = 26, PAD_R = 4, PAD_T = 10, PAD_B = 18;
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var paso = div_pasoEtiquetas(n, gW);
