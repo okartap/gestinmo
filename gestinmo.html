@@ -1932,7 +1932,14 @@ const DATA_KEYS = [
   // Fecha de la última copia de seguridad (Exportar) — se sincroniza entre
   // dispositivos para que el futuro aviso de "hace tiempo que no exportas"
   // sepa la fecha real, la hayas exportado desde el móvil de quien sea.
-  'app:ultimo_backup'
+  'app:ultimo_backup',
+  // PUNTO 90b (03/09/2026): registro de actividad de perfiles "Visualización"
+  // (hoy solo Mercedes) — intentos bloqueados de crear/editar/borrar algo, y
+  // el caso raro de que algo se guarde de verdad sin pasar por el candado
+  // (ver _registrarActividad e interceptor de localStorage.setItem, más
+  // abajo). Sincronizado como cualquier otro dato, para que Patricio lo vea
+  // desde cualquier aparato.
+  'app:registro_actividad'
 ];
 // BLINDAJE DE DATOS (Bloque 4): las nóminas y gastos de "Renta Patricio" se
 // guardan en una clave por año (renta:gastos:2026, renta:nominas:2026...).
@@ -2076,6 +2083,31 @@ function _notasMerge(localJSON, remoteJSON) {
   }
 }
 window._notasMerge = _notasMerge; // expuesta para pruebas automáticas
+
+// PUNTO 90b (03/09/2026): fusión del registro de actividad, elemento a
+// elemento igual que las ideas — cada entrada es inmutable una vez creada
+// (nunca se edita, solo se añade), así que aquí basta con unir por id sin
+// necesitar comparar updatedAt. Se recorta a los últimos 90 días (decidido
+// contigo) para que no crezca sin límite; el recorte se hace aquí, tras la
+// fusión, así que se aplica igual venga el dato de donde venga.
+function _registroMerge(localJSON, remoteJSON) {
+  try {
+    const locales = localJSON ? JSON.parse(localJSON) : [];
+    const remotas = remoteJSON ? JSON.parse(remoteJSON) : [];
+    const mapa = {};
+    (locales || []).forEach(function(e) { if (e && e.id) mapa[e.id] = e; });
+    (remotas || []).forEach(function(e) { if (e && e.id && !mapa[e.id]) mapa[e.id] = e; });
+    const limite = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    const lista = Object.keys(mapa).map(function(k) { return mapa[k]; })
+      .filter(function(e) { const t = Date.parse(e.ts || ''); return isNaN(t) || t >= limite; })
+      .sort(function(a, b) { return String(b.ts || '').localeCompare(String(a.ts || '')); });
+    return JSON.stringify(lista);
+  } catch (e) {
+    console.warn('Fusión del registro de actividad fallida, se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._registroMerge = _registroMerge; // expuesta para pruebas automáticas
 
 // PUNTO 67 (28/08/2026) — BUG REAL ENCONTRADO Y CONFIRMADO CON DATOS REALES:
 // "inmuebles:lista" se guardaba como UN SOLO BLOQUE con todos los inmuebles
@@ -2277,6 +2309,14 @@ window.loadFromFirestore = async function() {
             const fusionado = _notasMerge(actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
+          } else if (key === 'app:registro_actividad') {
+            // PUNTO 90b: unión por id, nunca sustitución en bloque — así una
+            // entrada añadida en un aparato no borra la que se añadió casi a
+            // la vez en otro.
+            const actual = localStorage.getItem(key);
+            const fusionado = _registroMerge(actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
           } else if (key === 'inmuebles:lista') {
             // PUNTO 67: fusión inmueble a inmueble, nunca sustitución en bloque.
             const actual = localStorage.getItem(key);
@@ -2328,6 +2368,17 @@ window.startFirebaseSync = function() {
         if (key === 'app:notas_mejoras') {
           const actual = localStorage.getItem(key);
           const fusionado = _notasMerge(actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (key === 'app:registro_actividad') {
+          // PUNTO 90b: mismo motivo que "app:notas_mejoras" arriba — fusión
+          // por id, nunca sustitución en bloque.
+          const actual = localStorage.getItem(key);
+          const fusionado = _registroMerge(actual, data.value);
           if (fusionado !== actual) {
             localStorage.setItem(key, fusionado);
             window._refreshCurrentModule && window._refreshCurrentModule(key);
@@ -2659,6 +2710,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div id="pend-toggle-icon" style="font-size:12px;color:var(--silver-dim);position:absolute;right:0;">▾</div>
       </div>
       <div id="pend-body" style="display:none;margin-top:12px;"></div>
+    </div>
+
+    <!-- PUNTO 90b (03/09/2026): acceso permanente y discreto al registro de
+         actividad, solo para el admin — no depende de que haya algo nuevo
+         (eso lo cubre el aviso dentro de "Pendiente de gestionar", arriba,
+         que solo aparece cuando hay intentos sin revisar). -->
+    <div data-rol="admin" style="text-align:center;margin:-8px 0 16px;">
+      <span onclick="registro_abrir()" style="font-size:11px;color:var(--silver-dim);cursor:pointer;text-decoration:underline;">🔒 Registro de actividad</span>
     </div>
 
     <!-- ACCIONES RÁPIDAS -->
@@ -4595,6 +4654,19 @@ con editar/borrar en cada línea. -->
   </div>
 </div>
 
+<!-- PUNTO 90b (03/09/2026): registro de actividad de perfiles "Visualización"
+     (hoy solo Mercedes) — solo visible/abrible para el admin. Lista los
+     intentos bloqueados (candado normal funcionando) y, si alguna vez
+     apareciera, los "posible_fuga" (aviso de que algo se coló sin candado). -->
+<div class="moverlay" id="registro-modal">
+  <div class="modal" style="max-height:75vh;display:flex;flex-direction:column;">
+    <div class="mtitle">Registro de actividad<span class="mclose" onclick="closeModalById('registro-modal')">&#10005;</span></div>
+    <div style="font-size:11px;color:var(--silver-dim);margin:-6px 0 8px;">Intentos de crear/editar/borrar de los usuarios en modo Visualización, de los últimos 90 días. No lo ve Mercedes, solo tú.</div>
+    <div id="registro-lista" style="overflow-y:auto;flex:1;"></div>
+    <button class="btn2" onclick="closeModalById('registro-modal')" style="margin-top:12px;">Cerrar</button>
+  </div>
+</div>
+
 <!-- ── MÓDULO: CLIENTES ── fuera de appShell igual que docs -->
 <div id="mod-clientes" class="module-view">
 <header class="header" id="hdr-main-clientes">
@@ -5321,7 +5393,8 @@ const BACKUP_KEYS = [
   'facturacion:historico:patricio',
   'facturacion:historico:industrias',
   'app:notas_mejoras',
-  'fin:ultima_actualizacion'
+  'fin:ultima_actualizacion',
+  'app:registro_actividad'
 ];
 // BLINDAJE DE DATOS (Bloque 4): mismo motivo que en DATA_KEYS — proteger
 // también en la copia de seguridad las nóminas/gastos anuales de Renta
@@ -6214,7 +6287,7 @@ function inm_showLista() {
 }
 
 function inm_asignarInquilino() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Asignar un inquilino a un inmueble')) return;
   if (currentDetailIdx === null || currentDetailIdx === undefined) return;
   const inmuebles = loadInmuebles();
   const inm = inmuebles[currentDetailIdx];
@@ -6550,7 +6623,7 @@ function recalcPreview() {
 }
 
 function saveInmueble() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar la ficha de un inmueble')) return;
   const refInm = document.getElementById('f-ref-inm').value.trim().toUpperCase();
   if (!refInm) { alert('Introduce una referencia (ej. VIV02)'); return; }
   const modal2 = document.getElementById('inm-modal-inmueble');
@@ -7045,7 +7118,7 @@ function det_generarRenovacionORescision() {
 }
 
 function det_iniciarRescision(c) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Iniciar la rescisión de un contrato')) return;
   if (typeof showWizard === 'function') showWizard();
   setTimeout(() => {
     // Arrendador: el mismo que ya tiene el contrato
@@ -7133,7 +7206,7 @@ function sp_render(c) {
 }
 
 function sp_abrirModal() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Abrir el formulario de una subida de renta pactada')) return;
   if (!_detalleContratoActual) return;
   _spContratoActual = _detalleContratoActual;
   const fEl = document.getElementById('sp-fecha'); if (fEl) fEl.value = '';
@@ -7142,7 +7215,7 @@ function sp_abrirModal() {
 }
 
 function sp_guardar() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar una subida de renta pactada')) return;
   if (!_spContratoActual) { closeModalById('sp-modal'); return; }
   const fecha = document.getElementById('sp-fecha').value;
   const importe = parseFmtGlobal(document.getElementById('sp-importe').value);
@@ -7164,7 +7237,7 @@ function sp_guardar() {
 }
 
 function sp_marcarAplicada(i) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Marcar como aplicada una subida de renta pactada')) return;
   if (!_detalleContratoActual) return;
   const contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
   const idx = contratos.findIndex(x => x.id === _detalleContratoActual.id);
@@ -7177,7 +7250,7 @@ function sp_marcarAplicada(i) {
 }
 
 function sp_eliminar(i) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar una subida de renta pactada')) return;
   if (!_detalleContratoActual) return;
   const contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
   const idx = contratos.findIndex(x => x.id === _detalleContratoActual.id);
@@ -9341,7 +9414,7 @@ function rus_prepararEdicion(anio, importe, mes) {
 }
 
 function rus_guardarAnio() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar el importe de una finca rústica')) return;
   var anioEl = document.getElementById('rus-form-anio');
   var impEl = document.getElementById('rus-form-importe');
   var mesEl = document.getElementById('rus-form-mes');
@@ -9471,7 +9544,7 @@ function fac_editarMes(mes, importe) {
 // histórico global; si ese mes tenía además una factura desglosada por inmueble
 // (KEYS.facturas), esa no se toca aquí — se gestiona desde "Facturar".
 function fac_eliminarMes(mes) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un mes del histórico de facturación')) return;
   showConfirm('🗑️','¿Borrar este mes del histórico?',
     'Se borrará el total de ' + mesNombre(mes) + ' del histórico global. Esta acción no se puede deshacer.',
     [
@@ -9485,7 +9558,7 @@ function fac_eliminarMes(mes) {
     ]);
 }
 function fac_guardarHistorico() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un mes en el histórico de facturación')) return;
   var mes = document.getElementById('fac-hist-mes').value;
   var imp = parseFloat(document.getElementById('fac-hist-importe').value) || 0;
   if (!mes) { alert('Selecciona el mes.'); return; }
@@ -9558,7 +9631,9 @@ function fac_renderHistorico() {
     html += '<div style="font-size:14px;font-weight:700;color:var(--accent-blue);">' + yr + varHtml + '</div>';
     html += '<div style="display:flex;align-items:center;gap:10px;">';
     html += '<div style="font-size:14px;font-weight:700;color:#4caf82;">' + fmtEur(totalAnio) + '</div>';
-    html += '<div style="font-size:12px;color:var(--silver-dim);">&#9654;</div>';
+    // PUNTO 91 (03/09/2026): se le pone una clase propia a la flecha para
+    // poder encontrarla luego sin ambigüedad — ver el porqué en fac_toggleAnio.
+    html += '<div class="fac-anio-arrow" style="font-size:12px;color:var(--silver-dim);">&#9654;</div>';
     html += '</div></div>';
     // Desglose mensual (oculto por defecto)
     html += '<div class="fac-hist-meses" style="display:none;padding:8px 14px;">';
@@ -9578,9 +9653,28 @@ function fac_renderHistorico() {
   }
   el.innerHTML = html;
 }
+// PUNTO 91 (03/09/2026) — BUG REAL ENCONTRADO Y CORREGIDO: la flecha ▼/▶ se
+// buscaba con el selector "div:last-child div:last-child", pensado para
+// encontrar el último div dentro del último div de la cabecera. El problema
+// es que ese mismo selector, tal y como funciona un navegador, también
+// podía encontrar (y de hecho encontraba, en este caso) el div DE MÁS
+// ARRIBA que envuelve el total y la flecha juntos — sin avisar de que se
+// había equivocado de elemento. Al desplegar un año, la línea que cambia el
+// contenido de "arrow" (para poner la flecha hacia abajo) borraba entonces
+// TODO ese div envolvente, incluido el importe del año, dejando solo la
+// flecha — y como es un borrado real del contenido (no un simple
+// mostrar/ocultar), cerrar y volver a abrir el año no lo arreglaba: el
+// importe ya no estaba en ningún sitio para volver a mostrarlo. Importante
+// para tu tranquilidad: el dato en sí (el importe guardado) nunca se tocó
+// ni se perdió — el fallo era solo visual, al pintar la pantalla; al salir
+// de Facturación y volver a entrar (o recargar la app), la lista se
+// reconstruye desde cero con los datos reales y el importe vuelve a verse
+// bien. Arreglo de fondo: la flecha ahora lleva su propia marca
+// (class="fac-anio-arrow", ver fac_renderHistorico) para encontrarla
+// siempre sin ambigüedad, en vez de intentar deducirla por su posición.
 function fac_toggleAnio(header) {
   var detalle = header.nextElementSibling;
-  var arrow = header.querySelector('div:last-child div:last-child');
+  var arrow = header.querySelector('.fac-anio-arrow');
   if (detalle.style.display === 'none') {
     detalle.style.display = 'block';
     if (arrow) arrow.innerHTML = '&#9660;';
@@ -10098,7 +10192,7 @@ function renderNotasCuenta(idx){
 }
 
 function tickNota(localIdx){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Marcar una nota de cobro')) return;
   const notas=load(KEYS.notas);
   const propias=notas.filter(n=>n.inmuebleIdx===ctaInmuebleIdx);
   if(!propias[localIdx])return;
@@ -10241,7 +10335,7 @@ function calcTotal(){
 }
 
 function confirmFactura(){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Confirmar la facturación del mes')) return;
   const mes=mesActual();
   const items=[];
   document.querySelectorAll('.ifitem').forEach(item=>{
@@ -10339,7 +10433,7 @@ function facCobro_calcSaldo(){
 }
 
 function facCobro_guardar(){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un cobro')) return;
   const it=_facCobroItems[_facCobroIdx];
   if(!it){ closeModalById('fac-cobro-modal'); return; }
   const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
@@ -10422,7 +10516,7 @@ function ipc_renderBanners(){
 }
 
 function ipc_abrirModal(contratoId){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Abrir el formulario de actualización de IPC')) return;
   const contratos=JSON.parse(localStorage.getItem('contratos:lista')||'[]');
   const c=contratos.find(x=>x.id===contratoId);
   if(!c){ info('Contrato no encontrado.'); return; }
@@ -10464,7 +10558,7 @@ function ipc_calcular(){
 }
 
 function ipc_aplicar(){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Aplicar una actualización de IPC')) return;
   if(!_ipcContratoActual){ closeModalById('ipc-modal'); return; }
   const pct=parseFloat(document.getElementById('ipc-pct').value);
   if(!pct||isNaN(pct)){info('Introduce el % de IPC para continuar.');return;}
@@ -10661,7 +10755,7 @@ function openModalCobro(){
 }
 
 function guardarCobro(){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un cobro')) return;
   const fecha=document.getElementById('cobro-fecha').value;
   const importe=parseFloat(document.getElementById('cobro-importe').value)||0;
   const concepto=document.getElementById('cobro-concepto').value.trim();
@@ -10699,7 +10793,7 @@ function openModalNota(){
   document.getElementById('cob-modal-nota').classList.add('open');
 }
 function guardarNota(){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar una nota de cobro')) return;
   const texto=document.getElementById('nota-texto').value.trim();
   const limite=document.getElementById('nota-limite').value;
   if(!texto){info('Escribe una descripción para la tarea.');return;}
@@ -11404,7 +11498,7 @@ function recogerGastosCat(cat){
 }
 
 function guardarEstudio(){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un estudio de inversión')) return;
   const precio    = getV('e_precio');
   const efectivo  = getV('e_efectivo');
   const comision  = getComisionImporte();
@@ -11466,7 +11560,7 @@ function guardarEstudio(){
 }
 
 function eliminarEstudio(idx, e){
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un estudio de inversión')) return;
   e.stopPropagation();
   // BLINDAJE DE DATOS: antes borraba directamente, sin preguntar — pendiente
   // anotado hace días. Ahora pide confirmación, igual que el resto de
@@ -12074,7 +12168,7 @@ function generarNombreAuto(tipo, inmueble, archivoOriginal) {
 
 /* ─── SUBIR ─── */
 async function subirDocumento() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Subir un documento')) return;
   if (!archivosEnCola.length) { showToast('⚠️ Selecciona al menos un archivo', 'warning'); return; }
 
   const tipo     = document.getElementById('input-tipo').value;
@@ -12147,7 +12241,7 @@ function cerrarDuplicado() {
 }
 
 async function reemplazarDocumento() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Reemplazar un documento')) return;
   document.getElementById('doc-modal-duplicado').classList.remove('open');
   if (!pendingUpload) return;
   await guardarEntrada(pendingUpload.tipo, pendingUpload.inmueble, pendingUpload.nombre, true);
@@ -12182,7 +12276,7 @@ function descargarDoc() {
 }
 
 function renombrarDoc() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Renombrar un documento')) return;
   const nuevoNombre = prompt('Nuevo nombre:', docSeleccionado.nombre);
   if (!nuevoNombre || nuevoNombre.trim() === docSeleccionado.nombre) return;
   const nombre = nuevoNombre.trim();
@@ -12213,7 +12307,7 @@ function cerrarConfirmDel() {
 }
 
 async function eliminarDocConfirmado() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un documento')) return;
   cerrarConfirmDel();
   const docsAntes = docs;
   docs = docs.filter(d => d.id !== docSeleccionado.id);
@@ -12305,14 +12399,60 @@ function getRol()         { const u=loadUsuario(); return u && USUARIOS[u] ? USU
 // BLINDAJE DE DATOS (Bloque 1): guardián de escritura para el rol viewer.
 // Se llama al principio de cualquier función que modifique datos.
 // Devuelve true (y corta la acción) si el usuario activo es solo-consulta.
-function bloqueaSiViewer() {
+// PUNTO 90b (03/09/2026): admite ahora una "etiqueta" opcional describiendo
+// qué se intentaba hacer (ej. "Guardar una cuenta") — si se pasa, el
+// intento bloqueado queda apuntado en el registro de actividad (solo
+// visible para Patricio). Si no se pasa, se registra igual con un texto
+// genérico, para que ningún sitio se quede sin dejar rastro por olvido.
+function bloqueaSiViewer(etiqueta) {
   if (getRol() === 'viewer') {
     if (typeof showToast === 'function') {
       showToast('🔒 Modo consulta: esta acción no está disponible para tu usuario', 'warning');
     }
+    _registrarActividad('bloqueado', etiqueta || 'Intentó modificar un dato');
     return true;
   }
   return false;
+}
+
+// PUNTO 90b (03/09/2026) — Registro de actividad de perfiles "Visualización".
+// Dos tipos de entrada:
+//  - 'bloqueado': el candado de arriba ha cortado un intento real de
+//    crear/editar/borrar algo. Es la actividad normal y esperable si
+//    Mercedes toca un botón de guardar/borrar.
+//  - 'posible_fuga': se ha guardado un cambio de verdad en la app estando
+//    en modo Visualización — esto NUNCA debería pasar si todos los botones
+//    tienen su candado puesto; si aparece, es la señal de que hay un botón
+//    en algún sitio sin proteger (una "puerta abierta"), y conviene
+//    revisarlo. Se genera aparte, desde el interceptor de guardado general
+//    (ver más abajo en el archivo), no desde aquí.
+// Solo se registra si hay un usuario "Visualización" activo — no tiene
+// sentido para el admin, y así una prueba tuya como Patricio no ensucia
+// el registro con ruido.
+function _registroLoad() {
+  try { return JSON.parse(localStorage.getItem('app:registro_actividad') || '[]'); }
+  catch (e) { return []; }
+}
+function _registrarActividad(tipo, etiqueta) {
+  try {
+    if (getRol() !== 'viewer') return;
+    const u = loadUsuario();
+    const nombre = (u && USUARIOS[u] && USUARIOS[u].nombre) || u || 'Desconocido';
+    const arr = _registroLoad();
+    arr.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      ts: new Date().toISOString(),
+      usuario: nombre,
+      tipo: tipo,
+      etiqueta: etiqueta,
+      empresa: localStorage.getItem('patrimer:empresa') || ''
+    });
+    // Recorte también aquí (además del que hace la fusión con la nube), para
+    // que un aparato que nunca llega a sincronizar no acumule sin límite.
+    const limite = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    const recortado = arr.filter(function(e) { const t = Date.parse(e.ts || ''); return isNaN(t) || t >= limite; });
+    localStorage.setItem('app:registro_actividad', JSON.stringify(recortado));
+  } catch (e) { console.warn('No se pudo apuntar en el registro de actividad:', e.message); }
 }
 
 // BLINDAJE DE DATOS (Bloque 2): normalización y validación de DNI/NIE/CIF.
@@ -12606,7 +12746,7 @@ function fin_asiFormatInput(el) {
 }
 
 function fin_asiGuardarPaso(paso, valor) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un paso del asistente de Finanzas')) return;
   if (paso.tipo === 'cuenta') {
     var data = fin_load('fin:cuentas');
     if (data[paso.idx]) { data[paso.idx].saldo = valor; data[paso.idx].updatedAt = new Date().toISOString(); fin_save('fin:cuentas', data); }
@@ -12809,7 +12949,7 @@ function fin_editarCuenta(idx) {
   setTimeout(function() { var el = document.getElementById('fin-cuenta-saldo'); if (el) { el.focus(); el.select(); } }, 150);
 }
 function fin_guardarCuenta() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar una cuenta')) return;
   var nombre = document.getElementById('fin-cuenta-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre de la cuenta.'); return; }
   // El campo ahora es de texto libre (para poder seleccionarlo entero al editar),
@@ -12830,7 +12970,7 @@ function fin_guardarCuenta() {
   fin_renderCuentas();
 }
 function fin_borrarCuenta(idx) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar una cuenta')) return;
   if (!confirm('Eliminar esta cuenta?')) return;
   var data = fin_load('fin:cuentas');
   data.splice(idx, 1);
@@ -13027,7 +13167,7 @@ function fin_verHistorico(ticker) {
   openModalById('fin-modal-historico');
 }
 function fin_setCotizacion(ticker) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Actualizar la cotización de una acción')) return;
   var val = prompt('Precio actual de ' + (FIN_NOMBRES[ticker] || ticker) + ' (euros):');
   if (val === null) return;
   var n = parseFloat(val.replace(',', '.'));
@@ -13123,7 +13263,7 @@ function fin_editarAccion(idx) {
 // tanto la tarjeta de Acciones como, si está abierto, el propio modal de
 // Histórico — así el usuario ve el resultado al momento sin reabrir nada.
 function fin_borrarAccionMov(idx, ticker) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un movimiento de acciones')) return;
   var ops = fin_load('fin:acciones');
   var op = ops[idx];
   if (!op) return;
@@ -13136,7 +13276,7 @@ function fin_borrarAccionMov(idx, ticker) {
   }
 }
 function fin_guardarAccion() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un movimiento de acciones')) return;
   var ticker = document.getElementById('fin-accion-ticker').value;
   if (ticker === 'OTRO') ticker = (document.getElementById('fin-accion-ticker-manual').value || '').trim().toUpperCase();
   if (!ticker) { alert('Selecciona el valor.'); return; }
@@ -13282,7 +13422,7 @@ function fin_toggleDcaCampos() {
   if (campos) campos.style.display = (chk && chk.checked) ? 'block' : 'none';
 }
 function fin_guardarFondo() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un fondo')) return;
   var nombre = document.getElementById('fin-fondo-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre del fondo.'); return; }
   var gestora = document.getElementById('fin-fondo-gestora').value.trim();
@@ -13322,7 +13462,7 @@ function fin_guardarFondo() {
   fin_renderFondos();
 }
 function fin_borrarFondo(idx) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un fondo')) return;
   if (!confirm('Eliminar este fondo?')) return;
   var data = fin_load('fin:fondos');
   data.splice(idx, 1);
@@ -13400,7 +13540,7 @@ function fin_dcaMostrarPaso() {
 }
 
 function fin_dcaAplicar() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Aplicar una aportación periódica (DCA)')) return;
   var p = _finDcaPendientes[_finDcaIdx];
   if (!p) return;
   var totalAplicado = parseImporteFlexible(document.getElementById('fin-dca-importe-input').value);
@@ -13550,7 +13690,7 @@ function fin_editarUrbanitae(idx) {
   document.getElementById('fin-modal-urbanitae').classList.add('open');
 }
 function fin_guardarUrbanitae() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un proyecto de Urbanitae')) return;
   var nombre = document.getElementById('fin-urb-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre del proyecto.'); return; }
   var fecha = document.getElementById('fin-urb-fecha').value || '';
@@ -13573,7 +13713,7 @@ function fin_guardarUrbanitae() {
   fin_renderUrbanitae();
 }
 function fin_borrarUrbanitae(idx) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un proyecto de Urbanitae')) return;
   if (!confirm('Eliminar este proyecto de Urbanitae?')) return;
   var data = fin_load('fin:urbanitae');
   data.splice(idx, 1);
@@ -14613,7 +14753,7 @@ function notas_toggle() {
 }
 
 function notas_add() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Añadir una idea/nota')) return;
   const input = document.getElementById('notas-input');
   if (!input) return;
   const texto = input.value.trim();
@@ -14633,7 +14773,7 @@ function notas_add() {
 }
 
 function notas_toggleHecho(id) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Marcar una idea como hecha')) return;
   const arr = notas_load();
   const n = arr.find(x => x.id === id);
   if (n) { n.hecho = !n.hecho; n.updatedAt = new Date().toISOString(); }
@@ -14642,7 +14782,7 @@ function notas_toggleHecho(id) {
 }
 
 function notas_eliminar(id) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar una idea/nota')) return;
   // No se quita físicamente del array — se marca "deleted:true" (con su
   // propio sello de tiempo) y se queda ahí para siempre, invisible en
   // pantalla. Es lo que permite que, si llega de la nube o de otra sesión
@@ -14845,6 +14985,25 @@ function pend_calcular() {
       items.push({ icon: '📈', t: 'Subida de renta pactada: ' + s.nombre + ' sube a ' + fmtE(parseFloat(s.importe) || 0), s: (s.ref ? s.ref + ' · ' : '') + 'Pactada para el ' + fmtDate(s.fecha) + ' (' + cuando + ')', accion: 'subida', id: s.contratoId });
     });
   } catch (e) {}
+  // PUNTO 90b (03/09/2026): aviso del registro de actividad — solo para el
+  // admin, y solo si hay entradas más recientes que la última vez que lo
+  // revisó (para que no salte siempre, tal y como pediste). Las "posible_fuga"
+  // (algo se coló sin candado) se avisan aparte y con más urgencia que los
+  // intentos bloqueados normales.
+  try {
+    if (getRol() === 'admin') {
+      var vistoHasta = localStorage.getItem('app:registro_visto_hasta') || '';
+      var reg = _registroLoad().filter(function(e) { return String(e.ts || '') > vistoHasta; });
+      var fugas = reg.filter(function(e) { return e.tipo === 'posible_fuga'; });
+      var bloqueados = reg.filter(function(e) { return e.tipo === 'bloqueado'; });
+      if (fugas.length > 0) {
+        items.push({ icon: '🚨', t: 'Posible fallo de protección detectado (' + fugas.length + ')', s: 'Se ha guardado un cambio real en modo Visualización — revísalo cuanto antes', accion: 'registro' });
+      }
+      if (bloqueados.length > 0) {
+        items.push({ icon: '🔒', t: bloqueados.length + ' intento' + (bloqueados.length === 1 ? '' : 's') + ' bloqueado' + (bloqueados.length === 1 ? '' : 's') + ' desde tu última revisión', s: 'Registro de actividad — repásalo cuando puedas', accion: 'registro' });
+      }
+    }
+  } catch (e) {}
   return items;
 }
 
@@ -14928,7 +15087,48 @@ function pend_gestionar(i) {
     setTimeout(function() {
       if (typeof rus_verHistorico === 'function') rus_verHistorico(it.ref, it.nombre);
     }, 250);
+  } else if (it.accion === 'registro') {
+    // PUNTO 90b: intentos bloqueados / posible fuga → abre el registro
+    if (typeof registro_abrir === 'function') registro_abrir();
   }
+}
+
+// PUNTO 90b (03/09/2026) — Registro de actividad: abre el listado completo
+// (últimos 90 días) y marca como "revisado hasta ahora", para que el aviso
+// de "Pendiente de gestionar" no vuelva a saltar por estas mismas entradas.
+function registro_render() {
+  var lista = document.getElementById('registro-lista');
+  if (!lista) return;
+  var reg = _registroLoad().slice().sort(function(a, b) { return String(b.ts || '').localeCompare(String(a.ts || '')); });
+  if (reg.length === 0) {
+    lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:16px 0;">Sin actividad registrada en los últimos 90 días.</div>';
+    return;
+  }
+  lista.innerHTML = reg.map(function(e) {
+    var fecha = '';
+    try {
+      var d = new Date(e.ts);
+      fecha = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    } catch (err) { fecha = e.ts || ''; }
+    var esFuga = e.tipo === 'posible_fuga';
+    var icono = esFuga ? '🚨' : '🔒';
+    var color = esFuga ? 'var(--accent-red)' : 'var(--silver-bright)';
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+      '<div style="font-size:15px;flex-shrink:0;margin-top:1px;">' + icono + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:12.5px;color:' + color + ';line-height:1.35;">' + notas_esc(e.etiqueta || '') + '</div>' +
+        '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:1px;">' + notas_esc(e.usuario || '') + ' · ' + fecha + (e.empresa ? ' · ' + notas_esc(e.empresa) : '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+function registro_abrir() {
+  registro_render();
+  openModalById('registro-modal');
+  // Se marca como revisado a partir de este momento — así el aviso de
+  // "Pendiente de gestionar" no vuelve a contar estas mismas entradas.
+  localStorage.setItem('app:registro_visto_hasta', new Date().toISOString());
+  if (typeof pend_render === 'function') pend_render();
 }
 
 function dash_buildChart(year, facturas, _reintentado) {
@@ -15006,6 +15206,15 @@ document.addEventListener("DOMContentLoaded", loginInit);
   // actualizaciones no dejaban ningún rastro de fecha. Añadida como caso
   // aparte para que también cuente.
   const _finKeyRegex = /^fin:(cuentas|acciones|fondos|urbanitae):/;
+  // PUNTO 90b (03/09/2026): red de seguridad para "puertas abiertas" — si
+  // ALGUNA VEZ se guarda un dato real mientras el usuario activo es
+  // "Visualización", es que algún botón se ha quedado sin el candado
+  // bloqueaSiViewer(). Se espera un poco tras abrir la app antes de vigilar
+  // esto (window._appEstable), para no confundirlo con migraciones
+  // automáticas de arranque (que no son acciones de Mercedes, y guardan
+  // datos igual para cualquier usuario que abra la app primero).
+  window._appEstable = false;
+  setTimeout(function() { window._appEstable = true; }, 10000);
   localStorage.setItem = function(key, value) {
     _origSetItem(key, value);
     if (_finKeyRegex.test(key) || key === 'fin:cotizaciones') {
@@ -15013,6 +15222,13 @@ document.addEventListener("DOMContentLoaded", loginInit);
       if (window.syncToFirestore) {
         window.syncToFirestore('fin:ultima_actualizacion', localStorage.getItem('fin:ultima_actualizacion'));
       }
+    }
+    if (window._appEstable && key !== 'app:registro_actividad' && DATA_KEYS.includes(key)) {
+      try {
+        if (typeof getRol === 'function' && getRol() === 'viewer') {
+          _registrarActividad('posible_fuga', 'Se guardó un cambio real en "' + key + '" estando en modo Visualización — revisar qué botón no tiene el candado puesto');
+        }
+      } catch (e) {}
     }
     // Sincronizar con Firebase si está disponible
     if (window.syncToFirestore) {
@@ -15059,6 +15275,7 @@ window._refreshCurrentModule = function(key) {
     'fin:urbanitae:industrias': 'finanzas',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
+    'app:registro_actividad': 'inicio',
   };
   // Mismo rango de años que en DATA_KEYS, para que Renta Patricio también
   // se refresque en pantalla al recibir un cambio de otro dispositivo.
@@ -15373,7 +15590,7 @@ let cli_tabActual = 'activos';
 let cli_clienteActivo = null;
 
 function cli_abrirEdicion() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Abrir la edición de un cliente')) return;
   if (!cli_clienteActivo) return;
   const c = cli_clienteActivo;
   document.getElementById('cli-edit-nombre').value = c.nombre || '';
@@ -15390,7 +15607,7 @@ function cli_cancelarEdicion() {
 }
 
 function cli_guardarEdicion() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar la edición de un cliente')) return;
   if (!cli_clienteActivo) return;
   const clientes = cli_cargar();
   const idx = clientes.findIndex(c => c.id === cli_clienteActivo.id);
@@ -15498,7 +15715,7 @@ function cli_migrarPropietarios(clientes) {
 }
 
 function cli_abrirNuevo() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Abrir el formulario de un cliente nuevo')) return;
   document.getElementById('cli-nuevo-nombre').value = '';
   document.getElementById('cli-nuevo-dni').value = '';
   document.getElementById('cli-nuevo-tel').value = '';
@@ -15509,7 +15726,7 @@ function cli_abrirNuevo() {
 }
 
 function cli_guardarNuevo() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un cliente nuevo')) return;
   const nombre = document.getElementById('cli-nuevo-nombre').value.trim();
   if (!nombre) {
     showToast('⚠️ Escribe al menos el nombre del cliente.', 'warning');
@@ -15670,7 +15887,7 @@ function cli_cerrarDetalle() {
 }
 
 function cli_marcarAntiguo() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Marcar un cliente como antiguo')) return;
   if (!cli_clienteActivo) return;
   const clientes = cli_cargar();
   const idx = clientes.findIndex(c => c.id === cli_clienteActivo.id);
@@ -15709,7 +15926,7 @@ function cli_prefillInmuebleDesdeCliente(c) {
 }
 
 function cli_nuevoContrato() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Crear un contrato nuevo para un cliente')) return;
   if (!cli_clienteActivo) return;
   // Precarga los datos del cliente en el wizard y navega a Contratos
   showModule('contratos');
@@ -15752,7 +15969,7 @@ function cli_nuevoContrato() {
 }
 
 function cli_renovacion() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Renovar el contrato de un cliente')) return;
   if (!cli_clienteActivo) return;
   showModule('contratos');
   setTimeout(() => {
@@ -15816,7 +16033,7 @@ function cli_renovacion() {
 }
 
 function cli_rescision() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Rescindir el contrato de un cliente')) return;
   if (!cli_clienteActivo) return;
   showModule('contratos');
   setTimeout(() => {
@@ -16057,7 +16274,7 @@ function renta_renderNominas() {
 }
 
 function renta_borrarNomina(idx) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar una nómina')) return;
   var arr = renta_getNominas();
   arr.splice(idx, 1);
   renta_saveNominas(arr);
@@ -16082,7 +16299,7 @@ function renta_cerrarModalNomina() {
   document.getElementById('renta-modal-nomina').style.display = 'none';
 }
 function renta_guardarNomina() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar una nómina')) return;
   var mes = document.getElementById('renta-nom-mes').value;
   var bruto = parseFmtGlobal(document.getElementById('renta-nom-bruto').value);
   var retencion = parseFmtGlobal(document.getElementById('renta-nom-retencion').value);
@@ -16108,7 +16325,7 @@ function renta_saveInmDatos(obj) {
   localStorage.setItem('renta:inm_datos', JSON.stringify(obj));
 }
 function renta_setInmCampo(inmId, campo, valor) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Editar un dato de un inmueble en Renta')) return;
   var datos = renta_getInmDatos();
   if (!datos[inmId]) datos[inmId] = {};
   datos[inmId][campo] = valor;
@@ -16288,7 +16505,7 @@ function renta_renderGastos() {
 }
 
 function renta_borrarGasto(idx) {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Borrar un gasto')) return;
   var arr = renta_getGastos();
   arr.splice(idx, 1);
   renta_saveGastos(arr);
@@ -16306,7 +16523,7 @@ function renta_cerrarModalGasto() {
   document.getElementById('renta-modal-gasto').style.display = 'none';
 }
 function renta_guardarGasto() {
-  if (bloqueaSiViewer()) return;
+  if (bloqueaSiViewer('Guardar un gasto')) return;
   var concepto = document.getElementById('renta-gasto-concepto').value.trim();
   var importe = parseFmtGlobal(document.getElementById('renta-gasto-importe').value);
   var fecha = document.getElementById('renta-gasto-fecha').value;
