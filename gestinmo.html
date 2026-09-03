@@ -6550,6 +6550,7 @@ function recalcPreview() {
 }
 
 function saveInmueble() {
+  if (bloqueaSiViewer()) return;
   const refInm = document.getElementById('f-ref-inm').value.trim().toUpperCase();
   if (!refInm) { alert('Introduce una referencia (ej. VIV02)'); return; }
   const modal2 = document.getElementById('inm-modal-inmueble');
@@ -9340,6 +9341,7 @@ function rus_prepararEdicion(anio, importe, mes) {
 }
 
 function rus_guardarAnio() {
+  if (bloqueaSiViewer()) return;
   var anioEl = document.getElementById('rus-form-anio');
   var impEl = document.getElementById('rus-form-importe');
   var mesEl = document.getElementById('rus-form-mes');
@@ -9469,6 +9471,7 @@ function fac_editarMes(mes, importe) {
 // histórico global; si ese mes tenía además una factura desglosada por inmueble
 // (KEYS.facturas), esa no se toca aquí — se gestiona desde "Facturar".
 function fac_eliminarMes(mes) {
+  if (bloqueaSiViewer()) return;
   showConfirm('🗑️','¿Borrar este mes del histórico?',
     'Se borrará el total de ' + mesNombre(mes) + ' del histórico global. Esta acción no se puede deshacer.',
     [
@@ -9482,6 +9485,7 @@ function fac_eliminarMes(mes) {
     ]);
 }
 function fac_guardarHistorico() {
+  if (bloqueaSiViewer()) return;
   var mes = document.getElementById('fac-hist-mes').value;
   var imp = parseFloat(document.getElementById('fac-hist-importe').value) || 0;
   if (!mes) { alert('Selecciona el mes.'); return; }
@@ -10094,6 +10098,7 @@ function renderNotasCuenta(idx){
 }
 
 function tickNota(localIdx){
+  if (bloqueaSiViewer()) return;
   const notas=load(KEYS.notas);
   const propias=notas.filter(n=>n.inmuebleIdx===ctaInmuebleIdx);
   if(!propias[localIdx])return;
@@ -10236,6 +10241,7 @@ function calcTotal(){
 }
 
 function confirmFactura(){
+  if (bloqueaSiViewer()) return;
   const mes=mesActual();
   const items=[];
   document.querySelectorAll('.ifitem').forEach(item=>{
@@ -10333,6 +10339,7 @@ function facCobro_calcSaldo(){
 }
 
 function facCobro_guardar(){
+  if (bloqueaSiViewer()) return;
   const it=_facCobroItems[_facCobroIdx];
   if(!it){ closeModalById('fac-cobro-modal'); return; }
   const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
@@ -10654,6 +10661,7 @@ function openModalCobro(){
 }
 
 function guardarCobro(){
+  if (bloqueaSiViewer()) return;
   const fecha=document.getElementById('cobro-fecha').value;
   const importe=parseFloat(document.getElementById('cobro-importe').value)||0;
   const concepto=document.getElementById('cobro-concepto').value.trim();
@@ -10691,6 +10699,7 @@ function openModalNota(){
   document.getElementById('cob-modal-nota').classList.add('open');
 }
 function guardarNota(){
+  if (bloqueaSiViewer()) return;
   const texto=document.getElementById('nota-texto').value.trim();
   const limite=document.getElementById('nota-limite').value;
   if(!texto){info('Escribe una descripción para la tarea.');return;}
@@ -10863,6 +10872,20 @@ document.addEventListener('firebaseLoaded', function() {
   // claude/datos_urbanitae_patricio.md) — así no hace falta que los metas a
   // mano. Solo se ejecuta si 'fin:urbanitae:patricio' está todavía vacío, para
   // no pisar nunca nada que ya hayas metido tú (a mano o desde otro aparato).
+  // CORRECCIÓN 03/09/2026 (misma noche, antes de que llegaras a verlo): esta
+  // carga se ejecuta en CUALQUIER aparato que abra esta versión por primera
+  // vez con la lista todavía vacía — normalmente solo pasa una vez, en el
+  // primer aparato que la abre, y los demás la reciben ya hecha desde la
+  // nube. Pero si dos aparatos (móvil y ordenador) abrieran esta versión por
+  // primera vez casi a la vez, antes de que a ninguno le diera tiempo a
+  // recibir la nube, cada uno la habría creado por su cuenta con un
+  // identificador ALEATORIO distinto — resultado: 8 proyectos en vez de 4,
+  // duplicados. Arreglo: el identificador de cada proyecto se calcula ahora
+  // a partir de su propio nombre y fecha (igual que ya se hace con cualquier
+  // dato antiguo sin id, ver _finHuella) en vez de al azar — así, aunque dos
+  // aparatos la creen por su cuenta, los dos calculan el MISMO identificador
+  // para "Vivaldi Project", y la fusión con la nube los reconoce como el
+  // mismo proyecto en vez de duplicarlo.
   (function() {
     var key = 'fin:urbanitae:patricio';
     var actual;
@@ -10879,11 +10902,45 @@ document.addEventListener('firebaseLoaded', function() {
       { nombre: 'Arcilla Project', fecha: '2026-07-01', capital: 1000, interes: 11.0, meses: 27, estado: 'en_curso',
         detalle: 'Llers, Alt Empordà, Girona. Deuda, hipoteca de primer rango. Vencimiento estimado octubre 2028. Sin prórrogas previstas.' }
     ];
-    seed.forEach(function(p) { p.id = _finGenId(); p.updatedAt = ahora; });
+    seed.forEach(function(p) { p.id = 'leg_urbanitae_' + _finHuella('urbanitae', p); p.updatedAt = ahora; });
     var val = JSON.stringify(seed);
     localStorage.setItem(key, val);
     if (window.syncToFirestore) window.syncToFirestore(key, val);
     console.log('[Migración] Urbanitae (Patricio): ' + seed.length + ' proyectos cargados por primera vez.');
+  })();
+  // LIMPIEZA DE PROPINA (03/09/2026): por si el fallo de arriba (id
+  // aleatorio) ya llegó a duplicar algún proyecto de Urbanitae antes de
+  // corregirlo — dos aparatos abriendo esta versión casi a la vez, cada uno
+  // creando su propia copia con un id distinto —, esto lo deja limpio solo,
+  // sin que tengas que borrar nada a mano: agrupa por nombre+fecha (la
+  // misma huella de arriba) y, si hay más de uno igual, se queda solo con
+  // el más reciente.
+  (function() {
+    var key = 'fin:urbanitae:patricio';
+    var arr;
+    try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { arr = []; }
+    if (!Array.isArray(arr) || arr.length === 0) return;
+    var vistos = {};
+    var limpio = [];
+    var huboDuplicados = false;
+    arr.forEach(function(it) {
+      if (!it) return;
+      var h = _finHuella('urbanitae', it);
+      var previo = vistos[h];
+      if (!previo) { vistos[h] = it; limpio.push(it); return; }
+      huboDuplicados = true;
+      if (String(it.updatedAt || '') > String(previo.updatedAt || '')) {
+        var idx = limpio.indexOf(previo);
+        limpio[idx] = it;
+        vistos[h] = it;
+      }
+    });
+    if (huboDuplicados) {
+      var val2 = JSON.stringify(limpio);
+      localStorage.setItem(key, val2);
+      if (window.syncToFirestore) window.syncToFirestore(key, val2);
+      console.log('[Migración] Urbanitae (Patricio): duplicados detectados y fusionados, quedan ' + limpio.length + ' proyectos.');
+    }
   })();
   // Inicializar histórico rústico si no existe aún en localStorage
   if (!localStorage.getItem(RUS_HIST_KEY)) {
@@ -11347,6 +11404,7 @@ function recogerGastosCat(cat){
 }
 
 function guardarEstudio(){
+  if (bloqueaSiViewer()) return;
   const precio    = getV('e_precio');
   const efectivo  = getV('e_efectivo');
   const comision  = getComisionImporte();
@@ -11408,6 +11466,7 @@ function guardarEstudio(){
 }
 
 function eliminarEstudio(idx, e){
+  if (bloqueaSiViewer()) return;
   e.stopPropagation();
   // BLINDAJE DE DATOS: antes borraba directamente, sin preguntar — pendiente
   // anotado hace días. Ahora pide confirmación, igual que el resto de
@@ -12015,6 +12074,7 @@ function generarNombreAuto(tipo, inmueble, archivoOriginal) {
 
 /* ─── SUBIR ─── */
 async function subirDocumento() {
+  if (bloqueaSiViewer()) return;
   if (!archivosEnCola.length) { showToast('⚠️ Selecciona al menos un archivo', 'warning'); return; }
 
   const tipo     = document.getElementById('input-tipo').value;
@@ -12087,6 +12147,7 @@ function cerrarDuplicado() {
 }
 
 async function reemplazarDocumento() {
+  if (bloqueaSiViewer()) return;
   document.getElementById('doc-modal-duplicado').classList.remove('open');
   if (!pendingUpload) return;
   await guardarEntrada(pendingUpload.tipo, pendingUpload.inmueble, pendingUpload.nombre, true);
@@ -12121,6 +12182,7 @@ function descargarDoc() {
 }
 
 function renombrarDoc() {
+  if (bloqueaSiViewer()) return;
   const nuevoNombre = prompt('Nuevo nombre:', docSeleccionado.nombre);
   if (!nuevoNombre || nuevoNombre.trim() === docSeleccionado.nombre) return;
   const nombre = nuevoNombre.trim();
@@ -12151,6 +12213,7 @@ function cerrarConfirmDel() {
 }
 
 async function eliminarDocConfirmado() {
+  if (bloqueaSiViewer()) return;
   cerrarConfirmDel();
   const docsAntes = docs;
   docs = docs.filter(d => d.id !== docSeleccionado.id);
@@ -12543,6 +12606,7 @@ function fin_asiFormatInput(el) {
 }
 
 function fin_asiGuardarPaso(paso, valor) {
+  if (bloqueaSiViewer()) return;
   if (paso.tipo === 'cuenta') {
     var data = fin_load('fin:cuentas');
     if (data[paso.idx]) { data[paso.idx].saldo = valor; data[paso.idx].updatedAt = new Date().toISOString(); fin_save('fin:cuentas', data); }
@@ -12745,6 +12809,7 @@ function fin_editarCuenta(idx) {
   setTimeout(function() { var el = document.getElementById('fin-cuenta-saldo'); if (el) { el.focus(); el.select(); } }, 150);
 }
 function fin_guardarCuenta() {
+  if (bloqueaSiViewer()) return;
   var nombre = document.getElementById('fin-cuenta-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre de la cuenta.'); return; }
   // El campo ahora es de texto libre (para poder seleccionarlo entero al editar),
@@ -12765,6 +12830,7 @@ function fin_guardarCuenta() {
   fin_renderCuentas();
 }
 function fin_borrarCuenta(idx) {
+  if (bloqueaSiViewer()) return;
   if (!confirm('Eliminar esta cuenta?')) return;
   var data = fin_load('fin:cuentas');
   data.splice(idx, 1);
@@ -12961,6 +13027,7 @@ function fin_verHistorico(ticker) {
   openModalById('fin-modal-historico');
 }
 function fin_setCotizacion(ticker) {
+  if (bloqueaSiViewer()) return;
   var val = prompt('Precio actual de ' + (FIN_NOMBRES[ticker] || ticker) + ' (euros):');
   if (val === null) return;
   var n = parseFloat(val.replace(',', '.'));
@@ -13056,6 +13123,7 @@ function fin_editarAccion(idx) {
 // tanto la tarjeta de Acciones como, si está abierto, el propio modal de
 // Histórico — así el usuario ve el resultado al momento sin reabrir nada.
 function fin_borrarAccionMov(idx, ticker) {
+  if (bloqueaSiViewer()) return;
   var ops = fin_load('fin:acciones');
   var op = ops[idx];
   if (!op) return;
@@ -13068,6 +13136,7 @@ function fin_borrarAccionMov(idx, ticker) {
   }
 }
 function fin_guardarAccion() {
+  if (bloqueaSiViewer()) return;
   var ticker = document.getElementById('fin-accion-ticker').value;
   if (ticker === 'OTRO') ticker = (document.getElementById('fin-accion-ticker-manual').value || '').trim().toUpperCase();
   if (!ticker) { alert('Selecciona el valor.'); return; }
@@ -13213,6 +13282,7 @@ function fin_toggleDcaCampos() {
   if (campos) campos.style.display = (chk && chk.checked) ? 'block' : 'none';
 }
 function fin_guardarFondo() {
+  if (bloqueaSiViewer()) return;
   var nombre = document.getElementById('fin-fondo-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre del fondo.'); return; }
   var gestora = document.getElementById('fin-fondo-gestora').value.trim();
@@ -13252,6 +13322,7 @@ function fin_guardarFondo() {
   fin_renderFondos();
 }
 function fin_borrarFondo(idx) {
+  if (bloqueaSiViewer()) return;
   if (!confirm('Eliminar este fondo?')) return;
   var data = fin_load('fin:fondos');
   data.splice(idx, 1);
@@ -13329,6 +13400,7 @@ function fin_dcaMostrarPaso() {
 }
 
 function fin_dcaAplicar() {
+  if (bloqueaSiViewer()) return;
   var p = _finDcaPendientes[_finDcaIdx];
   if (!p) return;
   var totalAplicado = parseImporteFlexible(document.getElementById('fin-dca-importe-input').value);
@@ -13478,6 +13550,7 @@ function fin_editarUrbanitae(idx) {
   document.getElementById('fin-modal-urbanitae').classList.add('open');
 }
 function fin_guardarUrbanitae() {
+  if (bloqueaSiViewer()) return;
   var nombre = document.getElementById('fin-urb-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre del proyecto.'); return; }
   var fecha = document.getElementById('fin-urb-fecha').value || '';
@@ -13500,6 +13573,7 @@ function fin_guardarUrbanitae() {
   fin_renderUrbanitae();
 }
 function fin_borrarUrbanitae(idx) {
+  if (bloqueaSiViewer()) return;
   if (!confirm('Eliminar este proyecto de Urbanitae?')) return;
   var data = fin_load('fin:urbanitae');
   data.splice(idx, 1);
@@ -14539,6 +14613,7 @@ function notas_toggle() {
 }
 
 function notas_add() {
+  if (bloqueaSiViewer()) return;
   const input = document.getElementById('notas-input');
   if (!input) return;
   const texto = input.value.trim();
@@ -14558,6 +14633,7 @@ function notas_add() {
 }
 
 function notas_toggleHecho(id) {
+  if (bloqueaSiViewer()) return;
   const arr = notas_load();
   const n = arr.find(x => x.id === id);
   if (n) { n.hecho = !n.hecho; n.updatedAt = new Date().toISOString(); }
@@ -14566,6 +14642,7 @@ function notas_toggleHecho(id) {
 }
 
 function notas_eliminar(id) {
+  if (bloqueaSiViewer()) return;
   // No se quita físicamente del array — se marca "deleted:true" (con su
   // propio sello de tiempo) y se queda ahí para siempre, invisible en
   // pantalla. Es lo que permite que, si llega de la nube o de otra sesión
@@ -15980,6 +16057,7 @@ function renta_renderNominas() {
 }
 
 function renta_borrarNomina(idx) {
+  if (bloqueaSiViewer()) return;
   var arr = renta_getNominas();
   arr.splice(idx, 1);
   renta_saveNominas(arr);
@@ -16004,6 +16082,7 @@ function renta_cerrarModalNomina() {
   document.getElementById('renta-modal-nomina').style.display = 'none';
 }
 function renta_guardarNomina() {
+  if (bloqueaSiViewer()) return;
   var mes = document.getElementById('renta-nom-mes').value;
   var bruto = parseFmtGlobal(document.getElementById('renta-nom-bruto').value);
   var retencion = parseFmtGlobal(document.getElementById('renta-nom-retencion').value);
@@ -16029,6 +16108,7 @@ function renta_saveInmDatos(obj) {
   localStorage.setItem('renta:inm_datos', JSON.stringify(obj));
 }
 function renta_setInmCampo(inmId, campo, valor) {
+  if (bloqueaSiViewer()) return;
   var datos = renta_getInmDatos();
   if (!datos[inmId]) datos[inmId] = {};
   datos[inmId][campo] = valor;
@@ -16208,6 +16288,7 @@ function renta_renderGastos() {
 }
 
 function renta_borrarGasto(idx) {
+  if (bloqueaSiViewer()) return;
   var arr = renta_getGastos();
   arr.splice(idx, 1);
   renta_saveGastos(arr);
@@ -16225,6 +16306,7 @@ function renta_cerrarModalGasto() {
   document.getElementById('renta-modal-gasto').style.display = 'none';
 }
 function renta_guardarGasto() {
+  if (bloqueaSiViewer()) return;
   var concepto = document.getElementById('renta-gasto-concepto').value.trim();
   var importe = parseFmtGlobal(document.getElementById('renta-gasto-importe').value);
   var fecha = document.getElementById('renta-gasto-fecha').value;
