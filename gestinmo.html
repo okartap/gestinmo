@@ -1915,6 +1915,13 @@ const DATA_KEYS = [
   'fin:fondos:patrimer',
   'fin:fondos:patricio',
   'fin:fondos:industrias',
+  // PUNTO 89 (03/09/2026): inversiones en Urbanitae — misma estructura por
+  // empresa que Cuentas/Acciones/Fondos, aunque hoy solo tengas datos en
+  // Patricio; así queda preparado igual que el resto de Finanzas.
+  'fin:urbanitae:empresa',
+  'fin:urbanitae:patrimer',
+  'fin:urbanitae:patricio',
+  'fin:urbanitae:industrias',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -1972,6 +1979,54 @@ function _guardarPendientes() {
   try { localStorage.setItem(_PENDING_WRITES_KEY, JSON.stringify(_pendingLocalWrites)); }
   catch (e) { /* localStorage lleno o no disponible: no es crítico, se reintentará en la próxima escritura */ }
 }
+
+// PUNTO 49 (03/09/2026, reapertura) — CAJÓN DE REINTENTOS DE SUBIDA. Hasta
+// ahora, syncToFirestore() intentaba subir un cambio a la nube UNA sola
+// vez: si ese intento fallaba (un corte de cobertura de un segundo,
+// típico en datos móviles, justo en ese instante), el cambio se perdía en
+// silencio y nadie lo volvía a intentar — ni al momento, ni la próxima
+// vez que se abriera la app. Esto explica, por ejemplo, ideas creadas en
+// el móvil que nunca llegaban a verse en el ordenador: si no se volvía a
+// tocar el bloc de ideas después (lo más habitual, se anota una vez y ya
+// está), ese cambio se quedaba atrapado para siempre solo en ese aparato,
+// sin que ni tú ni la app os enterarais. No es el mismo fallo que los
+// puntos 49 (primera parte)/67/71/93 — aquellos corrigen qué pasa cuando
+// SÍ llegan dos copias distintas y hay que decidir cuál gana; este
+// corrige el paso anterior: qué pasa cuando un cambio ni siquiera llega a
+// subirse la primera vez.
+//
+// Arreglo: cada intento de subida se apunta en una lista de "pendientes
+// de confirmar" (persistente en el propio aparato, sobrevive a cerrar la
+// app) ANTES de intentarlo; en cuanto la nube confirma que lo ha
+// recibido, se quita de la lista. Cada vez que se abre la app, y cada vez
+// que el aparato recupera la conexión tras haberla perdido, se revisa
+// esa lista y se reintenta en automático todo lo que siga pendiente —
+// usando siempre el dato MÁS ACTUAL que haya en ese momento en el
+// aparato (nunca una foto vieja guardada de cuando falló), para que un
+// reintento tardío jamás pueda deshacer un cambio posterior. Se aplica
+// por igual a cualquier dato de la app (Ideas, Cuentas, Inmuebles,
+// Contratos...), no solo a las Ideas, para cerrar este hueco de fondo
+// del todo.
+const _OUTBOX_KEY = '_sync:pendientes_subida';
+let _syncOutbox = {};
+try {
+  const _outboxGuardado = JSON.parse(localStorage.getItem(_OUTBOX_KEY) || '{}');
+  if (_outboxGuardado && typeof _outboxGuardado === 'object') _syncOutbox = _outboxGuardado;
+} catch (e) { /* si está corrupto, se ignora y se empieza de cero */ }
+function _guardarOutbox() {
+  try { localStorage.setItem(_OUTBOX_KEY, JSON.stringify(_syncOutbox)); }
+  catch (e) { /* no crítico */ }
+}
+function _flushOutbox() {
+  Object.keys(_syncOutbox).forEach(function(key) {
+    if (!DATA_KEYS.includes(key)) { delete _syncOutbox[key]; return; }
+    const valorActual = localStorage.getItem(key);
+    if (!_valorValido(valorActual)) { delete _syncOutbox[key]; return; }
+    if (window.syncToFirestore) window.syncToFirestore(key, valorActual);
+  });
+  _guardarOutbox();
+}
+window.addEventListener('online', _flushOutbox);
 
 // Comprueba que un valor es "de verdad" antes de guardarlo o propagarlo —
 // ni vacío (undefined/null) ni el texto literal "undefined"/"null" (lo que
@@ -2109,6 +2164,10 @@ window._finGenId = _finGenId; // expuesta para pruebas automáticas
 function _finHuella(tipo, it) {
   if (tipo === 'cuentas') return (it.nombre || '') + '|' + (it.iban || '');
   if (tipo === 'fondos') return (it.nombre || '') + '|' + (it.gestora || '');
+  // PUNTO 89 (03/09/2026): un proyecto de Urbanitae se identifica por su
+  // nombre y la fecha en la que se invirtió — nunca por el capital (mismo
+  // criterio que el resto: no usar datos que puedan estar recién editados).
+  if (tipo === 'urbanitae') return (it.nombre || '') + '|' + (it.fecha || '');
   // acciones: un movimiento se identifica por el valor, el tipo y la fecha.
   // Si algún día hay dos movimientos con exactamente los tres iguales (caso
   // raro), se resuelve igual que cualquier otra fusión: gana el más
@@ -2167,10 +2226,10 @@ function _finListaMerge(tipo, localJSON, remoteJSON) {
 window._finListaMerge = _finListaMerge; // expuesta para pruebas automáticas
 
 // Detecta si una clave de DATA_KEYS es una lista de Finanzas que debe
-// fusionarse elemento a elemento (cuentas/acciones/fondos, cualquier
-// empresa) — y de qué tipo, para elegir la huella correcta.
+// fusionarse elemento a elemento (cuentas/acciones/fondos/urbanitae,
+// cualquier empresa) — y de qué tipo, para elegir la huella correcta.
 function _finTipoDeClave(key) {
-  const m = /^fin:(cuentas|acciones|fondos):/.exec(key || '');
+  const m = /^fin:(cuentas|acciones|fondos|urbanitae):/.exec(key || '');
   return m ? m[1] : null;
 }
 
@@ -2181,6 +2240,12 @@ window.syncToFirestore = async function(key, value) {
   const ts = new Date().toISOString();
   _pendingLocalWrites[key] = ts;
   _guardarPendientes();
+  // PUNTO 49 (03/09/2026, reapertura): se apunta como "pendiente de
+  // confirmar" ANTES de intentar la subida — si el intento falla, el
+  // cambio se queda anotado aquí para reintentarlo más adelante (ver
+  // _flushOutbox), en vez de perderse en silencio.
+  _syncOutbox[key] = true;
+  _guardarOutbox();
   try {
     const docId = keyToDoc(key);
     await setDoc(doc(db, 'gestinmo_data', docId), {
@@ -2188,8 +2253,12 @@ window.syncToFirestore = async function(key, value) {
       value: value,
       updatedAt: ts
     });
+    delete _syncOutbox[key];
+    _guardarOutbox();
   } catch(e) {
     console.warn('Firebase sync error:', e.message);
+    // Se queda pendiente en _syncOutbox — se reintentará solo, sin que
+    // haga falta volver a tocar este dato a mano.
   }
 };
 
@@ -2303,9 +2372,12 @@ window.startFirebaseSync = function() {
   }
 };
 
-// Arrancar: cargar datos y luego escuchar cambios
+// Arrancar: cargar datos, escuchar cambios y, de paso, reintentar
+// cualquier cambio anterior que se hubiera quedado sin confirmar en la
+// nube (PUNTO 49, reapertura del 03/09/2026 — ver _flushOutbox arriba).
 window.loadFromFirestore().then(() => {
   window.startFirebaseSync();
+  _flushOutbox();
 });
 
 </script>
@@ -4277,6 +4349,21 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <span>Total fondos</span><span id="fin-fondos-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
     </div>
   </div>
+  <!-- PUNTO 89 (03/09/2026): inversiones en Urbanitae (crowdfunding
+  inmobiliario). Mismo estilo de tarjeta que Cuentas/Acciones/Fondos, con
+  el capital invertido de los proyectos "En curso" sumando en Patrimonio
+  total (ver fin_calcPatrimonio) — un proyecto "Cobrado" deja de contar
+  ahí, porque ese dinero ya habrá vuelto a una cuenta normal. -->
+  <div class="fin-section">
+    <div class="fin-section-header">
+      <div class="fin-section-title">&#127970; Urbanitae</div>
+      <button class="fin-add-btn" onclick="fin_nuevoUrbanitae()">&#xFF0B;</button>
+    </div>
+    <div id="fin-urbanitae-lista"></div>
+    <div class="fin-total-row" id="fin-urbanitae-total" style="display:none">
+      <span>Total invertido (en curso)</span><span id="fin-urbanitae-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    </div>
+  </div>
   <!-- DIVIDENDOS: dos tarjetas pequeñas (PUNTO 70, 30/08/2026) — sustituyen
        a la única línea "Resumen anual dividendos" que había antes. Una abre
        la misma tabla resumen de siempre; la otra abre el módulo nuevo con
@@ -4456,6 +4543,30 @@ abierto. -->
     </div>
     <button class="btn1" onclick="fin_guardarFondo()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-fondo')" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL URBANITAE (PUNTO 89, 03/09/2026) -->
+<div class="moverlay" id="fin-modal-urbanitae">
+  <div class="modal">
+    <div class="mtitle">Proyecto Urbanitae<span class="mclose" onclick="closeModalById('fin-modal-urbanitae')">&#10005;</span></div>
+    <div class="mfield"><div class="mflabel">Nombre del proyecto</div><input class="minput" id="fin-urb-nombre" placeholder="Ej: Vivaldi Project"></div>
+    <div class="mfield"><div class="mflabel">Fecha de inversión</div><input class="minput" id="fin-urb-fecha" type="date" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="mfield"><div class="mflabel">Capital invertido (euros)</div><input class="minput" id="fin-urb-capital" type="text" inputmode="decimal" placeholder="0" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="mfield"><div class="mflabel">Interés pactado (% anual)</div><input class="minput" id="fin-urb-interes" type="text" inputmode="decimal" placeholder="Ej: 10,5" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="mfield"><div class="mflabel">Plazo (meses)</div><input class="minput" id="fin-urb-meses" type="number" inputmode="numeric" placeholder="Ej: 18" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="form-hint" id="fin-urb-preview" style="margin:-4px 2px 10px;"></div>
+    <div class="mfield">
+      <div class="mflabel">Estado</div>
+      <select class="minput" id="fin-urb-estado">
+        <option value="en_curso">En curso</option>
+        <option value="cobrado">Cobrado</option>
+      </select>
+    </div>
+    <div class="mfield"><div class="mflabel">Detalle (opcional)</div><textarea class="mtextarea minput" id="fin-urb-detalle" rows="3" placeholder="Ubicación, garantía, condiciones de prórroga..."></textarea></div>
+    <input type="hidden" id="fin-urb-idx" value="">
+    <button class="btn1" onclick="fin_guardarUrbanitae()">Guardar</button>
+    <button class="btn2" onclick="closeModalById('fin-modal-urbanitae')" style="margin-top:8px;">Cancelar</button>
   </div>
 </div>
 
@@ -5203,6 +5314,7 @@ const BACKUP_KEYS = [
   'fin:cuentas:empresa','fin:cuentas:patrimer','fin:cuentas:patricio','fin:cuentas:industrias',
   'fin:acciones:empresa','fin:acciones:patrimer','fin:acciones:patricio','fin:acciones:industrias',
   'fin:fondos:empresa','fin:fondos:patrimer','fin:fondos:patricio','fin:fondos:industrias',
+  'fin:urbanitae:empresa','fin:urbanitae:patrimer','fin:urbanitae:patricio','fin:urbanitae:industrias',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -10728,7 +10840,7 @@ document.addEventListener('firebaseLoaded', function() {
   // normalidad, en cualquiera de los aparatos.
   (function() {
     var empresas = ['empresa', 'patrimer', 'patricio', 'industrias'];
-    var tipos = ['cuentas', 'acciones', 'fondos'];
+    var tipos = ['cuentas', 'acciones', 'fondos', 'urbanitae'];
     tipos.forEach(function(tipo) {
       empresas.forEach(function(emp) {
         var key = 'fin:' + tipo + ':' + emp;
@@ -10745,6 +10857,33 @@ document.addEventListener('firebaseLoaded', function() {
         }
       });
     });
+  })();
+  // PUNTO 89 (03/09/2026): carga inicial, una sola vez, de los 4 proyectos
+  // reales de Urbanitae que ya nos habías pasado (30/08/2026, guardados en
+  // claude/datos_urbanitae_patricio.md) — así no hace falta que los metas a
+  // mano. Solo se ejecuta si 'fin:urbanitae:patricio' está todavía vacío, para
+  // no pisar nunca nada que ya hayas metido tú (a mano o desde otro aparato).
+  (function() {
+    var key = 'fin:urbanitae:patricio';
+    var actual;
+    try { actual = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { actual = []; }
+    if (Array.isArray(actual) && actual.length > 0) return;
+    var ahora = new Date().toISOString();
+    var seed = [
+      { nombre: 'Vivaldi Project', fecha: '2026-06-01', capital: 500, interes: 10.5, meses: 18, estado: 'en_curso',
+        detalle: 'Sierra Blanca, Marbella. Deuda, hipoteca de primer rango. Vencimiento estimado diciembre 2027. Prórrogas posibles: +6 meses y otros +6 meses (máximo 30 meses en total).' },
+      { nombre: 'Ronda Nord Project', fecha: '2026-06-01', capital: 500, interes: 10.0, meses: 18, estado: 'en_curso',
+        detalle: 'Sant Feliu de Guíxols, Girona. Deuda, hipoteca de primer rango. Vencimiento estimado diciembre 2027. Sin prórrogas previstas — mínimo garantizado 9 meses.' },
+      { nombre: 'Walk of the Olives', fecha: '2026-06-01', capital: 500, interes: 11.0, meses: 18, estado: 'en_curso',
+        detalle: 'Madrid. Deuda, hipoteca de primer rango. Vencimiento estimado diciembre 2027. Prórroga posible +6 meses, "make whole" 18 meses garantizado.' },
+      { nombre: 'Arcilla Project', fecha: '2026-07-01', capital: 1000, interes: 11.0, meses: 27, estado: 'en_curso',
+        detalle: 'Llers, Alt Empordà, Girona. Deuda, hipoteca de primer rango. Vencimiento estimado octubre 2028. Sin prórrogas previstas.' }
+    ];
+    seed.forEach(function(p) { p.id = _finGenId(); p.updatedAt = ahora; });
+    var val = JSON.stringify(seed);
+    localStorage.setItem(key, val);
+    if (window.syncToFirestore) window.syncToFirestore(key, val);
+    console.log('[Migración] Urbanitae (Patricio): ' + seed.length + ' proyectos cargados por primera vez.');
   })();
   // Inicializar histórico rústico si no existe aún en localStorage
   if (!localStorage.getItem(RUS_HIST_KEY)) {
@@ -12549,6 +12688,7 @@ function fin_render() {
   fin_renderCuentas();
   fin_renderAcciones();
   fin_renderFondos();
+  fin_renderUrbanitae();
   fin_renderUltimaActualizacion();
 }
 
@@ -13231,6 +13371,142 @@ function fin_dcaCerrar() {
   fin_renderFondos();
 }
 
+// --- URBANITAE (PUNTO 89, 03/09/2026) ---
+// Inversiones de tipo "deuda" (crowdfunding inmobiliario, plazo fijo con un
+// interés pactado, tipo un depósito). De cada proyecto se guarda solo lo que
+// se pacta al invertir (capital, interés %, plazo); el importe que se espera
+// cobrar al final (bruto y neto de IRPF) se CALCULA solo con esos 3 datos —
+// así no hace falta hacer la cuenta a mano ni volver a escribirla. Fórmula
+// de interés simple, la misma que ya usa Urbanitae en sus propios proyectos:
+// capital × interés% × (meses ÷ 12). El 19% de IRPF es el tipo que aplica a
+// estos importes hoy — si algún día cambiara, se ajusta aquí, en un único
+// sitio.
+var FIN_URB_IRPF = 0.19;
+function fin_urbanitaeCalcular(capital, interesPct, meses) {
+  var bruto = (parseFloat(capital) || 0) * ((parseFloat(interesPct) || 0) / 100) * ((parseFloat(meses) || 0) / 12);
+  var neto = bruto * (1 - FIN_URB_IRPF);
+  return { bruto: bruto, neto: neto };
+}
+function fin_urbanitaeActualizarPreview() {
+  var capital = parseImporteFlexible(document.getElementById('fin-urb-capital').value);
+  var interes = parseImporteFlexible(document.getElementById('fin-urb-interes').value);
+  var meses = parseFloat(document.getElementById('fin-urb-meses').value) || 0;
+  var el = document.getElementById('fin-urb-preview');
+  if (!el) return;
+  if (capital <= 0 || interes <= 0 || meses <= 0) { el.textContent = ''; return; }
+  var r = fin_urbanitaeCalcular(capital, interes, meses);
+  el.textContent = 'Resultado previsto al vencimiento: ' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos (tras 19% IRPF)';
+}
+function fin_renderUrbanitae() {
+  var data = fin_load('fin:urbanitae');
+  var lista = document.getElementById('fin-urbanitae-lista');
+  var totEl = document.getElementById('fin-urbanitae-total');
+  if (!lista) return;
+  if (data.length === 0) {
+    lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin proyectos de Urbanitae. Pulsa + para añadir.</div>';
+    if (totEl) totEl.style.display = 'none';
+    fin_calcPatrimonio(); fin_renderUltimaActualizacion(); return;
+  }
+  var totalEnCurso = 0;
+  var html = '';
+  for (var i = 0; i < data.length; i++) {
+    var u = data[i];
+    var capital = parseFloat(u.capital) || 0;
+    var cobrado = u.estado === 'cobrado';
+    if (!cobrado) totalEnCurso += capital;
+    var r = fin_urbanitaeCalcular(capital, u.interes, u.meses);
+    html += '<div class="fin-card">';
+    html += '<div class="fin-card-top"><div>';
+    html += '<div class="fin-card-nombre">' + (u.nombre || 'Proyecto') + '</div>';
+    html += '<div class="fin-card-sub">' + (u.fecha ? fin_urbanitaeFechaCorta(u.fecha) : '') + '</div>';
+    html += '</div><div class="fin-card-saldo">' + fin_fmt(capital) + '</div></div>';
+    html += '<div class="fin-card-meta">';
+    html += '<div class="fin-meta-item">Interés: <span class="fin-meta-val">' + fin_fmtPct(u.interes) + '</span></div>';
+    html += '<div class="fin-meta-item">Plazo: <span class="fin-meta-val">' + (u.meses || 0) + ' meses</span></div>';
+    html += '<div class="fin-meta-item" style="width:100%;">Resultado previsto: <span class="fin-meta-val fin-plus">' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos</span></div>';
+    html += '<div class="fin-meta-item" style="width:100%;">Estado: <span class="fin-meta-val" style="' + (cobrado ? 'color:var(--accent-blue);' : 'color:var(--accent-green);') + '">' + (cobrado ? '✅ Cobrado' : '🟢 En curso') + '</span></div>';
+    html += '</div>';
+    if (u.detalle) {
+      html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:4px;padding-top:6px;border-top:1px solid var(--border);">' + notas_esc(u.detalle) + '</div>';
+    }
+    html += '<div class="fin-card-actions">';
+    html += '<div class="fin-action-btn" onclick="fin_editarUrbanitae(' + i + ')">Editar</div>';
+    html += '<div class="fin-action-btn red" onclick="fin_borrarUrbanitae(' + i + ')">Eliminar</div>';
+    html += '</div></div>';
+  }
+  lista.innerHTML = html;
+  if (totEl) {
+    totEl.style.display = 'flex';
+    var tv = document.getElementById('fin-urbanitae-total-val');
+    if (tv) tv.textContent = fin_fmt(totalEnCurso);
+  }
+  fin_calcPatrimonio();
+  fin_renderUltimaActualizacion();
+}
+function fin_urbanitaeFechaCorta(iso) {
+  try {
+    var d = new Date(iso + 'T00:00:00');
+    var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return d.getDate() + ' ' + meses[d.getMonth()] + ' ' + d.getFullYear();
+  } catch (e) { return iso; }
+}
+function fin_nuevoUrbanitae() {
+  document.getElementById('fin-urb-nombre').value = '';
+  document.getElementById('fin-urb-fecha').value = '';
+  document.getElementById('fin-urb-capital').value = '';
+  document.getElementById('fin-urb-interes').value = '';
+  document.getElementById('fin-urb-meses').value = '';
+  document.getElementById('fin-urb-estado').value = 'en_curso';
+  document.getElementById('fin-urb-detalle').value = '';
+  document.getElementById('fin-urb-idx').value = '';
+  document.getElementById('fin-urb-preview').textContent = '';
+  document.getElementById('fin-modal-urbanitae').classList.add('open');
+}
+function fin_editarUrbanitae(idx) {
+  var data = fin_load('fin:urbanitae');
+  var u = data[idx];
+  if (!u) return;
+  document.getElementById('fin-urb-nombre').value = u.nombre || '';
+  document.getElementById('fin-urb-fecha').value = u.fecha || '';
+  document.getElementById('fin-urb-capital').value = u.capital || '';
+  document.getElementById('fin-urb-interes').value = u.interes || '';
+  document.getElementById('fin-urb-meses').value = u.meses || '';
+  document.getElementById('fin-urb-estado').value = u.estado || 'en_curso';
+  document.getElementById('fin-urb-detalle').value = u.detalle || '';
+  document.getElementById('fin-urb-idx').value = idx;
+  fin_urbanitaeActualizarPreview();
+  document.getElementById('fin-modal-urbanitae').classList.add('open');
+}
+function fin_guardarUrbanitae() {
+  var nombre = document.getElementById('fin-urb-nombre').value.trim();
+  if (!nombre) { alert('Introduce el nombre del proyecto.'); return; }
+  var fecha = document.getElementById('fin-urb-fecha').value || '';
+  var capital = parseImporteFlexible(document.getElementById('fin-urb-capital').value);
+  var interes = parseImporteFlexible(document.getElementById('fin-urb-interes').value);
+  var meses = parseFloat(document.getElementById('fin-urb-meses').value) || 0;
+  var estado = document.getElementById('fin-urb-estado').value || 'en_curso';
+  var detalle = document.getElementById('fin-urb-detalle').value.trim();
+  var idx = document.getElementById('fin-urb-idx').value;
+  var data = fin_load('fin:urbanitae');
+  var obj = { nombre: nombre, fecha: fecha, capital: capital, interes: interes, meses: meses, estado: estado, detalle: detalle };
+  // Mismo blindaje de sincronización que Cuentas/Acciones/Fondos (PUNTO 93):
+  // conserva el id si ya existía (edición) y siempre refresca updatedAt.
+  if (idx !== '' && data[parseInt(idx)]) { obj.id = data[parseInt(idx)].id || _finGenId(); }
+  else { obj.id = _finGenId(); }
+  obj.updatedAt = new Date().toISOString();
+  if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
+  fin_save('fin:urbanitae', data);
+  closeModalById('fin-modal-urbanitae');
+  fin_renderUrbanitae();
+}
+function fin_borrarUrbanitae(idx) {
+  if (!confirm('Eliminar este proyecto de Urbanitae?')) return;
+  var data = fin_load('fin:urbanitae');
+  data.splice(idx, 1);
+  fin_save('fin:urbanitae', data);
+  fin_renderUrbanitae();
+}
+
 // --- PATRIMONIO ---
 function fin_calcPatrimonio() {
   var cuentas = fin_load('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
@@ -13256,6 +13532,14 @@ function fin_calcPatrimonio() {
     var cot = _finCotizaciones[tk] || null;
     if (cot) acciones += cot * posAcc[tk];
   });
+  // PUNTO 89 (03/09/2026): solo el CAPITAL invertido en proyectos "En curso"
+  // cuenta aquí — criterio conservador, igual que el resto de la app: el
+  // interés previsto no es un dato garantizado hasta que de verdad se cobra.
+  // Un proyecto "Cobrado" deja de sumar aquí (ese dinero ya está, o debería
+  // estar, contado como parte de una cuenta normal).
+  var urbanitae = fin_load('fin:urbanitae').reduce(function(s, u) {
+    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
+  }, 0);
   // PUNTO 41 (25/08/2026): se suma el patrimonio inmobiliario (valor de
   // mercado actual de los inmuebles de esta empresa) al total.
   var empresaActivaFin = localStorage.getItem('patrimer:empresa') || 'patrimer';
@@ -13272,7 +13556,7 @@ function fin_calcPatrimonio() {
   // ("Patrimonio total") vuelve a ser solo lo de esta empresa (sin IGC) — el
   // 33% de Industrias se muestra aparte, como una fila más (no en pequeño),
   // con su propia suma "Total+IGC".
-  var total = cuentas + fondos + acciones + inmob.total;
+  var total = cuentas + fondos + acciones + urbanitae + inmob.total;
   var el = document.getElementById('fin-patrimonio-total');
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
   var rowsEl = document.getElementById('fin-patrimonio-rows');
@@ -13281,6 +13565,7 @@ function fin_calcPatrimonio() {
       '<div class="row"><span>Cuentas</span><span>' + (cuentas > 0 ? fin_fmt(cuentas) : '-') + '</span></div>' +
       '<div class="row"><span>Fondos</span><span>' + (fondos > 0 ? fin_fmt(fondos) : '-') + '</span></div>' +
       '<div class="row"><span>Acciones</span><span>' + (acciones > 0 ? fin_fmt(acciones) : '-') + '</span></div>' +
+      (urbanitae > 0 ? '<div class="row"><span>Urbanitae</span><span>' + fin_fmt(urbanitae) + '</span></div>' : '') +
       '<div class="row"><span>Inmuebles</span><span>' + (inmob.total > 0 ? fin_fmt(inmob.total) : '-') + '</span></div>' +
       (igc > 0 ? '<div class="row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span>' + fin_fmt(total + igc) + '</span></div>' : '');
   }
@@ -14127,6 +14412,12 @@ function dash_render() {
     var _cot = _cotiz[_tks[_j]] ? _cotiz[_tks[_j]].precio : null;
     if (_cot) acciones += _cot * _p.num;
   }
+  // PUNTO 89 (03/09/2026): mismo criterio que en Finanzas — solo el capital
+  // de los proyectos de Urbanitae "En curso" cuenta aquí (ver comentario
+  // junto a fin_calcPatrimonio()).
+  var urbanitae = fin_load('fin:urbanitae').reduce(function(s, u) {
+    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
+  }, 0);
   // PUNTO 41 (25/08/2026): se suma el patrimonio inmobiliario, igual que en Finanzas.
   var _empActivaPat = localStorage.getItem('patrimer:empresa') || 'patrimer';
   var _inmobDash = inm_patrimonioInmobiliario(_empActivaPat);
@@ -14135,7 +14426,7 @@ function dash_render() {
   var _igcDash = (_empActivaPat === 'patrimer') ? 1000000 : 0;
   // AJUSTE 25/08/2026 (noche): igual que en Finanzas — el número grande ya no
   // incluye el IGC, se muestra aparte como fila "Total+IGC".
-  var total = cuentas + fondos + acciones + _inmobDash.total;
+  var total = cuentas + fondos + acciones + urbanitae + _inmobDash.total;
   var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmtEntero(total) : '—';
   var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmtEnteroSinSimbolo(_inmobDash.total) : '—';
   var dPatIgcRow = document.getElementById('dash-pat-igc-row');
@@ -14144,7 +14435,10 @@ function dash_render() {
   if (dPatIgc) dPatIgc.textContent = _igcDash > 0 ? fin_fmtEnteroSinSimbolo(total + _igcDash) : '';
   // AJUSTE 25/08/2026 (tarde): en Inicio ya no se desglosan Cuentas/Acciones/
   // Fondos por separado — se juntan en un único dato "Financiero".
-  var _financiero = cuentas + acciones + fondos;
+  // PUNTO 89 (03/09/2026): Urbanitae se suma también aquí, dentro de
+  // "Financiero" — en Inicio no hay sitio para desglosarlo aparte (a
+  // diferencia de Finanzas, que sí tiene su propia fila).
+  var _financiero = cuentas + acciones + fondos + urbanitae;
   var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmtEnteroSinSimbolo(_financiero) : '—';
   // PUNTO 72 (28/08/2026): "Cuentas + Fondos", misma liquidez para inversión
   // que en Finanzas — ver comentario junto a fin_calcPatrimonio().
@@ -14634,7 +14928,7 @@ document.addEventListener("DOMContentLoaded", loginInit);
   // — esta clave no encajaba en el patrón de abajo, así que esas
   // actualizaciones no dejaban ningún rastro de fecha. Añadida como caso
   // aparte para que también cuente.
-  const _finKeyRegex = /^fin:(cuentas|acciones|fondos):/;
+  const _finKeyRegex = /^fin:(cuentas|acciones|fondos|urbanitae):/;
   localStorage.setItem = function(key, value) {
     _origSetItem(key, value);
     if (_finKeyRegex.test(key) || key === 'fin:cotizaciones') {
@@ -14682,6 +14976,10 @@ window._refreshCurrentModule = function(key) {
     'fin:fondos:patrimer': 'finanzas',
     'fin:fondos:patricio': 'finanzas',
     'fin:fondos:industrias': 'finanzas',
+    'fin:urbanitae:empresa': 'finanzas',
+    'fin:urbanitae:patrimer': 'finanzas',
+    'fin:urbanitae:patricio': 'finanzas',
+    'fin:urbanitae:industrias': 'finanzas',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
   };
