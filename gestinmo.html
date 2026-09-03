@@ -2073,6 +2073,107 @@ function _inmueblesMerge(localJSON, remoteJSON) {
 }
 window._inmueblesMerge = _inmueblesMerge; // expuesta para pruebas automáticas
 
+// PUNTO 93 (03/09/2026) — BUG REAL CONFIRMADO CON DATOS REALES: "creo una
+// cuenta nueva en Patricio y desaparece", "actualizo el saldo y vuelve al
+// antiguo". Misma causa de fondo que ya se corrigió en Inmuebles (67/71) e
+// Ideas (49), pero nunca se había extendido aquí: fin:cuentas / fin:acciones
+// / fin:fondos (las 3 empresas) se guardaban en la nube como UN SOLO BLOQUE
+// por empresa. Si el aparato tenía en memoria una copia no del todo
+// actualizada de ese bloque (por ejemplo, tras una recarga de la PWA justo
+// antes de que un cambio terminara de confirmarse en la nube — mismo
+// escenario del punto 51.7/52), al guardar cualquier cosa de ese bloque se
+// subía la copia entera y antigua, borrando en silencio cambios recientes —
+// incluida una cuenta recién creada, que nunca había llegado a estar en esa
+// copia vieja.
+//
+// Arreglo: mismo mecanismo que Inmuebles — fusión elemento a elemento en vez
+// de sustitución en bloque. La diferencia es que Cuentas/Acciones/Fondos no
+// tenían ningún dato estable para identificar "es el mismo elemento" entre
+// aparatos (Inmuebles tiene la referencia, ej. VIV01). Se les da un "id"
+// propio: los elementos nuevos lo reciben al crearse (aleatorio); los que ya
+// existían de antes de esta versión lo calculan solos, a partir de sus
+// propios datos ESTABLES (nombre+IBAN en cuentas, nombre+gestora en fondos,
+// valor+tipo+fecha en movimientos de acciones — nunca el saldo/aportado/
+// importe, que es justo lo que puede estar recién editado y sin sincronizar
+// todavía en uno de los aparatos) — así, si dos aparatos distintos abren la
+// app sin haber sincronizado entre sí todavía, los dos calculan el MISMO id
+// para lo que es, de hecho, el mismo dato, y no se duplica.
+function _finGenId() {
+  return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+window._finGenId = _finGenId; // expuesta para pruebas automáticas
+
+// "Huella" estable de un elemento sin id todavía (dato creado antes de esta
+// versión) — se usa solo para calcularle un id la primera vez que se ve sin
+// uno. Deliberadamente NO incluye saldo/aportado/valor/importe (ver arriba).
+function _finHuella(tipo, it) {
+  if (tipo === 'cuentas') return (it.nombre || '') + '|' + (it.iban || '');
+  if (tipo === 'fondos') return (it.nombre || '') + '|' + (it.gestora || '');
+  // acciones: un movimiento se identifica por el valor, el tipo y la fecha.
+  // Si algún día hay dos movimientos con exactamente los tres iguales (caso
+  // raro), se resuelve igual que cualquier otra fusión: gana el más
+  // reciente en cuanto uno de los dos se edite y quede con fecha real.
+  return (it.ticker || '') + '|' + (it.tipo || '') + '|' + (it.fecha || '');
+}
+
+// Asegura que cada elemento de la lista tiene id — a los que no lo tengan se
+// lo calcula a partir de su huella estable. Si dos elementos de la MISMA
+// lista calculan la misma huella (huella repetida), se numeran para no
+// colisionar entre sí dentro del propio aparato. No inventa fecha de sello
+// (updatedAt) — se deja vacía si no la tenía, igual que hace _inmueblesMerge
+// con las fichas sin sello: así un elemento recién creado, todavía sin
+// confirmar en la nube, no puede ser sustituido por una copia vieja
+// mientras dure ese primer momento de riesgo (ver el sellado real, una sola
+// vez, en el listener 'firebaseLoaded' más abajo en el archivo).
+function _finConIds(tipo, arr) {
+  const vistos = {};
+  return (arr || []).filter(function(it) { return !!it; }).map(function(it) {
+    if (!it.id) {
+      const base = 'leg_' + tipo + '_' + _finHuella(tipo, it);
+      let id = base, n = 2;
+      while (vistos[id]) { id = base + '_' + n; n++; }
+      it.id = id;
+    }
+    vistos[it.id] = true;
+    if (!it.updatedAt) it.updatedAt = '';
+    return it;
+  });
+}
+
+function _finListaMerge(tipo, localJSON, remoteJSON) {
+  try {
+    const locales = _finConIds(tipo, localJSON ? JSON.parse(localJSON) : []);
+    const remotas = _finConIds(tipo, remoteJSON ? JSON.parse(remoteJSON) : []);
+    const mapa = {};
+    const orden = [];
+    locales.forEach(function(it) {
+      if (!(it.id in mapa)) orden.push(it.id);
+      mapa[it.id] = it;
+    });
+    remotas.forEach(function(it) {
+      const actual = mapa[it.id];
+      if (!actual) { orden.push(it.id); mapa[it.id] = it; }
+      // Mismo criterio que PUNTO 71: solo se decide por fecha cuando las DOS
+      // versiones ya tienen sello — un elemento local sin sello todavía
+      // nunca se deja pisar por la copia de la nube, sea esta la que sea.
+      else if (actual.updatedAt && String(it.updatedAt || '') > String(actual.updatedAt)) mapa[it.id] = it;
+    });
+    return JSON.stringify(orden.map(function(id) { return mapa[id]; }));
+  } catch (e) {
+    console.warn('Fusión de Finanzas fallida (' + tipo + '), se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._finListaMerge = _finListaMerge; // expuesta para pruebas automáticas
+
+// Detecta si una clave de DATA_KEYS es una lista de Finanzas que debe
+// fusionarse elemento a elemento (cuentas/acciones/fondos, cualquier
+// empresa) — y de qué tipo, para elegir la huella correcta.
+function _finTipoDeClave(key) {
+  const m = /^fin:(cuentas|acciones|fondos):/.exec(key || '');
+  return m ? m[1] : null;
+}
+
 // ── ESCRIBIR EN FIRESTORE ──────────────────────────────────────────
 window.syncToFirestore = async function(key, value) {
   if (!DATA_KEYS.includes(key)) return;
@@ -2111,6 +2212,13 @@ window.loadFromFirestore = async function() {
             // PUNTO 67: fusión inmueble a inmueble, nunca sustitución en bloque.
             const actual = localStorage.getItem(key);
             const fusionado = _inmueblesMerge(actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
+          } else if (_finTipoDeClave(key)) {
+            // PUNTO 93: fusión elemento a elemento (cuenta/movimiento/fondo),
+            // nunca sustitución del bloque completo de la empresa.
+            const actual = localStorage.getItem(key);
+            const fusionado = _finListaMerge(_finTipoDeClave(key), actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
           } else {
@@ -2163,6 +2271,18 @@ window.startFirebaseSync = function() {
           // antiguos, ya no puede pisar un cambio reciente de otra.
           const actual = localStorage.getItem(key);
           const fusionado = _inmueblesMerge(actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (_finTipoDeClave(key)) {
+          // PUNTO 93: fusión elemento a elemento (cuenta/movimiento/fondo),
+          // nunca sustitución del bloque completo de la empresa — mismo
+          // motivo que en Inmuebles justo arriba.
+          const actual = localStorage.getItem(key);
+          const fusionado = _finListaMerge(_finTipoDeClave(key), actual, data.value);
           if (fusionado !== actual) {
             localStorage.setItem(key, fusionado);
             window._refreshCurrentModule && window._refreshCurrentModule(key);
@@ -10597,6 +10717,35 @@ document.addEventListener('firebaseLoaded', function() {
       console.log('[Migración] ' + cambios + ' inmuebles sellados con fecha por primera vez');
     }
   })();
+  // PUNTO 93 (03/09/2026): mismo sellado que el bloque de arriba, ahora para
+  // Cuentas/Acciones/Fondos de las 3 empresas. _finListaMerge (más arriba en
+  // el archivo) ya les da un id la primera vez que los ve, pero deja el
+  // sello de fecha en blanco a propósito, para que ese primer encuentro con
+  // la nube nunca pueda pisar un elemento local recién creado (ver el
+  // comentario en _finConIds). Aquí, una vez pasado ese primer momento de
+  // riesgo, se sellan con la fecha de ahora y se suben a la nube — a partir
+  // de ese momento, cualquier cambio futuro se compara por fecha con
+  // normalidad, en cualquiera de los aparatos.
+  (function() {
+    var empresas = ['empresa', 'patrimer', 'patricio', 'industrias'];
+    var tipos = ['cuentas', 'acciones', 'fondos'];
+    tipos.forEach(function(tipo) {
+      empresas.forEach(function(emp) {
+        var key = 'fin:' + tipo + ':' + emp;
+        var arr;
+        try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { arr = []; }
+        if (!Array.isArray(arr) || arr.length === 0) return;
+        var cambios = 0;
+        arr.forEach(function(it) { if (it && !it.updatedAt) { it.updatedAt = new Date().toISOString(); cambios++; } });
+        if (cambios > 0) {
+          var val = JSON.stringify(arr);
+          localStorage.setItem(key, val);
+          if (window.syncToFirestore) window.syncToFirestore(key, val);
+          console.log('[Migración] ' + key + ': ' + cambios + ' elemento(s) sellados con fecha por primera vez');
+        }
+      });
+    });
+  })();
   // Inicializar histórico rústico si no existe aún en localStorage
   if (!localStorage.getItem(RUS_HIST_KEY)) {
     localStorage.setItem(RUS_HIST_KEY, JSON.stringify(RUS_HIST_INICIAL));
@@ -12257,7 +12406,7 @@ function fin_asiFormatInput(el) {
 function fin_asiGuardarPaso(paso, valor) {
   if (paso.tipo === 'cuenta') {
     var data = fin_load('fin:cuentas');
-    if (data[paso.idx]) { data[paso.idx].saldo = valor; fin_save('fin:cuentas', data); }
+    if (data[paso.idx]) { data[paso.idx].saldo = valor; data[paso.idx].updatedAt = new Date().toISOString(); fin_save('fin:cuentas', data); }
   } else if (paso.tipo === 'accion') {
     _finCotizaciones[paso.ticker] = valor;
     var cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}');
@@ -12265,7 +12414,7 @@ function fin_asiGuardarPaso(paso, valor) {
     localStorage.setItem('fin:cotizaciones', JSON.stringify(cache));
   } else if (paso.tipo === 'fondo') {
     var fondos = fin_load('fin:fondos');
-    if (fondos[paso.idx]) { fondos[paso.idx].valor = valor; fin_save('fin:fondos', fondos); }
+    if (fondos[paso.idx]) { fondos[paso.idx].valor = valor; fondos[paso.idx].updatedAt = new Date().toISOString(); fin_save('fin:fondos', fondos); }
   }
 }
 
@@ -12465,6 +12614,11 @@ function fin_guardarCuenta() {
   var idx = document.getElementById('fin-cuenta-idx').value;
   var data = fin_load('fin:cuentas');
   var obj = { nombre: nombre, iban: iban, saldo: saldo };
+  // PUNTO 93: conservamos el id si ya existía (edición) y siempre refrescamos
+  // updatedAt, para que la fusión elemento a elemento con la nube funcione.
+  if (idx !== '' && data[parseInt(idx)]) { obj.id = data[parseInt(idx)].id || _finGenId(); }
+  else { obj.id = _finGenId(); }
+  obj.updatedAt = new Date().toISOString();
   if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
   fin_save('fin:cuentas', data);
   closeModalById('fin-modal-cuenta');
@@ -12806,6 +12960,10 @@ function fin_guardarAccion() {
   // de añadir uno nuevo al final.
   var idxStr = document.getElementById('fin-accion-idx').value;
   var editando = idxStr !== '' && ops[parseInt(idxStr)];
+  // PUNTO 93: conservamos el id si ya existía (edición) y siempre refrescamos
+  // updatedAt, para que la fusión elemento a elemento con la nube funcione.
+  nuevoOp.id = editando ? (ops[parseInt(idxStr)].id || _finGenId()) : _finGenId();
+  nuevoOp.updatedAt = new Date().toISOString();
   if (editando) {
     ops[parseInt(idxStr)] = nuevoOp;
   } else {
@@ -12943,6 +13101,11 @@ function fin_guardarFondo() {
     dcaActivo: dcaActivo, dcaImporte: dcaImporte, dcaPeriodicidad: dcaPeriodicidad,
     dcaFechaInicio: dcaFechaInicio, dcaUltimaAplicada: dcaUltimaAplicada
   };
+  // PUNTO 93: conservamos el id si ya existía (edición) y siempre refrescamos
+  // updatedAt, para que la fusión elemento a elemento con la nube funcione.
+  if (idx !== '' && data[parseInt(idx)]) { obj.id = data[parseInt(idx)].id || _finGenId(); }
+  else { obj.id = _finGenId(); }
+  obj.updatedAt = new Date().toISOString();
   if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
   fin_save('fin:fondos', data);
   closeModalById('fin-modal-fondo');
@@ -13039,6 +13202,9 @@ function fin_dcaAplicar() {
     // la próxima vez (si se aplicaron varios ciclos a la vez, se reparte a
     // partes iguales entre ellos).
     f.dcaImporte = Math.round((totalAplicado / p.ciclos) * 100) / 100;
+    // PUNTO 93: sella la fecha de modificación para que la fusión con la
+    // nube compare correctamente esta aportación automática.
+    f.updatedAt = new Date().toISOString();
     data[p.idx] = f;
     fin_save('fin:fondos', data);
   }
