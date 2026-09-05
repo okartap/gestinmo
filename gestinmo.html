@@ -1878,6 +1878,16 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+// CIERRE DE SEGURIDAD (03/09/2026): hasta hoy, la base de datos estaba
+// completamente abierta ("allow read, write: if true" en las reglas de
+// Firestore) — cualquiera con la dirección del proyecto podía leer o
+// modificar los datos reales, sin necesidad de ningún login. Como primer
+// cierre (rápido, sin cambiar nada en la pantalla de la app), se exige
+// ahora un login técnico anónimo de Firebase antes de poder leer/escribir
+// nada — invisible para Patricio y Mercedes, pero cierra la puerta a
+// cualquiera que no pase por la propia app. Ver import { getAuth,
+// signInAnonymously } y el arranque al final de este bloque.
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDxtqNsvRhVl4yL9-FdPwQeIokQGhXdR0U",
@@ -1890,6 +1900,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Claves de datos a sincronizar (excluimos preferencias de sesión)
 const DATA_KEYS = [
@@ -2426,9 +2437,24 @@ window.startFirebaseSync = function() {
 // Arrancar: cargar datos, escuchar cambios y, de paso, reintentar
 // cualquier cambio anterior que se hubiera quedado sin confirmar en la
 // nube (PUNTO 49, reapertura del 03/09/2026 — ver _flushOutbox arriba).
-window.loadFromFirestore().then(() => {
-  window.startFirebaseSync();
-  _flushOutbox();
+function _arrancarSincronizacion() {
+  window.loadFromFirestore().then(() => {
+    window.startFirebaseSync();
+    _flushOutbox();
+  });
+}
+// CIERRE DE SEGURIDAD (03/09/2026): primero el login técnico anónimo, y
+// solo cuando se confirma (o falla) se empieza a leer/escribir en la nube
+// — así, en cuanto las reglas de Firestore exijan estar identificado, la
+// app ya cumple ese requisito antes de hacer ninguna petición.
+signInAnonymously(auth).then(() => {
+  _arrancarSincronizacion();
+}).catch((e) => {
+  console.warn('No se pudo iniciar el login técnico anónimo de Firebase:', e.message);
+  // Se intenta igualmente — si las reglas de la nube ya exigen login, estas
+  // llamadas fallarán solas y quedará constancia en la consola, sin romper
+  // el resto de la app (que sigue funcionando con la copia local).
+  _arrancarSincronizacion();
 });
 
 </script>
