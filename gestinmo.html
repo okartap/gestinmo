@@ -1933,6 +1933,10 @@ const DATA_KEYS = [
   'fin:urbanitae:patrimer',
   'fin:urbanitae:patricio',
   'fin:urbanitae:industrias',
+  // PUNTO 92 (05/09/2026): histórico mensual de patrimonio — solo Patrimer
+  // y Patricio (confirmado con Patry, Industrias no tiene datos propios).
+  'fin:patrimonio_historico:patrimer',
+  'fin:patrimonio_historico:patricio',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -2276,6 +2280,40 @@ function _finTipoDeClave(key) {
   return m ? m[1] : null;
 }
 
+// PUNTO 92 (05/09/2026): fusión del histórico de patrimonio (una fila por
+// mes, id = "YYYY-MM") — igual criterio que _finListaMerge (última fecha de
+// modificación gana, fila a fila), no sustitución del bloque completo. Se
+// necesita una fusión propia porque aquí SÍ se puede editar una fila ya
+// creada (añadir/cambiar la nota, o repetir el snapshot del mismo mes), a
+// diferencia del registro de actividad (solo se añade, nunca se edita).
+function _esPatHistClave(key) {
+  return /^fin:patrimonio_historico:/.test(key || '');
+}
+function _patHistMerge(localJSON, remoteJSON) {
+  try {
+    const locales = localJSON ? JSON.parse(localJSON) : [];
+    const remotas = remoteJSON ? JSON.parse(remoteJSON) : [];
+    const mapa = {};
+    const orden = [];
+    (locales || []).forEach(function(r) {
+      if (!r || !r.id) return;
+      if (!(r.id in mapa)) orden.push(r.id);
+      mapa[r.id] = r;
+    });
+    (remotas || []).forEach(function(r) {
+      if (!r || !r.id) return;
+      const actual = mapa[r.id];
+      if (!actual) { orden.push(r.id); mapa[r.id] = r; }
+      else if (actual.updatedAt && String(r.updatedAt || '') > String(actual.updatedAt)) mapa[r.id] = r;
+    });
+    return JSON.stringify(orden.map(function(id) { return mapa[id]; }));
+  } catch (e) {
+    console.warn('Fusión del histórico de patrimonio fallida, se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._patHistMerge = _patHistMerge; // expuesta para pruebas automáticas
+
 // ── ESCRIBIR EN FIRESTORE ──────────────────────────────────────────
 window.syncToFirestore = async function(key, value) {
   if (!DATA_KEYS.includes(key)) return;
@@ -2339,6 +2377,13 @@ window.loadFromFirestore = async function() {
             // nunca sustitución del bloque completo de la empresa.
             const actual = localStorage.getItem(key);
             const fusionado = _finListaMerge(_finTipoDeClave(key), actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
+          } else if (_esPatHistClave(key)) {
+            // PUNTO 92: fusión fila a fila (una por mes), nunca sustitución
+            // del bloque completo — ver _patHistMerge más arriba.
+            const actual = localStorage.getItem(key);
+            const fusionado = _patHistMerge(actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
           } else {
@@ -2414,6 +2459,17 @@ window.startFirebaseSync = function() {
           // motivo que en Inmuebles justo arriba.
           const actual = localStorage.getItem(key);
           const fusionado = _finListaMerge(_finTipoDeClave(key), actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (_esPatHistClave(key)) {
+          // PUNTO 92: fusión fila a fila (una por mes) — mismo motivo que
+          // en Finanzas justo arriba.
+          const actual = localStorage.getItem(key);
+          const fusionado = _patHistMerge(actual, data.value);
           if (fusionado !== actual) {
             localStorage.setItem(key, fusionado);
             window._refreshCurrentModule && window._refreshCurrentModule(key);
@@ -4449,6 +4505,18 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <span>Total invertido (en curso)</span><span id="fin-urbanitae-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
     </div>
   </div>
+  <!-- PUNTO 92 (05/09/2026): Histórico de patrimonio (Liquidez/Invertido/
+  Inmobiliario/Total), mensual, con snapshot manual — solo Patrimer y
+  Patricio (ver fin_patHist_render, más abajo en el archivo). -->
+  <div class="fin-section" id="fin-pathist-section">
+    <div class="fin-section-header">
+      <div class="fin-section-title">&#128202; Histórico de patrimonio</div>
+      <button class="fin-add-btn" onclick="fin_patHist_guardarSnapshot()">&#xFF0B;</button>
+    </div>
+    <div id="fin-pathist-aviso" style="display:none;"></div>
+    <div id="fin-pathist-lista"></div>
+    <div id="fin-pathist-faltan-inmob" style="display:none;font-size:10.5px;color:var(--silver-dim);margin-top:8px;"></div>
+  </div>
   <!-- DIVIDENDOS: dos tarjetas pequeñas (PUNTO 70, 30/08/2026) — sustituyen
        a la única línea "Resumen anual dividendos" que había antes. Una abre
        la misma tabla resumen de siempre; la otra abre el módulo nuevo con
@@ -5413,6 +5481,8 @@ const BACKUP_KEYS = [
   'fin:acciones:empresa','fin:acciones:patrimer','fin:acciones:patricio','fin:acciones:industrias',
   'fin:fondos:empresa','fin:fondos:patrimer','fin:fondos:patricio','fin:fondos:industrias',
   'fin:urbanitae:empresa','fin:urbanitae:patrimer','fin:urbanitae:patricio','fin:urbanitae:industrias',
+  // PUNTO 92 (05/09/2026): histórico mensual de patrimonio.
+  'fin:patrimonio_historico:patrimer','fin:patrimonio_historico:patricio',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -12919,6 +12989,7 @@ function fin_render() {
   fin_renderAcciones();
   fin_renderFondos();
   fin_renderUrbanitae();
+  fin_patHist_render();
   fin_renderUltimaActualizacion();
 }
 
@@ -13853,6 +13924,194 @@ function fin_calcPatrimonio() {
 function fin_toggleAvisoPatrimonio() {
   var el = document.getElementById('fin-patrimonio-aviso-texto');
   if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 92 (05/09/2026): HISTÓRICO DE PATRIMONIO (Liquidez/Invertido/
+// Inmobiliario/Total), mensual, con snapshot manual y aviso destacado el
+// día 1 de cada mes hasta que se guarda. Decisiones acordadas con Patry:
+// (1) Liquidez = Cuentas; Invertido = Acciones + Fondos + Urbanitae — mismo
+// criterio que ya usa en su Excel a mano (ver
+// claude/patrimonio_financiero_historico_ejemplo.md, donde se confirmó que
+// su "Total" de siempre ya incluía en silencio el valor inmobiliario, solo
+// que sin desglosarlo). (2) El aviso mensual no solo recuerda, se queda
+// destacado (it.urgente en pend_calcular/pend_render) hasta que se guarda
+// el snapshot de ese mes. (3) Cada fila se crea con un botón manual "＋",
+// nunca automático — así Patry decide cuándo están los saldos ya al día.
+// (4) El valor inmobiliario suma solo lo que tenga "valor de mercado" o
+// "precio de compra" relleno (reutilizando inm_patrimonioInmobiliario, la
+// misma función que ya usa la tarjeta "Patrimonio total" de arriba) — los
+// inmuebles sin ningún precio quedan fuera, con aviso de cuáles son.
+// Aplica solo a Patrimer y Patricio (confirmado por Patry) — Industrias no
+// tiene datos propios en esta app.
+//
+// NOTA TÉCNICA: los números de Liquidez/Invertido se recalculan aquí con
+// la MISMA lógica que fin_calcPatrimonio() (líneas más arriba), en vez de
+// reutilizar esa función directamente — a propósito, para no arriesgar a
+// que un cambio aquí afecte a la tarjeta "Patrimonio total" ya probada.
+// ═══════════════════════════════════════════════════════════════════════
+
+function fin_patHist_key(emp) {
+  return 'fin:patrimonio_historico:' + emp;
+}
+function fin_patHist_load(empOpt) {
+  try {
+    return JSON.parse(localStorage.getItem(fin_patHist_key(empOpt || fin_emp())) || '[]');
+  } catch (e) { return []; }
+}
+function fin_patHist_save(lista, empOpt) {
+  localStorage.setItem(fin_patHist_key(empOpt || fin_emp()), JSON.stringify(lista));
+}
+function fin_patHist_mesActual() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function fin_patHist_nombreMes(id) {
+  var partes = String(id).split('-');
+  var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  var m = parseInt(partes[1], 10) - 1;
+  return (meses[m] || partes[1]) + ' ' + partes[0];
+}
+// Calcula Liquidez/Invertido/Inmobiliario de la empresa activa AHORA MISMO
+// (los saldos tal y como estén en pantalla en el momento de pulsar "＋").
+function fin_patHist_calcularActual() {
+  var emp = fin_emp();
+  var cuentas = fin_load('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
+  var fondos = fin_load('fin:fondos').reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
+  var opsAcc = fin_load('fin:acciones');
+  var posAcc = {};
+  for (var i = 0; i < opsAcc.length; i++) {
+    var op = opsAcc[i];
+    var t = op.ticker;
+    if (!posAcc[t]) posAcc[t] = 0;
+    if (op.tipo === 'compra') posAcc[t] += parseFloat(op.cantidad) || 0;
+    else if (op.tipo === 'venta') posAcc[t] -= parseFloat(op.cantidad) || 0;
+    else if (op.tipo === 'scrip') posAcc[t] += parseFloat(op.scripAcciones) || 0;
+  }
+  var acciones = 0;
+  Object.keys(posAcc).forEach(function(tk) {
+    if (posAcc[tk] <= 0) return;
+    var cot = _finCotizaciones[tk] || null;
+    if (cot) acciones += cot * posAcc[tk];
+  });
+  var urbanitae = fin_load('fin:urbanitae').reduce(function(s, u) {
+    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
+  }, 0);
+  var inmob = inm_patrimonioInmobiliario(emp);
+  return {
+    liquidez: cuentas,
+    invertido: fondos + acciones + urbanitae,
+    inmobiliario: inmob.total,
+    inmobSinValor: inmob.sinValor,
+    inmobRefsSinValor: inmob.refsSinValor
+  };
+}
+function fin_patHist_guardarSnapshot() {
+  if (bloqueaSiViewer('Guardar un snapshot del histórico de patrimonio')) return;
+  var emp = fin_emp();
+  if (emp !== 'patrimer' && emp !== 'patricio') return;
+  var mesId = fin_patHist_mesActual();
+  var lista = fin_patHist_load();
+  var existente = lista.find(function(r) { return r.id === mesId; });
+  if (existente) {
+    if (!confirm('Ya hay un snapshot guardado para ' + fin_patHist_nombreMes(mesId) + ' (' + fin_fmt(existente.total) + '). ¿Lo actualizo con los saldos de ahora mismo?')) return;
+  }
+  var datos = fin_patHist_calcularActual();
+  var row = existente || { id: mesId, nota: '' };
+  row.fecha = new Date().toISOString().slice(0, 10);
+  row.liquidez = datos.liquidez;
+  row.invertido = datos.invertido;
+  row.inmobiliario = datos.inmobiliario;
+  row.total = datos.liquidez + datos.invertido + datos.inmobiliario;
+  row.updatedAt = new Date().toISOString();
+  if (existente) {
+    lista = lista.map(function(r) { return r.id === mesId ? row : r; });
+  } else {
+    lista.push(row);
+  }
+  fin_patHist_save(lista);
+  fin_patHist_render();
+}
+function fin_patHist_editarNota(id) {
+  if (bloqueaSiViewer('Editar una nota del histórico de patrimonio')) return;
+  var lista = fin_patHist_load();
+  var row = lista.find(function(r) { return r.id === id; });
+  if (!row) return;
+  var nueva = prompt('Nota para ' + fin_patHist_nombreMes(id) + ' (ej: "Venta de acciones ACS", "Compra piso VIV21")— déjalo en blanco para quitarla:', row.nota || '');
+  if (nueva === null) return;
+  row.nota = nueva.trim();
+  row.updatedAt = new Date().toISOString();
+  fin_patHist_save(lista);
+  fin_patHist_render();
+}
+function fin_patHist_borrar(id) {
+  if (bloqueaSiViewer('Borrar una fila del histórico de patrimonio')) return;
+  if (!confirm('¿Borrar el snapshot de ' + fin_patHist_nombreMes(id) + '? No se puede deshacer.')) return;
+  var lista = fin_patHist_load().filter(function(r) { return r.id !== id; });
+  fin_patHist_save(lista);
+  fin_patHist_render();
+}
+function fin_patHist_render() {
+  var sec = document.getElementById('fin-pathist-section');
+  var emp = fin_emp();
+  if (emp !== 'patrimer' && emp !== 'patricio') {
+    // Confirmado con Patry: este histórico no aplica a Industrias.
+    if (sec) sec.style.display = 'none';
+    return;
+  }
+  if (sec) sec.style.display = '';
+  var lista = fin_patHist_load();
+  var mesActual = fin_patHist_mesActual();
+  var tieneEsteMes = lista.some(function(r) { return r.id === mesActual; });
+  var avisoEl = document.getElementById('fin-pathist-aviso');
+  if (avisoEl) {
+    if (!tieneEsteMes) {
+      avisoEl.style.display = 'block';
+      avisoEl.innerHTML = '<div style="background:rgba(230,168,63,0.14);border:1px solid var(--accent-gold);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--accent-gold);font-weight:600;">📅 Actualiza los saldos y pulsa "＋" para guardar el snapshot de ' + fin_patHist_nombreMes(mesActual) + '.</div>';
+    } else {
+      avisoEl.style.display = 'none';
+      avisoEl.innerHTML = '';
+    }
+  }
+  var faltanEl = document.getElementById('fin-pathist-faltan-inmob');
+  if (faltanEl) {
+    var datosAhora = fin_patHist_calcularActual();
+    if (datosAhora.inmobSinValor > 0) {
+      faltanEl.style.display = 'block';
+      faltanEl.textContent = '⚠️ El valor inmobiliario no incluye ' + datosAhora.inmobSinValor + ' inmueble' + (datosAhora.inmobSinValor === 1 ? '' : 's') + ' sin ningún precio registrado (' + datosAhora.inmobRefsSinValor.join(', ') + ')';
+    } else {
+      faltanEl.style.display = 'none';
+      faltanEl.textContent = '';
+    }
+  }
+  var listaEl = document.getElementById('fin-pathist-lista');
+  if (!listaEl) return;
+  if (lista.length === 0) {
+    listaEl.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin snapshots guardados todavía. Pulsa + para guardar el de este mes.</div>';
+    return;
+  }
+  var ordenada = lista.slice().sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
+  var html = '';
+  var totalAnterior = null;
+  ordenada.forEach(function(r) {
+    var dif = totalAnterior !== null ? (r.total - totalAnterior) : null;
+    var difHtml = dif !== null
+      ? '<span style="color:' + (dif >= 0 ? '#4caf82' : '#e57373') + ';">' + (dif >= 0 ? '+' : '') + fin_fmt(dif) + '</span>'
+      : '<span style="color:var(--silver-dim);">—</span>';
+    html += '<div class="fin-card">';
+    html += '<div class="fin-card-top">';
+    html += '<div><div class="fin-card-nombre">' + fin_patHist_nombreMes(r.id) + '</div>';
+    html += '<div class="fin-card-sub">Liquidez ' + fin_fmt(r.liquidez) + ' · Invertido ' + fin_fmt(r.invertido) + ' · Inmobiliario ' + fin_fmt(r.inmobiliario) + '</div></div>';
+    html += '<div class="fin-card-saldo">' + fin_fmt(r.total) + '</div></div>';
+    html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">Diferencia vs. mes anterior: ' + difHtml + '</div>';
+    if (r.nota) html += '<div style="font-size:11px;color:var(--silver-bright);font-style:italic;margin-top:4px;">📝 ' + notas_esc(r.nota) + '</div>';
+    html += '<div class="fin-card-actions">';
+    html += '<div class="fin-action-btn" onclick="fin_patHist_editarNota(\'' + r.id + '\')">' + (r.nota ? 'Editar nota' : 'Añadir nota') + '</div>';
+    html += '<div class="fin-action-btn red" onclick="fin_patHist_borrar(\'' + r.id + '\')">Eliminar</div>';
+    html += '</div></div>';
+    totalAnterior = r.total;
+  });
+  listaEl.innerHTML = html;
 }
 
 // --- RESUMEN ANUAL DIVIDENDOS ---
@@ -15030,6 +15289,24 @@ function pend_calcular() {
       }
     }
   } catch (e) {}
+  // PUNTO 92 (05/09/2026): aviso mensual del histórico de patrimonio — se
+  // queda destacado (urgente:true) hasta que se guarda el snapshot de ese
+  // mes, en Patrimer y en Patricio (confirmado con Patry, aplica a las dos).
+  // No depende de qué empresa esté activa ahora mismo en pantalla — se
+  // comprueban las dos siempre, igual que el resto de avisos de Inicio.
+  try {
+    if (getRol() === 'admin') {
+      var mesIdPat = fin_patHist_mesActual();
+      [{ k: 'patrimer', n: 'Patrimer' }, { k: 'patricio', n: 'Patricio' }].forEach(function(e) {
+        var listaChk = [];
+        try { listaChk = JSON.parse(localStorage.getItem('fin:patrimonio_historico:' + e.k) || '[]'); } catch (err) {}
+        var yaEsteMes = listaChk.some(function(r) { return r.id === mesIdPat; });
+        if (!yaEsteMes) {
+          items.push({ icon: '📅', t: 'Snapshot de patrimonio de ' + e.n + ' sin guardar este mes', s: 'Actualiza los saldos en Finanzas y pulsa "＋" en Histórico de patrimonio', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
+        }
+      });
+    }
+  } catch (e) {}
   return items;
 }
 
@@ -15065,7 +15342,13 @@ function pend_render() {
   if (contador) contador.textContent = '(' + items.length + ')';
   body.innerHTML = items.map(function(it, i) {
     var btn = it.accion ? '<button class="btn-secondary" style="width:auto;padding:6px 12px;font-size:11px;margin:6px 0 0;" onclick="pend_gestionar(' + i + ')">Gestionar →</button>' : '';
-    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+    // PUNTO 92 (05/09/2026): un aviso "urgente" (hoy solo el snapshot mensual
+    // de patrimonio sin guardar) se pinta más destacado que el resto — borde
+    // de color y fondo tintado — en vez de ser un texto más entre los demás.
+    var estiloFila = it.urgente
+      ? 'display:flex;align-items:flex-start;gap:10px;padding:9px 10px;margin:4px 0;border-radius:8px;background:rgba(230,168,63,0.10);border:1px solid var(--accent-gold);'
+      : 'display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);';
+    return '<div style="' + estiloFila + '">' +
       '<div style="font-size:15px;flex-shrink:0;margin-top:1px;">' + it.icon + '</div>' +
       '<div style="flex:1;min-width:0;">' +
         '<div style="font-size:12.5px;color:var(--silver-bright);line-height:1.35;">' + it.t + '</div>' +
@@ -15116,6 +15399,12 @@ function pend_gestionar(i) {
   } else if (it.accion === 'registro') {
     // PUNTO 90b: intentos bloqueados / posible fuga → abre el registro
     if (typeof registro_abrir === 'function') registro_abrir();
+  } else if (it.accion === 'patrimonio_snapshot') {
+    // PUNTO 92: snapshot mensual sin guardar → Finanzas, ya con la empresa
+    // correcta seleccionada (Patrimer o Patricio, según el aviso concreto).
+    if (typeof saveProfile === 'function') saveProfile(it.empresa);
+    if (typeof applyProfile === 'function') applyProfile(it.empresa);
+    showModule('finanzas');
   }
 }
 
@@ -15299,6 +15588,8 @@ window._refreshCurrentModule = function(key) {
     'fin:urbanitae:patrimer': 'finanzas',
     'fin:urbanitae:patricio': 'finanzas',
     'fin:urbanitae:industrias': 'finanzas',
+    'fin:patrimonio_historico:patrimer': 'finanzas',
+    'fin:patrimonio_historico:patricio': 'finanzas',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
     'app:registro_actividad': 'inicio',
