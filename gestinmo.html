@@ -1937,6 +1937,11 @@ const DATA_KEYS = [
   // y Patricio (confirmado con Patry, Industrias no tiene datos propios).
   'fin:patrimonio_historico:patrimer',
   'fin:patrimonio_historico:patricio',
+  // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
+  // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
+  // amortización real (punto 35) sin tener que entrar en cada inmueble.
+  'inmuebles:alquileres_mensuales',
+  'inmuebles:seguro_ibi',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -2314,6 +2319,15 @@ function _patHistMerge(localJSON, remoteJSON) {
 }
 window._patHistMerge = _patHistMerge; // expuesta para pruebas automáticas
 
+// PUNTO 97 (05/09/2026): mismo criterio de fusión fila a fila que el
+// histórico de patrimonio (punto 92) — reutiliza _patHistMerge tal cual,
+// porque ambas colecciones son "una fila por id, con updatedAt" — para los
+// alquileres mensuales por inmueble (id = idx+"_"+mes) y el seguro/IBI
+// anual por inmueble (id = idx+"_"+año).
+function _esInmRegistroClave(key) {
+  return key === 'inmuebles:alquileres_mensuales' || key === 'inmuebles:seguro_ibi';
+}
+
 // ── ESCRIBIR EN FIRESTORE ──────────────────────────────────────────
 window.syncToFirestore = async function(key, value) {
   if (!DATA_KEYS.includes(key)) return;
@@ -2379,9 +2393,9 @@ window.loadFromFirestore = async function() {
             const fusionado = _finListaMerge(_finTipoDeClave(key), actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
-          } else if (_esPatHistClave(key)) {
-            // PUNTO 92: fusión fila a fila (una por mes), nunca sustitución
-            // del bloque completo — ver _patHistMerge más arriba.
+          } else if (_esPatHistClave(key) || _esInmRegistroClave(key)) {
+            // PUNTO 92/97: fusión fila a fila (una por mes o por año), nunca
+            // sustitución del bloque completo — ver _patHistMerge más arriba.
             const actual = localStorage.getItem(key);
             const fusionado = _patHistMerge(actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
@@ -2465,9 +2479,9 @@ window.startFirebaseSync = function() {
           }
           return;
         }
-        if (_esPatHistClave(key)) {
-          // PUNTO 92: fusión fila a fila (una por mes) — mismo motivo que
-          // en Finanzas justo arriba.
+        if (_esPatHistClave(key) || _esInmRegistroClave(key)) {
+          // PUNTO 92/97: fusión fila a fila (una por mes o por año) — mismo
+          // motivo que en Finanzas justo arriba.
           const actual = localStorage.getItem(key);
           const fusionado = _patHistMerge(actual, data.value);
           if (fusionado !== actual) {
@@ -3053,10 +3067,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         </div>
         <div class="form-group">
           <div class="form-label">Estado</div>
-          <select class="form-select" id="f-estado">
+          <select class="form-select" id="f-estado" onchange="inm_onEstadoChange()">
             <option value="alquilado">Alquilado</option>
             <option value="vacio">Vacío</option>
             <option value="reforma">En reforma</option>
+            <option value="vendido">Vendido</option>
           </select>
         </div>
       </div>
@@ -3143,6 +3158,25 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           <input class="form-input" id="f-ingresos-acum" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint">Punto de partida para calcular la amortización real (punto 35): se rellena una sola vez con una estimación de todo lo cobrado desde que compraste el inmueble. A partir de ahí, la app suma sola los cobros que vayas registrando</div>
         </div>
+      </div>
+
+      <!-- PUNTO 97b (05/09/2026): resultado de la venta, solo visible cuando el
+           estado del inmueble es "Vendido" — para que la amortización real
+           (punto 35) pueda incluir también lo sacado de la venta, no solo el
+           alquiler cobrado mientras fue tuyo. -->
+      <div class="form-section-title" id="venta-resultado-title" style="display:none;">Resultado de la venta</div>
+      <div id="venta-resultado-section" style="display:none;">
+        <div class="form-row two">
+          <div class="form-group">
+            <div class="form-label">Precio de venta (€)</div>
+            <input class="form-input" id="f-venta-declarado" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Efectivo aparte (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
+            <input class="form-input" id="f-venta-efectivo" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          </div>
+        </div>
+        <div class="form-hint">Se suma a lo cobrado en alquiler para calcular el resultado final de la inversión (punto 35)</div>
       </div>
 
       <!-- Preview rentabilidad en tiempo real -->
@@ -5000,6 +5034,59 @@ con editar/borrar en cada línea. -->
     </div>
   </div>
 
+  <!-- PUNTO 97 (05/09/2026): Bloque B2 — Alquileres mensuales (registro simple
+       de cobro + comunidad por inmueble y mes, todos juntos en una tabla, tal
+       como lo pediste — sin tener que entrar en cada inmueble). Alimenta solo
+       la amortización real (punto 35) de cada inmueble. -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-alqmen')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">🗓️</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">ALQUILERES MENSUALES</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Cobro y comunidad, mes a mes</div>
+        </div>
+      </div>
+      <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-alqmen">›</span>
+    </div>
+    <div id="bloque-alqmen" style="display:none;padding:0 16px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <button onclick="alqmen_mesAnterior()" style="background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:16px;width:34px;height:34px;cursor:pointer;">‹</button>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--silver-bright);letter-spacing:1px;" id="alqmen-mes-label">—</div>
+        <button onclick="alqmen_mesSiguiente()" style="background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:16px;width:34px;height:34px;cursor:pointer;">›</button>
+      </div>
+      <div id="alqmen-aviso-copia" style="display:none;font-size:11px;color:var(--text-secondary);margin-bottom:8px;"></div>
+      <div id="alqmen-filas"></div>
+      <button onclick="alqmen_guardarMes()" style="width:100%;background:rgba(76,175,130,0.15);border:1px solid rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:10px;cursor:pointer;margin-top:4px;">Guardar este mes</button>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:10px;">💡 Navega con ‹ › a cualquier mes para corregir un dato ya guardado. Si el mes que ves aún no tiene nada guardado, se rellena solo con lo del mes anterior para que solo tengas que revisar y guardar.</div>
+    </div>
+  </div>
+
+  <!-- PUNTO 97 (05/09/2026): Bloque B3 — Seguro e IBI anual por inmueble, con
+       histórico desplegable de años anteriores para llevar seguimiento. -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-segibi')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">🛡️</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">SEGURO E IBI</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Gasto anual por inmueble</div>
+        </div>
+      </div>
+      <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-segibi">›</span>
+    </div>
+    <div id="bloque-segibi" style="display:none;padding:0 16px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <button onclick="segibi_anioAnterior()" style="background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:16px;width:34px;height:34px;cursor:pointer;">‹</button>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--silver-bright);letter-spacing:1px;" id="segibi-anio-label">—</div>
+        <button onclick="segibi_anioSiguiente()" style="background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:16px;width:34px;height:34px;cursor:pointer;">›</button>
+      </div>
+      <div id="segibi-filas"></div>
+      <button onclick="segibi_guardarAnio()" style="width:100%;background:rgba(76,175,130,0.15);border:1px solid rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:10px;cursor:pointer;margin-top:4px;">Guardar este año</button>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:10px;">💡 Navega con ‹ › para ver o corregir el seguro e IBI de años anteriores — todo queda guardado, no se borra al cambiar de año.</div>
+    </div>
+  </div>
+
   <!-- Bloque C: Capital Mobiliario -->
   <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
     <div onclick="renta_toggleBloque('bloque-capital')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
@@ -5483,6 +5570,8 @@ const BACKUP_KEYS = [
   'fin:urbanitae:empresa','fin:urbanitae:patrimer','fin:urbanitae:patricio','fin:urbanitae:industrias',
   // PUNTO 92 (05/09/2026): histórico mensual de patrimonio.
   'fin:patrimonio_historico:patrimer','fin:patrimonio_historico:patricio',
+  // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
+  'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -5789,7 +5878,11 @@ function saveInmuebles(arr) {
 function inm_patrimonioInmobiliario(empresa) {
   var todos = loadInmuebles();
   var propBuscado = normEmpresa(empresa);
-  var deEstaEmpresa = todos.filter(function(inm) { return normEmpresa(inm.propietario || 'patrimer') === propBuscado; });
+  // PUNTO 97 (05/09/2026): un inmueble marcado como "vendido" ya no es
+  // patrimonio inmobiliario — su valor pasa a ser liquidez (o lo que sea
+  // que hicieras con lo obtenido), así que se excluye de este total para
+  // no contar el mismo dinero dos veces.
+  var deEstaEmpresa = todos.filter(function(inm) { return normEmpresa(inm.propietario || 'patrimer') === propBuscado && inm.estado !== 'vendido'; });
   var total = 0, contados = 0, usandoCompra = 0;
   // PUNTO 66 (28/08/2026): además de contar cuántos inmuebles faltan, se
   // guarda también SU REFERENCIA (ej. "RUS05", "PG07") — así el aviso de
@@ -5869,24 +5962,71 @@ function inm_cobrosAcumulados(idx) {
   const cobros = load(KEYS.cobros).filter(c => c.inmuebleIdx === idx);
   return cobros.reduce((s, c) => s + (parseFloat(c.importe) || 0), 0);
 }
+// PUNTO 97 (05/09/2026) — ALQUILERES MENSUALES POR INMUEBLE
+// ───────────────────────────────────────────────────────────
+// Tabla sencilla (una fila por inmueble y mes) donde Patry apunta el
+// alquiler cobrado y la comunidad pagada cada mes, para los inmuebles de
+// Patricio. Guardada como lista plana con id = idx + "_" + "YYYY-MM" para
+// que la fusión entre dispositivos sea fila a fila (ver _esInmRegistroClave).
+function inm_alqMenLoad() {
+  return load('inmuebles:alquileres_mensuales');
+}
+function inm_alqMenSave(lista) {
+  save('inmuebles:alquileres_mensuales', lista);
+  if (window.syncToFirestore) window.syncToFirestore('inmuebles:alquileres_mensuales', JSON.stringify(lista));
+}
+function inm_alqMenAcumulado(idx) {
+  return inm_alqMenLoad().filter(function(r) { return r.inmuebleIdx === idx; })
+    .reduce(function(s, r) { return s + (parseFloat(r.alquiler) || 0); }, 0);
+}
+// PUNTO 97 (05/09/2026) — SEGURO E IBI ANUAL POR INMUEBLE
+// ──────────────────────────────────────────────────────────
+// Un dato al año por inmueble (id = idx + "_" + año), con histórico de años
+// anteriores consultable — no afecta a la amortización (que es en bruto,
+// solo alquiler), es solo para llevar seguimiento de estos dos gastos fijos.
+function inm_seguroIbiLoad() {
+  return load('inmuebles:seguro_ibi');
+}
+function inm_seguroIbiSave(lista) {
+  save('inmuebles:seguro_ibi', lista);
+  if (window.syncToFirestore) window.syncToFirestore('inmuebles:seguro_ibi', JSON.stringify(lista));
+}
+// PUNTO 97b (05/09/2026): si el inmueble está vendido, lo sacado de la venta
+// (precio + cualquier efectivo aparte) también cuenta como "recuperado" de
+// la inversión — igual que el alquiler, solo que de una vez.
+function inm_ventaTotal(inm) {
+  return (parseFloat(inm.ventaDeclarado) || 0) + (parseFloat(inm.ventaEfectivo) || 0);
+}
 // Ingresos totales de un inmueble = lo que el propio Patry apunta como punto
 // de partida (alquiler cobrado antes de usar la app, campo "ingresosAcumInicial",
 // se rellena una sola vez a mano) + lo que la app ya lleva registrado como
-// cobrado desde entonces. Es un dato en BRUTO (alquiler cobrado), no se
-// restan gastos anuales — decisión tomada con Patry el 25/08/2026.
+// cobrado desde entonces (cobros sueltos de la pestaña Cuenta) + lo que se
+// va apuntando mes a mes en la nueva tabla de Alquileres mensuales (punto
+// 97) + lo sacado de la venta, si el inmueble ya está vendido (punto 97b).
+// Es un dato en BRUTO (alquiler cobrado), no se restan gastos anuales —
+// decisión tomada con Patry el 25/08/2026.
 function inm_ingresosTotales(idx, inm) {
-  return (parseFloat(inm.ingresosAcumInicial) || 0) + inm_cobrosAcumulados(idx);
+  return (parseFloat(inm.ingresosAcumInicial) || 0) + inm_cobrosAcumulados(idx) + inm_alqMenAcumulado(idx) + inm_ventaTotal(inm);
+}
+// PUNTO 97 (05/09/2026): coste total de inversión de un inmueble, sin
+// depender de calcRent (que exige una renta activa). Antes, un inmueble
+// vendido o vacío sin renta activa se quedaba SIN amortización calculada
+// aunque sí tuviera precio de compra — ahora el coste total se calcula
+// aparte, así la amortización funciona también en esos casos.
+function inm_costeTotalInversion(inm) {
+  return (parseFloat(inm.precio) || 0) + (parseFloat(inm.gastosCompra) || 0) + (parseFloat(inm.reforma) || 0);
 }
 // Devuelve el estado de amortización de un inmueble, o null si no hay datos
-// suficientes (hace falta precio de compra y renta actual, igual que calcRent).
+// suficientes (hace falta al menos el precio de compra).
 function inm_amortizacion(idx, inm) {
-  const rent = calcRent(inm);
-  if (!rent) return null;
+  const costeTotal = inm_costeTotalInversion(inm);
+  if (!costeTotal) return null;
   const ingresosTotales = inm_ingresosTotales(idx, inm);
-  const pendiente = Math.max(0, rent.costeTotal - ingresosTotales);
-  const superavit = ingresosTotales > rent.costeTotal ? ingresosTotales - rent.costeTotal : 0;
-  const aniosFaltan = pendiente <= 0 ? 0 : (rent.ingresoAnual > 0 ? pendiente / rent.ingresoAnual : null);
-  return { ingresosTotales, pendiente, superavit, aniosFaltan, costeTotal: rent.costeTotal };
+  const rent = calcRent(inm); // solo para estimar años restantes al ritmo actual, si hay renta activa
+  const pendiente = Math.max(0, costeTotal - ingresosTotales);
+  const superavit = ingresosTotales > costeTotal ? ingresosTotales - costeTotal : 0;
+  const aniosFaltan = pendiente <= 0 ? 0 : (rent && rent.ingresoAnual > 0 ? pendiente / rent.ingresoAnual : null);
+  return { ingresosTotales, pendiente, superavit, aniosFaltan, costeTotal };
 }
 
 function semaforoColor(neta) {
@@ -6053,8 +6193,8 @@ function renderLista() {
     // se avisa de qué piso la incluye, para que no se confunda con una
     // plaza realmente disponible.
     const garajeIncluidoEn = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, todos) : '';
-    const estadoColor = garajeIncluidoEn ? 'var(--accent-blue)' : inm.estado === 'alquilado' ? '#4caf82' : inm.estado === 'reforma' ? '#ffb74d' : 'var(--silver-dim)';
-    const estadoTxt = garajeIncluidoEn ? ('Incluida en ' + garajeIncluidoEn) : inm.estado === 'alquilado' ? 'Alquilado' : inm.estado === 'reforma' ? 'En reforma' : 'Vacío';
+    const estadoColor = garajeIncluidoEn ? 'var(--accent-blue)' : inm.estado === 'alquilado' ? '#4caf82' : inm.estado === 'reforma' ? '#ffb74d' : inm.estado === 'vendido' ? '#9c88c4' : 'var(--silver-dim)';
+    const estadoTxt = garajeIncluidoEn ? ('Incluida en ' + garajeIncluidoEn) : inm.estado === 'alquilado' ? 'Alquilado' : inm.estado === 'reforma' ? 'En reforma' : inm.estado === 'vendido' ? 'Vendido' : 'Vacío';
 
     // Propietario
     const propTxt = propLabels[inm.propietario] || inm.propietario || '';
@@ -6229,7 +6369,7 @@ function inm_showDetail(idx) {
   if (badgeEstadoDet) {
     const garajeIncluidoDet = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, inmuebles) : '';
     const estadoKeyDet = garajeIncluidoDet ? 'alquilado' : (inm.estado || 'vacio');
-    const estadoTextoDet = garajeIncluidoDet ? 'Alquilado' : ({alquilado:'Alquilado', vacio:'Vacío', reforma:'En reforma'}[inm.estado] || 'Vacío');
+    const estadoTextoDet = garajeIncluidoDet ? 'Alquilado' : ({alquilado:'Alquilado', vacio:'Vacío', reforma:'En reforma', vendido:'Vendido'}[inm.estado] || 'Vacío');
     badgeEstadoDet.textContent = estadoTextoDet;
     badgeEstadoDet.className = 'card-status-badge badge-' + (estadoKeyDet === 'alquilado' ? 'alquilado' : (estadoKeyDet === 'reforma' ? 'reforma' : 'vacio'));
   }
@@ -6279,7 +6419,30 @@ function inm_showDetail(idx) {
         ${amortRowsHtml}
       </div>`;
   } else {
-    semBox.innerHTML = `<div style="color:var(--silver-dim);font-size:13px;padding:8px 0">Sin datos de inversión — introduce precio de compra y renta para calcular rentabilidad.</div>`;
+    // PUNTO 97 (05/09/2026): sin renta activa (p. ej. inmueble vendido) no se
+    // puede calcular rentabilidad %, pero sí se puede seguir mostrando la
+    // amortización real (inversión vs. ingresos totales) si hay precio de compra.
+    const amortSolo = inm_amortizacion(idx, inm);
+    if (amortSolo) {
+      const amortTxt = amortSolo.pendiente <= 0
+        ? `<div class="semaforo-row"><div class="semaforo-row-label">${inm.estado === 'vendido' ? 'Resultado final' : 'Amortización'}</div><div class="semaforo-row-value" style="color:var(--accent-green)">✅ ${inm.estado === 'vendido' ? 'Ganancia' : 'Recuperada'}${amortSolo.superavit > 0 ? ' (+' + fmt(amortSolo.superavit) + ' €)' : ''}</div></div>`
+        : `<div class="semaforo-row"><div class="semaforo-row-label">${inm.estado === 'vendido' ? 'Resultado final (pérdida)' : 'Falta por amortizar'}</div><div class="semaforo-row-value">${inm.estado === 'vendido' ? '-' : ''}${fmt(amortSolo.pendiente)} €</div></div>`;
+      // PUNTO 97b (05/09/2026): si está vendido y tiene precio de venta, se
+      // desglosa aparte de "ingresos totales" para que se vea claro que ese
+      // dinero viene de la venta, no de alquiler.
+      const ventaTotal = inm_ventaTotal(inm);
+      const ventaRow = (inm.estado === 'vendido' && ventaTotal > 0)
+        ? `<div class="semaforo-row"><div class="semaforo-row-label">Venta${inm.ventaEfectivo > 0 ? ' (' + fmt(inm.ventaDeclarado || 0) + ' + ' + fmt(inm.ventaEfectivo) + ' efvo.)' : ''}</div><div class="semaforo-row-value">${fmt(ventaTotal)} €</div></div>`
+        : '';
+      semBox.innerHTML = `<div style="padding:4px 0">
+        <div class="semaforo-row"><div class="semaforo-row-label">Inversión total</div><div class="semaforo-row-value">${fmt(amortSolo.costeTotal)} €</div></div>
+        <div class="semaforo-row"><div class="semaforo-row-label">${inm.estado === 'vendido' ? 'Alquiler cobrado' : 'Ingresos totales'}</div><div class="semaforo-row-value">${fmt(amortSolo.ingresosTotales - ventaTotal)} €</div></div>
+        ${ventaRow}
+        ${amortTxt}
+      </div>`;
+    } else {
+      semBox.innerHTML = `<div style="color:var(--silver-dim);font-size:13px;padding:8px 0">Sin datos de inversión — introduce precio de compra y renta para calcular rentabilidad.</div>`;
+    }
   }
 
   // Tab info
@@ -6294,7 +6457,7 @@ function inm_showDetail(idx) {
   const garajeIncluidoEnDet = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, inmuebles) : '';
   document.getElementById('info-estado').textContent = garajeIncluidoEnDet
     ? ('Incluida en el alquiler de ' + garajeIncluidoEnDet)
-    : ({alquilado:'Alquilado', vacio:'Vacío', reforma:'En reforma'}[inm.estado] || '—');
+    : ({alquilado:'Alquilado', vacio:'Vacío', reforma:'En reforma', vendido:'Vendido'}[inm.estado] || '—');
   const infoGarajeRow = document.getElementById('info-garaje-row');
   if (inm.tipo === 'piso' && inm.garajeRef) {
     if (infoGarajeRow) infoGarajeRow.style.display = 'flex';
@@ -6580,6 +6743,16 @@ function inm_onPropietarioChange() {
   inm_onGarajeSeleccionado();
 }
 
+// PUNTO 97b (05/09/2026): el bloque "Resultado de la venta" solo tiene
+// sentido si el inmueble está marcado como "Vendido".
+function inm_onEstadoChange() {
+  const esVendido = document.getElementById('f-estado').value === 'vendido';
+  const sec = document.getElementById('venta-resultado-section');
+  const titulo = document.getElementById('venta-resultado-title');
+  if (sec) sec.style.display = esVendido ? 'block' : 'none';
+  if (titulo) titulo.style.display = esVendido ? 'block' : 'none';
+}
+
 function openModal(editIdx) {
   const modal = document.getElementById('inm-modal-inmueble');
   clearForm();
@@ -6634,8 +6807,11 @@ function openModal(editIdx) {
     document.getElementById('f-reforma').value = inm.reforma ? fmt(inm.reforma) : '';
     document.getElementById('f-gastos-anuales').value = inm.gastosAnuales ? fmt(inm.gastosAnuales) : '';
     document.getElementById('f-ingresos-acum').value = inm.ingresosAcumInicial ? fmt(inm.ingresosAcumInicial) : '';
+    document.getElementById('f-venta-declarado').value = inm.ventaDeclarado ? fmt(inm.ventaDeclarado) : '';
+    document.getElementById('f-venta-efectivo').value = inm.ventaEfectivo ? fmt(inm.ventaEfectivo) : '';
     document.getElementById('f-notas').value = inm.notas || '';
     modal.dataset.editIdx = editIdx;
+    inm_onEstadoChange();
     // PUNTO 63: ocultar/renombrar campos que no aplican según el tipo
     // (rústico), después de rellenar el formulario con los datos guardados.
     inm_actualizarCamposPorTipo(inm.tipo || 'piso');
@@ -6684,11 +6860,12 @@ function closeModal() {
 }
 
 function clearForm() {
-  ['f-ref-inm','f-direccion','f-edificio','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-notas'].forEach(id => {
+  ['f-ref-inm','f-direccion','f-edificio','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-notas'].forEach(id => {
     const el = document.getElementById(id);
     if (el.tagName === 'SELECT') el.selectedIndex = 0;
     else el.value = '';
   });
+  inm_onEstadoChange();
   document.getElementById('rent-preview').style.display = 'none';
   // PUNTO 33: al abrir "Nuevo inmueble" (sin ref, no puede haber contrato
   // activo todavía) el campo Renta vuelve a quedar editable por defecto.
@@ -6759,6 +6936,8 @@ function saveInmueble() {
     reforma: parseFmtGlobal(document.getElementById('f-reforma').value) || '',
     gastosAnuales: parseFmtGlobal(document.getElementById('f-gastos-anuales').value) || '',
     ingresosAcumInicial: parseFmtGlobal(document.getElementById('f-ingresos-acum').value) || '',
+    ventaDeclarado: parseFmtGlobal(document.getElementById('f-venta-declarado').value) || '',
+    ventaEfectivo: parseFmtGlobal(document.getElementById('f-venta-efectivo').value) || '',
     notas: document.getElementById('f-notas').value.trim(),
     inquilino: _inquilinoNombre,
     // PUNTO 32: plaza de garaje asociada a este piso (solo tiene sentido si
@@ -10307,7 +10486,7 @@ function renderFacturar(){
   const empresaActivaFac=localStorage.getItem('patrimer:empresa')||'patrimer';
   const inmuebles=todosInm.filter(inm=>!inm.propietario||normEmpresa(inm.propietario)===normEmpresa(empresaActivaFac));
   const alquilados=inmuebles.filter(i=>i.estado==='alquilado');
-  const vacantes=inmuebles.filter(i=>i.estado!=='alquilado');
+  const vacantes=inmuebles.filter(i=>i.estado!=='alquilado'&&i.estado!=='vendido');
 
   // Agrupar alquilados por tipo
   const grupos={};
@@ -11131,6 +11310,205 @@ document.addEventListener('firebaseLoaded', function() {
       if (window.syncToFirestore) window.syncToFirestore(key, val2);
       console.log('[Migración] Urbanitae (Patricio): duplicados detectados y fusionados, quedan ' + limpio.length + ' proyectos.');
     }
+  })();
+  // PUNTO 92 (05/09/2026): carga inicial, una sola vez, de los 9 meses
+  // históricos que ya llevabas a mano en tu Excel de Patrimer (pasado el
+  // 30/08/2026, guardados en
+  // claude/patrimonio_financiero_historico_ejemplo.md) — así el histórico
+  // no arranca vacío. Solo se ejecuta si 'fin:patrimonio_historico:patrimer'
+  // está todavía vacío, para no pisar nunca nada que ya hayas guardado tú (a
+  // mano o desde otro aparato) — mismo criterio de seguridad que la carga
+  // de Urbanitae justo arriba. El valor "inmobiliario" de cada mes NO
+  // estaba en tu Excel como columna propia — se ha calculado restando
+  // Liquidez+Invertido a tu "Total" de siempre (el hallazgo comentado
+  // contigo el 05/09/2026: tu Total de toda la vida ya incluía en silencio
+  // el valor de tus inmuebles). Revísalo tú: diciembre-25 sale con 40
+  // céntimos sueltos por un redondeo del Excel original, sin importancia
+  // real, y julio-26 repite exactamente los valores de junio (tu propio
+  // Excel ya lo apuntaba así — la nota de esa fila lo explica).
+  (function() {
+    var key = 'fin:patrimonio_historico:patrimer';
+    var actual;
+    try { actual = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { actual = []; }
+    if (Array.isArray(actual) && actual.length > 0) return;
+    var ahora = new Date().toISOString();
+    var seed = [
+      { id: '2025-11', fecha: '2025-11-09', liquidez: 31675.02, invertido: 19128.53, inmobiliario: 540000.00, nota: '' },
+      { id: '2025-12', fecha: '2025-12-01', liquidez: 43377.04, invertido: 17122.98, inmobiliario: 530000.40, nota: '' },
+      { id: '2026-01', fecha: '2026-01-01', liquidez: 47045.79, invertido: 18754.77, inmobiliario: 530000.00, nota: '' },
+      { id: '2026-02', fecha: '2026-02-01', liquidez: 47660.52, invertido: 19157.62, inmobiliario: 535000.00, nota: '' },
+      { id: '2026-03', fecha: '2026-03-01', liquidez: 48061.40, invertido: 20414.23, inmobiliario: 535000.00, nota: '' },
+      { id: '2026-04', fecha: '2026-04-01', liquidez: 47075.89, invertido: 21070.93, inmobiliario: 535000.00, nota: '' },
+      { id: '2026-05', fecha: '2026-05-01', liquidez: 49524.83, invertido: 20720.57, inmobiliario: 535000.00, nota: '' },
+      { id: '2026-06', fecha: '2026-06-01', liquidez: 51568.69, invertido: 22005.47, inmobiliario: 535000.00, nota: '' },
+      { id: '2026-07', fecha: '2026-07-01', liquidez: 51568.69, invertido: 22005.47, inmobiliario: 535000.00, nota: 'Este mes repite exactamente los valores de junio en tu Excel original — probablemente porque julio aún no se había actualizado a mano cuando se hizo esa copia. Corrígelo si ya tienes el dato real de julio.' }
+    ];
+    seed.forEach(function(r) {
+      r.total = r.liquidez + r.invertido + r.inmobiliario;
+      r.updatedAt = ahora;
+    });
+    var val = JSON.stringify(seed);
+    localStorage.setItem(key, val);
+    if (window.syncToFirestore) window.syncToFirestore(key, val);
+    console.log('[Migración] Histórico de patrimonio (Patrimer): ' + seed.length + ' meses cargados por primera vez.');
+  })();
+  // PUNTO 97 (05/09/2026): carga inicial, una sola vez, de tus 3 tablas de
+  // alquileres de Patricio (cobros de 2025 mes a mes, histórico de inversión
+  // 2014-2026 e ingresos por inmueble, y precio de mercado actual) — mismo
+  // criterio de seguridad que el histórico de patrimonio de arriba: solo se
+  // ejecuta si 'inmuebles:alquileres_mensuales' está vacío, y NUNCA pisa un
+  // campo (precio, gastos de compra, reforma, precio actual o ingreso
+  // acumulado inicial) que ya tenga algo escrito — si un inmueble no se
+  // encuentra por su nombre, se deja constancia en consola y no se toca nada
+  // de él, en vez de arriesgarme a crear un duplicado o rellenar el que no es.
+  // Montegorbea = Sierra Nevada y Loterías = Carril C. son el mismo inmueble
+  // con dos nombres distintos entre tus dos tablas — confirmado contigo.
+  (function() {
+    var ALQ_KEY = 'inmuebles:alquileres_mensuales';
+    var SEG_KEY = 'inmuebles:seguro_ibi';
+    var yaCargado;
+    try { yaCargado = JSON.parse(localStorage.getItem(ALQ_KEY) || '[]'); } catch (e) { yaCargado = []; }
+    if (Array.isArray(yaCargado) && yaCargado.length > 0) return;
+
+    var todosInm = loadInmuebles();
+    function buscarPorNombre(palabra) {
+      var encontrados = [];
+      todosInm.forEach(function(inm, i) {
+        if ((inm.propietario || '').toLowerCase() !== 'patricio') return;
+        var dir = (inm.direccion || '').toLowerCase();
+        if (dir.indexOf(palabra) !== -1) encontrados.push(i);
+      });
+      return encontrados;
+    }
+    var sinResolver = [];
+
+    // Datos de inversión histórica (2014-2026), TOTAL ING. desglosado en
+    // "hasta 2024" (para ingresosAcumInicial) + "2025" (mes a mes, más abajo)
+    // — coste = precio compra + impuestos + comisión; reforma = reforma +
+    // mobiliario + derramas — la app no tiene esos campos por separado.
+    var INVERSION = {
+      carril:  { precio: 65000.00, gastosCompra: 7250.00,  reforma: 0.00,     precioActual: 90000.00,  ingresosAcumInicial: 0.00 },
+      gabriel: { precio: 32000.00, gastosCompra: 5180.35,  reforma: 5200.00,  precioActual: 80000.00,  ingresosAcumInicial: 41154.08 },
+      poeta:   { precio: 29990.00, gastosCompra: 5045.40,  reforma: 14130.00, precioActual: 125000.00, ingresosAcumInicial: 44574.88 },
+      yanfer:  { precio: 79000.00, gastosCompra: 7600.00,  reforma: 11350.00, precioActual: 100000.00, ingresosAcumInicial: 1231.60 },
+      nevada:  { precio: 90000.00, gastosCompra: 7574.88,  reforma: 17504.24, precioActual: null,      ingresosAcumInicial: 35661.39 }
+    };
+
+    // Alquiler y comunidad reales de 2025, mes a mes (de tu tabla de cobros).
+    // Carril C. no genera nada hasta octubre (comprado en abril, en reforma).
+    var MESES2025 = {
+      carril:  { alquiler: [0,0,0,0,0,0,0,0,0,700,700,700],                                     comunidad: [0,0,0,24.48,24.48,24.48,24.48,24.48,24.48,24.48,24.48,24.80] },
+      gabriel: { alquiler: [400,400,400,400,400,400,400,400,410,410,410,410],                    comunidad: [0,0,53.94,53.94,53.94,53.94,0,53.94,107.88,107.88,107.88,107.88] },
+      poeta:   { alquiler: [480,480,480,500,494.40,494.40,494.40,494.40,494.40,494.40,494.70,494.70], comunidad: [30,30,30,30,30,30,30,30,30,30,30,30] },
+      nevada:  { alquiler: [583.33,583.33,583.33,583.33,583.33,583.33,583.33,583.33,583.33,583.33,800,800], comunidad: [56.33,56.33,56.33,58.93,58.93,58.93,58.93,58.93,58.93,58.93,58.93,58.93] },
+      yanfer:  { alquiler: [800,800,800,800,800,800,800,800,800,800,825,825],                    comunidad: [52.80,52.80,52.80,52.80,52.80,52.80,52.80,52.80,52.80,52.80,119.27,119.27] }
+    };
+    // Seguro e IBI de 2025 (anual, no mensual) — IBI en blanco donde no lo
+    // apuntaste (Carril y S. Nevada), no se inventa un 0 con significado.
+    var SEGURO_IBI_2025 = {
+      carril:  { seguro: 170.78, ibi: null },
+      gabriel: { seguro: 259.80, ibi: 355.01 },
+      poeta:   { seguro: 246.63, ibi: 179.94 },
+      nevada:  { seguro: 149.86, ibi: null },
+      yanfer:  { seguro: 197.79, ibi: 317.87 }
+    };
+
+    var idxPorClave = {};
+    ['carril','gabriel','poeta','yanfer'].forEach(function(clave) {
+      var matches = buscarPorNombre(clave);
+      if (matches.length !== 1) {
+        sinResolver.push(clave);
+        console.warn('[Migración alquileres Patricio] "' + clave + '": ' + matches.length + ' coincidencias en inmuebles:lista (se esperaba 1) — no se ha tocado, revísalo a mano.');
+        return;
+      }
+      idxPorClave[clave] = matches[0];
+    });
+
+    // Sierra Nevada / Montegorbea: si no existe ya un inmueble de Patricio
+    // con "nevada" o "montegorbea" en la dirección, se crea nuevo — es el
+    // piso que ya vendiste, así que se da de alta como "vendido" directamente.
+    var matchNevada = buscarPorNombre('nevada').concat(buscarPorNombre('montegorbea'));
+    if (matchNevada.length >= 1) {
+      idxPorClave.nevada = matchNevada[0];
+    } else {
+      var nuevoInm = {
+        ref: 'SNEV01', direccion: 'Sierra Nevada (vendido)', tipo: 'piso', propietario: 'patricio',
+        estado: 'vendido', renta: '', rentaEst: '', notas: 'Inmueble vendido — datos históricos cargados el 05/09/2026 a partir de tu Excel, para que la amortización real cuadre con lo que de verdad cobraste mientras fue tuyo.'
+      };
+      todosInm.push(nuevoInm);
+      idxPorClave.nevada = todosInm.length - 1;
+      console.log('[Migración alquileres Patricio] Creado nuevo inmueble "Sierra Nevada" (ref SNEV01, vendido) — revísalo en Inmuebles.');
+    }
+
+    // Rellenar precio/gastos/reforma/precio actual/ingreso inicial — SOLO
+    // los campos que estén vacíos, nunca se pisa un dato que ya exista.
+    Object.keys(idxPorClave).forEach(function(clave) {
+      var idx = idxPorClave[clave];
+      var inm = todosInm[idx];
+      var datos = INVERSION[clave];
+      if (!datos) return;
+      if (!parseFloat(inm.precio)) inm.precio = datos.precio;
+      if (!parseFloat(inm.gastosCompra)) inm.gastosCompra = datos.gastosCompra;
+      if (!parseFloat(inm.reforma)) inm.reforma = datos.reforma;
+      if (datos.precioActual !== null && !parseFloat(inm.precioActual)) inm.precioActual = datos.precioActual;
+      if (!parseFloat(inm.ingresosAcumInicial)) inm.ingresosAcumInicial = datos.ingresosAcumInicial;
+    });
+    saveInmuebles(todosInm);
+    if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', JSON.stringify(todosInm));
+
+    // Cargar los 12 meses de 2025 de alquiler+comunidad para cada inmueble
+    // resuelto, y el seguro/IBI del mismo año.
+    var ahoraTs = new Date().toISOString();
+    var alqSeed = [];
+    var segSeed = [];
+    Object.keys(idxPorClave).forEach(function(clave) {
+      var idx = idxPorClave[clave];
+      var meses = MESES2025[clave];
+      if (meses) {
+        for (var m = 0; m < 12; m++) {
+          var ym = '2025-' + String(m + 1).padStart(2, '0');
+          alqSeed.push({ id: idx + '_' + ym, inmuebleIdx: idx, mes: ym, alquiler: meses.alquiler[m], comunidad: meses.comunidad[m], updatedAt: ahoraTs });
+        }
+      }
+      var si = SEGURO_IBI_2025[clave];
+      if (si) {
+        segSeed.push({ id: idx + '_2025', inmuebleIdx: idx, anio: 2025, seguro: si.seguro, ibi: si.ibi, updatedAt: ahoraTs });
+      }
+    });
+    localStorage.setItem(ALQ_KEY, JSON.stringify(alqSeed));
+    localStorage.setItem(SEG_KEY, JSON.stringify(segSeed));
+    if (window.syncToFirestore) {
+      window.syncToFirestore(ALQ_KEY, JSON.stringify(alqSeed));
+      window.syncToFirestore(SEG_KEY, JSON.stringify(segSeed));
+    }
+    console.log('[Migración alquileres Patricio] Cargados ' + alqSeed.length + ' meses de alquiler/comunidad y ' + segSeed.length + ' registros de seguro/IBI de 2025.' + (sinResolver.length ? ' Sin resolver: ' + sinResolver.join(', ') + '.' : ''));
+  })();
+  // PUNTO 97b (05/09/2026): resultado de la venta de Sierra Nevada
+  // (Montegorbea) — vendido en 120.000€ + 40.000€ en efectivo aparte, dato
+  // que me diste el mismo día. Con guardia propia (no depende de que la
+  // migración de arriba haya podido ejecutarse ya en un login anterior) y
+  // sin pisar nunca el dato si ya lo tuvieras puesto a mano.
+  (function() {
+    var todosInm = loadInmuebles();
+    var idx = -1;
+    for (var i = 0; i < todosInm.length; i++) {
+      var dir = (todosInm[i].direccion || '').toLowerCase();
+      if ((todosInm[i].propietario || '').toLowerCase() === 'patricio' && (dir.indexOf('nevada') !== -1 || dir.indexOf('montegorbea') !== -1)) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) {
+      console.warn('[Migración venta Sierra Nevada] No se ha encontrado el inmueble — revísalo a mano.');
+      return;
+    }
+    var inm = todosInm[idx];
+    if (parseFloat(inm.ventaDeclarado) || parseFloat(inm.ventaEfectivo)) return; // ya tiene algo puesto, no se toca
+    inm.ventaDeclarado = 120000.00;
+    inm.ventaEfectivo = 40000.00;
+    saveInmuebles(todosInm);
+    if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', JSON.stringify(todosInm));
+    console.log('[Migración venta Sierra Nevada] Resultado de la venta cargado: 120.000€ + 40.000€ en efectivo.');
   })();
   // Inicializar histórico rústico si no existe aún en localStorage
   if (!localStorage.getItem(RUS_HIST_KEY)) {
@@ -15590,6 +15968,8 @@ window._refreshCurrentModule = function(key) {
     'fin:urbanitae:industrias': 'finanzas',
     'fin:patrimonio_historico:patrimer': 'finanzas',
     'fin:patrimonio_historico:patricio': 'finanzas',
+    'inmuebles:alquileres_mensuales': 'renta',
+    'inmuebles:seguro_ibi': 'renta',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
     'app:registro_actividad': 'inicio',
@@ -16534,6 +16914,8 @@ function renta_render() {
   renta_renderCapital();
   renta_renderGastos();
   renta_calcPrevision();
+  alqmen_render();
+  segibi_render();
 }
 
 function renta_anioAnterior() {
@@ -16668,19 +17050,19 @@ function renta_renderAlquileres() {
     return;
   }
 
-  // Sumar ingresos por inmueble del año
-  var facturas = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
+  // PUNTO 97 (05/09/2026): esta suma leía de 'facturacion:facturas[].items'
+  // (la factura desglosada por inmueble) — esa forma de facturar se
+  // desactivó en el punto 88 (30/08/2026), así que desde entonces esta
+  // pestaña se quedaba siempre en 0€ aunque sí estuvieras cobrando. Ahora
+  // lee de la nueva tabla "Alquileres mensuales" (más abajo en Renta
+  // Patricio), que es la que de verdad se sigue rellenando mes a mes.
+  var registrosAlq = inm_alqMenLoad();
   var ingresosPorInm = {};
-  for (var j = 0; j < facturas.length; j++) {
-    var f = facturas[j];
-    if (!f.mes || parseInt(f.mes.split('-')[0]) !== renta_anio) continue;
-    if (f.items && f.items.length) {
-      for (var k = 0; k < f.items.length; k++) {
-        var idxF = f.items[k].idx;
-        var importe = parseFloat(f.items[k].precio) || 0;
-        if (importe > 0) ingresosPorInm[idxF] = (ingresosPorInm[idxF] || 0) + importe;
-      }
-    }
+  for (var j = 0; j < registrosAlq.length; j++) {
+    var r = registrosAlq[j];
+    if (!r.mes || parseInt(r.mes.split('-')[0]) !== renta_anio) continue;
+    var importe = parseFloat(r.alquiler) || 0;
+    if (importe > 0) ingresosPorInm[r.inmuebleIdx] = (ingresosPorInm[r.inmuebleIdx] || 0) + importe;
   }
 
   var datos = renta_getInmDatos();
@@ -16745,6 +17127,185 @@ function renta_renderAlquileres() {
 
   cont.innerHTML = html;
   document.getElementById('renta-total-alquileres').textContent = fmtGlobal(totalAlq) + ' €';
+}
+
+// ── PUNTO 97 (05/09/2026): ALQUILERES MENSUALES ────────────────────────────
+// Tabla simple, todos los inmuebles de Patricio juntos, un mes a la vez —
+// para no tener que entrar en cada inmueble por separado (pedido explícito
+// de Patry). Los inmuebles "vendido" no aparecen aquí: ya no generan
+// alquiler que registrar mes a mes.
+var alqmen_mes = null;
+function alqmen_inmActivos() {
+  var todos = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+  var out = [];
+  for (var i = 0; i < todos.length; i++) {
+    if ((todos[i].propietario || '').toLowerCase() === 'patricio' && todos[i].estado !== 'vendido') {
+      out.push({ idx: i, inm: todos[i] });
+    }
+  }
+  return out;
+}
+function alqmen_sumarMes(ym, delta) {
+  var partes = ym.split('-');
+  var y = parseInt(partes[0], 10), m = parseInt(partes[1], 10) - 1;
+  var d = new Date(y, m + delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function alqmen_mesAnterior() { alqmen_mes = alqmen_sumarMes(alqmen_mes, -1); alqmen_render(); }
+function alqmen_mesSiguiente() { alqmen_mes = alqmen_sumarMes(alqmen_mes, 1); alqmen_render(); }
+function alqmen_render() {
+  var cont = document.getElementById('alqmen-filas');
+  if (!cont) return;
+  if (!alqmen_mes) {
+    var d = new Date();
+    alqmen_mes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  document.getElementById('alqmen-mes-label').textContent = mesNombre(alqmen_mes);
+  var inmuebles = alqmen_inmActivos();
+  if (inmuebles.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">No hay inmuebles activos de Patricio en la app.</div>';
+    document.getElementById('alqmen-aviso-copia').style.display = 'none';
+    return;
+  }
+  var registros = inm_alqMenLoad();
+  var mesAnteriorYm = alqmen_sumarMes(alqmen_mes, -1);
+  var hayCopiados = false;
+  var html = '';
+  inmuebles.forEach(function(x) {
+    var reg = registros.find(function(r) { return r.inmuebleIdx === x.idx && r.mes === alqmen_mes; });
+    var esCopia = false;
+    var alquilerVal = '', comunidadVal = '';
+    if (reg) {
+      alquilerVal = reg.alquiler || reg.alquiler === 0 ? fmtGlobal(reg.alquiler) : '';
+      comunidadVal = reg.comunidad || reg.comunidad === 0 ? fmtGlobal(reg.comunidad) : '';
+    } else {
+      var regAnt = registros.find(function(r) { return r.inmuebleIdx === x.idx && r.mes === mesAnteriorYm; });
+      if (regAnt) {
+        alquilerVal = regAnt.alquiler || regAnt.alquiler === 0 ? fmtGlobal(regAnt.alquiler) : '';
+        comunidadVal = regAnt.comunidad || regAnt.comunidad === 0 ? fmtGlobal(regAnt.comunidad) : '';
+        esCopia = true;
+        hayCopiados = true;
+      }
+    }
+    var label = x.inm.direccion || x.inm.ref || ('Inmueble ' + (x.idx + 1));
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:10px 12px;margin-bottom:8px;" data-alqmen-idx="' + x.idx + '">'
+      + '<div style="font-size:12.5px;font-weight:700;color:var(--silver-bright);margin-bottom:8px;">' + label + (esCopia ? ' <span style="font-weight:400;color:var(--text-secondary);font-size:10.5px;">(copiado de ' + mesNombre(mesAnteriorYm) + ')</span>' : '') + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">ALQUILER (€)</div>'
+      + '<input type="text" inputmode="decimal" class="alqmen-input-alquiler" value="' + alquilerVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">COMUNIDAD (€)</div>'
+      + '<input type="text" inputmode="decimal" class="alqmen-input-comunidad" value="' + comunidadVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '</div></div>';
+  });
+  cont.innerHTML = html;
+  var avisoEl = document.getElementById('alqmen-aviso-copia');
+  if (hayCopiados) {
+    avisoEl.style.display = 'block';
+    avisoEl.textContent = '📋 Este mes aún no tenía nada guardado — se han rellenado los datos del mes anterior como punto de partida. Revísalos y pulsa "Guardar este mes".';
+  } else {
+    avisoEl.style.display = 'none';
+  }
+}
+function alqmen_guardarMes() {
+  if (bloqueaSiViewer('Guardar alquileres del mes')) return;
+  var filas = document.querySelectorAll('#alqmen-filas [data-alqmen-idx]');
+  var registros = inm_alqMenLoad();
+  var ahora = new Date().toISOString();
+  filas.forEach(function(fila) {
+    var idx = parseInt(fila.dataset.alqmenIdx, 10);
+    var alquiler = parseFmtGlobal(fila.querySelector('.alqmen-input-alquiler').value) || 0;
+    var comunidad = parseFmtGlobal(fila.querySelector('.alqmen-input-comunidad').value) || 0;
+    var id = idx + '_' + alqmen_mes;
+    var existente = registros.find(function(r) { return r.id === id; });
+    if (existente) {
+      existente.alquiler = alquiler;
+      existente.comunidad = comunidad;
+      existente.updatedAt = ahora;
+    } else {
+      registros.push({ id: id, inmuebleIdx: idx, mes: alqmen_mes, alquiler: alquiler, comunidad: comunidad, updatedAt: ahora });
+    }
+  });
+  inm_alqMenSave(registros);
+  alqmen_render();
+  if (typeof renta_renderAlquileres === 'function') renta_renderAlquileres();
+  if (typeof renta_calcPrevision === 'function') renta_calcPrevision();
+}
+
+// ── PUNTO 97 (05/09/2026): SEGURO E IBI ANUAL ──────────────────────────────
+// Un dato al año por inmueble, con histórico desplegable de años anteriores
+// para llevar seguimiento (pedido explícito de Patry el 05/09/2026). No
+// entra en ningún cálculo automático — es solo registro.
+var segibi_anio = null;
+var segibi_histAbierto = {};
+function segibi_anioAnterior() { segibi_anio--; segibi_render(); }
+function segibi_anioSiguiente() { segibi_anio++; segibi_render(); }
+function segibi_toggleHist(idx) {
+  segibi_histAbierto[idx] = !segibi_histAbierto[idx];
+  segibi_render();
+}
+function segibi_render() {
+  var cont = document.getElementById('segibi-filas');
+  if (!cont) return;
+  if (!segibi_anio) segibi_anio = new Date().getFullYear();
+  document.getElementById('segibi-anio-label').textContent = segibi_anio;
+  var inmuebles = alqmen_inmActivos();
+  if (inmuebles.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">No hay inmuebles activos de Patricio en la app.</div>';
+    return;
+  }
+  var registros = inm_seguroIbiLoad();
+  var html = '';
+  inmuebles.forEach(function(x) {
+    var reg = registros.find(function(r) { return r.inmuebleIdx === x.idx && r.anio === segibi_anio; });
+    var seguroVal = reg && (reg.seguro || reg.seguro === 0) ? fmtGlobal(reg.seguro) : '';
+    var ibiVal = reg && (reg.ibi || reg.ibi === 0) ? fmtGlobal(reg.ibi) : '';
+    var label = x.inm.direccion || x.inm.ref || ('Inmueble ' + (x.idx + 1));
+    var historicos = registros.filter(function(r) { return r.inmuebleIdx === x.idx && r.anio !== segibi_anio; }).sort(function(a, b) { return b.anio - a.anio; });
+    var histHtml = '';
+    if (historicos.length > 0) {
+      histHtml = '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">'
+        + historicos.map(function(h) {
+            return '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);padding:2px 0;"><span>' + h.anio + '</span><span>Seguro ' + (h.seguro || h.seguro === 0 ? fmtGlobal(h.seguro) + ' €' : '—') + ' · IBI ' + (h.ibi || h.ibi === 0 ? fmtGlobal(h.ibi) + ' €' : '—') + '</span></div>';
+          }).join('')
+        + '</div>';
+    }
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:10px 12px;margin-bottom:8px;" data-segibi-idx="' + x.idx + '">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+      + '<div style="font-size:12.5px;font-weight:700;color:var(--silver-bright);">' + label + '</div>'
+      + (historicos.length > 0 ? '<span onclick="segibi_toggleHist(' + x.idx + ')" style="font-size:11px;color:#5b8dee;cursor:pointer;">' + (segibi_histAbierto[x.idx] ? '▾ ocultar' : '▸ histórico (' + historicos.length + ')') + '</span>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">SEGURO (€/año)</div>'
+      + '<input type="text" inputmode="decimal" class="segibi-input-seguro" value="' + seguroVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">IBI (€/año)</div>'
+      + '<input type="text" inputmode="decimal" class="segibi-input-ibi" value="' + ibiVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '</div>'
+      + (segibi_histAbierto[x.idx] ? histHtml : '')
+      + '</div>';
+  });
+  cont.innerHTML = html;
+}
+function segibi_guardarAnio() {
+  if (bloqueaSiViewer('Guardar seguro/IBI del año')) return;
+  var filas = document.querySelectorAll('#segibi-filas [data-segibi-idx]');
+  var registros = inm_seguroIbiLoad();
+  var ahora = new Date().toISOString();
+  filas.forEach(function(fila) {
+    var idx = parseInt(fila.dataset.segibiIdx, 10);
+    var seguro = parseFmtGlobal(fila.querySelector('.segibi-input-seguro').value) || 0;
+    var ibi = parseFmtGlobal(fila.querySelector('.segibi-input-ibi').value) || 0;
+    var id = idx + '_' + segibi_anio;
+    var existente = registros.find(function(r) { return r.id === id; });
+    if (existente) {
+      existente.seguro = seguro;
+      existente.ibi = ibi;
+      existente.updatedAt = ahora;
+    } else {
+      registros.push({ id: id, inmuebleIdx: idx, anio: segibi_anio, seguro: seguro, ibi: ibi, updatedAt: ahora });
+    }
+  });
+  inm_seguroIbiSave(registros);
+  segibi_render();
 }
 
 // ── Capital mobiliario (desde Finanzas patricio) ───────────────────────────
