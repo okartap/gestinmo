@@ -1879,7 +1879,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 ══════════════════════════════════════════════ -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 // CIERRE DE SEGURIDAD (03/09/2026): hasta hoy, la base de datos estaba
 // completamente abierta ("allow read, write: if true" en las reglas de
 // Firestore) — cualquiera con la dirección del proyecto podía leer o
@@ -2574,6 +2574,45 @@ signInAnonymously(auth).then(() => {
   // el resto de la app (que sigue funcionando con la copia local).
   _arrancarSincronizacion();
 });
+
+// PUNTO 87 (06/09/2026): panel de solo lectura del módulo de Trading
+// (TradingOkar) — lee EN VIVO la colección compartida `trading_operaciones`
+// de esta misma base de datos (gestinmo-13c65), escrita directamente por la
+// otra app, no por GestInmo. Importante: estos datos NO pasan por el
+// mecanismo de sincronización de localStorage del resto de la app (no
+// tienen clave en DATA_KEYS, no se guardan en el aparato) — GestInmo solo
+// pregunta y muestra, nunca escribe aquí. Filtra modo='real' (descarta las
+// pruebas en demo) y excluye cualquier documento marcado _test:true. Solo
+// cuenta como "operación" el tipo 'operacion' (un 'no-operacion' es un
+// descarte disciplinado sin datos de precio, no debe contar en las
+// estadísticas). Decidido con Patry (punto 87): sin saldo en euros — el
+// capital inicial no vive en la nube, solo en el móvil de TradingOkar.
+window.cargarTradingOkarStats = async function() {
+  try {
+    const q = query(collection(db, 'trading_operaciones'), where('modo', '==', 'real'));
+    const snap = await getDocs(q);
+    let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, ultimaFecha = '';
+    snap.forEach((docSnap) => {
+      const d = docSnap.data();
+      if (d._test === true) return;
+      if (d.tipo !== 'operacion') return;
+      numOperaciones++;
+      if (typeof d.resultadoEUR === 'number' && d.resultadoEUR > 0) ganadoras++;
+      if (typeof d.resultadoR === 'number') { rAcumulada += d.resultadoR; tieneR++; }
+      const fh = (d.fecha || '') + ' ' + (d.hora || '');
+      if (fh > ultimaFecha) ultimaFecha = fh;
+    });
+    return {
+      ok: true,
+      numOperaciones,
+      winrate: numOperaciones ? (ganadoras / numOperaciones) * 100 : null,
+      rAcumulada, tieneR,
+      ultimaFecha: ultimaFecha.trim()
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+};
 
 </script>
 
@@ -4692,6 +4731,20 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div style="font-size:20px;">&#128202;</div>
       <div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-top:4px;">Panel Patrimonio Financiero</div>
       <div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">Estado actual, por cuenta &#8250;</div>
+    </div>
+  </div>
+  <!-- PUNTO 87 (06/09/2026): panel de solo lectura de Trading (TradingOkar).
+  Lee en vivo de la colección compartida `trading_operaciones` (ver
+  window.cargarTradingOkarStats, bloque de conexión con Firebase) — GestInmo
+  nunca escribe aquí. Solo Patricio, mismo criterio que el Panel de arriba. -->
+  <div class="fin-section" id="fin-trading-section" style="display:none;margin-top:10px;">
+    <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-trading-chev" onclick="fin_toggleSeccion('trading')">&#9660;</button>
+      <div class="fin-section-title">&#128200; Trading</div>
+      <button class="fin-add-btn" onclick="fin_renderTrading(true)" title="Actualizar">&#8635;</button>
+    </div>
+    <div id="fin-trading-body">
+      <div id="fin-trading-content" style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Cargando datos de Trading&hellip;</div>
     </div>
   </div>
   <!-- DIVIDENDOS: dos tarjetas pequeñas (PUNTO 70, 30/08/2026) — sustituyen
@@ -13972,7 +14025,7 @@ function fin_renderUltimaActualizacion() {
 // pediste. El estado (plegada/desplegada) se guarda en el dispositivo
 // (no se sincroniza entre Patricio/Mercedes ni entre dispositivos) para
 // que la próxima vez que abras Finanzas se quede como lo dejaste.
-var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'finper'];
+var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'finper', 'trading'];
 function fin_seccionesColapsadasLoad() {
   try { return JSON.parse(localStorage.getItem('fin:secciones_colapsadas') || '{}'); }
   catch (e) { return {}; }
@@ -14013,8 +14066,57 @@ function fin_render() {
   // — mismo criterio que la sección de arriba, solo visible para Patricio.
   var secFinperDash = document.getElementById('fin-finperdash-section');
   if (secFinperDash) secFinperDash.style.display = (emp === 'patricio') ? '' : 'none';
+  // PUNTO 87 (06/09/2026): panel de Trading, solo Patricio.
+  var secTrading = document.getElementById('fin-trading-section');
+  if (secTrading) {
+    secTrading.style.display = (emp === 'patricio') ? '' : 'none';
+    if (emp === 'patricio') fin_renderTrading(false);
+  }
   fin_aplicarColapsosGuardados();
   fin_renderUltimaActualizacion();
+}
+// PUNTO 87 (06/09/2026): pinta el panel de Trading (TradingOkar). Se guarda
+// en caché en memoria (no en localStorage — no son datos "nuestros", son de
+// la otra app) para no repetir la consulta a Firestore cada vez que se
+// repinta Finanzas; el botón ↻ de la cabecera (forzar=true) pide un dato
+// nuevo. GestInmo solo LEE esta colección, nunca escribe en ella.
+var _tradingCache = null;
+function fin_renderTrading(forzar) {
+  var cont = document.getElementById('fin-trading-content');
+  if (!cont) return;
+  if (!window.cargarTradingOkarStats) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">No disponible en este navegador.</div>';
+    return;
+  }
+  if (_tradingCache && !forzar) { _pintarTrading(_tradingCache); return; }
+  cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Cargando datos de Trading&hellip;</div>';
+  window.cargarTradingOkarStats().then(function (r) {
+    _tradingCache = r;
+    _pintarTrading(r);
+  });
+}
+function _pintarTrading(r) {
+  var cont = document.getElementById('fin-trading-content');
+  if (!cont) return;
+  if (!r || !r.ok) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">No se han podido cargar los datos de Trading' + (r && r.error ? ' (' + r.error + ')' : '') + '. Prueba a pulsar &#8635; para reintentar.</div>';
+    return;
+  }
+  if (!r.numOperaciones) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin operaciones reales registradas todavía en TradingOkar.</div>';
+    return;
+  }
+  var winTxt = r.winrate === null ? '—' : r.winrate.toFixed(1).replace('.', ',') + '%';
+  var rTxt = (r.rAcumulada >= 0 ? '+' : '') + r.rAcumulada.toFixed(1).replace('.', ',') + 'R';
+  var html = '<div class="fin-patrimonio-rows compact">';
+  html += '<div class="row"><span>Operaciones</span><span>' + r.numOperaciones + '</span></div>';
+  html += '<div class="row"><span>Winrate</span><span>' + winTxt + '</span></div>';
+  html += '<div class="row"><span>R acumulada</span><span style="color:' + (r.rAcumulada >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + rTxt + '</span></div>';
+  html += '</div>';
+  if (r.tieneR < r.numOperaciones) {
+    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:8px;">' + (r.numOperaciones - r.tieneR) + ' operación(es) sin stop puesto — no cuentan en la R acumulada.</div>';
+  }
+  cont.innerHTML = html;
 }
 
 // --- CUENTAS ---
