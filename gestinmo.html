@@ -4606,19 +4606,6 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   </div>
   <div class="fin-section">
     <div class="fin-section-header">
-      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-acciones-chev" onclick="fin_toggleSeccion('acciones')">&#9660;</button>
-      <div class="fin-section-title">&#128200; Acciones</div>
-      <button class="fin-add-btn" onclick="fin_nuevaAccion()">&#xFF0B;</button>
-    </div>
-    <div id="fin-acciones-body">
-    <div id="fin-acciones-lista"></div>
-    <div class="fin-total-row" id="fin-acciones-total" style="display:none">
-      <span>Total acciones</span><span id="fin-acciones-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
-    </div>
-    </div>
-  </div>
-  <div class="fin-section">
-    <div class="fin-section-header">
       <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-fondos-chev" onclick="fin_toggleSeccion('fondos')">&#9660;</button>
       <div class="fin-section-title">&#128202; Fondos</div>
       <button class="fin-add-btn" onclick="fin_nuevoFondo()">&#xFF0B;</button>
@@ -4627,6 +4614,19 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="fin-fondos-lista"></div>
     <div class="fin-total-row" id="fin-fondos-total" style="display:none">
       <span>Total fondos</span><span id="fin-fondos-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    </div>
+    </div>
+  </div>
+  <div class="fin-section">
+    <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-acciones-chev" onclick="fin_toggleSeccion('acciones')">&#9660;</button>
+      <div class="fin-section-title">&#128200; Acciones</div>
+      <button class="fin-add-btn" onclick="fin_nuevaAccion()">&#xFF0B;</button>
+    </div>
+    <div id="fin-acciones-body">
+    <div id="fin-acciones-lista"></div>
+    <div class="fin-total-row" id="fin-acciones-total" style="display:none">
+      <span>Total acciones</span><span id="fin-acciones-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
     </div>
     </div>
   </div>
@@ -14004,8 +14004,8 @@ function fin_render() {
   var el = document.getElementById('fin-company-name');
   if (el) el.textContent = names[emp] || 'Patrimer';
   fin_renderCuentas();
-  fin_renderAcciones();
   fin_renderFondos();
+  fin_renderAcciones();
   fin_renderUrbanitae();
   fin_patHist_render();
   finper_render();
