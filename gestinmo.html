@@ -2837,16 +2837,16 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         ÷ 365, igual que en tu hoja de Economía personal. -->
         <div id="dash-reparto-patricio" style="display:none;font-size:14px;line-height:2.1;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-mid);">Ingresos año</span>
-            <span id="dash-pat-ing-anio" style="color:var(--silver-bright);font-weight:700;font-size:17px;">—</span>
+            <span style="color:var(--silver-mid);">Ing. Año</span>
+            <span id="dash-pat-ing-anio" style="color:var(--silver-bright);font-weight:700;font-size:17px;white-space:nowrap;">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-mid);">Ingresos mes</span>
-            <span id="dash-pat-ing-mes" style="color:var(--silver-bright);font-weight:700;font-size:17px;">—</span>
+            <span style="color:var(--silver-mid);">Ing. Mes</span>
+            <span id="dash-pat-ing-mes" style="color:var(--silver-bright);font-weight:700;font-size:17px;white-space:nowrap;">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-mid);">Ingresos día</span>
-            <span id="dash-pat-ing-dia" style="color:var(--silver-bright);font-size:15px;">—</span>
+            <span style="color:var(--silver-mid);">Ing. Día</span>
+            <span id="dash-pat-ing-dia" style="color:var(--silver-bright);font-weight:700;font-size:17px;white-space:nowrap;">—</span>
           </div>
         </div>
       </div>
@@ -16376,9 +16376,15 @@ function dash_render() {
     var ingAnioP = alqAnioP + otrosAnioP;
     var ingMesP = alqMesP + otrosMesP;
     var ingDiaP = ingAnioP / 365;
-    var elPatIngAnio = document.getElementById('dash-pat-ing-anio'); if (elPatIngAnio) elPatIngAnio.textContent = fmtE(ingAnioP);
-    var elPatIngMes = document.getElementById('dash-pat-ing-mes'); if (elPatIngMes) elPatIngMes.textContent = fmtE(ingMesP);
-    var elPatIngDia = document.getElementById('dash-pat-ing-dia'); if (elPatIngDia) elPatIngDia.textContent = fmtE(ingDiaP);
+    // PUNTO 122 (06/09/2026): etiquetas acortadas ("Ing. Año/Mes/Día") y sin
+    // símbolo € (fin_fmtSinSimbolo — mantiene los decimales, solo quita el
+    // "€") — con el símbolo puesto y la etiqueta larga, "Ingresos año" se
+    // partía en 2 líneas en el iPhone (viste tu propia captura). Las 3 filas
+    // quedan también con el mismo negrita/tamaño entre sí (antes "Ingresos
+    // día" era la única sin negrita y más pequeña).
+    var elPatIngAnio = document.getElementById('dash-pat-ing-anio'); if (elPatIngAnio) elPatIngAnio.textContent = fin_fmtSinSimbolo(ingAnioP);
+    var elPatIngMes = document.getElementById('dash-pat-ing-mes'); if (elPatIngMes) elPatIngMes.textContent = fin_fmtSinSimbolo(ingMesP);
+    var elPatIngDia = document.getElementById('dash-pat-ing-dia'); if (elPatIngDia) elPatIngDia.textContent = fin_fmtSinSimbolo(ingDiaP);
   } else {
     // Vista Patrimer/Industrias: urbano + rústico
     // AJUSTE 27/08/2026 — a petición tuya, se devuelven los decimales a la
