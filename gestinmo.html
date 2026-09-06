@@ -2915,13 +2915,12 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <span><span class="dot" style="background:var(--accent-amber);"></span>Libres</span>
     </div>
     <div class="tipo-list" id="tipo-list-inmuebles"></div>
-    <div class="filter-tabs">
-      <div class="tab active" onclick="setTab(this,'todos')">Todos</div>
-      <div class="tab" onclick="setTab(this,'piso')">Pisos</div>
-      <div class="tab" onclick="setTab(this,'local')">Locales</div>
-      <div class="tab" onclick="setTab(this,'garaje')">Garajes</div>
-      <div class="tab" onclick="setTab(this,'rustico')">R&#250;sticas</div>
-    </div>
+    <!-- PUNTO 100 (06/09/2026): antes era una lista fija de 5 pestañas iguales
+    para todas las empresas. Ahora se genera en renderLista() con solo los
+    tipos que ese perfil realmente tiene (a petición tuya — Patricio solo
+    tiene pisos, no tenía sentido ver Locales/Garajes/Rústicas siempre vacíos),
+    más "Vendidos" al final si hay algún inmueble vendido (ver PUNTO 100b). -->
+    <div class="filter-tabs" id="filter-tabs-inmuebles"></div>
     <!-- Oculto a petición de Patry el 24/08/2026: el recuento ya se ve arriba,
          en la tarjeta "Total" de las 3 estadísticas. Se deja el elemento en el
          HTML (solo oculto) para no tocar el JS que sigue actualizando su texto. -->
@@ -3781,7 +3780,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   <div class="main">
     <!-- ANÁLISIS -->
     <div id="tab-a">
-      <div class="slabel" style="margin-bottom:12px" id="analisis-periodo">—</div>
+      <!-- PUNTO 100.4 (06/09/2026): centrada a petición tuya — se veía descuadrada respecto a las tarjetas de abajo. -->
+      <div class="slabel" style="margin-bottom:12px;text-align:center;" id="analisis-periodo">—</div>
       <!-- PUNTO 42 (25/08/2026): estas 4 tarjetas usaban la plantilla genérica
       .kpi sin el retoque de centrado que ya llevan las de Inicio (mismos
       nombres de clase, pero sin text-align:center ni el centrado vertical de
@@ -3809,21 +3809,42 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           letra pequeña de antes. Mismo ajuste aplicado a las 3 tarjetas de
           "Reparto"/similares de la app (ver Inicio). -->
           <div style="margin-top:8px;" id="kpi-reparto">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;">
-              <span style="color:var(--silver-dim);">Urbano</span>
-              <span id="kpi-urbano-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
+            <div id="kpi-reparto-urbrus">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;">
+                <span style="color:var(--silver-dim);">Urbano</span>
+                <span id="kpi-urbano-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+                <span style="color:var(--silver-dim);"></span>
+                <span id="kpi-urbano-pct" style="color:var(--silver-dim);">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;">
+                <span style="color:var(--silver-dim);">Rústico</span>
+                <span id="kpi-rustico-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;">
+                <span style="color:var(--silver-dim);"></span>
+                <span id="kpi-rustico-pct" style="color:var(--silver-dim);">—</span>
+              </div>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
-              <span style="color:var(--silver-dim);"></span>
-              <span id="kpi-urbano-pct" style="color:var(--silver-dim);">—</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;">
-              <span style="color:var(--silver-dim);">Rústico</span>
-              <span id="kpi-rustico-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:13px;">
-              <span style="color:var(--silver-dim);"></span>
-              <span id="kpi-rustico-pct" style="color:var(--silver-dim);">—</span>
+            <!-- PUNTO 100.5 (06/09/2026): Patricio no tiene rústico, así que
+            para su perfil esta tarjeta muestra Coste total de sus inmuebles
+            vs Valor actual, con la diferencia (plusvalía/minusvalía latente)
+            — a petición tuya, en vez de un desglose Urbano/Rústico que
+            siempre sería 100%/0%. -->
+            <div id="kpi-reparto-coste" style="display:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;">
+                <span style="color:var(--silver-dim);">Coste total</span>
+                <span id="kpi-coste-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;margin-top:6px;">
+                <span style="color:var(--silver-dim);">Valor actual</span>
+                <span id="kpi-valoractual-val" style="color:var(--accent-blue);font-weight:700;font-size:16px;">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px;">
+                <span style="color:var(--silver-dim);">Diferencia</span>
+                <span id="kpi-diferencia-val" style="font-weight:700;">—</span>
+              </div>
             </div>
           </div>
         </div>
@@ -6006,6 +6027,53 @@ function inm_alqMenSave(lista) {
   save('inmuebles:alquileres_mensuales', lista);
   if (window.syncToFirestore) window.syncToFirestore('inmuebles:alquileres_mensuales', JSON.stringify(lista));
 }
+// PUNTO 99 (06/09/2026): "Facturación → Histórico" (y las gráficas que
+// dependen de fac_resumenAnual: Inicio y Facturación → Análisis) leen de
+// facturacion:historico:<empresa> — un cajón manual totalmente aparte de esta
+// tabla de alquileres reales (punto 97). Por eso el alquiler real de 2025
+// nunca aparecía en esas pantallas aunque ya estuviera cargado aquí.
+// Esta función mantiene facturacion:historico:patricio sincronizado con la
+// suma real de alquileres de Patricio mes a mes, para que Inicio, Análisis e
+// Histórico muestren siempre el mismo número real sin tener que apuntarlo
+// dos veces. Es idempotente (recalcula desde cero cada vez) y nunca toca un
+// mes que hayas metido tú a mano desde el botón "＋" de Histórico
+// (origen:'manual') — solo escribe/actualiza los que vienen de esta tabla
+// (origen:'alqmen'). Solo guarda si algo ha cambiado de verdad, para no
+// generar sincronizaciones de más en cada carga de la app.
+function fac_sincronizarHistoricoPatricio() {
+  var todos = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+  var idxsPat = [];
+  for (var i = 0; i < todos.length; i++) {
+    if ((todos[i].propietario || '').toLowerCase() === 'patricio') idxsPat.push(i);
+  }
+  var registros = inm_alqMenLoad();
+  var porMes = {};
+  for (var j = 0; j < registros.length; j++) {
+    var r = registros[j];
+    if (idxsPat.indexOf(r.inmuebleIdx) < 0) continue;
+    porMes[r.mes] = (porMes[r.mes] || 0) + (parseFloat(r.alquiler) || 0);
+  }
+  var raw = localStorage.getItem('facturacion:historico:patricio');
+  var data = [];
+  try { data = raw ? JSON.parse(raw) : []; } catch (e) { data = []; }
+  var antes = JSON.stringify(data);
+  var mesesConDato = Object.keys(porMes);
+  for (var k = 0; k < mesesConDato.length; k++) {
+    var mes = mesesConDato[k];
+    var total = Math.round(porMes[mes] * 100) / 100;
+    var idxData = -1;
+    for (var d = 0; d < data.length; d++) { if (data[d].mes === mes) { idxData = d; break; } }
+    if (idxData >= 0) {
+      if (data[idxData].origen !== 'manual') { data[idxData].importe = total; data[idxData].origen = 'alqmen'; }
+    } else {
+      data.push({ mes: mes, importe: total, origen: 'alqmen' });
+    }
+  }
+  data.sort(function(a, b) { return a.mes.localeCompare(b.mes); });
+  if (JSON.stringify(data) === antes) return;
+  localStorage.setItem('facturacion:historico:patricio', JSON.stringify(data));
+  if (window.syncToFirestore) window.syncToFirestore('facturacion:historico:patricio', JSON.stringify(data));
+}
 function inm_alqMenAcumulado(idx) {
   return inm_alqMenLoad().filter(function(r) { return r.inmuebleIdx === idx; })
     .reduce(function(s, r) { return s + (parseFloat(r.alquiler) || 0); }, 0);
@@ -6180,6 +6248,12 @@ function renderLista() {
 
   const emojis = { piso:'🏠', local:'🏪', garaje:'🚗', rustico:'🌾', otro:'📦' };
   const tipoLabels = { piso:'Piso', local:'Local comercial', garaje:'Garaje', rustico:'Rústico', otro:'Otro' };
+  // PUNTO 100 (06/09/2026): un inmueble vendido no cuenta como "libre" en
+  // este desglose (antes sí, porque lib = total - alquilados contaba
+  // cualquier estado que no fuera "alquilado", incluido "vendido") — se
+  // excluye del todo, igual que ahora se excluye de "Todos" en el listado.
+  const inmueblesActivos = inmuebles.filter(i => i.estado !== 'vendido');
+  const inmueblesVendidos = inmuebles.filter(i => i.estado === 'vendido');
   // PUNTO 39 (25/08/2026): desglose por tipo (alquilados/libres), sustituye a
   // las 3 tarjetas Total/Alquilados/Libres. Las rústicas quedan fuera — su
   // "alquiler" es un cobro anual por finca, no un inquilino fijo tipo piso.
@@ -6187,7 +6261,7 @@ function renderLista() {
   const tipoListOrder = ['piso','local','garaje','otro'];
   let tipoListHtml = '';
   tipoListOrder.forEach(tipo => {
-    const deEsteTipo = inmuebles.filter(i => (i.tipo || 'otro') === tipo);
+    const deEsteTipo = inmueblesActivos.filter(i => (i.tipo || 'otro') === tipo);
     if (deEsteTipo.length === 0) return;
     const alq = deEsteTipo.filter(i => i.estado === 'alquilado').length;
     const lib = deEsteTipo.length - alq;
@@ -6200,11 +6274,65 @@ function renderLista() {
   if (tipoListEl) tipoListEl.innerHTML = tipoListHtml || '<div class="tipo-row" style="color:var(--silver-dim);font-size:13px;">Sin inmuebles urbanos todavía.</div>';
   const propLabels = { empresa:'Patrimer', patrimer:'Patrimer', patricio:'Patricio', industrias:'Industrias' };
 
+  // PUNTO 100 (06/09/2026): pestañas de filtro dinámicas — solo se muestran
+  // los tipos que este perfil realmente tiene, más "Vendidos" al final si
+  // hay algún inmueble vendido. Si el filtro activo ya no aplica (p.ej. venías
+  // filtrando por "Locales" y cambias a un perfil sin locales), se vuelve a
+  // "Todos" para no dejar la pantalla en blanco sin ninguna pestaña marcada.
+  const tabTipoOrder = ['piso','local','garaje','rustico','otro'];
+  const tabTipoLabels = { piso:'Pisos', local:'Locales', garaje:'Garajes', rustico:'Rústicas', otro:'Otros' };
+  const tiposDisponibles = tabTipoOrder.filter(t => inmueblesActivos.some(i => (i.tipo || 'otro') === t));
+  const hayVendidos = inmueblesVendidos.length > 0;
+  if (currentFilter !== 'todos' && currentFilter !== 'vendido' && tiposDisponibles.indexOf(currentFilter) === -1) currentFilter = 'todos';
+  if (currentFilter === 'vendido' && !hayVendidos) currentFilter = 'todos';
+  let tabsHtml = `<div class="tab${currentFilter==='todos'?' active':''}" onclick="setTab(this,'todos')">Todos</div>`;
+  tiposDisponibles.forEach(t => {
+    tabsHtml += `<div class="tab${currentFilter===t?' active':''}" onclick="setTab(this,'${t}')">${tabTipoLabels[t]}</div>`;
+  });
+  if (hayVendidos) {
+    tabsHtml += `<div class="tab${currentFilter==='vendido'?' active':''}" onclick="setTab(this,'vendido')">Vendidos</div>`;
+  }
+  const filterTabsEl = document.getElementById('filter-tabs-inmuebles');
+  if (filterTabsEl) filterTabsEl.innerHTML = tabsHtml;
+
   inmuebles.forEach((inm, idx) => {
-    if (currentFilter !== 'todos' && inm.tipo !== currentFilter) return;
+    // PUNTO 100 (06/09/2026): un inmueble vendido solo aparece bajo el
+    // filtro "Vendidos" — nunca en "Todos" ni mezclado con los de su tipo,
+    // para no verlo el primero en el listado activo sin buscarlo a propósito.
+    if (currentFilter === 'vendido') { if (inm.estado !== 'vendido') return; }
+    else {
+      if (inm.estado === 'vendido') return;
+      if (currentFilter !== 'todos' && inm.tipo !== currentFilter) return;
+    }
 
     const rent = calcRent(inm);
     const esRustico = inm.tipo === 'rustico';
+    // PUNTO 19: idx real (por id) para abrir la ficha correcta — movido aquí
+    // arriba porque el punto 100.2 (amortización en tarjeta) también lo necesita.
+    const idxReal = todos.findIndex(t => t.id === inm.id);
+    // PUNTO 100.2 (06/09/2026): amortización real en la propia tarjeta —
+    // años que faltan para recuperar el 100% de la inversión al ritmo actual
+    // de alquiler. Solo se calcula si hay coste de inversión y renta activa;
+    // si no hay datos suficientes se deja vacío (no se inventa un número).
+    // BLINDAJE: envuelto en try/catch — renderLista() se llama una vez, muy
+    // pronto, nada más cargar el script (ver "INIT" más abajo), antes de que
+    // KEYS (usada por inm_cobrosAcumulados, dentro de inm_amortizacion) esté
+    // definida. Sin este blindaje, ESA primera llamada lanzaba una excepción
+    // sin capturar dentro del forEach, que abortaba no solo el pintado de
+    // tarjetas sino TODO el código de "INIT" que viene justo después en el
+    // mismo script (bloqueo detectado con pruebas automáticas antes de
+    // subir esta versión, nunca llegó a la app en producción).
+    let amortInfo = null;
+    try { amortInfo = inm_amortizacion(idxReal, inm); } catch (e) { amortInfo = null; }
+    let amortTxt = '';
+    if (amortInfo && inm.estado === 'alquilado') {
+      if (amortInfo.pendiente <= 0) {
+        amortTxt = 'Amortizado ✅';
+      } else if (amortInfo.aniosFaltan !== null) {
+        const aniosR = Math.ceil(amortInfo.aniosFaltan);
+        amortTxt = 'Faltan ' + aniosR + (aniosR === 1 ? ' año' : ' años');
+      }
+    }
 
     // Renta — PUNTO 33: se lee del contrato activo si lo hay (ver inm_rentaActiva)
     const rentaActiva = inm_rentaActiva(inm);
@@ -6269,6 +6397,7 @@ function renderLista() {
       ? `<div style="text-align:right;flex-shrink:0;">
           ${inm.precio ? `<div style="font-size:11px;font-weight:700;color:var(--silver-bright);white-space:nowrap;">${fmt(inm.precio)} € <span style="font-size:9px;font-weight:400;color:var(--silver-dim);">compra</span></div>` : '<div>&nbsp;</div>'}
           ${inm.precioActual ? `<div style="font-size:11px;font-weight:700;color:var(--accent-blue);white-space:nowrap;margin-top:4px;">${fmt(inm.precioActual)} € <span style="font-size:9px;font-weight:400;color:var(--silver-dim);">actual</span></div>` : ''}
+          ${amortTxt ? `<div style="font-size:9.5px;font-weight:600;color:var(--silver-mid);white-space:nowrap;margin-top:4px;">⏳ ${amortTxt}</div>` : ''}
         </div>`
       : '';
 
@@ -6293,22 +6422,39 @@ function renderLista() {
       ? `<div style="font-size:10.5px;color:var(--silver-dim);margin-top:6px;">🚗 ${inm.garajeRef}${inm.garajeIncluido ? ' · incluida en el alquiler' : ' · se alquila aparte'}</div>`
       : '';
 
-    // Sin contrato activo (inmueble vacío) no hay línea de inquilino donde
-    // colgar el precio — se mantiene entonces como fila propia al final,
-    // para que el dato no desaparezca en esos casos.
-    const precioBlock = (!contratoActivo && (inm.precio || inm.precioActual))
+    // PUNTO 100.3 (06/09/2026): tarjeta de un inmueble vendido — a petición
+    // tuya, el "Precio compra" no interesa aquí; lo que interesa es el
+    // resultado completo de la operación: coste total de la inversión,
+    // ingresos totales cobrados de alquiler mientras fue tuyo, lo sacado de
+    // la venta, y el rendimiento total (ingresos + venta − coste).
+    const ventaResultadoBlock = (inm.estado === 'vendido' && amortInfo)
+      ? (function() {
+          const ventaTotalV = inm_ventaTotal(inm);
+          const ingresosAlquilerV = amortInfo.ingresosTotales - ventaTotalV;
+          const rendimientoV = amortInfo.superavit > 0 ? amortInfo.superavit : -amortInfo.pendiente;
+          const colorRend = rendimientoV >= 0 ? 'var(--accent-green)' : '#e57373';
+          return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+            <div><div style="font-size:10px;color:var(--silver-dim);">Coste total</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(amortInfo.costeTotal)} €</div></div>
+            <div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Ingresos totales</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(ingresosAlquilerV)} €</div></div>
+            <div><div style="font-size:10px;color:var(--silver-dim);">Venta total</div><div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${fmt(ventaTotalV)} €</div></div>
+            <div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Rendimiento total</div><div style="font-size:13px;font-weight:700;color:${colorRend};">${rendimientoV >= 0 ? '+' : ''}${fmt(rendimientoV)} €</div></div>
+          </div>`;
+        })()
+      : '';
+
+    // Sin contrato activo (inmueble vacío, en reforma, o alquilado sin
+    // contrato formal enlazado) no hay línea de inquilino donde colgar el
+    // precio — se mantiene entonces como fila propia al final, para que el
+    // dato no desaparezca en esos casos. Ya no se usa para "vendido" (ver
+    // ventaResultadoBlock arriba), que tiene su propio bloque de resultado.
+    const precioBlock = (inm.estado !== 'vendido' && !contratoActivo && (inm.precio || inm.precioActual))
       ? `<div style="display:flex;justify-content:flex-end;gap:18px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
           ${inm.precio ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Precio compra</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(inm.precio)} €</div></div>` : ''}
           ${inm.precioActual ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Valor actual</div><div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${fmt(inm.precioActual)} €</div></div>` : ''}
+          ${amortTxt ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Amortización</div><div style="font-size:13px;font-weight:700;color:var(--silver-mid);">${amortTxt}</div></div>` : ''}
         </div>`
       : '';
 
-    // PUNTO 19: con la lista ahora reordenada, "idx" (posición dentro de
-    // este forEach) ya NO coincide con la posición real del inmueble en
-    // loadInmuebles() — hay que buscar su índice real por "id" (único),
-    // para que la tarjeta abra siempre la ficha correcta, no la que le
-    // toque por casualidad en el orden nuevo.
-    const idxReal = todos.findIndex(t => t.id === inm.id);
     const div = document.createElement('div');
     div.className = 'inmueble-card';
     div.dataset.tipo = inm.tipo;
@@ -6349,7 +6495,8 @@ function renderLista() {
       </div>
       ${contratoBlock}
       ${garajeAsocBlock}
-      ${precioBlock}`;
+      ${precioBlock}
+      ${ventaResultadoBlock}`;
     container.appendChild(div);
   });
 
@@ -10159,6 +10306,40 @@ function renderAnalisis(){
   if (elRusVal) elRusVal.textContent = fmtE(rentaRusticoAnual);
   if (elRusPct) elRusPct.textContent = pctRus + '% del total';
 
+  // PUNTO 100.5 (06/09/2026): Patricio no tiene rústico — para su perfil,
+  // en vez del desglose Urbano/Rústico (que sería siempre 100%/0%), esta
+  // misma tarjeta "Reparto" muestra Coste total de sus inmuebles vs Valor
+  // actual, con la diferencia. Los vendidos no entran (su coste/valor ya
+  // se liquidó en la venta, ver la tarjeta del propio inmueble).
+  var _empAnalisis = localStorage.getItem('patrimer:empresa') || 'patrimer';
+  var elRepUrbrus = document.getElementById('kpi-reparto-urbrus');
+  var elRepCoste = document.getElementById('kpi-reparto-coste');
+  if (_empAnalisis === 'patricio') {
+    if (elRepUrbrus) elRepUrbrus.style.display = 'none';
+    if (elRepCoste) elRepCoste.style.display = '';
+    var todosInmRep = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+    var costeTotalRep = 0, valorActualRep = 0;
+    for (var ir = 0; ir < todosInmRep.length; ir++) {
+      var inmRep = todosInmRep[ir];
+      if ((inmRep.propietario || '').toLowerCase() !== 'patricio' || inmRep.estado === 'vendido') continue;
+      costeTotalRep += inm_costeTotalInversion(inmRep);
+      valorActualRep += parseFloat(inmRep.precioActual) || 0;
+    }
+    var diferenciaRep = valorActualRep - costeTotalRep;
+    var elCosteVal = document.getElementById('kpi-coste-val');
+    var elValorActualVal = document.getElementById('kpi-valoractual-val');
+    var elDiferenciaVal = document.getElementById('kpi-diferencia-val');
+    if (elCosteVal) elCosteVal.textContent = fmtE(costeTotalRep);
+    if (elValorActualVal) elValorActualVal.textContent = fmtE(valorActualRep);
+    if (elDiferenciaVal) {
+      elDiferenciaVal.textContent = (diferenciaRep >= 0 ? '+' : '') + fmtE(diferenciaRep);
+      elDiferenciaVal.style.color = diferenciaRep >= 0 ? 'var(--accent-green)' : '#e57373';
+    }
+  } else {
+    if (elRepUrbrus) elRepUrbrus.style.display = '';
+    if (elRepCoste) elRepCoste.style.display = 'none';
+  }
+
   // Historial
   // PUNTO 89 (30/08/2026): esta tabla leía solo de KEYS.facturas (las facturas
   // desglosadas por inmueble de "Facturar mes", ya retirado en el punto 88) —
@@ -11541,6 +11722,12 @@ document.addEventListener('firebaseLoaded', function() {
     if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', JSON.stringify(todosInm));
     console.log('[Migración venta Sierra Nevada] Resultado de la venta cargado: 120.000€ + 40.000€ en efectivo.');
   })();
+  // PUNTO 99 (06/09/2026): se ejecuta en cada carga (no es una migración de
+  // una sola vez, es autocorrectiva) para que Inicio/Análisis/Histórico
+  // reflejen siempre el alquiler real de Patricio — ver fac_sincronizarHistoricoPatricio.
+  if (typeof fac_sincronizarHistoricoPatricio === 'function') {
+    try { fac_sincronizarHistoricoPatricio(); } catch (e) { console.warn('[PUNTO 99] fallo al sincronizar histórico Patricio:', e); }
+  }
   // Inicializar histórico rústico si no existe aún en localStorage
   if (!localStorage.getItem(RUS_HIST_KEY)) {
     localStorage.setItem(RUS_HIST_KEY, JSON.stringify(RUS_HIST_INICIAL));
@@ -14127,8 +14314,22 @@ function fin_renderUrbanitae() {
   }
   var totalEnCurso = 0;
   var html = '';
-  for (var i = 0; i < data.length; i++) {
-    var u = data[i];
+  // PUNTO 100.6 (06/09/2026): ordenado por fecha de vencimiento del contrato
+  // (fecha de inversión + plazo en meses), el que vence antes primero — a
+  // petición tuya. Los proyectos sin fecha o sin plazo (vencimiento
+  // desconocido) se quedan al final, sin descuadrar el orden de los demás.
+  // Los índices "i" que usan Editar/Eliminar son siempre los del array
+  // original (fin:urbanitae), no la posición en esta lista ya reordenada.
+  var ordenUrb = data.map(function(u, i) { return { u: u, i: i, venc: fin_urbanitaeVencimiento(u) }; });
+  ordenUrb.sort(function(a, b) {
+    if (a.venc === null && b.venc === null) return 0;
+    if (a.venc === null) return 1;
+    if (b.venc === null) return -1;
+    return a.venc - b.venc;
+  });
+  for (var oi = 0; oi < ordenUrb.length; oi++) {
+    var i = ordenUrb[oi].i;
+    var u = ordenUrb[oi].u;
     var capital = parseFloat(u.capital) || 0;
     var cobrado = u.estado === 'cobrado';
     if (!cobrado) totalEnCurso += capital;
@@ -14160,6 +14361,17 @@ function fin_renderUrbanitae() {
   }
   fin_calcPatrimonio();
   fin_renderUltimaActualizacion();
+}
+// PUNTO 100.6 (06/09/2026): fecha de vencimiento = fecha de inversión + plazo
+// en meses. Devuelve null si falta cualquiera de los dos datos.
+function fin_urbanitaeVencimiento(u) {
+  if (!u.fecha || !u.meses) return null;
+  try {
+    var d = new Date(u.fecha + 'T00:00:00');
+    if (isNaN(d.getTime())) return null;
+    d.setMonth(d.getMonth() + (parseInt(u.meses, 10) || 0));
+    return d;
+  } catch (e) { return null; }
 }
 function fin_urbanitaeFechaCorta(iso) {
   try {
@@ -15256,19 +15468,19 @@ function dash_render() {
     for (var pi = 0; pi < todosInmP.length; pi++) {
       if ((todosInmP[pi].propietario || '').toLowerCase() === 'patricio') { nInmP++; idxP.push(pi); }
     }
-    var facturasP = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
+    // PUNTO 99 (06/09/2026): leía de 'facturacion:facturas' (vía de
+    // facturación desactivada para Patricio desde el punto 88), por eso
+    // siempre mostraba 0€ aunque el alquiler real ya estuviera cargado.
+    // Ahora lee de la tabla real de alquileres mensuales (punto 97).
+    var registrosAlqP = (typeof inm_alqMenLoad === 'function') ? inm_alqMenLoad() : [];
     var ingresosP = 0;
     var mesesConFac = {};
-    for (var pfi = 0; pfi < facturasP.length; pfi++) {
-      var fpf = facturasP[pfi];
-      if (!fpf.mes || parseInt(fpf.mes.split('-')[0]) !== year) continue;
-      if (fpf.items && fpf.items.length) {
-        for (var pfk = 0; pfk < fpf.items.length; pfk++) {
-          if (idxP.indexOf(fpf.items[pfk].idx) >= 0) {
-            ingresosP += parseFloat(fpf.items[pfk].precio) || 0;
-            mesesConFac[fpf.mes] = true;
-          }
-        }
+    for (var pfi = 0; pfi < registrosAlqP.length; pfi++) {
+      var regP = registrosAlqP[pfi];
+      if (!regP.mes || parseInt(regP.mes.split('-')[0]) !== year) continue;
+      if (idxP.indexOf(regP.inmuebleIdx) >= 0) {
+        ingresosP += parseFloat(regP.alquiler) || 0;
+        mesesConFac[regP.mes] = true;
       }
     }
     var nMesesP = Object.keys(mesesConFac).length || 1;
@@ -17257,6 +17469,7 @@ function alqmen_guardarMes() {
     }
   });
   inm_alqMenSave(registros);
+  fac_sincronizarHistoricoPatricio();
   alqmen_render();
   if (typeof renta_renderAlquileres === 'function') renta_renderAlquileres();
   if (typeof renta_calcPrevision === 'function') renta_calcPrevision();
