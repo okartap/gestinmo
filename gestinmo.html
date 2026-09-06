@@ -890,6 +890,8 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .fin-section-title{position:absolute;left:0;right:0;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-bright);text-align:center;pointer-events:none;}
 .fin-add-btn{background:rgba(91,141,238,.15);border:1px solid rgba(91,141,238,.3);border-radius:8px;padding:4px 10px;font-size:16px;color:var(--accent-blue);cursor:pointer;line-height:1;}
 .fin-add-btn:active{transform:scale(.92);}
+.fin-collapse-btn{background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--silver-dim);cursor:pointer;line-height:1;}
+.fin-collapse-btn:active{transform:scale(.92);}
 .fin-card{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;}
 .fin-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
 .fin-card-nombre{font-size:13px;font-weight:700;color:var(--silver-bright);}
@@ -4591,32 +4593,41 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   <div style="font-size:11px;color:var(--silver-dim);text-align:right;margin:-8px 2px 10px;" id="fin-ultima-actualizacion"></div>
   <div class="fin-section">
     <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-cuentas-chev" onclick="fin_toggleSeccion('cuentas')">&#9660;</button>
       <div class="fin-section-title">&#127974; Cuentas bancarias</div>
       <button class="fin-add-btn" onclick="fin_nuevaCuenta()">&#xFF0B;</button>
     </div>
+    <div id="fin-cuentas-body">
     <div id="fin-cuentas-lista"></div>
     <div class="fin-total-row" id="fin-cuentas-total" style="display:none">
       <span>Total liquidez</span><span id="fin-cuentas-total-val" style="color:var(--accent-green);font-weight:700;">-</span>
     </div>
+    </div>
   </div>
   <div class="fin-section">
     <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-acciones-chev" onclick="fin_toggleSeccion('acciones')">&#9660;</button>
       <div class="fin-section-title">&#128200; Acciones</div>
       <button class="fin-add-btn" onclick="fin_nuevaAccion()">&#xFF0B;</button>
     </div>
+    <div id="fin-acciones-body">
     <div id="fin-acciones-lista"></div>
     <div class="fin-total-row" id="fin-acciones-total" style="display:none">
       <span>Total acciones</span><span id="fin-acciones-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
     </div>
+    </div>
   </div>
   <div class="fin-section">
     <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-fondos-chev" onclick="fin_toggleSeccion('fondos')">&#9660;</button>
       <div class="fin-section-title">&#128202; Fondos</div>
       <button class="fin-add-btn" onclick="fin_nuevoFondo()">&#xFF0B;</button>
     </div>
+    <div id="fin-fondos-body">
     <div id="fin-fondos-lista"></div>
     <div class="fin-total-row" id="fin-fondos-total" style="display:none">
       <span>Total fondos</span><span id="fin-fondos-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    </div>
     </div>
   </div>
   <!-- PUNTO 89 (03/09/2026): inversiones en Urbanitae (crowdfunding
@@ -4626,12 +4637,15 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   ahí, porque ese dinero ya habrá vuelto a una cuenta normal. -->
   <div class="fin-section">
     <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-urbanitae-chev" onclick="fin_toggleSeccion('urbanitae')">&#9660;</button>
       <div class="fin-section-title">&#127970; Urbanitae</div>
       <button class="fin-add-btn" onclick="fin_nuevoUrbanitae()">&#xFF0B;</button>
     </div>
+    <div id="fin-urbanitae-body">
     <div id="fin-urbanitae-lista"></div>
     <div class="fin-total-row" id="fin-urbanitae-total" style="display:none">
       <span>Total invertido (en curso)</span><span id="fin-urbanitae-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    </div>
     </div>
   </div>
   <!-- PUNTO 92 (05/09/2026): Histórico de patrimonio (Liquidez/Invertido/
@@ -4639,12 +4653,15 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   Patricio (ver fin_patHist_render, más abajo en el archivo). -->
   <div class="fin-section" id="fin-pathist-section">
     <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-pathist-chev" onclick="fin_toggleSeccion('pathist')">&#9660;</button>
       <div class="fin-section-title">&#128202; Histórico de patrimonio</div>
       <button class="fin-add-btn" onclick="fin_patHist_guardarSnapshot()">&#xFF0B;</button>
     </div>
+    <div id="fin-pathist-body">
     <div id="fin-pathist-aviso" style="display:none;"></div>
     <div id="fin-pathist-lista"></div>
     <div id="fin-pathist-faltan-inmob" style="display:none;font-size:10.5px;color:var(--silver-dim);margin-top:8px;"></div>
+    </div>
   </div>
   <!-- PUNTO 109 (06/09/2026): Patrimonio Financiero (personal) — a petición
   tuya, tabla propia y APARTE del "Histórico de patrimonio" de arriba (que
@@ -4654,11 +4671,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   que la llevas en tu Excel personal. Solo para Patricio. -->
   <div class="fin-section" id="fin-finper-section" style="display:none;">
     <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-finper-chev" onclick="fin_toggleSeccion('finper')">&#9660;</button>
       <div class="fin-section-title">&#128176; Patrimonio Financiero (personal)</div>
       <button class="fin-add-btn" onclick="finper_abrirModal()">&#xFF0B;</button>
     </div>
+    <div id="fin-finper-body">
     <div id="fin-finper-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"></div>
     <div id="fin-finper-lista"></div>
+    </div>
   </div>
   <!-- PUNTO 114 (06/09/2026): Panel "Patrimonio Financiero" — pantalla propia
   con más diseño, a petición tuya (mismo patrón que la tarjeta de Dividendos
@@ -13945,6 +13965,39 @@ function fin_renderUltimaActualizacion() {
   }
 }
 
+// PUNTO 116 (06/09/2026): secciones plegables (Cuentas, Acciones, Fondos,
+// Urbanitae, Histórico de patrimonio y Patrimonio Financiero personal) —
+// a petición tuya, el módulo Finanzas se quedaba muy largo. "Patrimonio
+// total" (la tarjeta grande de arriba) se queda siempre visible, tal cual
+// pediste. El estado (plegada/desplegada) se guarda en el dispositivo
+// (no se sincroniza entre Patricio/Mercedes ni entre dispositivos) para
+// que la próxima vez que abras Finanzas se quede como lo dejaste.
+var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'finper'];
+function fin_seccionesColapsadasLoad() {
+  try { return JSON.parse(localStorage.getItem('fin:secciones_colapsadas') || '{}'); }
+  catch (e) { return {}; }
+}
+function fin_seccionesColapsadasSave(estado) {
+  try { localStorage.setItem('fin:secciones_colapsadas', JSON.stringify(estado)); } catch (e) {}
+}
+function fin_aplicarColapso(key, colapsada) {
+  var body = document.getElementById('fin-' + key + '-body');
+  var chev = document.getElementById('fin-' + key + '-chev');
+  if (body) body.style.display = colapsada ? 'none' : '';
+  if (chev) chev.innerHTML = colapsada ? '&#9654;' : '&#9660;';
+}
+function fin_toggleSeccion(key) {
+  var estado = fin_seccionesColapsadasLoad();
+  estado[key] = !estado[key];
+  fin_seccionesColapsadasSave(estado);
+  fin_aplicarColapso(key, estado[key]);
+}
+function fin_aplicarColapsosGuardados() {
+  var estado = fin_seccionesColapsadasLoad();
+  for (var i = 0; i < FIN_SECCIONES_COLAPSABLES.length; i++) {
+    fin_aplicarColapso(FIN_SECCIONES_COLAPSABLES[i], !!estado[FIN_SECCIONES_COLAPSABLES[i]]);
+  }
+}
 function fin_render() {
   var emp = fin_emp();
   var names = { empresa: 'Patrimer', patrimer: 'Patrimer', patricio: 'Patricio', industrias: 'Industrias' };
@@ -13960,6 +14013,7 @@ function fin_render() {
   // — mismo criterio que la sección de arriba, solo visible para Patricio.
   var secFinperDash = document.getElementById('fin-finperdash-section');
   if (secFinperDash) secFinperDash.style.display = (emp === 'patricio') ? '' : 'none';
+  fin_aplicarColapsosGuardados();
   fin_renderUltimaActualizacion();
 }
 
@@ -14744,6 +14798,8 @@ function fin_renderUrbanitae() {
     html += '<div class="fin-card-meta">';
     html += '<div class="fin-meta-item">Interés: <span class="fin-meta-val">' + fin_fmtPct(u.interes) + '</span></div>';
     html += '<div class="fin-meta-item">Plazo: <span class="fin-meta-val">' + (u.meses || 0) + ' meses</span></div>';
+    var vencDate = ordenUrb[oi].venc;
+    html += '<div class="fin-meta-item">Vencimiento previsto: <span class="fin-meta-val">' + (vencDate ? fin_urbanitaeFechaCortaDate(vencDate) : '—') + '</span></div>';
     html += '<div class="fin-meta-item" style="width:100%;">Resultado previsto: <span class="fin-meta-val fin-plus">' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos</span></div>';
     html += '<div class="fin-meta-item" style="width:100%;">Estado: <span class="fin-meta-val" style="' + (cobrado ? 'color:var(--accent-blue);' : 'color:var(--accent-green);') + '">' + (cobrado ? '✅ Cobrado' : '🟢 En curso') + '</span></div>';
     html += '</div>';
@@ -14781,6 +14837,12 @@ function fin_urbanitaeFechaCorta(iso) {
     var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     return d.getDate() + ' ' + meses[d.getMonth()] + ' ' + d.getFullYear();
   } catch (e) { return iso; }
+}
+// PUNTO 115 (06/09/2026): igual que fin_urbanitaeFechaCorta pero recibe un
+// objeto Date ya calculado (la fecha de vencimiento previsto), no un string ISO.
+function fin_urbanitaeFechaCortaDate(d) {
+  var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return d.getDate() + ' ' + meses[d.getMonth()] + ' ' + d.getFullYear();
 }
 function fin_nuevoUrbanitae() {
   document.getElementById('fin-urb-nombre').value = '';
