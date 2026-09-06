@@ -3291,6 +3291,43 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           </div>
         </div>
         <div class="form-hint">Se suma a lo cobrado en alquiler para calcular el resultado final de la inversión (punto 35)</div>
+
+        <!-- PUNTO 125 (06/09/2026): datos fiscales de la venta, para poder
+             estimar la ganancia patrimonial (plusvalía) que Hacienda cobra en
+             el IRPF del año de la venta — aparte del resultado de inversión
+             de arriba, que es solo para saber si el piso te ha salido
+             rentable. Solo hace falta rellenar esto en el año que vendes. -->
+        <div class="form-row two" style="margin-top:14px;">
+          <div class="form-group">
+            <div class="form-label">Año de la venta (para el IRPF)</div>
+            <input class="form-input" id="f-venta-anio" type="text" inputmode="numeric" placeholder="2026">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Gastos de venta (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(agencia, etc.)</span></div>
+            <input class="form-input" id="f-venta-gastos" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          </div>
+        </div>
+        <div class="form-row two">
+          <div class="form-group">
+            <div class="form-label">Plusvalía municipal (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(en cuanto la sepas)</span></div>
+            <input class="form-input" id="f-venta-plusvalia" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Año desde el que estuvo alquilado</div>
+            <input class="form-input" id="f-venta-anio-inicio" type="text" inputmode="numeric" placeholder="2017">
+          </div>
+        </div>
+        <div class="form-row two">
+          <div class="form-group">
+            <div class="form-label">% del valor que es construcción <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(el resto es suelo)</span></div>
+            <input class="form-input" id="f-venta-pct-construccion" type="text" inputmode="decimal" placeholder="70">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Meses alquilado en el año de venta <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(0 si ya estaba vacío)</span></div>
+            <input class="form-input" id="f-venta-meses-ultimo-anio" type="text" inputmode="numeric" placeholder="0">
+          </div>
+        </div>
+        <div class="form-hint">Con esto, Renta Patricio puede calcular aparte la ganancia patrimonial de la venta y mostrarte el resultado del IRPF de ese año contando también la venta. La plusvalía municipal se puede dejar en 0 y rellenar más adelante en cuanto llegue — el cálculo se actualiza solo.</div>
       </div>
 
       <!-- Preview rentabilidad en tiempo real -->
@@ -5248,6 +5285,21 @@ con editar/borrar en cada línea. -->
     <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="renta-prevision-nota">Añade datos para ver la previsión</div>
   </div>
 
+  <!-- PUNTO 125 (06/09/2026): tarjeta aparte para el impacto de una venta de
+       inmueble ese mismo año — solo aparece si hay una venta con ganancia
+       patrimonial en el año que estás viendo. La tarjeta de arriba (previsión
+       normal) no se toca ni cambia cuando esta aparece. -->
+  <div id="renta-impacto-venta-card" style="display:none;background:linear-gradient(135deg,#2a1e3a,#1e1436);border:1px solid rgba(180,120,230,0.35);border-radius:16px;padding:16px;margin-bottom:20px;text-align:center;">
+    <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">📈 Impacto de venta este año</div>
+    <div style="font-size:12px;color:var(--silver-mid);margin-bottom:8px;" id="renta-venta-detalle">—</div>
+    <div style="font-size:12px;color:var(--silver-mid);margin-bottom:10px;" id="renta-venta-cuota">—</div>
+    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
+      <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">Total con la venta incluida</div>
+      <div style="font-size:24px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-venta-total">— €</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;" id="renta-venta-total-nota">—</div>
+    </div>
+  </div>
+
   <!-- Bloque A: Trabajo / Nómina -->
   <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
     <div onclick="renta_toggleBloque('bloque-trabajo')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
@@ -5255,7 +5307,7 @@ con editar/borrar en cada línea. -->
         <span style="font-size:20px;">💼</span>
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">TRABAJO</div>
-          <div style="font-size:11px;color:var(--text-secondary);">Nóminas · Retención IRPF · SS</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Nóminas · Retención IRPF · Cuota autónomo</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -5418,8 +5470,14 @@ con editar/borrar en cada línea. -->
       <input id="renta-nom-retencion" type="text" inputmode="decimal" placeholder="420" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
     <div style="margin-bottom:20px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">SEGURIDAD SOCIAL (€)</div>
-      <input id="renta-nom-ss" type="text" inputmode="decimal" placeholder="210" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <!-- PUNTO 126 (06/09/2026): este campo se llamaba "Seguridad Social" —
+           a petición tuya, pasa a ser "Cuota de autónomo" (como CEO de
+           Patrimer con nómina, no usabas el campo de SS de un empleado, así
+           que se reaprovecha para tu cuota RETA en vez de crear uno nuevo).
+           El id y el nombre interno del dato (ss) se mantienen igual para no
+           romper nada de lo que ya tengas guardado. -->
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CUOTA DE AUTÓNOMO (€)</div>
+      <input id="renta-nom-ss" type="text" inputmode="decimal" placeholder="290" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
     <button onclick="renta_guardarNomina()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
     <button onclick="renta_cerrarModalNomina()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
@@ -6379,6 +6437,68 @@ function inm_seguroIbiSave(lista) {
 function inm_ventaTotal(inm) {
   return (parseFloat(inm.ventaDeclarado) || 0) + (parseFloat(inm.ventaEfectivo) || 0);
 }
+// PUNTO 125 (06/09/2026) — TRAMOS DE LA BASE DEL AHORRO (IRPF), ÚNICO PUNTO
+// DE VERDAD ─────────────────────────────────────────────────────────────
+// Antes vivían "a mano" dentro de renta_calcPrevision (solo para dividendos).
+// Se sacan aquí para poder reutilizarlos también en la ganancia patrimonial
+// de una venta (mismo tramo, misma tabla) — mismo motivo que el punto 121:
+// evitar que el mismo cálculo se reescriba en 2 sitios y se desincronice.
+// De paso, actualizados a los tramos de 2026 (antes solo llegaban a 200.000€
+// al 27% de forma indefinida; 2026 añade un tramo de 200.000 a 300.000€ al
+// 27% y uno nuevo a partir de 300.000€ al 30%) — no afecta a los cálculos de
+// Patricio actuales (muy por debajo de 200.000€), pero deja la tabla
+// correcta para el futuro.
+function renta_calcAhorroTramos(base) {
+  var tramos = [[0,6000,0.19],[6000,50000,0.21],[50000,200000,0.23],[200000,300000,0.27],[300000,999999999,0.30]];
+  var imp = 0;
+  for (var t = 0; t < tramos.length; t++) {
+    if (base <= tramos[t][0]) break;
+    imp += (Math.min(base, tramos[t][1]) - tramos[t][0]) * tramos[t][2];
+  }
+  return imp;
+}
+// PUNTO 125 (06/09/2026) — GANANCIA PATRIMONIAL DE LA VENTA DE UN INMUEBLE
+// ─────────────────────────────────────────────────────────────────────────
+// Cálculo aparte del "Resultado de la venta" (punto 97b, que es solo para
+// saber si la inversión ha sido rentable). Esto es lo que de verdad entra en
+// el IRPF: Valor de transmisión (venta − gastos de venta − plusvalía
+// municipal) menos Valor de adquisición actualizado (precio + gastos de
+// compra + reforma, restando la amortización fiscal del 3% anual que
+// corresponde a los años que estuvo alquilado — Hacienda obliga a restarla
+// aunque no se hubiera deducido de verdad, así que aumenta la ganancia).
+// El 3% se aplica solo sobre la parte de "construcción" del valor (el suelo
+// no se deprecia); a falta del dato catastral real, se usa el % que se
+// indique como estimación (por defecto 70% construcción / 30% suelo).
+// Solo el precio de venta DECLARADO cuenta aquí — cualquier efectivo aparte
+// (ventaEfectivo) no forma parte de este cálculo fiscal, a propósito.
+function inm_gananciaPatrimonialVenta(inm) {
+  if (!inm || inm.estado !== 'vendido' || !parseInt(inm.ventaAnio)) return null;
+  var precio = parseFloat(inm.precio) || 0;
+  var gastosCompra = parseFloat(inm.gastosCompra) || 0;
+  var reforma = parseFloat(inm.reforma) || 0;
+  var valorAdquisicion = precio + gastosCompra + reforma;
+  if (!valorAdquisicion) return null;
+  var pctConstruccion = (parseFloat(inm.ventaPctConstruccion) || 70) / 100;
+  var baseAmortizable = (precio + gastosCompra) * pctConstruccion + reforma;
+  var cuotaAnual3pc = baseAmortizable * 0.03;
+  var anioInicio = parseInt(inm.ventaAnioInicioAlquiler) || 0;
+  var anioVenta = parseInt(inm.ventaAnio) || 0;
+  var aniosCompletos = (anioInicio && anioVenta > anioInicio) ? (anioVenta - anioInicio) : 0;
+  var mesesUltimoAnio = Math.max(0, Math.min(12, parseFloat(inm.ventaMesesUltimoAnio) || 0));
+  var amortizacionAcumulada = cuotaAnual3pc * aniosCompletos + cuotaAnual3pc * (mesesUltimoAnio / 12);
+  var valorAdquisicionActualizado = Math.max(0, valorAdquisicion - amortizacionAcumulada);
+  var ventaDeclarada = parseFloat(inm.ventaDeclarado) || 0;
+  var gastosVenta = parseFloat(inm.ventaGastos) || 0;
+  var plusvalia = parseFloat(inm.ventaPlusvalia) || 0;
+  var valorTransmision = Math.max(0, ventaDeclarada - gastosVenta - plusvalia);
+  var ganancia = Math.max(0, valorTransmision - valorAdquisicionActualizado);
+  return {
+    anioVenta: anioVenta, baseAmortizable: baseAmortizable, cuotaAnual3pc: cuotaAnual3pc,
+    aniosCompletos: aniosCompletos, mesesUltimoAnio: mesesUltimoAnio,
+    amortizacionAcumulada: amortizacionAcumulada, valorAdquisicionActualizado: valorAdquisicionActualizado,
+    valorTransmision: valorTransmision, ganancia: ganancia
+  };
+}
 // Ingresos totales de un inmueble = lo que el propio Patry apunta como punto
 // de partida (alquiler cobrado antes de usar la app, campo "ingresosAcumInicial",
 // se rellena una sola vez a mano) + lo que la app ya lleva registrado como
@@ -6608,12 +6728,19 @@ function renderLista() {
     let amortInfo = null;
     try { amortInfo = inm_amortizacion(idxReal, inm); } catch (e) { amortInfo = null; }
     let amortTxt = '';
+    // PUNTO 124 (06/09/2026): a petición tuya, la cifra de años ya no se
+    // redondea al entero (Math.ceil) — se muestra con 1 decimal, igual que
+    // en la ficha del inmueble (puntos 59/60), y se añade también el importe
+    // que falta por amortizar en euros, reutilizando el mismo amortInfo.pendiente
+    // que ya usa la ficha — sin recalcular nada por duplicado.
+    let amortPendienteTxt = '';
     if (amortInfo && inm.estado === 'alquilado') {
       if (amortInfo.pendiente <= 0) {
         amortTxt = 'Amortizado ✅';
       } else if (amortInfo.aniosFaltan !== null) {
-        const aniosR = Math.ceil(amortInfo.aniosFaltan);
-        amortTxt = 'Faltan ' + aniosR + (aniosR === 1 ? ' año' : ' años');
+        const aniosTxt = amortInfo.aniosFaltan.toFixed(1).replace('.', ',');
+        amortTxt = 'Faltan ' + aniosTxt + ' años';
+        amortPendienteTxt = fmt(Math.round(amortInfo.pendiente)) + ' € por amortizar';
       }
     }
 
@@ -6681,6 +6808,7 @@ function renderLista() {
           ${inm.precio ? `<div style="font-size:11px;font-weight:700;color:var(--silver-bright);white-space:nowrap;">${fmt(inm.precio)} € <span style="font-size:9px;font-weight:400;color:var(--silver-dim);">compra</span></div>` : '<div>&nbsp;</div>'}
           ${inm.precioActual ? `<div style="font-size:11px;font-weight:700;color:var(--accent-blue);white-space:nowrap;margin-top:4px;">${fmt(inm.precioActual)} € <span style="font-size:9px;font-weight:400;color:var(--silver-dim);">actual</span></div>` : ''}
           ${amortTxt ? `<div style="font-size:9.5px;font-weight:600;color:var(--silver-mid);white-space:nowrap;margin-top:4px;">⏳ ${amortTxt}</div>` : ''}
+          ${amortPendienteTxt ? `<div style="font-size:9px;font-weight:400;color:var(--silver-dim);white-space:nowrap;">${amortPendienteTxt}</div>` : ''}
         </div>`
       : '';
 
@@ -6738,7 +6866,7 @@ function renderLista() {
       ? `<div style="display:flex;justify-content:flex-end;gap:18px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
           ${inm.precio ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Precio compra</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(inm.precio)} €</div></div>` : ''}
           ${inm.precioActual ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Valor actual</div><div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${fmt(inm.precioActual)} €</div></div>` : ''}
-          ${amortTxt ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Amortización</div><div style="font-size:13px;font-weight:700;color:var(--silver-mid);">${amortTxt}</div></div>` : ''}
+          ${amortTxt ? `<div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Amortización</div><div style="font-size:13px;font-weight:700;color:var(--silver-mid);">${amortTxt}</div>${amortPendienteTxt ? `<div style="font-size:9.5px;font-weight:400;color:var(--silver-dim);margin-top:2px;">${amortPendienteTxt}</div>` : ''}</div>` : ''}
         </div>`
       : '';
 
@@ -7295,6 +7423,13 @@ function openModal(editIdx) {
     document.getElementById('f-ingresos-acum').value = inm.ingresosAcumInicial ? fmt(inm.ingresosAcumInicial) : '';
     document.getElementById('f-venta-declarado').value = inm.ventaDeclarado ? fmt(inm.ventaDeclarado) : '';
     document.getElementById('f-venta-efectivo').value = inm.ventaEfectivo ? fmt(inm.ventaEfectivo) : '';
+    // PUNTO 125 (06/09/2026): datos fiscales de la venta (ganancia patrimonial)
+    document.getElementById('f-venta-anio').value = inm.ventaAnio || '';
+    document.getElementById('f-venta-gastos').value = inm.ventaGastos ? fmt(inm.ventaGastos) : '';
+    document.getElementById('f-venta-plusvalia').value = inm.ventaPlusvalia ? fmt(inm.ventaPlusvalia) : '';
+    document.getElementById('f-venta-anio-inicio').value = inm.ventaAnioInicioAlquiler || '';
+    document.getElementById('f-venta-pct-construccion').value = (inm.ventaPctConstruccion || inm.ventaPctConstruccion === 0) ? inm.ventaPctConstruccion : '';
+    document.getElementById('f-venta-meses-ultimo-anio').value = (inm.ventaMesesUltimoAnio || inm.ventaMesesUltimoAnio === 0) ? inm.ventaMesesUltimoAnio : '';
     document.getElementById('f-notas').value = inm.notas || '';
     modal.dataset.editIdx = editIdx;
     inm_onEstadoChange();
@@ -7346,7 +7481,7 @@ function closeModal() {
 }
 
 function clearForm() {
-  ['f-ref-inm','f-direccion','f-edificio','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-notas'].forEach(id => {
+  ['f-ref-inm','f-direccion','f-edificio','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-venta-anio','f-venta-gastos','f-venta-plusvalia','f-venta-anio-inicio','f-venta-pct-construccion','f-venta-meses-ultimo-anio','f-notas'].forEach(id => {
     const el = document.getElementById(id);
     if (el.tagName === 'SELECT') el.selectedIndex = 0;
     else el.value = '';
@@ -7424,6 +7559,13 @@ function saveInmueble() {
     ingresosAcumInicial: parseFmtGlobal(document.getElementById('f-ingresos-acum').value) || '',
     ventaDeclarado: parseFmtGlobal(document.getElementById('f-venta-declarado').value) || '',
     ventaEfectivo: parseFmtGlobal(document.getElementById('f-venta-efectivo').value) || '',
+    // PUNTO 125 (06/09/2026): datos fiscales de la venta (ganancia patrimonial)
+    ventaAnio: document.getElementById('f-venta-anio').value.trim() || '',
+    ventaGastos: parseFmtGlobal(document.getElementById('f-venta-gastos').value) || '',
+    ventaPlusvalia: parseFmtGlobal(document.getElementById('f-venta-plusvalia').value) || '',
+    ventaAnioInicioAlquiler: document.getElementById('f-venta-anio-inicio').value.trim() || '',
+    ventaPctConstruccion: document.getElementById('f-venta-pct-construccion').value.trim() || '',
+    ventaMesesUltimoAnio: document.getElementById('f-venta-meses-ultimo-anio').value.trim() || '',
     notas: document.getElementById('f-notas').value.trim(),
     inquilino: _inquilinoNombre,
     // PUNTO 32: plaza de garaje asociada a este piso (solo tiene sentido si
@@ -10711,7 +10853,7 @@ function renderAnalisis(){
   if (typeof rus_renderAvisoPendiente === 'function') rus_renderAvisoPendiente();
 }
 
-function buildChart(facturas,cobros,year){
+function buildChart(facturas,cobros,year,_reintentado){
   var meses=['E','F','M','A','M','J','J','A','S','O','N','D'];
   // Cargar histórico — solo usar FAC_HIST_INICIAL para empresa Patrimer
   var _empBC = localStorage.getItem('patrimer:empresa') || 'patrimer';
@@ -10744,8 +10886,21 @@ function buildChart(facturas,cobros,year){
     return { cur: v.cur > 0 ? acumCur : 0, prv: v.prv > 0 ? acumPrv : 0 };
   });
   const mx=Math.max(...dAcum.map(v=>Math.max(v.cur,v.prv)),1);
-  const ch=document.getElementById('bar-chart');ch.innerHTML='';
-  const barW = Math.max(4, Math.floor(402 / meses.length / 2) - 2);
+  const ch=document.getElementById('bar-chart');
+  // PUNTO 123 (06/09/2026): esto usaba un ancho fijo "a ciegas" (402px) para
+  // calcular el grosor de barra, en vez de medir el ancho real de la
+  // tarjeta como ya hace dash_buildChart (Inicio) desde el punto 64 —
+  // en el iPhone la tarjeta mide bastante menos de 402px, así que las
+  // barras salían demasiado anchas y se cortaban por los lados. Mismo
+  // arreglo que en Inicio: si el contenedor todavía mide 0 (pantalla
+  // recién abierta, aún oculta), se espera un instante y se reintenta una
+  // sola vez, para que nunca se quede en bucle.
+  if (ch.offsetWidth === 0 && !_reintentado) {
+    requestAnimationFrame(function() { requestAnimationFrame(function() { buildChart(facturas, cobros, year, true); }); });
+    return;
+  }
+  ch.innerHTML='';
+  const barW = Math.max(4, Math.floor(ch.offsetWidth / meses.length / 2) - 2);
   meses.forEach((m,i)=>{
     const h24=Math.round(dAcum[i].prv/mx*68);
     const h25=Math.round(dAcum[i].cur/mx*68);
@@ -12077,6 +12232,37 @@ document.addEventListener('firebaseLoaded', function() {
     saveInmuebles(todosInm);
     if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', JSON.stringify(todosInm));
     console.log('[Migración venta Sierra Nevada] Resultado de la venta cargado: 120.000€ + 40.000€ en efectivo.');
+  })();
+  // PUNTO 125 (06/09/2026): datos fiscales de la venta de Sierra Nevada, para
+  // calcular la ganancia patrimonial del IRPF 2026 — confirmados contigo:
+  // alquilada desde 2017 (año de compra), vacía todo 2026 (ya preparada para
+  // la venta), comisión de agencia 5.000€ + IVA (6.050€), plusvalía municipal
+  // aún pendiente de saber (se deja en 0, editable en cuanto llegue), y
+  // estimación estándar 70% construcción / 30% suelo al no tener el dato
+  // catastral real. Con guardia propia y sin pisar nunca un dato que ya
+  // tuvieras puesto a mano.
+  (function() {
+    var todosInm = loadInmuebles();
+    var idx = -1;
+    for (var i = 0; i < todosInm.length; i++) {
+      var dir = (todosInm[i].direccion || '').toLowerCase();
+      if ((todosInm[i].propietario || '').toLowerCase() === 'patricio' && (dir.indexOf('nevada') !== -1 || dir.indexOf('montegorbea') !== -1)) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) return; // ya se ha avisado arriba si no se encuentra
+    var inm = todosInm[idx];
+    if (inm.ventaAnio) return; // ya tiene algo puesto, no se toca
+    inm.ventaAnio = '2026';
+    inm.ventaAnioInicioAlquiler = '2017';
+    inm.ventaPctConstruccion = '70';
+    inm.ventaGastos = 6050.00;
+    inm.ventaPlusvalia = 0;
+    inm.ventaMesesUltimoAnio = '0';
+    saveInmuebles(todosInm);
+    if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', JSON.stringify(todosInm));
+    console.log('[Migración datos fiscales venta Sierra Nevada] Cargados: año venta 2026, alquilada desde 2017, 70% construcción, gastos venta 6.050€.');
   })();
   // PUNTO 108 (06/09/2026): desglose año a año 2015-2024 de tu tabla de
   // ingresos por alquiler (Gabriel Glez., Poeta V.M., Montegorbea = Sierra
@@ -18162,7 +18348,7 @@ function renta_renderNominas() {
     totalSS += parseFloat(n.ss) || 0;
     html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + n.mes + '</div>'
-      + '<div style="font-size:11px;color:var(--text-secondary);">Bruto: ' + fmtGlobal(n.bruto) + '€ · IRPF: ' + fmtGlobal(n.retencion) + '€ · SS: ' + fmtGlobal(n.ss) + '€</div></div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">Bruto: ' + fmtGlobal(n.bruto) + '€ · IRPF: ' + fmtGlobal(n.retencion) + '€ · Autónomo: ' + fmtGlobal(n.ss) + '€</div></div>'
       + '<button onclick="renta_borrarNomina(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
       + '</div>';
   }
@@ -18800,6 +18986,13 @@ function ingotros_totalAnioDeclarable(year) {
 // ── Previsión IRPF (estimación simplificada 2025) ─────────────────────────
 function renta_calcPrevision() {
   var nominas = renta_getNominas();
+  // PUNTO 126 (06/09/2026): "ssTrabajo" venía de un campo que se llamaba
+  // "Seguridad Social" en el formulario (pensado para un empleado normal) —
+  // como Patricio es autónomo y cobra nómina de Patrimer (es el CEO), ese
+  // campo no se usaba para SS de verdad; ahora en pantalla se llama "Cuota
+  // de autónomo" y es donde mete su cuota RETA. El nombre de la variable
+  // interna (ssTrabajo) y del dato guardado (nominas[ni].ss) se dejan igual
+  // a propósito, para no romper nada de lo que ya hubiera guardado.
   var brutoTrabajo = 0, retencionAcum = 0, ssTrabajo = 0;
   for (var ni = 0; ni < nominas.length; ni++) {
     brutoTrabajo += parseFloat(nominas[ni].bruto) || 0;
@@ -18866,6 +19059,9 @@ function renta_calcPrevision() {
     document.getElementById('renta-prevision-irpf').textContent = '\u2014 \u20ac';
     document.getElementById('renta-prevision-irpf').style.color = 'var(--silver-bright)';
     document.getElementById('renta-prevision-nota').textContent = 'A\u00f1ade datos para ver la previsi\u00f3n';
+    // PUNTO 125: sin datos, tampoco tiene sentido mostrar el impacto de venta
+    var elVentaCardVacio = document.getElementById('renta-impacto-venta-card');
+    if (elVentaCardVacio) elVentaCardVacio.style.display = 'none';
     return;
   }
 
@@ -18878,15 +19074,11 @@ function renta_calcPrevision() {
     }
     return imp;
   }
-  function calcAhorro(base) {
-    var tramos = [[0,6000,0.19],[6000,50000,0.21],[50000,200000,0.23],[200000,999999999,0.27]];
-    var imp = 0;
-    for (var t = 0; t < tramos.length; t++) {
-      if (base <= tramos[t][0]) break;
-      imp += (Math.min(base, tramos[t][1]) - tramos[t][0]) * tramos[t][2];
-    }
-    return imp;
-  }
+  // PUNTO 125 (06/09/2026): la tabla de tramos del ahorro ya no vive aqui "a
+  // mano" -- se usa la funcion comun renta_calcAhorroTramos (ver mas abajo
+  // en el archivo, junto a inm_gananciaPatrimonialVenta), para que esta
+  // prevision y el impacto de una venta usen siempre la misma tabla.
+  function calcAhorro(base) { return renta_calcAhorroTramos(base); }
 
   var baseGeneral = Math.max(0, brutoTrabajo - ssTrabajo - 2000);
   var baseTotal = baseGeneral + baseAlquilerTotal;
@@ -18904,6 +19096,47 @@ function renta_calcPrevision() {
   notaPrev.textContent = resultado > 0
     ? 'Estimaci\u00f3n: a PAGAR (cuota ' + fmtGlobal(cuotaTotal.toFixed(0)) + '\u20ac \u2212 retenciones ' + fmtGlobal(retencionAcum.toFixed(0)) + '\u20ac)'
     : 'Estimaci\u00f3n: a DEVOLVER (cuota ' + fmtGlobal(cuotaTotal.toFixed(0)) + '\u20ac \u2212 retenciones ' + fmtGlobal(retencionAcum.toFixed(0)) + '\u20ac)';
+
+  // PUNTO 125 (06/09/2026) -- IMPACTO DE VENTA, EN SU PROPIO APARTADO
+  // -----------------------------------------------------------------
+  // A peticion tuya: la prevision normal de arriba se queda exactamente
+  // igual todos los anios (no se toca ni se mezcla). Si en el anio que estas
+  // viendo (renta_anio) hay algun inmueble de Patricio vendido con sus datos
+  // fiscales de venta rellenados (ficha del inmueble, "Resultado de la
+  // venta"), aparece esta segunda tarjeta con la ganancia patrimonial y el
+  // total combinado (prevision normal + venta), sin tocar el numero de
+  // arriba.
+  var elVentaCard = document.getElementById('renta-impacto-venta-card');
+  if (elVentaCard) {
+    var gananciaTotalVenta = 0;
+    var detalleVentas = [];
+    for (var vi = 0; vi < inmPatricio.length; vi++) {
+      var inmV = todosInm[inmPatricio[vi]];
+      if (!inmV || inmV.estado !== 'vendido') continue;
+      var g = inm_gananciaPatrimonialVenta(inmV);
+      if (!g || parseInt(inmV.ventaAnio) !== renta_anio) continue;
+      gananciaTotalVenta += g.ganancia;
+      detalleVentas.push({ nombre: (inmV.direccionCalle || inmV.direccion || inmV.ref), ganancia: g.ganancia });
+    }
+    if (gananciaTotalVenta > 0) {
+      var cuotaAhorroConVenta = renta_calcAhorroTramos(capitalMobiliario + gananciaTotalVenta);
+      var cuotaVentaSola = cuotaAhorroConVenta - cuotaAhorro;
+      var cuotaTotalConVenta = cuotaGeneral + cuotaAhorroConVenta;
+      var resultadoConVenta = cuotaTotalConVenta - retencionAcum;
+      elVentaCard.style.display = '';
+      var nombresVenta = detalleVentas.map(function(d) { return d.nombre; }).join(', ');
+      document.getElementById('renta-venta-detalle').textContent = nombresVenta + ' \u2014 ganancia patrimonial estimada: ' + fmtGlobal(gananciaTotalVenta.toFixed(0)) + ' \u20ac';
+      document.getElementById('renta-venta-cuota').textContent = 'Cuota adicional por la venta (base del ahorro): ' + fmtGlobal(cuotaVentaSola.toFixed(0)) + ' \u20ac';
+      var elVentaTotal = document.getElementById('renta-venta-total');
+      elVentaTotal.textContent = (resultadoConVenta >= 0 ? '+' : '') + fmtGlobal(resultadoConVenta.toFixed(0)) + ' \u20ac';
+      elVentaTotal.style.color = resultadoConVenta > 0 ? '#e07070' : '#4caf82';
+      document.getElementById('renta-venta-total-nota').textContent = resultadoConVenta > 0
+        ? 'Renta normal + venta: a PAGAR'
+        : 'Renta normal + venta: a DEVOLVER';
+    } else {
+      elVentaCard.style.display = 'none';
+    }
+  }
 }
 
 // ── Exportar CSV ───────────────────────────────────────────────────────────
@@ -18912,7 +19145,7 @@ function renta_exportarCSV() {
   var gastos = renta_getGastos();
   var csv = 'RENTA ' + renta_anio + '\n\n';
   csv += 'BLOQUE A - TRABAJO\n';
-  csv += 'Mes,Bruto,Retenci\u00f3n IRPF,Seguridad Social\n';
+  csv += 'Mes,Bruto,Retenci\u00f3n IRPF,Cuota autonomo\n';
   for (var ni = 0; ni < nominas.length; ni++) {
     var n = nominas[ni];
     csv += n.mes + ',' + n.bruto + ',' + n.retencion + ',' + n.ss + '\n';
