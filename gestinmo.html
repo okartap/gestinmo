@@ -1968,6 +1968,20 @@ const DATA_KEYS = [
 for (let _rAnio = 2022; _rAnio <= 2036; _rAnio++) {
   DATA_KEYS.push('renta:gastos:' + _rAnio, 'renta:nominas:' + _rAnio);
 }
+// PUNTO 98b (06/09/2026): BUG REAL, SEGUNDO Y MÁS GRAVE — mismo motivo que
+// _finHuella (ver PUNTO 98 más abajo), pero aquí el efecto es mucho mayor:
+// DATA_KEYS también vive en este bloque aislado y nunca se dejó accesible
+// para el resto de la app. El interceptor que decide cuándo subir un dato
+// guardado a la nube (más abajo del todo, en el `<script>` normal) necesita
+// leer esta lista — y al no encontrarla, lanzaba un error real
+// ("DATA_KEYS is not defined") CADA VEZ que se guardaba cualquier dato en
+// toda la app (no solo hoy: desde que existe ese interceptor). El dato en
+// sí SE GUARDABA BIEN en el aparato (eso pasa antes del error), pero la
+// subida automática a la nube que depende de esa comprobación se cortaba
+// en seco justo ahí — y cualquier otra cosa programada para pasar
+// justo después de guardar, en la misma función, tampoco llegaba a
+// ejecutarse. Expuesta igual que el resto.
+window.DATA_KEYS = DATA_KEYS; // expuesta para el resto de la app — ver PUNTO 98b
 
 // Convertir clave localStorage a nombre de documento Firestore
 function keyToDoc(key) {
@@ -2226,6 +2240,23 @@ function _finHuella(tipo, it) {
   // reciente en cuanto uno de los dos se edite y quede con fecha real.
   return (it.ticker || '') + '|' + (it.tipo || '') + '|' + (it.fecha || '');
 }
+// PUNTO 98 (06/09/2026): BUG REAL ENCONTRADO Y CORREGIDO — esta función vive
+// en el bloque `<script type="module">` (arriba del todo del archivo), que
+// tiene su propio espacio aislado; nunca se había expuesto a `window`, así
+// que era invisible para el resto de la app (el `<script>` normal, mucho más
+// abajo). La migración de Urbanitae (punto 89, 03/09/2026) la llama
+// directamente sin saberlo — así que desde el 03/09/2026 esa llamada
+// lanzaba un error real ("_finHuella is not defined") nada más entrar en la
+// app, CADA VEZ, sin que se viera en pantalla. Ese error paraba en seco
+// TODO lo que venía después de él dentro del mismo bloque de arranque —
+// que es justo donde viven, más abajo, la carga del histórico de patrimonio
+// (punto 92, de ayer) y la de tus alquileres/inversión/venta (punto 97, de
+// hoy): por eso no se veía nada de ninguna de las dos, aunque el código en
+// sí estuviera bien y correctamente subido. Con esta única línea, expuesta
+// igual que ya están _finGenId y _patHistMerge un poco más abajo, el resto
+// del arranque ya no se corta y las migraciones de los puntos 92 y 97
+// pueden ejecutarse.
+window._finHuella = _finHuella; // expuesta para el resto de la app — ver PUNTO 98
 
 // Asegura que cada elemento de la lista tiene id — a los que no lo tengan se
 // lo calcula a partir de su huella estable. Si dos elementos de la MISMA
