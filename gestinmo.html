@@ -1940,6 +1940,12 @@ const DATA_KEYS = [
   // PUNTO 109 (06/09/2026): Patrimonio Financiero personal (Caixa/MyInvestor/
   // Trade Republic) — tabla aparte del histórico de arriba, solo Patricio.
   'fin:patrimonio_financiero:patricio',
+  // PUNTO 114 (06/09/2026): Panel "Patrimonio Financiero" — estado ACTUAL
+  // (no un histórico mes a mes como el de arriba), con Liquidez/Invertido
+  // separado dentro de MyInvestor y de Trade Republic. Pantalla propia,
+  // independiente de la tabla de PUNTO 109 — decidiremos más adelante si
+  // se fusionan.
+  'fin:patrimonio_financiero_actual:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
@@ -4652,6 +4658,20 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="fin-finper-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"></div>
     <div id="fin-finper-lista"></div>
   </div>
+  <!-- PUNTO 114 (06/09/2026): Panel "Patrimonio Financiero" — pantalla propia
+  con más diseño, a petición tuya (mismo patrón que la tarjeta de Dividendos
+  de abajo: una tarjeta pequeña abre una pantalla completa aparte). Muestra
+  el ESTADO ACTUAL (no un histórico mes a mes) de Caixa/MyInvestor/Trade
+  Republic, con Liquidez e Invertido separados dentro de cada broker, más el
+  valor inmobiliario en vivo. Tabla propia (fin:patrimonio_financiero_actual),
+  sin tocar la de arriba — decidiremos más adelante si se fusionan. -->
+  <div class="fin-section" id="fin-finperdash-section" style="display:none;margin-top:10px;">
+    <div class="fin-card" style="cursor:pointer;text-align:center;padding:14px 10px;" onclick="finperdash_abrirModulo()">
+      <div style="font-size:20px;">&#128202;</div>
+      <div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-top:4px;">Panel Patrimonio Financiero</div>
+      <div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">Estado actual, por cuenta &#8250;</div>
+    </div>
+  </div>
   <!-- DIVIDENDOS: dos tarjetas pequeñas (PUNTO 70, 30/08/2026) — sustituyen
        a la única línea "Resumen anual dividendos" que había antes. Una abre
        la misma tabla resumen de siempre; la otra abre el módulo nuevo con
@@ -4711,6 +4731,63 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   </div>
 </div>
 
+<!-- ═══ MÓDULO: PANEL PATRIMONIO FINANCIERO (PUNTO 114, 06/09/2026) ═══
+Pantalla propia con más diseño, a petición tuya, para ver hasta dónde
+llegamos y decidir más adelante si sustituye o se fusiona con la tabla
+mensual de "Patrimonio Financiero (personal)" de Finanzas. Muestra el
+ESTADO ACTUAL (no un mes concreto): Caixa, MyInvestor (Liquidez+Invertido
+por separado) y Trade Republic (Liquidez+Invertido por separado, sin
+Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
+"Patrim. Inmo." de Inicio) para ver el patrimonio total combinado. -->
+<div id="mod-finperdash" class="module-view">
+  <header class="header">
+    <div class="header-back" onclick="finperdash_cerrarModulo()">&#8249;</div>
+    <div class="header-identity">
+      <div class="header-single-row">
+        <span class="header-module-name">Patrimonio Financiero</span>
+      </div>
+    </div>
+    <div style="padding-right:14px;cursor:pointer;font-size:20px;" onclick="finperdash_abrirEditar()">&#9998;</div>
+  </header>
+  <div style="padding:14px 14px 100px;">
+    <div id="finperdash-content"></div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR PANEL PATRIMONIO FINANCIERO (PUNTO 114, 06/09/2026) -->
+<div class="moverlay" id="finperdash-modal" style="display:none;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:380px;width:92%;">
+    <div class="mtitle">Patrimonio financiero — actualizar<span class="mclose" onclick="finperdash_cerrarEditar()">&#10005;</span></div>
+    <div style="padding:4px 0;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CAIXA (€)</div>
+        <input id="finperdash-caixa" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MYINVESTOR LIQ. (€)</div>
+          <input id="finperdash-myinvestor-liq" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MYINVESTOR INV. (€)</div>
+          <input id="finperdash-myinvestor-inv" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">TRADE REP. LIQ. (€)</div>
+          <input id="finperdash-trade-liq" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">TRADE REP. INV. (€)</div>
+          <input id="finperdash-trade-inv" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        </div>
+      </div>
+      <button onclick="finperdash_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
+      <button onclick="finperdash_cerrarEditar()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL HISTÓRICO RÚSTICO -->
 <div class="moverlay" id="rus-modal-historico" style="display:none;align-items:center;justify-content:center;">
@@ -5747,6 +5824,8 @@ const BACKUP_KEYS = [
   'fin:patrimonio_historico:patrimer','fin:patrimonio_historico:patricio',
   // PUNTO 109 (06/09/2026): Patrimonio Financiero personal (Caixa/MyInvestor/Trade Republic).
   'fin:patrimonio_financiero:patricio',
+  // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — estado actual.
+  'fin:patrimonio_financiero_actual:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
@@ -11718,10 +11797,15 @@ document.addEventListener('firebaseLoaded', function() {
   // real, y julio-26 repite exactamente los valores de junio (tu propio
   // Excel ya lo apuntaba así — la nota de esa fila lo explica).
   (function() {
+    // PUNTO 113 (06/09/2026): misma guardia permanente que en la migración
+    // de alquileres de más abajo — evita que esto vuelva a rellenar el
+    // histórico con los 9 meses fijos si el array se llegara a leer vacío
+    // en el futuro, borrando snapshots reales ya guardados.
+    if (localStorage.getItem('migracion:patrimonio_historico_patrimer_v1')) return;
     var key = 'fin:patrimonio_historico:patrimer';
     var actual;
     try { actual = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { actual = []; }
-    if (Array.isArray(actual) && actual.length > 0) return;
+    if (Array.isArray(actual) && actual.length > 0) { localStorage.setItem('migracion:patrimonio_historico_patrimer_v1', '1'); return; }
     var ahora = new Date().toISOString();
     var seed = [
       { id: '2025-11', fecha: '2025-11-09', liquidez: 31675.02, invertido: 19128.53, inmobiliario: 540000.00, nota: '' },
@@ -11741,6 +11825,7 @@ document.addEventListener('firebaseLoaded', function() {
     var val = JSON.stringify(seed);
     localStorage.setItem(key, val);
     if (window.syncToFirestore) window.syncToFirestore(key, val);
+    localStorage.setItem('migracion:patrimonio_historico_patrimer_v1', '1');
     console.log('[Migración] Histórico de patrimonio (Patrimer): ' + seed.length + ' meses cargados por primera vez.');
   })();
   // PUNTO 97 (05/09/2026): carga inicial, una sola vez, de tus 3 tablas de
@@ -11755,11 +11840,25 @@ document.addEventListener('firebaseLoaded', function() {
   // Montegorbea = Sierra Nevada y Loterías = Carril C. son el mismo inmueble
   // con dos nombres distintos entre tus dos tablas — confirmado contigo.
   (function() {
+    // PUNTO 113 (06/09/2026): guardia añadida tras detectar que esta
+    // migración podía volver a ejecutarse y BORRAR tus alquileres reales
+    // (incluidos meses de 2026 que ya habías metido a mano) si el array
+    // llegaba a leerse vacío por cualquier motivo (un fallo de sincronía,
+    // un JSON dañado, etc.) — antes solo miraba "¿está vacío ahora?", así
+    // que si alguna vez lo veía vacío, lo rellenaba entero con el
+    // histórico fijo de 2025 y lo subía a Firebase, tapando lo que
+    // hubiera. Ahora, en cuanto se ejecuta una vez con éxito, queda una
+    // marca ('migracion:alquileres_patricio_v1') que impide que se
+    // repita nunca más, pase lo que pase con el array en el futuro.
+    if (localStorage.getItem('migracion:alquileres_patricio_v1')) return;
     var ALQ_KEY = 'inmuebles:alquileres_mensuales';
     var SEG_KEY = 'inmuebles:seguro_ibi';
     var yaCargado;
     try { yaCargado = JSON.parse(localStorage.getItem(ALQ_KEY) || '[]'); } catch (e) { yaCargado = []; }
-    if (Array.isArray(yaCargado) && yaCargado.length > 0) return;
+    if (Array.isArray(yaCargado) && yaCargado.length > 0) {
+      localStorage.setItem('migracion:alquileres_patricio_v1', '1');
+      return;
+    }
 
     var todosInm = loadInmuebles();
     function buscarPorNombre(palabra) {
@@ -11872,6 +11971,7 @@ document.addEventListener('firebaseLoaded', function() {
       window.syncToFirestore(ALQ_KEY, JSON.stringify(alqSeed));
       window.syncToFirestore(SEG_KEY, JSON.stringify(segSeed));
     }
+    localStorage.setItem('migracion:alquileres_patricio_v1', '1');
     console.log('[Migración alquileres Patricio] Cargados ' + alqSeed.length + ' meses de alquiler/comunidad y ' + segSeed.length + ' registros de seguro/IBI de 2025.' + (sinResolver.length ? ' Sin resolver: ' + sinResolver.join(', ') + '.' : ''));
   })();
   // PUNTO 97b (05/09/2026): resultado de la venta de Sierra Nevada
@@ -13838,6 +13938,10 @@ function fin_render() {
   fin_renderUrbanitae();
   fin_patHist_render();
   finper_render();
+  // PUNTO 114 (06/09/2026): tarjeta de acceso al Panel Patrimonio Financiero
+  // — mismo criterio que la sección de arriba, solo visible para Patricio.
+  var secFinperDash = document.getElementById('fin-finperdash-section');
+  if (secFinperDash) secFinperDash.style.display = (emp === 'patricio') ? '' : 'none';
   fin_renderUltimaActualizacion();
 }
 
@@ -15131,6 +15235,145 @@ function finper_render() {
     html += '</div></div>';
   });
   if (listaEl) listaEl.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 114 (06/09/2026): PANEL PATRIMONIO FINANCIERO — pantalla propia,
+// aparte de la tabla mensual de arriba (PUNTO 109). Guarda un único
+// registro con el ESTADO ACTUAL (no un histórico), con Liquidez e
+// Invertido separados DENTRO de cada broker (MyInvestor y Trade Republic),
+// tal y como pediste al ver tu plantilla de referencia. El valor
+// "Inmobiliario" no se guarda aquí — se calcula en vivo, igual que la
+// tarjeta "Patrim. Inmo." de Inicio, para que el panel nunca se desactualice
+// aunque cambies el precio de un inmueble. Solo para Patricio.
+// ═══════════════════════════════════════════════════════════════════════
+function finperdash_key() {
+  return 'fin:patrimonio_financiero_actual:patricio';
+}
+function finperdash_load() {
+  try {
+    var r = JSON.parse(localStorage.getItem(finperdash_key()) || 'null');
+    return r && typeof r === 'object' ? r : {};
+  } catch (e) { return {}; }
+}
+function finperdash_save(data) {
+  localStorage.setItem(finperdash_key(), JSON.stringify(data));
+  if (window.syncToFirestore) window.syncToFirestore(finperdash_key(), JSON.stringify(data));
+}
+// Mismo cálculo que la tarjeta "Patrim. Inmo." de Inicio (punto 100.5/101):
+// suma del valor actual de los inmuebles NO vendidos de ese propietario.
+function patrim_valorInmobiliarioActual(propietario) {
+  var todos = [];
+  try { todos = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'); } catch (e) { todos = []; }
+  var total = 0;
+  for (var i = 0; i < todos.length; i++) {
+    var inm = todos[i];
+    if ((inm.propietario || '').toLowerCase() !== propietario || inm.estado === 'vendido') continue;
+    total += parseFloat(inm.precioActual) || 0;
+  }
+  return total;
+}
+function finperdash_abrirModulo() {
+  showModule('finperdash');
+  finperdash_render();
+}
+function finperdash_cerrarModulo() {
+  showModule('finanzas');
+}
+function finperdash_abrirEditar() {
+  if (bloqueaSiViewer('Actualizar el Panel Patrimonio Financiero')) return;
+  var d = finperdash_load();
+  document.getElementById('finperdash-caixa').value = fmtGlobal(parseFloat(d.caixa) || 0);
+  document.getElementById('finperdash-myinvestor-liq').value = fmtGlobal(parseFloat(d.myinvestorLiq) || 0);
+  document.getElementById('finperdash-myinvestor-inv').value = fmtGlobal(parseFloat(d.myinvestorInv) || 0);
+  document.getElementById('finperdash-trade-liq').value = fmtGlobal(parseFloat(d.traderepublicLiq) || 0);
+  document.getElementById('finperdash-trade-inv').value = fmtGlobal(parseFloat(d.traderepublicInv) || 0);
+  document.getElementById('finperdash-modal').style.display = 'flex';
+}
+function finperdash_cerrarEditar() {
+  document.getElementById('finperdash-modal').style.display = 'none';
+}
+function finperdash_guardar() {
+  if (bloqueaSiViewer('Guardar el Panel Patrimonio Financiero')) return;
+  var data = {
+    caixa: parseFmtGlobal(document.getElementById('finperdash-caixa').value) || 0,
+    myinvestorLiq: parseFmtGlobal(document.getElementById('finperdash-myinvestor-liq').value) || 0,
+    myinvestorInv: parseFmtGlobal(document.getElementById('finperdash-myinvestor-inv').value) || 0,
+    traderepublicLiq: parseFmtGlobal(document.getElementById('finperdash-trade-liq').value) || 0,
+    traderepublicInv: parseFmtGlobal(document.getElementById('finperdash-trade-inv').value) || 0,
+    updatedAt: new Date().toISOString()
+  };
+  finperdash_save(data);
+  finperdash_cerrarEditar();
+  finperdash_render();
+  info('✓ Panel Patrimonio Financiero actualizado.');
+}
+function finperdash_render() {
+  var cont = document.getElementById('finperdash-content');
+  if (!cont) return;
+  var d = finperdash_load();
+  var hayDatos = Object.keys(d).length > 0;
+  if (!hayDatos) {
+    cont.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--silver-dim);font-size:13px;">Sin datos todavía.<br>Pulsa el lápiz de arriba para meter tus cifras actuales.</div>';
+    return;
+  }
+  var caixa = parseFloat(d.caixa) || 0;
+  var myLiq = parseFloat(d.myinvestorLiq) || 0;
+  var myInv = parseFloat(d.myinvestorInv) || 0;
+  var trLiq = parseFloat(d.traderepublicLiq) || 0;
+  var trInv = parseFloat(d.traderepublicInv) || 0;
+  var myTotal = myLiq + myInv;
+  var trTotal = trLiq + trInv;
+  var totalLiq = caixa + myLiq + trLiq;
+  var totalInv = myInv + trInv;
+  var totalFinanciero = totalLiq + totalInv;
+  var pctLiq = totalFinanciero > 0 ? (totalLiq / totalFinanciero * 100) : 0;
+  var pctInv = totalFinanciero > 0 ? (totalInv / totalFinanciero * 100) : 0;
+  var totalInmobiliario = patrim_valorInmobiliarioActual('patricio');
+  var patrimonioTotal = totalInmobiliario + totalFinanciero;
+  var pctInmob = patrimonioTotal > 0 ? (totalInmobiliario / patrimonioTotal * 100) : 0;
+  var pctFin = patrimonioTotal > 0 ? (totalFinanciero / patrimonioTotal * 100) : 0;
+
+  function fila(label, valor, opts) {
+    opts = opts || {};
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:' + (opts.pad || '10px 14px') + ';' + (opts.borderTop ? 'border-top:1px solid var(--border);' : '') + '">' +
+      '<span style="font-size:' + (opts.fsLabel || '12px') + ';font-weight:' + (opts.bold ? '700' : '600') + ';color:' + (opts.colorLabel || 'var(--text-secondary)') + ';letter-spacing:.3px;">' + label + '</span>' +
+      '<span style="font-size:' + (opts.fsVal || '14px') + ';font-weight:700;color:' + (opts.colorVal || 'var(--silver-bright)') + ';">' + valor + '</span></div>';
+  }
+
+  var html = '';
+  // Bloque cuentas
+  html += '<div class="fin-section" style="padding:0;overflow:hidden;">';
+  html += fila('CAIXA', fin_fmt(caixa), { bold: true });
+  html += fila('MyInvestor · Liquidez', fin_fmt(myLiq), { borderTop: true });
+  html += fila('MyInvestor · Invertido', fin_fmt(myInv));
+  html += fila('MyInvestor · Total', fin_fmt(myTotal), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
+  html += fila('Trade Republic · Liquidez', fin_fmt(trLiq), { borderTop: true });
+  html += fila('Trade Republic · Invertido', fin_fmt(trInv));
+  html += fila('Trade Republic · Total', fin_fmt(trTotal), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
+  html += '</div>';
+  // Bloque totales financiero
+  html += '<div class="fin-section" style="padding:0;overflow:hidden;margin-top:10px;background:rgba(76,175,130,.08);">';
+  html += fila('TOTAL LIQUIDEZ', fin_fmt(totalLiq), { bold: true, colorVal: '#4caf82' });
+  html += fila('TOTAL INVERTIDO', fin_fmt(totalInv), { bold: true, colorVal: '#4caf82', borderTop: true });
+  html += fila('% Liquidez / % Invertido', pctLiq.toFixed(0) + '% / ' + pctInv.toFixed(0) + '%', { fsVal: '13px', colorVal: 'var(--silver-bright)', borderTop: true });
+  html += '</div>';
+  // Bloque patrimonio total (inmobiliario + financiero)
+  html += '<div class="fin-section" style="padding:0;overflow:hidden;margin-top:10px;">';
+  html += '<div style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-secondary);letter-spacing:.5px;">PATRIMONIO TOTAL</div>';
+  html += fila('Inmobiliario (' + pctInmob.toFixed(0) + '%)', fin_fmt(totalInmobiliario), { borderTop: true });
+  html += fila('Financiero (' + pctFin.toFixed(0) + '%)', fin_fmt(totalFinanciero), { borderTop: true });
+  html += '</div>';
+  html += '<div class="fin-card" style="margin-top:10px;text-align:center;padding:16px;">';
+  html += '<div style="font-size:11px;color:var(--silver-dim);letter-spacing:.5px;">TOTAL PATRIMONIO</div>';
+  html += '<div style="font-size:24px;font-weight:700;color:var(--silver-bright);margin-top:4px;">' + fin_fmt(patrimonioTotal) + '</div>';
+  html += '</div>';
+  if (d.updatedAt) {
+    var dU = new Date(d.updatedAt);
+    var pad2 = function(n) { return String(n).padStart(2, '0'); };
+    html += '<div style="text-align:center;font-size:10px;color:var(--silver-dim);margin-top:10px;">Actualizado el ' + pad2(dU.getDate()) + '/' + pad2(dU.getMonth() + 1) + '/' + dU.getFullYear() + '</div>';
+  }
+  cont.innerHTML = html;
 }
 
 // --- RESUMEN ANUAL DIVIDENDOS ---
@@ -16615,6 +16858,9 @@ window._refreshCurrentModule = function(key) {
     'fin:patrimonio_historico:patrimer': 'finanzas',
     'fin:patrimonio_historico:patricio': 'finanzas',
     'fin:patrimonio_financiero:patricio': 'finanzas',
+    // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — pantalla propia
+    // (mod-finperdash), no la de Finanzas.
+    'fin:patrimonio_financiero_actual:patricio': 'finperdash',
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     'ingresos:otros:patricio': 'renta',
@@ -16662,6 +16908,18 @@ window._refreshCurrentModule = function(key) {
     if (module === 'renta' && typeof renta_render === 'function') renta_render();
     if (module === 'inicio' && typeof notas_render === 'function') notas_render();
     if (module === 'inicio' && typeof pend_render === 'function') pend_render();
+    // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero (pantalla propia).
+    if (module === 'finperdash' && typeof finperdash_render === 'function') finperdash_render();
+  }
+  // PUNTO 114 (06/09/2026): el valor "Inmobiliario" del panel también
+  // depende de inmuebles:lista (no solo de su propia clave) — si cambia el
+  // precio actual de un inmueble mientras el panel está abierto, se
+  // refresca igual, aunque el módulo "dueño" de esa clave sea Inmuebles.
+  if (key === 'inmuebles:lista') {
+    var modFinperDash = document.getElementById('mod-finperdash');
+    if (modFinperDash && modFinperDash.classList.contains('active') && typeof finperdash_render === 'function') {
+      finperdash_render();
+    }
   }
   // PUNTO 102 (06/09/2026) — BUG REAL ENCONTRADO: el dashboard de Inicio
   // (dash_render, con sus KPIs y la gráfica "Acumulado mensual") nunca se
