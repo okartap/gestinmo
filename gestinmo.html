@@ -6336,6 +6336,31 @@ function inm_alqMenAcumulado(idx) {
   return inm_alqMenLoad().filter(function(r) { return r.inmuebleIdx === idx; })
     .reduce(function(s, r) { return s + (parseFloat(r.alquiler) || 0); }, 0);
 }
+// PUNTO 121 (06/09/2026): único punto de verdad para "cuánto alquiler real
+// hay registrado en un año concreto, para un grupo de inmuebles" (Patricio).
+// Antes esta misma cuenta se reescribía por separado en 2 sitios (Ingresos
+// anuales de Inicio, y la previsión de IRPF) — cada uno con su propio bucle
+// sobre inm_alqMenLoad(). Es justo ese patrón el que ha ido provocando que
+// el mismo fallo de fondo (leer de la vía antigua, retirada el 30/08/2026)
+// fuera reapareciendo en un sitio nuevo cada vez, aunque ya se hubiera
+// corregido en otro. A partir de ahora, cualquier pantalla que necesite este
+// dato llama aquí — un solo sitio que mantener, no uno por pantalla.
+function inm_alqMenTotalAnioPorInm(idxsPermitidos, year) {
+  var registros = inm_alqMenLoad();
+  var porInm = {}, total = 0, totalMesActual = 0;
+  var mesActualYm = year + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+  for (var i = 0; i < registros.length; i++) {
+    var r = registros[i];
+    if (!r.mes || idxsPermitidos.indexOf(r.inmuebleIdx) < 0) continue;
+    var imp = parseFloat(r.alquiler) || 0;
+    if (parseInt(r.mes.split('-')[0], 10) === year) {
+      porInm[r.inmuebleIdx] = (porInm[r.inmuebleIdx] || 0) + imp;
+      total += imp;
+    }
+    if (r.mes === mesActualYm) totalMesActual += imp;
+  }
+  return { porInm: porInm, total: total, totalMesActual: totalMesActual };
+}
 // PUNTO 97 (05/09/2026) — SEGURO E IBI ANUAL POR INMUEBLE
 // ──────────────────────────────────────────────────────────
 // Un dato al año por inmueble (id = idx + "_" + año), con histórico de años
@@ -16340,16 +16365,12 @@ function dash_render() {
     for (var pi = 0; pi < todosInmP.length; pi++) {
       if ((todosInmP[pi].propietario || '').toLowerCase() === 'patricio') { idxP.push(pi); }
     }
-    var registrosAlqP = (typeof inm_alqMenLoad === 'function') ? inm_alqMenLoad() : [];
+    // PUNTO 121 (06/09/2026): antes este bucle recalculaba por su cuenta lo
+    // mismo que ya hace inm_alqMenTotalAnioPorInm — unificado para que solo
+    // haya un sitio que mantener si mañana cambia algo de esta cuenta.
     var mesActualYm = year + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
-    var alqAnioP = 0, alqMesP = 0;
-    for (var pfi = 0; pfi < registrosAlqP.length; pfi++) {
-      var regP = registrosAlqP[pfi];
-      if (!regP.mes || idxP.indexOf(regP.inmuebleIdx) === -1) continue;
-      var importeAlqP = parseFloat(regP.alquiler) || 0;
-      if (parseInt(regP.mes.split('-')[0], 10) === year) alqAnioP += importeAlqP;
-      if (regP.mes === mesActualYm) alqMesP += importeAlqP;
-    }
+    var _alqP = (typeof inm_alqMenTotalAnioPorInm === 'function') ? inm_alqMenTotalAnioPorInm(idxP, year) : { total: 0, totalMesActual: 0 };
+    var alqAnioP = _alqP.total, alqMesP = _alqP.totalMesActual;
     var otrosAnioP = (typeof ingotros_totalAnio === 'function') ? ingotros_totalAnio(year) : 0;
     var otrosMesP = (typeof ingotros_totalMes === 'function') ? ingotros_totalMes(mesActualYm) : 0;
     var ingAnioP = alqAnioP + otrosAnioP;
@@ -18789,17 +18810,10 @@ function renta_calcPrevision() {
   // PUNTO 120 (06/09/2026): esto leía de 'facturacion:facturas' — el
   // desglose por inmueble que se desactivó el 30/08/2026 (punto 88) y que
   // Patricio nunca ha usado, así que su alquiler real quedaba siempre en
-  // 0 aquí. El dato real de Patricio vive en 'inmuebles:alquileres_mensuales'
-  // (tabla del punto 97, la misma que ya usa fac_sincronizarHistoricoPatricio
-  // para Inicio/Histórico desde el punto 99) — se lee de ahí en su lugar.
-  var registrosAlq = inm_alqMenLoad();
-  var ingresosPorInm = {};
-  for (var ai = 0; ai < registrosAlq.length; ai++) {
-    var ra = registrosAlq[ai];
-    if (!ra.mes || parseInt(ra.mes.split('-')[0], 10) !== renta_anio) continue;
-    if (inmPatricio.indexOf(ra.inmuebleIdx) < 0) continue;
-    ingresosPorInm[ra.inmuebleIdx] = (ingresosPorInm[ra.inmuebleIdx] || 0) + (parseFloat(ra.alquiler) || 0);
-  }
+  // 0 aquí. PUNTO 121: unificado con inm_alqMenTotalAnioPorInm (mismo dato
+  // real que ya usa "Ingresos anuales" de Inicio), en vez de tener este
+  // cálculo por duplicado aquí también.
+  var ingresosPorInm = (typeof inm_alqMenTotalAnioPorInm === 'function') ? inm_alqMenTotalAnioPorInm(inmPatricio, renta_anio).porInm : {};
 
   // Gastos deducibles generales (bloque D)
   var gastosArr = renta_getGastos();
