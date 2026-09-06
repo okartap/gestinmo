@@ -1937,6 +1937,9 @@ const DATA_KEYS = [
   // y Patricio (confirmado con Patry, Industrias no tiene datos propios).
   'fin:patrimonio_historico:patrimer',
   'fin:patrimonio_historico:patricio',
+  // PUNTO 109 (06/09/2026): Patrimonio Financiero personal (Caixa/MyInvestor/
+  // Trade Republic) — tabla aparte del histórico de arriba, solo Patricio.
+  'fin:patrimonio_financiero:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
@@ -4611,6 +4614,20 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="fin-pathist-lista"></div>
     <div id="fin-pathist-faltan-inmob" style="display:none;font-size:10.5px;color:var(--silver-dim);margin-top:8px;"></div>
   </div>
+  <!-- PUNTO 109 (06/09/2026): Patrimonio Financiero (personal) — a petición
+  tuya, tabla propia y APARTE del "Histórico de patrimonio" de arriba (que
+  se calcula solo con lo que ya tienes cargado en Cuentas/Fondos/Acciones).
+  Esta es manual, mes a mes, con tus 3 cuentas reales (Caixa, MyInvestor,
+  Trade Republic — Bitcoin fuera, nos dijiste que lo vas a cancelar), igual
+  que la llevas en tu Excel personal. Solo para Patricio. -->
+  <div class="fin-section" id="fin-finper-section" style="display:none;">
+    <div class="fin-section-header">
+      <div class="fin-section-title">&#128176; Patrimonio Financiero (personal)</div>
+      <button class="fin-add-btn" onclick="finper_abrirModal()">&#xFF0B;</button>
+    </div>
+    <div id="fin-finper-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"></div>
+    <div id="fin-finper-lista"></div>
+  </div>
   <!-- DIVIDENDOS: dos tarjetas pequeñas (PUNTO 70, 30/08/2026) — sustituyen
        a la única línea "Resumen anual dividendos" que había antes. Una abre
        la misma tabla resumen de siempre; la otra abre el módulo nuevo con
@@ -4676,6 +4693,34 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   <div class="modal" style="max-width:380px;width:92%;">
     <div class="mtitle">Histórico rústico<span class="mclose" onclick="document.getElementById('rus-modal-historico').style.display='none'">&#10005;</span></div>
     <div id="rus-hist-content" style="padding:4px 0;"></div>
+  </div>
+</div>
+
+<!-- MODAL PATRIMONIO FINANCIERO PERSONAL (PUNTO 109, 06/09/2026) -->
+<div class="moverlay" id="fin-finper-modal" style="display:none;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:380px;width:92%;">
+    <div class="mtitle">Patrimonio financiero — mes<span class="mclose" onclick="finper_cerrarModal()">&#10005;</span></div>
+    <input type="hidden" id="finper-id-hidden">
+    <div style="padding:4px 0;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MES</div>
+        <input id="finper-fecha" type="month" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CAIXA (€)</div>
+        <input id="finper-caixa" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MYINVESTOR (€)</div>
+        <input id="finper-myinvestor" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">TRADE REPUBLIC (€)</div>
+        <input id="finper-traderepublic" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      </div>
+      <button onclick="finper_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
+      <button onclick="finper_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -5318,6 +5363,14 @@ con editar/borrar en cada línea. -->
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA</div>
       <input id="ingotros-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
+    <!-- PUNTO 106.1 (06/09/2026): a petición tuya — no todos los "Otros
+    ingresos" van a la declaración (ej. Tortugas/Lala no; un dividendo de
+    Patrimer sí), así que se marca aparte en cada apunte, sin afectar al
+    total de "Ingresos anuales" (que sigue sumando todo). -->
+    <div style="margin-bottom:20px;display:flex;align-items:center;gap:10px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px;">
+      <input id="ingotros-declara" type="checkbox" style="width:18px;height:18px;flex-shrink:0;accent-color:#4caf82;">
+      <label for="ingotros-declara" style="font-size:13px;color:var(--silver-bright);cursor:pointer;">Entra en la declaración (IRPF)</label>
+    </div>
     <button onclick="ingotros_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
     <button onclick="ingotros_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
   </div>
@@ -5676,6 +5729,8 @@ const BACKUP_KEYS = [
   'fin:urbanitae:empresa','fin:urbanitae:patrimer','fin:urbanitae:patricio','fin:urbanitae:industrias',
   // PUNTO 92 (05/09/2026): histórico mensual de patrimonio.
   'fin:patrimonio_historico:patrimer','fin:patrimonio_historico:patricio',
+  // PUNTO 109 (06/09/2026): Patrimonio Financiero personal (Caixa/MyInvestor/Trade Republic).
+  'fin:patrimonio_financiero:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
@@ -11815,6 +11870,68 @@ document.addEventListener('firebaseLoaded', function() {
     if (window.syncToFirestore) window.syncToFirestore('inmuebles:lista', JSON.stringify(todosInm));
     console.log('[Migración venta Sierra Nevada] Resultado de la venta cargado: 120.000€ + 40.000€ en efectivo.');
   })();
+  // PUNTO 108 (06/09/2026): desglose año a año 2015-2024 de tu tabla de
+  // ingresos por alquiler (Gabriel Glez., Poeta V.M., Montegorbea = Sierra
+  // Nevada, Loterías = Carril C., Yanfer) — hasta ahora solo teníamos el
+  // total conjunto de esos años metido de una vez en "ingresosAcumInicial"
+  // (ver PUNTO 97/108), así que "Evolución anual" en Cobros → Histórico solo
+  // podía mostrar 2025 en adelante. Se añade un total por año (2015-2024) a
+  // facturacion:historico:patricio, con origen:'manual-anual' para
+  // distinguirlo del alquiler real mes a mes (origen:'alqmen') — nunca pisa
+  // un año que ya exista ahí (por si algún mes de esos años se llegara a
+  // cargar más adelante con detalle mensual real). Solo se ejecuta una vez
+  // (guardado con su propia bandera).
+  if (!localStorage.getItem('migracion:historico_anual_patricio_v1')) {
+    var TOTAL_ANUAL_PATRICIO_2015_2024 = {
+      2015: 5243.00, 2016: 7400.00, 2017: 8830.00, 2018: 12224.00, 2019: 14744.35,
+      2020: 14000.25, 2021: 12220.00, 2022: 15820.15, 2023: 16014.55, 2024: 16125.65
+    };
+    var histAnualData = [];
+    try { histAnualData = JSON.parse(localStorage.getItem('facturacion:historico:patricio') || '[]'); } catch (e) { histAnualData = []; }
+    var aniosAntes = {};
+    histAnualData.forEach(function (h) { aniosAntes[h.mes.slice(0, 4)] = true; });
+    var aniosAnadidos = [];
+    Object.keys(TOTAL_ANUAL_PATRICIO_2015_2024).forEach(function (yr) {
+      if (aniosAntes[yr]) return; // ya hay algo ese año — no se toca
+      histAnualData.push({ mes: yr + '-12', importe: TOTAL_ANUAL_PATRICIO_2015_2024[yr], origen: 'manual-anual' });
+      aniosAnadidos.push(yr);
+    });
+    if (aniosAnadidos.length > 0) {
+      histAnualData.sort(function (a, b) { return a.mes.localeCompare(b.mes); });
+      localStorage.setItem('facturacion:historico:patricio', JSON.stringify(histAnualData));
+      if (window.syncToFirestore) window.syncToFirestore('facturacion:historico:patricio', JSON.stringify(histAnualData));
+    }
+    localStorage.setItem('migracion:historico_anual_patricio_v1', '1');
+    console.log('[Migración histórico anual Patricio] Años añadidos a Evolución anual: ' + (aniosAnadidos.length ? aniosAnadidos.join(', ') : 'ninguno (ya existían)') + '.');
+  }
+  // PUNTO 109 (06/09/2026): carga inicial del nuevo módulo "Patrimonio
+  // Financiero (personal)" con los 9 meses de tu hoja (nov-25 a jul-26) que
+  // nos pasaste como ejemplo. Esa hoja solo traía Liquidez/Invertido en
+  // conjunto (sin desglosar Caixa/MyInvestor/Trade Republic), así que estos
+  // meses concretos quedan guardados como "importeLiquidez"/"importeInvertido"
+  // en vez de por cuenta — el desglose por cuenta empieza con el próximo mes
+  // que añadas tú a mano. Solo se ejecuta una vez.
+  if (!localStorage.getItem('migracion:patrimonio_financiero_patricio_v1')) {
+    var FINPER_INICIAL = [
+      { id: '2025-11', importeLiquidez: 31675.02, importeInvertido: 19128.53 },
+      { id: '2025-12', importeLiquidez: 43377.04, importeInvertido: 17122.98 },
+      { id: '2026-01', importeLiquidez: 47045.79, importeInvertido: 18754.77 },
+      { id: '2026-02', importeLiquidez: 47660.52, importeInvertido: 19157.62 },
+      { id: '2026-03', importeLiquidez: 48061.40, importeInvertido: 20414.23 },
+      { id: '2026-04', importeLiquidez: 47075.89, importeInvertido: 21070.93 },
+      { id: '2026-05', importeLiquidez: 49524.83, importeInvertido: 20720.57 },
+      { id: '2026-06', importeLiquidez: 51568.69, importeInvertido: 22005.47 },
+      { id: '2026-07', importeLiquidez: 51568.69, importeInvertido: 22005.47 }
+    ];
+    var finperExistente = [];
+    try { finperExistente = JSON.parse(localStorage.getItem('fin:patrimonio_financiero:patricio') || '[]'); } catch (e) { finperExistente = []; }
+    if (finperExistente.length === 0) {
+      localStorage.setItem('fin:patrimonio_financiero:patricio', JSON.stringify(FINPER_INICIAL));
+      if (window.syncToFirestore) window.syncToFirestore('fin:patrimonio_financiero:patricio', JSON.stringify(FINPER_INICIAL));
+      console.log('[Migración Patrimonio Financiero] ' + FINPER_INICIAL.length + ' meses cargados por primera vez (nov-25 a jul-26).');
+    }
+    localStorage.setItem('migracion:patrimonio_financiero_patricio_v1', '1');
+  }
   // PUNTO 99 (06/09/2026): se ejecuta en cada carga (no es una migración de
   // una sola vez, es autocorrectiva) para que Inicio/Análisis/Histórico
   // reflejen siempre el alquiler real de Patricio — ver fac_sincronizarHistoricoPatricio.
@@ -13679,6 +13796,7 @@ function fin_render() {
   fin_renderFondos();
   fin_renderUrbanitae();
   fin_patHist_render();
+  finper_render();
   fin_renderUltimaActualizacion();
 }
 
@@ -14826,6 +14944,152 @@ function fin_patHist_render() {
     totalAnterior = r.total;
   });
   listaEl.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 109 (06/09/2026): PATRIMONIO FINANCIERO (PERSONAL) — tabla manual,
+// aparte del "Histórico de patrimonio" de arriba (ese se calcula solo con
+// Cuentas/Fondos/Acciones ya cargados en la app). Esta refleja tus 3
+// cuentas reales tal cual las llevas en tu Excel: Caixa, MyInvestor, Trade
+// Republic (Bitcoin fuera, nos dijiste que lo vas a cancelar). Liquidez =
+// Caixa; Invertido = MyInvestor + Trade Republic — mismo criterio que ya
+// usas tú mismo. Solo para Patricio.
+//
+// Los 9 meses de nov-25 a jul-26 que nos pasaste como ejemplo de tu hoja
+// solo traían el total de Liquidez y de Invertido, sin desglosar cuánto
+// había en cada cuenta — así que esos meses concretos se cargan con el
+// total en un único campo (importeLiquidez/importeInvertido) en vez de
+// caixa/myinvestor/traderepublic. Desde el próximo mes que añadas tú a
+// mano, ya se pide el desglose por cuenta.
+// ═══════════════════════════════════════════════════════════════════════
+function finper_key() {
+  return 'fin:patrimonio_financiero:patricio';
+}
+function finper_load() {
+  try { return JSON.parse(localStorage.getItem(finper_key()) || '[]'); } catch (e) { return []; }
+}
+function finper_save(lista) {
+  localStorage.setItem(finper_key(), JSON.stringify(lista));
+  if (window.syncToFirestore) window.syncToFirestore(finper_key(), JSON.stringify(lista));
+}
+// Liquidez/Invertido de una fila, sea del tipo que sea (desglosada por
+// cuenta, o solo el total importado de tu Excel).
+function finper_liquidez(r) {
+  return (r.caixa !== undefined && r.caixa !== null) ? (parseFloat(r.caixa) || 0) : (parseFloat(r.importeLiquidez) || 0);
+}
+function finper_invertido(r) {
+  if ((r.myinvestor !== undefined && r.myinvestor !== null) || (r.traderepublic !== undefined && r.traderepublic !== null)) {
+    return (parseFloat(r.myinvestor) || 0) + (parseFloat(r.traderepublic) || 0);
+  }
+  return parseFloat(r.importeInvertido) || 0;
+}
+function finper_total(r) {
+  return finper_liquidez(r) + finper_invertido(r);
+}
+function finper_abrirModal() {
+  document.getElementById('finper-id-hidden').value = '';
+  var hoy = new Date();
+  document.getElementById('finper-fecha').value = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+  document.getElementById('finper-caixa').value = '';
+  document.getElementById('finper-myinvestor').value = '';
+  document.getElementById('finper-traderepublic').value = '';
+  document.getElementById('fin-finper-modal').style.display = 'flex';
+}
+function finper_editar(id) {
+  var lista = finper_load();
+  var r = lista.find(function (x) { return x.id === id; });
+  if (!r) return;
+  document.getElementById('finper-id-hidden').value = r.id;
+  document.getElementById('finper-fecha').value = r.id;
+  document.getElementById('finper-caixa').value = fmtGlobal(finper_liquidez(r));
+  document.getElementById('finper-myinvestor').value = fmtGlobal(r.myinvestor !== undefined && r.myinvestor !== null ? r.myinvestor : finper_invertido(r));
+  document.getElementById('finper-traderepublic').value = fmtGlobal(r.traderepublic || 0);
+  document.getElementById('fin-finper-modal').style.display = 'flex';
+}
+function finper_cerrarModal() {
+  document.getElementById('fin-finper-modal').style.display = 'none';
+}
+function finper_guardar() {
+  if (bloqueaSiViewer('Guardar un mes de Patrimonio financiero')) return;
+  var idEdit = document.getElementById('finper-id-hidden').value;
+  var mesId = document.getElementById('finper-fecha').value;
+  if (!mesId) { alert('Selecciona el mes.'); return; }
+  var caixa = parseFmtGlobal(document.getElementById('finper-caixa').value) || 0;
+  var myinvestor = parseFmtGlobal(document.getElementById('finper-myinvestor').value) || 0;
+  var traderepublic = parseFmtGlobal(document.getElementById('finper-traderepublic').value) || 0;
+  var lista = finper_load();
+  var existente = lista.find(function (x) { return x.id === mesId; });
+  if (existente && !idEdit) {
+    if (!confirm('Ya hay datos guardados para ese mes. ¿Los sustituyo?')) return;
+  }
+  var row = { id: mesId, caixa: caixa, myinvestor: myinvestor, traderepublic: traderepublic };
+  if (existente) {
+    lista = lista.map(function (x) { return x.id === mesId ? row : x; });
+  } else {
+    lista.push(row);
+  }
+  finper_save(lista);
+  finper_cerrarModal();
+  finper_render();
+  info('✓ Patrimonio financiero guardado.');
+}
+function finper_borrar(id) {
+  if (bloqueaSiViewer('Borrar un mes de Patrimonio financiero')) return;
+  showConfirm('🗑️', 'Borrar mes', '¿Seguro que quieres borrar este mes de Patrimonio financiero?', [
+    { label: 'Borrar', cls: 'danger', fn: function () {
+      var lista = finper_load().filter(function (x) { return x.id !== id; });
+      finper_save(lista);
+      finper_render();
+    } }
+  ]);
+}
+function finper_render() {
+  var sec = document.getElementById('fin-finper-section');
+  if (!sec) return;
+  if (fin_emp() !== 'patricio') { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  var lista = finper_load().slice().sort(function (a, b) { return a.id.localeCompare(b.id); });
+  var kpisEl = document.getElementById('fin-finper-kpis');
+  var listaEl = document.getElementById('fin-finper-lista');
+  if (lista.length === 0) {
+    if (kpisEl) kpisEl.innerHTML = '';
+    if (listaEl) listaEl.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin meses guardados todavía. Pulsa + para añadir el primero.</div>';
+    return;
+  }
+  var ultimo = lista[lista.length - 1];
+  var liqUlt = finper_liquidez(ultimo), invUlt = finper_invertido(ultimo), totUlt = liqUlt + invUlt;
+  var pctLiq = totUlt > 0 ? (liqUlt / totUlt * 100) : 0;
+  var pctInv = totUlt > 0 ? (invUlt / totUlt * 100) : 0;
+  if (kpisEl) {
+    kpisEl.innerHTML =
+      '<div class="fin-card" style="text-align:center;padding:10px;"><div style="font-size:10px;color:var(--silver-dim);">TOTAL ACTUAL</div><div style="font-size:16px;font-weight:700;color:var(--silver-bright);">' + fin_fmt(totUlt) + '</div></div>' +
+      '<div class="fin-card" style="text-align:center;padding:10px;"><div style="font-size:10px;color:var(--silver-dim);">% LIQUIDEZ / % INVERTIDO</div><div style="font-size:16px;font-weight:700;color:var(--accent-blue);">' + pctLiq.toFixed(0) + '% / ' + pctInv.toFixed(0) + '%</div></div>';
+  }
+  var html = '';
+  var totalAnterior = null;
+  lista.slice().reverse().forEach(function (r) {
+    var liq = finper_liquidez(r), inv = finper_invertido(r), tot = liq + inv;
+    var idxOrig = lista.indexOf(r);
+    var totAnt = idxOrig > 0 ? finper_total(lista[idxOrig - 1]) : null;
+    var dif = totAnt !== null ? (tot - totAnt) : null;
+    var difHtml = dif !== null
+      ? '<span style="color:' + (dif >= 0 ? '#4caf82' : '#e57373') + ';">' + (dif >= 0 ? '+' : '') + fin_fmt(dif) + '</span>'
+      : '<span style="color:var(--silver-dim);">—</span>';
+    var partes = r.id.split('-');
+    var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    var nombreMes = (meses[parseInt(partes[1], 10) - 1] || partes[1]) + ' ' + partes[0];
+    html += '<div class="fin-card">';
+    html += '<div class="fin-card-top">';
+    html += '<div><div class="fin-card-nombre">' + nombreMes + '</div>';
+    html += '<div class="fin-card-sub">Liquidez ' + fin_fmt(liq) + ' · Invertido ' + fin_fmt(inv) + '</div></div>';
+    html += '<div class="fin-card-saldo">' + fin_fmt(tot) + '</div></div>';
+    html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">Diferencia vs. mes anterior: ' + difHtml + '</div>';
+    html += '<div class="fin-card-actions">';
+    html += '<div class="fin-action-btn" onclick="finper_editar(\'' + r.id + '\')">Editar</div>';
+    html += '<div class="fin-action-btn red" onclick="finper_borrar(\'' + r.id + '\')">Eliminar</div>';
+    html += '</div></div>';
+  });
+  if (listaEl) listaEl.innerHTML = html;
 }
 
 // --- RESUMEN ANUAL DIVIDENDOS ---
@@ -16304,6 +16568,7 @@ window._refreshCurrentModule = function(key) {
     'fin:urbanitae:industrias': 'finanzas',
     'fin:patrimonio_historico:patrimer': 'finanzas',
     'fin:patrimonio_historico:patricio': 'finanzas',
+    'fin:patrimonio_financiero:patricio': 'finanzas',
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     'ingresos:otros:patricio': 'renta',
@@ -17830,6 +18095,9 @@ function ingotros_abrirModal() {
   document.getElementById('ingotros-concepto').value = '';
   document.getElementById('ingotros-importe').value = '';
   document.getElementById('ingotros-fecha').value = new Date().toISOString().split('T')[0];
+  // PUNTO 106.1 (06/09/2026): sin marcar por defecto — la mayoría de estos
+  // ingresos (Tortugas, Lala...) NO van a la declaración, según nos dijiste.
+  document.getElementById('ingotros-declara').checked = false;
   document.getElementById('renta-modal-ingreso').style.display = 'flex';
 }
 function ingotros_editar(id) {
@@ -17841,6 +18109,7 @@ function ingotros_editar(id) {
   document.getElementById('ingotros-concepto').value = item.concepto;
   document.getElementById('ingotros-importe').value = fmtGlobal(item.importe);
   document.getElementById('ingotros-fecha').value = item.fecha;
+  document.getElementById('ingotros-declara').checked = !!item.declaraIrpf;
   document.getElementById('renta-modal-ingreso').style.display = 'flex';
 }
 function ingotros_cerrarModal() {
@@ -17852,14 +18121,21 @@ function ingotros_guardar() {
   var concepto = document.getElementById('ingotros-concepto').value.trim();
   var importe = parseFmtGlobal(document.getElementById('ingotros-importe').value);
   var fecha = document.getElementById('ingotros-fecha').value;
+  // PUNTO 106.1 (06/09/2026): checkbox "Entra en la declaración (IRPF)" — a
+  // petición tuya, porque varios de estos ingresos (Tortugas, Lala...) son
+  // tuyos pero no se declaran, y solo alguno (ej. un dividendo de Patrimer)
+  // sí entraría. No afecta a "Ingresos anuales" (sigue sumando todo); queda
+  // guardado por si mañana hace falta un total "solo declarables" para la
+  // previsión de Renta.
+  var declaraIrpf = document.getElementById('ingotros-declara').checked;
   if (!concepto || !importe || !fecha) { alert('Introduce concepto, importe y fecha.'); return; }
   var arr = ingotros_load();
   if (idEdit) {
     for (var i = 0; i < arr.length; i++) {
-      if (arr[i].id === idEdit) { arr[i].concepto = concepto; arr[i].importe = importe; arr[i].fecha = fecha; break; }
+      if (arr[i].id === idEdit) { arr[i].concepto = concepto; arr[i].importe = importe; arr[i].fecha = fecha; arr[i].declaraIrpf = declaraIrpf; break; }
     }
   } else {
-    arr.push({ id: 'ing_' + Date.now(), concepto: concepto, importe: importe, fecha: fecha });
+    arr.push({ id: 'ing_' + Date.now(), concepto: concepto, importe: importe, fecha: fecha, declaraIrpf: declaraIrpf });
   }
   ingotros_save(arr);
   ingotros_cerrarModal();
@@ -17894,7 +18170,8 @@ function ingotros_render() {
     var it = arr[i];
     total += parseFloat(it.importe) || 0;
     html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + notas_esc(it.concepto) + '</div>'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + notas_esc(it.concepto)
+      + (it.declaraIrpf ? ' <span style="font-size:9px;font-weight:700;color:#5b8dee;background:rgba(91,141,238,0.15);border-radius:4px;padding:2px 5px;vertical-align:middle;">IRPF</span>' : '') + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">' + (it.fecha || '') + '</div></div>'
       + '<div style="display:flex;align-items:center;gap:8px;">'
       + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">+' + fmtGlobal(it.importe) + ' €</div>'
@@ -17918,6 +18195,18 @@ function ingotros_totalMes(ym) {
   var total = 0;
   for (var i = 0; i < arr.length; i++) {
     if (arr[i].fecha && arr[i].fecha.slice(0, 7) === ym) total += parseFloat(arr[i].importe) || 0;
+  }
+  return total;
+}
+// PUNTO 106.1 (06/09/2026): totales "solo declarables" — de momento no los
+// usa ninguna pantalla (renta_calcPrevision no toca "Otros ingresos"), pero
+// quedan listos por si algún día hace falta un total de Otros ingresos que
+// SÍ entra en la previsión de IRPF (ej. un dividendo de Patrimer marcado).
+function ingotros_totalAnioDeclarable(year) {
+  var arr = ingotros_load();
+  var total = 0;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].declaraIrpf && arr[i].fecha && parseInt(arr[i].fecha.split('-')[0], 10) === year) total += parseFloat(arr[i].importe) || 0;
   }
   return total;
 }
