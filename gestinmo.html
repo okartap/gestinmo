@@ -3849,9 +3849,9 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
                 <span style="color:var(--silver-dim);">Valor actual</span>
                 <span id="kpi-valoractual-val" style="color:var(--accent-blue);font-weight:700;font-size:16px;">—</span>
               </div>
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-top:6px;">
                 <span style="color:var(--silver-dim);">Diferencia</span>
-                <span id="kpi-diferencia-val" style="font-weight:700;">—</span>
+                <span id="kpi-diferencia-val" style="font-weight:700;font-size:16px;">—</span>
               </div>
             </div>
           </div>
@@ -6525,7 +6525,6 @@ function renderLista() {
       ? `<div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;">
           <div style="font-size:26px;line-height:1.2;">${emojis[inm.tipo]||'🏠'}</div>
           <div>
-            ${inm.ref ? `<div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${inm.ref}</div>` : ''}
             <div style="font-size:14px;font-weight:700;color:var(--silver-bright);line-height:1.35;">${[inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ')}</div>
             ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">${inm.edificio}</div>` : ''}
           </div>
@@ -10401,14 +10400,11 @@ function renderAnalisis(){
     if (elRepUrbrus) elRepUrbrus.style.display = 'none';
     if (elRepCoste) elRepCoste.style.display = '';
     // PUNTO 101 (06/09/2026): "Reparto" no tenía sentido para Patricio (ver
-    // punto 100.5) — renombrada a "Patrimonio Inmobiliario", con el nombre
-    // corto "Patrimonio Inmo" como reserva si no cupiera en el ancho de la
-    // tarjeta (se comprueba con el ancho real ya pintado en pantalla).
+    // punto 100.5) — renombrada a "Patrim. Inmo." (una sola línea, corregido
+    // 06/09/2026 tras ver que el intento anterior con "Patrimonio
+    // Inmobiliario" se partía en dos líneas y quedaba mal).
     if (elRepTitulo) {
-      elRepTitulo.textContent = 'PATRIMONIO INMOBILIARIO';
-      if (elRepTitulo.scrollWidth > elRepTitulo.clientWidth) {
-        elRepTitulo.textContent = 'PATRIMONIO INMO';
-      }
+      elRepTitulo.textContent = 'PATRIM. INMO.';
     }
     var todosInmRep = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
     var costeTotalRep = 0, valorActualRep = 0;
@@ -10422,10 +10418,13 @@ function renderAnalisis(){
     var elCosteVal = document.getElementById('kpi-coste-val');
     var elValorActualVal = document.getElementById('kpi-valoractual-val');
     var elDiferenciaVal = document.getElementById('kpi-diferencia-val');
-    if (elCosteVal) elCosteVal.textContent = fmtE(costeTotalRep);
-    if (elValorActualVal) elValorActualVal.textContent = fmtE(valorActualRep);
+    // Corregido 06/09/2026: sin decimales en las 3 cifras (antes se colaban
+    // los céntimos, ej. "261.745,75 €", y quedaba desigual con el resto de
+    // tarjetas redondeadas).
+    if (elCosteVal) elCosteVal.textContent = fmtE(Math.round(costeTotalRep));
+    if (elValorActualVal) elValorActualVal.textContent = fmtE(Math.round(valorActualRep));
     if (elDiferenciaVal) {
-      elDiferenciaVal.textContent = (diferenciaRep >= 0 ? '+' : '') + fmtE(diferenciaRep);
+      elDiferenciaVal.textContent = (diferenciaRep >= 0 ? '+' : '') + fmtE(Math.round(diferenciaRep));
       elDiferenciaVal.style.color = diferenciaRep >= 0 ? 'var(--accent-green)' : '#e57373';
     }
   } else {
