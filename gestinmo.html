@@ -11881,28 +11881,33 @@ document.addEventListener('firebaseLoaded', function() {
   // un año que ya exista ahí (por si algún mes de esos años se llegara a
   // cargar más adelante con detalle mensual real). Solo se ejecuta una vez
   // (guardado con su propia bandera).
-  if (!localStorage.getItem('migracion:historico_anual_patricio_v1')) {
-    var TOTAL_ANUAL_PATRICIO_2015_2024 = {
-      2015: 5243.00, 2016: 7400.00, 2017: 8830.00, 2018: 12224.00, 2019: 14744.35,
-      2020: 14000.25, 2021: 12220.00, 2022: 15820.15, 2023: 16014.55, 2024: 16125.65
-    };
-    var histAnualData = [];
-    try { histAnualData = JSON.parse(localStorage.getItem('facturacion:historico:patricio') || '[]'); } catch (e) { histAnualData = []; }
-    var aniosAntes = {};
-    histAnualData.forEach(function (h) { aniosAntes[h.mes.slice(0, 4)] = true; });
-    var aniosAnadidos = [];
-    Object.keys(TOTAL_ANUAL_PATRICIO_2015_2024).forEach(function (yr) {
-      if (aniosAntes[yr]) return; // ya hay algo ese año — no se toca
-      histAnualData.push({ mes: yr + '-12', importe: TOTAL_ANUAL_PATRICIO_2015_2024[yr], origen: 'manual-anual' });
-      aniosAnadidos.push(yr);
-    });
-    if (aniosAnadidos.length > 0) {
-      histAnualData.sort(function (a, b) { return a.mes.localeCompare(b.mes); });
-      localStorage.setItem('facturacion:historico:patricio', JSON.stringify(histAnualData));
-      if (window.syncToFirestore) window.syncToFirestore('facturacion:historico:patricio', JSON.stringify(histAnualData));
+  try {
+    if (!localStorage.getItem('migracion:historico_anual_patricio_v1')) {
+      var TOTAL_ANUAL_PATRICIO_2015_2024 = {
+        2015: 5243.00, 2016: 7400.00, 2017: 8830.00, 2018: 12224.00, 2019: 14744.35,
+        2020: 14000.25, 2021: 12220.00, 2022: 15820.15, 2023: 16014.55, 2024: 16125.65
+      };
+      var histAnualData = [];
+      try { histAnualData = JSON.parse(localStorage.getItem('facturacion:historico:patricio') || '[]'); } catch (e) { histAnualData = []; }
+      if (!Array.isArray(histAnualData)) histAnualData = [];
+      var aniosAntes = {};
+      histAnualData.forEach(function (h) { if (h && typeof h.mes === 'string') aniosAntes[h.mes.slice(0, 4)] = true; });
+      var aniosAnadidos = [];
+      Object.keys(TOTAL_ANUAL_PATRICIO_2015_2024).forEach(function (yr) {
+        if (aniosAntes[yr]) return; // ya hay algo ese año — no se toca
+        histAnualData.push({ mes: yr + '-12', importe: TOTAL_ANUAL_PATRICIO_2015_2024[yr], origen: 'manual-anual' });
+        aniosAnadidos.push(yr);
+      });
+      if (aniosAnadidos.length > 0) {
+        histAnualData.sort(function (a, b) { return String(a.mes).localeCompare(String(b.mes)); });
+        localStorage.setItem('facturacion:historico:patricio', JSON.stringify(histAnualData));
+        if (window.syncToFirestore) window.syncToFirestore('facturacion:historico:patricio', JSON.stringify(histAnualData));
+      }
+      localStorage.setItem('migracion:historico_anual_patricio_v1', '1');
+      console.log('[Migración histórico anual Patricio] Años añadidos a Evolución anual: ' + (aniosAnadidos.length ? aniosAnadidos.join(', ') : 'ninguno (ya existían)') + '.');
     }
-    localStorage.setItem('migracion:historico_anual_patricio_v1', '1');
-    console.log('[Migración histórico anual Patricio] Años añadidos a Evolución anual: ' + (aniosAnadidos.length ? aniosAnadidos.join(', ') : 'ninguno (ya existían)') + '.');
+  } catch (e) {
+    console.warn('[Migración histórico anual Patricio] fallo, no se ha tocado nada:', e);
   }
   // PUNTO 109 (06/09/2026): carga inicial del nuevo módulo "Patrimonio
   // Financiero (personal)" con los 9 meses de tu hoja (nov-25 a jul-26) que
@@ -11911,26 +11916,31 @@ document.addEventListener('firebaseLoaded', function() {
   // meses concretos quedan guardados como "importeLiquidez"/"importeInvertido"
   // en vez de por cuenta — el desglose por cuenta empieza con el próximo mes
   // que añadas tú a mano. Solo se ejecuta una vez.
-  if (!localStorage.getItem('migracion:patrimonio_financiero_patricio_v1')) {
-    var FINPER_INICIAL = [
-      { id: '2025-11', importeLiquidez: 31675.02, importeInvertido: 19128.53 },
-      { id: '2025-12', importeLiquidez: 43377.04, importeInvertido: 17122.98 },
-      { id: '2026-01', importeLiquidez: 47045.79, importeInvertido: 18754.77 },
-      { id: '2026-02', importeLiquidez: 47660.52, importeInvertido: 19157.62 },
-      { id: '2026-03', importeLiquidez: 48061.40, importeInvertido: 20414.23 },
-      { id: '2026-04', importeLiquidez: 47075.89, importeInvertido: 21070.93 },
-      { id: '2026-05', importeLiquidez: 49524.83, importeInvertido: 20720.57 },
-      { id: '2026-06', importeLiquidez: 51568.69, importeInvertido: 22005.47 },
-      { id: '2026-07', importeLiquidez: 51568.69, importeInvertido: 22005.47 }
-    ];
-    var finperExistente = [];
-    try { finperExistente = JSON.parse(localStorage.getItem('fin:patrimonio_financiero:patricio') || '[]'); } catch (e) { finperExistente = []; }
-    if (finperExistente.length === 0) {
-      localStorage.setItem('fin:patrimonio_financiero:patricio', JSON.stringify(FINPER_INICIAL));
-      if (window.syncToFirestore) window.syncToFirestore('fin:patrimonio_financiero:patricio', JSON.stringify(FINPER_INICIAL));
-      console.log('[Migración Patrimonio Financiero] ' + FINPER_INICIAL.length + ' meses cargados por primera vez (nov-25 a jul-26).');
+  try {
+    if (!localStorage.getItem('migracion:patrimonio_financiero_patricio_v1')) {
+      var FINPER_INICIAL = [
+        { id: '2025-11', importeLiquidez: 31675.02, importeInvertido: 19128.53 },
+        { id: '2025-12', importeLiquidez: 43377.04, importeInvertido: 17122.98 },
+        { id: '2026-01', importeLiquidez: 47045.79, importeInvertido: 18754.77 },
+        { id: '2026-02', importeLiquidez: 47660.52, importeInvertido: 19157.62 },
+        { id: '2026-03', importeLiquidez: 48061.40, importeInvertido: 20414.23 },
+        { id: '2026-04', importeLiquidez: 47075.89, importeInvertido: 21070.93 },
+        { id: '2026-05', importeLiquidez: 49524.83, importeInvertido: 20720.57 },
+        { id: '2026-06', importeLiquidez: 51568.69, importeInvertido: 22005.47 },
+        { id: '2026-07', importeLiquidez: 51568.69, importeInvertido: 22005.47 }
+      ];
+      var finperExistente = [];
+      try { finperExistente = JSON.parse(localStorage.getItem('fin:patrimonio_financiero:patricio') || '[]'); } catch (e) { finperExistente = []; }
+      if (!Array.isArray(finperExistente)) finperExistente = [];
+      if (finperExistente.length === 0) {
+        localStorage.setItem('fin:patrimonio_financiero:patricio', JSON.stringify(FINPER_INICIAL));
+        if (window.syncToFirestore) window.syncToFirestore('fin:patrimonio_financiero:patricio', JSON.stringify(FINPER_INICIAL));
+        console.log('[Migración Patrimonio Financiero] ' + FINPER_INICIAL.length + ' meses cargados por primera vez (nov-25 a jul-26).');
+      }
+      localStorage.setItem('migracion:patrimonio_financiero_patricio_v1', '1');
     }
-    localStorage.setItem('migracion:patrimonio_financiero_patricio_v1', '1');
+  } catch (e) {
+    console.warn('[Migración Patrimonio Financiero] fallo, no se ha tocado nada:', e);
   }
   // PUNTO 99 (06/09/2026): se ejecuta en cada carga (no es una migración de
   // una sola vez, es autocorrectiva) para que Inicio/Análisis/Histórico
