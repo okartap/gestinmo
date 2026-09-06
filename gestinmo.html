@@ -2826,6 +2826,30 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
     </div>
 
+    <!-- PUNTO 112 (06/09/2026): "Otros ingresos" movido aquí desde Renta
+    Patricio — a petición tuya, para poder apuntar un ingreso suelto (Lala,
+    Tortugas, sueldo...) directamente desde Inicio, sin tener que entrar en
+    Renta. Solo visible con el perfil Patricio (ver dash_render). -->
+    <div id="dash-otros-ingresos-section" style="display:none;background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+      <div onclick="renta_toggleBloque('bloque-ingresos')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">💰</span>
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">OTROS INGRESOS</div>
+            <div style="font-size:11px;color:var(--text-secondary);">Lala, Tortugas, sueldo... con fecha</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-ingresos-otros">— €</div>
+          <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-ingresos">›</span>
+        </div>
+      </div>
+      <div id="bloque-ingresos" style="display:none;padding:0 16px 14px;">
+        <div id="renta-lista-ingresos-otros" style="margin-bottom:12px;"></div>
+        <button onclick="ingotros_abrirModal()" style="width:100%;background:rgba(76,175,130,0.15);border:1px dashed rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir ingreso</button>
+      </div>
+    </div>
+
     <!-- GRÁFICA MENSUAL -->
     <div class="chart-card" style="margin-bottom:16px;">
       <div class="chart-title" style="font-size:11px;color:var(--silver-mid);letter-spacing:1.5px;">Acumulado mensual · <span id="dash-chart-year">2026</span></div>
@@ -5234,29 +5258,10 @@ con editar/borrar en cada línea. -->
     </div>
   </div>
 
-  <!-- Bloque E: Otros ingresos (PUNTO 101, 06/09/2026) — sueldo y cualquier
-       otro ingreso, con fecha e importe. El alquiler ya se recoge solo
-       (bloque B2, arriba); esto es para lo que NO es alquiler. Alimenta,
-       junto con el alquiler real, la tarjeta "Ingresos anuales" de Inicio. -->
-  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
-    <div onclick="renta_toggleBloque('bloque-ingresos')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:20px;">💰</span>
-        <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">OTROS INGRESOS</div>
-          <div style="font-size:11px;color:var(--text-secondary);">Sueldo y cualquier otro ingreso, con fecha</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-ingresos-otros">— €</div>
-        <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-ingresos">›</span>
-      </div>
-    </div>
-    <div id="bloque-ingresos" style="display:none;padding:0 16px 14px;">
-      <div id="renta-lista-ingresos-otros" style="margin-bottom:12px;"></div>
-      <button onclick="ingotros_abrirModal()" style="width:100%;background:rgba(76,175,130,0.15);border:1px dashed rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir ingreso</button>
-    </div>
-  </div>
+  <!-- PUNTO 112 (06/09/2026): el bloque "Otros ingresos" se ha mudado a
+  Inicio (ver más abajo, dentro de mod-inicio) — a petición tuya, no tenía
+  sentido entrar en Renta Patricio solo para apuntar un ingreso suelto. -->
+  <!-- Bloque E: Otros ingresos (PUNTO 101, movido a Inicio en el PUNTO 112) -->
 
   <!-- Bloque F: Exportar -->
   <button onclick="renta_exportarCSV()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:12px;">
@@ -5351,9 +5356,22 @@ con editar/borrar en cada línea. -->
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💰 AÑADIR INGRESO</div>
     <input type="hidden" id="ingotros-id-hidden">
+    <!-- PUNTO 111 (06/09/2026): a petición tuya, el concepto pasa de texto
+    libre a un desplegable con Lala / Tortugas / Otros — Lala y Tortugas van
+    siempre fuera de la declaración (ni se pregunta), y solo con "Otros" se
+    pide el detalle (ej. "Sueldo", "Dividendo Patrimer") y aparece el check
+    de si entra en la declaración (IRPF). -->
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CONCEPTO</div>
-      <input id="ingotros-concepto" type="text" placeholder="Ej: Sueldo, Lala, Tortugas..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <select id="ingotros-concepto-select" onchange="ingotros_onConceptoChange()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        <option value="Lala">Lala</option>
+        <option value="Tortugas">Tortugas</option>
+        <option value="Otros">Otros</option>
+      </select>
+    </div>
+    <div id="ingotros-otros-detalle-wrap" style="display:none;margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">ESPECIFICA</div>
+      <input id="ingotros-otros-detalle" type="text" placeholder="Ej: Sueldo, Dividendo Patrimer..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">IMPORTE (€)</div>
@@ -5363,11 +5381,9 @@ con editar/borrar en cada línea. -->
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA</div>
       <input id="ingotros-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
-    <!-- PUNTO 106.1 (06/09/2026): a petición tuya — no todos los "Otros
-    ingresos" van a la declaración (ej. Tortugas/Lala no; un dividendo de
-    Patrimer sí), así que se marca aparte en cada apunte, sin afectar al
-    total de "Ingresos anuales" (que sigue sumando todo). -->
-    <div style="margin-bottom:20px;display:flex;align-items:center;gap:10px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px;">
+    <!-- PUNTO 106.1/111 (06/09/2026): solo se muestra con "Otros" — Lala y
+    Tortugas nunca entran en la declaración, no hace falta ni preguntarlo. -->
+    <div id="ingotros-declara-wrap" style="display:none;margin-bottom:20px;align-items:center;gap:10px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px;">
       <input id="ingotros-declara" type="checkbox" style="width:18px;height:18px;flex-shrink:0;accent-color:#4caf82;">
       <label for="ingotros-declara" style="font-size:13px;color:var(--silver-bright);cursor:pointer;">Entra en la declaración (IRPF)</label>
     </div>
@@ -9785,10 +9801,25 @@ function fac_renderGraficas() {
     var col = FAC_COLORES[todosAnios.indexOf(yr) % FAC_COLORES.length];
     var vals = [];
     var acum = 0;
+    // PUNTO 110 (06/09/2026): a petición tuya — los años que solo tienen un
+    // total anual metido de una vez (origen 'manual-anual', ver punto 108,
+    // 2015-2024) se quedaban con la línea plana en 0 y un salto brusco en
+    // diciembre, muy distinto a los años con detalle mes a mes real. Solo
+    // para ESTA gráfica (visual, "cuánto llevas acumulado cada mes"), se
+    // reparte ese total a partes iguales entre los 12 meses — el dato real
+    // (Evolución anual, y cualquier otro cálculo de la app) no se toca, sigue
+    // siendo el total exacto de golpe, nunca un reparto inventado mes a mes.
+    var entriesAnioMen = data.filter(function(d) { return d.mes.slice(0, 4) === yr; });
+    var esSoloAnualMen = entriesAnioMen.length === 1 && entriesAnioMen[0].origen === 'manual-anual';
+    var repartoMensual = esSoloAnualMen ? (entriesAnioMen[0].importe / 12) : null;
     for (var m = 1; m <= 12; m++) {
       var mesKey = yr + '-' + String(m).padStart(2,'0');
       var found = 0;
-      for (var d = 0; d < data.length; d++) { if (data[d].mes === mesKey) { found = data[d].importe; break; } }
+      if (repartoMensual !== null) {
+        found = repartoMensual;
+      } else {
+        for (var d = 0; d < data.length; d++) { if (data[d].mes === mesKey) { found = data[d].importe; break; } }
+      }
       // Sumar rústico en el mes real de cobro de cada finca (solo Patrimer;
       // o reparto julio/agosto a partes iguales para los años sin mes asignado)
       if (_facGrafEmp === 'patrimer') found += rus_totalMes(parseInt(yr), m);
@@ -15823,6 +15854,11 @@ function dash_render() {
   if (elRepartoEmp) elRepartoEmp.style.display = _esPatricioRep ? 'none' : '';
   if (elRepartoPat) elRepartoPat.style.display = _esPatricioRep ? '' : 'none';
   if (elRepartoTitulo) elRepartoTitulo.textContent = _esPatricioRep ? 'INGRESOS ANUALES' : 'REPARTO';
+  // PUNTO 112 (06/09/2026): "Otros ingresos" solo tiene sentido con el
+  // perfil Patricio — se muestra/oculta y se refresca su lista aquí mismo.
+  var elOtrosIngSec = document.getElementById('dash-otros-ingresos-section');
+  if (elOtrosIngSec) elOtrosIngSec.style.display = _esPatricioRep ? '' : 'none';
+  if (_esPatricioRep && typeof ingotros_render === 'function') ingotros_render();
 
   if (_esPatricioRep) {
     // PUNTO 101 (06/09/2026): esta tarjeta ya no "reparte" nada (Patricio no
@@ -18100,14 +18136,25 @@ function ingotros_load() {
 function ingotros_save(arr) {
   localStorage.setItem('ingresos:otros:patricio', JSON.stringify(arr));
 }
+// PUNTO 111 (06/09/2026): muestra/oculta el detalle y el check de IRPF según
+// el concepto elegido — Lala y Tortugas nunca los necesitan.
+function ingotros_onConceptoChange() {
+  var esOtros = document.getElementById('ingotros-concepto-select').value === 'Otros';
+  document.getElementById('ingotros-otros-detalle-wrap').style.display = esOtros ? 'block' : 'none';
+  var wrapDeclara = document.getElementById('ingotros-declara-wrap');
+  wrapDeclara.style.display = esOtros ? 'flex' : 'none';
+  if (!esOtros) document.getElementById('ingotros-declara').checked = false;
+}
 function ingotros_abrirModal() {
   document.getElementById('ingotros-id-hidden').value = '';
-  document.getElementById('ingotros-concepto').value = '';
+  document.getElementById('ingotros-concepto-select').value = 'Lala';
+  document.getElementById('ingotros-otros-detalle').value = '';
   document.getElementById('ingotros-importe').value = '';
   document.getElementById('ingotros-fecha').value = new Date().toISOString().split('T')[0];
   // PUNTO 106.1 (06/09/2026): sin marcar por defecto — la mayoría de estos
   // ingresos (Tortugas, Lala...) NO van a la declaración, según nos dijiste.
   document.getElementById('ingotros-declara').checked = false;
+  ingotros_onConceptoChange();
   document.getElementById('renta-modal-ingreso').style.display = 'flex';
 }
 function ingotros_editar(id) {
@@ -18116,10 +18163,17 @@ function ingotros_editar(id) {
   for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) { item = arr[i]; break; } }
   if (!item) return;
   document.getElementById('ingotros-id-hidden').value = item.id;
-  document.getElementById('ingotros-concepto').value = item.concepto;
+  // PUNTO 111: si el concepto guardado es exactamente "Lala" o "Tortugas",
+  // se selecciona tal cual; cualquier otro texto (incluidos los antiguos
+  // apuntes libres de antes de este cambio) se trata como "Otros" con ese
+  // texto en el detalle, para no perder nada de lo ya guardado.
+  var esFijo = item.concepto === 'Lala' || item.concepto === 'Tortugas';
+  document.getElementById('ingotros-concepto-select').value = esFijo ? item.concepto : 'Otros';
+  document.getElementById('ingotros-otros-detalle').value = esFijo ? '' : (item.concepto || '');
   document.getElementById('ingotros-importe').value = fmtGlobal(item.importe);
   document.getElementById('ingotros-fecha').value = item.fecha;
   document.getElementById('ingotros-declara').checked = !!item.declaraIrpf;
+  ingotros_onConceptoChange();
   document.getElementById('renta-modal-ingreso').style.display = 'flex';
 }
 function ingotros_cerrarModal() {
@@ -18128,16 +18182,20 @@ function ingotros_cerrarModal() {
 function ingotros_guardar() {
   if (bloqueaSiViewer('Guardar un ingreso')) return;
   var idEdit = document.getElementById('ingotros-id-hidden').value;
-  var concepto = document.getElementById('ingotros-concepto').value.trim();
+  var conceptoSel = document.getElementById('ingotros-concepto-select').value;
+  var esOtros = conceptoSel === 'Otros';
+  // PUNTO 111 (06/09/2026): concepto viene del desplegable (Lala/Tortugas),
+  // o del detalle escrito a mano cuando es "Otros".
+  var concepto = esOtros ? document.getElementById('ingotros-otros-detalle').value.trim() : conceptoSel;
   var importe = parseFmtGlobal(document.getElementById('ingotros-importe').value);
   var fecha = document.getElementById('ingotros-fecha').value;
-  // PUNTO 106.1 (06/09/2026): checkbox "Entra en la declaración (IRPF)" — a
-  // petición tuya, porque varios de estos ingresos (Tortugas, Lala...) son
-  // tuyos pero no se declaran, y solo alguno (ej. un dividendo de Patrimer)
-  // sí entraría. No afecta a "Ingresos anuales" (sigue sumando todo); queda
-  // guardado por si mañana hace falta un total "solo declarables" para la
-  // previsión de Renta.
-  var declaraIrpf = document.getElementById('ingotros-declara').checked;
+  // PUNTO 106.1/111 (06/09/2026): checkbox "Entra en la declaración (IRPF)"
+  // — solo tiene sentido (y solo se muestra) con "Otros"; Lala y Tortugas
+  // van siempre fuera, forzado aquí por si acaso, aunque el check ya esté
+  // oculto para esos dos. No afecta a "Ingresos anuales" (sigue sumando
+  // todo); queda guardado por si mañana hace falta un total "solo
+  // declarables" para la previsión de Renta.
+  var declaraIrpf = esOtros ? document.getElementById('ingotros-declara').checked : false;
   if (!concepto || !importe || !fecha) { alert('Introduce concepto, importe y fecha.'); return; }
   var arr = ingotros_load();
   if (idEdit) {
