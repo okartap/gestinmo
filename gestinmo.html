@@ -1942,6 +1942,10 @@ const DATA_KEYS = [
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
   'inmuebles:alquileres_mensuales',
   'inmuebles:seguro_ibi',
+  // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
+  // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
+  // anuales" de Inicio junto con los alquileres reales.
+  'ingresos:otros:patricio',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -2755,7 +2759,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <!-- FILA 2: Reparto + Patrimonio financiero -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div class="kpi" onclick="showModule('cobros')" style="cursor:pointer;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:center;">
-        <div class="kpi-l" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:8px;text-align:center;">REPARTO</div>
+        <div class="kpi-l" id="dash-reparto-titulo" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:8px;text-align:center;">REPARTO</div>
         <!-- PUNTO 43 (25/08/2026): letra y números agrandados en las 2 vistas de
         esta tarjeta (Patrimer/Industrias y Patricio) — mismo ajuste que en el
         Reparto de Cobros→Análisis (punto 42), a petición tuya para las 3 juntas. -->
@@ -2774,19 +2778,23 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
             <span id="dash-rustico-val" style="font-weight:700;font-size:17px;">—</span>
           </div>
         </div>
-        <!-- Vista Patricio -->
+        <!-- Vista Patricio — PUNTO 101 (06/09/2026): antes "Ingresos año /
+        Inmuebles / Media mes" (la tarjeta se llamaba "Reparto", pero ya no
+        reparte nada — a petición tuya pasa a ser "Ingresos anuales" con el
+        resumen que de verdad usas: año / mes / día. "Día" = ingresos del año
+        ÷ 365, igual que en tu hoja de Economía personal. -->
         <div id="dash-reparto-patricio" style="display:none;font-size:14px;line-height:2.1;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
             <span style="color:var(--silver-mid);">Ingresos año</span>
-            <span id="dash-pat-ingresos" style="color:var(--silver-bright);font-weight:700;font-size:17px;">—</span>
+            <span id="dash-pat-ing-anio" style="color:var(--silver-bright);font-weight:700;font-size:17px;">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-mid);">Inmuebles</span>
-            <span id="dash-pat-ninm" style="color:var(--silver-bright);font-weight:700;font-size:17px;">—</span>
+            <span style="color:var(--silver-mid);">Ingresos mes</span>
+            <span id="dash-pat-ing-mes" style="color:var(--silver-bright);font-weight:700;font-size:17px;">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="color:var(--silver-mid);">Media/mes</span>
-            <span id="dash-pat-media" style="color:var(--silver-bright);font-size:15px;">—</span>
+            <span style="color:var(--silver-mid);">Ingresos día</span>
+            <span id="dash-pat-ing-dia" style="color:var(--silver-bright);font-size:15px;">—</span>
           </div>
         </div>
       </div>
@@ -3803,7 +3811,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           <div class="kpi-s up" id="kpi-prevision-s" style="font-size:13px;text-align:center;">—</div>
         </div>
         <div class="kpi">
-          <div class="kpi-l" style="font-size:13px;text-align:center;">REPARTO</div>
+          <div class="kpi-l" id="kpi-reparto-titulo" style="font-size:13px;text-align:center;">REPARTO</div>
           <!-- PUNTO 43 (25/08/2026): letra y números agrandados — la tarjeta,
           ya centrada (punto 42), se quedaba con mucho hueco visual con la
           letra pequeña de antes. Mismo ajuste aplicado a las 3 tarjetas de
@@ -5181,6 +5189,30 @@ con editar/borrar en cada línea. -->
     </div>
   </div>
 
+  <!-- Bloque E: Otros ingresos (PUNTO 101, 06/09/2026) — sueldo y cualquier
+       otro ingreso, con fecha e importe. El alquiler ya se recoge solo
+       (bloque B2, arriba); esto es para lo que NO es alquiler. Alimenta,
+       junto con el alquiler real, la tarjeta "Ingresos anuales" de Inicio. -->
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;">
+    <div onclick="renta_toggleBloque('bloque-ingresos')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">💰</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">OTROS INGRESOS</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Sueldo y cualquier otro ingreso, con fecha</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-ingresos-otros">— €</div>
+        <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-ingresos">›</span>
+      </div>
+    </div>
+    <div id="bloque-ingresos" style="display:none;padding:0 16px 14px;">
+      <div id="renta-lista-ingresos-otros" style="margin-bottom:12px;"></div>
+      <button onclick="ingotros_abrirModal()" style="width:100%;background:rgba(76,175,130,0.15);border:1px dashed rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir ingreso</button>
+    </div>
+  </div>
+
   <!-- Bloque F: Exportar -->
   <button onclick="renta_exportarCSV()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:12px;">
     <span>📤</span> EXPORTAR PARA ASESOR (CSV)
@@ -5268,6 +5300,28 @@ con editar/borrar en cada línea. -->
   </div>
 </div>
 
+<!-- MODAL RENTA: OTRO INGRESO (PUNTO 101, 06/09/2026) -->
+<div id="renta-modal-ingreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💰 AÑADIR INGRESO</div>
+    <input type="hidden" id="ingotros-id-hidden">
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CONCEPTO</div>
+      <input id="ingotros-concepto" type="text" placeholder="Ej: Sueldo, Lala, Tortugas..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">IMPORTE (€)</div>
+      <input id="ingotros-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA</div>
+      <input id="ingotros-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+    </div>
+    <button onclick="ingotros_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
+    <button onclick="ingotros_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
+  </div>
+</div>
 
 
 <!-- ══════════════════════════════════════════════
@@ -5624,6 +5678,8 @@ const BACKUP_KEYS = [
   'fin:patrimonio_historico:patrimer','fin:patrimonio_historico:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
+  // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
+  'ingresos:otros:patricio',
   'fin:cotizaciones',
   'rustico:historico',
   'facturacion:historico:patrimer',
@@ -6433,11 +6489,15 @@ function renderLista() {
           const ingresosAlquilerV = amortInfo.ingresosTotales - ventaTotalV;
           const rendimientoV = amortInfo.superavit > 0 ? amortInfo.superavit : -amortInfo.pendiente;
           const colorRend = rendimientoV >= 0 ? 'var(--accent-green)' : '#e57373';
-          return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
-            <div><div style="font-size:10px;color:var(--silver-dim);">Coste total</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(amortInfo.costeTotal)} €</div></div>
-            <div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Ingresos totales</div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">${fmt(ingresosAlquilerV)} €</div></div>
-            <div><div style="font-size:10px;color:var(--silver-dim);">Venta total</div><div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${fmt(ventaTotalV)} €</div></div>
-            <div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Rendimiento total</div><div style="font-size:13px;font-weight:700;color:${colorRend};">${rendimientoV >= 0 ? '+' : ''}${fmt(rendimientoV)} €</div></div>
+          // PUNTO 101 (06/09/2026): a petición tuya, las 4 cifras más grandes
+          // (mismo tamaño que "Valor actual" en la tarjeta de Patrimonio
+          // Inmobiliario) y sin decimales — antes se mezclaban tamaños
+          // distintos en esta misma tarjeta y quedaba descuadrado.
+          return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+            <div><div style="font-size:10px;color:var(--silver-dim);">Coste total</div><div style="font-size:16px;font-weight:700;color:var(--silver-bright);">${fmt(Math.round(amortInfo.costeTotal))} €</div></div>
+            <div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Ingresos totales</div><div style="font-size:16px;font-weight:700;color:var(--silver-bright);">${fmt(Math.round(ingresosAlquilerV))} €</div></div>
+            <div><div style="font-size:10px;color:var(--silver-dim);">Venta total</div><div style="font-size:16px;font-weight:700;color:var(--accent-blue);">${fmt(Math.round(ventaTotalV))} €</div></div>
+            <div style="text-align:right;"><div style="font-size:10px;color:var(--silver-dim);">Rendimiento total</div><div style="font-size:16px;font-weight:700;color:${colorRend};">${rendimientoV >= 0 ? '+' : ''}${fmt(Math.round(rendimientoV))} €</div></div>
           </div>`;
         })()
       : '';
@@ -6455,14 +6515,22 @@ function renderLista() {
         </div>`
       : '';
 
-    const div = document.createElement('div');
-    div.className = 'inmueble-card';
-    div.dataset.tipo = inm.tipo;
-    div.style.animationDelay = (idx * 0.06) + 's';
-    div.style.cssText += 'padding:12px 14px;';
-    div.onclick = () => inm_showDetail(idxReal);
-    div.innerHTML = `
-      <div style="display:flex;align-items:flex-start;gap:10px;">
+    // PUNTO 101 (06/09/2026): cabecera de la tarjeta "vendido" — a petición
+    // tuya, icono y nombre centrados arriba (en vez de icono a la izquierda
+    // y texto alineado a la izquierda), y se quita del todo la fila de
+    // "● Vendido" y "Rent. neta" que ya no aportaba nada útil en un
+    // inmueble que ya no es tuyo.
+    const esVendidoCard = inm.estado === 'vendido';
+    const cabeceraBlock = esVendidoCard
+      ? `<div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;">
+          <div style="font-size:26px;line-height:1.2;">${emojis[inm.tipo]||'🏠'}</div>
+          <div>
+            ${inm.ref ? `<div style="font-size:13px;font-weight:700;color:var(--accent-blue);">${inm.ref}</div>` : ''}
+            <div style="font-size:14px;font-weight:700;color:var(--silver-bright);line-height:1.35;">${[inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ')}</div>
+            ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">${inm.edificio}</div>` : ''}
+          </div>
+        </div>`
+      : `<div style="display:flex;align-items:flex-start;gap:10px;">
         <div style="font-size:22px;flex-shrink:0;line-height:1.35;">${emojis[inm.tipo]||'🏠'}</div>
         <!-- PUNTO 38 (25/08/2026): la sangría de la 2ª línea se hacía antes con
         un "padding-left:44px;text-indent:-44px" a pixel fijo, calculado a ojo
@@ -6482,8 +6550,12 @@ function renderLista() {
           <div style="font-size:13px;font-weight:700;color:var(--silver-bright);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${[inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ')}</div>
           ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;${inm.ref ? 'grid-column:2;' : ''}">${inm.edificio}</div>` : ''}
         </div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);gap:10px;">
+      </div>`;
+    // Fila "● Vendido / Rent. neta" — solo en inmuebles no vendidos (ver
+    // comentario de cabeceraBlock arriba).
+    const filaEstadoBlock = esVendidoCard
+      ? ''
+      : `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);gap:10px;">
         <div style="min-width:0;">
           <span style="font-size:11px;color:${estadoColor};font-weight:600;margin-right:10px;">● ${estadoTxt}</span>
           <span style="font-size:13px;font-weight:700;color:${rentaColor};">${rentaValor}</span>
@@ -6492,7 +6564,17 @@ function renderLista() {
           ${rentNetaBlock}
           ${rusHistBtn}
         </div>
-      </div>
+      </div>`;
+
+    const div = document.createElement('div');
+    div.className = 'inmueble-card';
+    div.dataset.tipo = inm.tipo;
+    div.style.animationDelay = (idx * 0.06) + 's';
+    div.style.cssText += 'padding:12px 14px;';
+    div.onclick = () => inm_showDetail(idxReal);
+    div.innerHTML = `
+      ${cabeceraBlock}
+      ${filaEstadoBlock}
       ${contratoBlock}
       ${garajeAsocBlock}
       ${precioBlock}
@@ -10314,9 +10396,20 @@ function renderAnalisis(){
   var _empAnalisis = localStorage.getItem('patrimer:empresa') || 'patrimer';
   var elRepUrbrus = document.getElementById('kpi-reparto-urbrus');
   var elRepCoste = document.getElementById('kpi-reparto-coste');
+  var elRepTitulo = document.getElementById('kpi-reparto-titulo');
   if (_empAnalisis === 'patricio') {
     if (elRepUrbrus) elRepUrbrus.style.display = 'none';
     if (elRepCoste) elRepCoste.style.display = '';
+    // PUNTO 101 (06/09/2026): "Reparto" no tenía sentido para Patricio (ver
+    // punto 100.5) — renombrada a "Patrimonio Inmobiliario", con el nombre
+    // corto "Patrimonio Inmo" como reserva si no cupiera en el ancho de la
+    // tarjeta (se comprueba con el ancho real ya pintado en pantalla).
+    if (elRepTitulo) {
+      elRepTitulo.textContent = 'PATRIMONIO INMOBILIARIO';
+      if (elRepTitulo.scrollWidth > elRepTitulo.clientWidth) {
+        elRepTitulo.textContent = 'PATRIMONIO INMO';
+      }
+    }
     var todosInmRep = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
     var costeTotalRep = 0, valorActualRep = 0;
     for (var ir = 0; ir < todosInmRep.length; ir++) {
@@ -10338,6 +10431,7 @@ function renderAnalisis(){
   } else {
     if (elRepUrbrus) elRepUrbrus.style.display = '';
     if (elRepCoste) elRepCoste.style.display = 'none';
+    if (elRepTitulo) elRepTitulo.textContent = 'REPARTO';
   }
 
   // Historial
@@ -15452,42 +15546,42 @@ function dash_render() {
   var _esPatricioRep = (_empDash === 'patricio');
   var elRepartoEmp = document.getElementById('dash-reparto-empresa');
   var elRepartoPat = document.getElementById('dash-reparto-patricio');
+  var elRepartoTitulo = document.getElementById('dash-reparto-titulo');
   if (elRepartoEmp) elRepartoEmp.style.display = _esPatricioRep ? 'none' : '';
   if (elRepartoPat) elRepartoPat.style.display = _esPatricioRep ? '' : 'none';
+  if (elRepartoTitulo) elRepartoTitulo.textContent = _esPatricioRep ? 'INGRESOS ANUALES' : 'REPARTO';
 
   if (_esPatricioRep) {
-    // Vista Patricio: ingresos totales, nº inmuebles, media mensual
-    // BLINDAJE DE DATOS: 'patrimer:inmuebles' no es la clave real donde se
-    // guardan los inmuebles (esa es 'inmuebles:lista', ver módulo
-    // Inmuebles) — nunca se escribe nada ahí, así que esta tarjeta siempre
-    // mostraba 0 inmuebles y 0€ de ingresos para Patricio. Corregido para
-    // leer la clave correcta.
+    // PUNTO 101 (06/09/2026): esta tarjeta ya no "reparte" nada (Patricio no
+    // tiene rústico) — a petición tuya pasa a resumir tus ingresos reales:
+    // año / mes / día. Suma el alquiler real (tabla del punto 97) más
+    // cualquier otro ingreso que apuntes en el bloque "Otros ingresos" de
+    // Renta Patricio (sueldo, u otro cualquiera, con su fecha — punto 101).
+    // "Día" = ingresos del año ÷ 365, igual que en tu hoja de Economía
+    // personal (no es una media de lo que llevas del año, es el ritmo anual).
     var todosInmP = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
-    var nInmP = 0;
     var idxP = [];
     for (var pi = 0; pi < todosInmP.length; pi++) {
-      if ((todosInmP[pi].propietario || '').toLowerCase() === 'patricio') { nInmP++; idxP.push(pi); }
+      if ((todosInmP[pi].propietario || '').toLowerCase() === 'patricio') { idxP.push(pi); }
     }
-    // PUNTO 99 (06/09/2026): leía de 'facturacion:facturas' (vía de
-    // facturación desactivada para Patricio desde el punto 88), por eso
-    // siempre mostraba 0€ aunque el alquiler real ya estuviera cargado.
-    // Ahora lee de la tabla real de alquileres mensuales (punto 97).
     var registrosAlqP = (typeof inm_alqMenLoad === 'function') ? inm_alqMenLoad() : [];
-    var ingresosP = 0;
-    var mesesConFac = {};
+    var mesActualYm = year + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+    var alqAnioP = 0, alqMesP = 0;
     for (var pfi = 0; pfi < registrosAlqP.length; pfi++) {
       var regP = registrosAlqP[pfi];
-      if (!regP.mes || parseInt(regP.mes.split('-')[0]) !== year) continue;
-      if (idxP.indexOf(regP.inmuebleIdx) >= 0) {
-        ingresosP += parseFloat(regP.alquiler) || 0;
-        mesesConFac[regP.mes] = true;
-      }
+      if (!regP.mes || idxP.indexOf(regP.inmuebleIdx) === -1) continue;
+      var importeAlqP = parseFloat(regP.alquiler) || 0;
+      if (parseInt(regP.mes.split('-')[0], 10) === year) alqAnioP += importeAlqP;
+      if (regP.mes === mesActualYm) alqMesP += importeAlqP;
     }
-    var nMesesP = Object.keys(mesesConFac).length || 1;
-    var mediaP = ingresosP / nMesesP;
-    var elPatIng = document.getElementById('dash-pat-ingresos'); if (elPatIng) elPatIng.textContent = fmtE(ingresosP);
-    var elPatNinm = document.getElementById('dash-pat-ninm'); if (elPatNinm) elPatNinm.textContent = nInmP;
-    var elPatMedia = document.getElementById('dash-pat-media'); if (elPatMedia) elPatMedia.textContent = fmtE(mediaP) + '/mes';
+    var otrosAnioP = (typeof ingotros_totalAnio === 'function') ? ingotros_totalAnio(year) : 0;
+    var otrosMesP = (typeof ingotros_totalMes === 'function') ? ingotros_totalMes(mesActualYm) : 0;
+    var ingAnioP = alqAnioP + otrosAnioP;
+    var ingMesP = alqMesP + otrosMesP;
+    var ingDiaP = ingAnioP / 365;
+    var elPatIngAnio = document.getElementById('dash-pat-ing-anio'); if (elPatIngAnio) elPatIngAnio.textContent = fmtE(ingAnioP);
+    var elPatIngMes = document.getElementById('dash-pat-ing-mes'); if (elPatIngMes) elPatIngMes.textContent = fmtE(ingMesP);
+    var elPatIngDia = document.getElementById('dash-pat-ing-dia'); if (elPatIngDia) elPatIngDia.textContent = fmtE(ingDiaP);
   } else {
     // Vista Patrimer/Industrias: urbano + rústico
     // AJUSTE 27/08/2026 — a petición tuya, se devuelven los decimales a la
@@ -16213,6 +16307,7 @@ window._refreshCurrentModule = function(key) {
     'fin:patrimonio_historico:patricio': 'finanzas',
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
+    'ingresos:otros:patricio': 'renta',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
     'app:registro_actividad': 'inicio',
@@ -16257,6 +16352,37 @@ window._refreshCurrentModule = function(key) {
     if (module === 'renta' && typeof renta_render === 'function') renta_render();
     if (module === 'inicio' && typeof notas_render === 'function') notas_render();
     if (module === 'inicio' && typeof pend_render === 'function') pend_render();
+  }
+  // PUNTO 102 (06/09/2026) — BUG REAL ENCONTRADO: el dashboard de Inicio
+  // (dash_render, con sus KPIs y la gráfica "Acumulado mensual") nunca se
+  // volvía a pintar cuando llegaba un cambio de estos datos — ni el de
+  // arriba (que solo mira si el módulo DUEÑO del dato, p.ej. "cobros" o
+  // "renta", está activo) ni ningún otro sitio llamaban a dash_render()
+  // desde aquí. Por eso, si tenías Inicio abierto en un aparato mientras
+  // en otro (o la propia sincronización automática del alquiler real,
+  // punto 99) actualizaba estos datos, el mes nuevo no aparecía hasta
+  // salir y volver a entrar en Inicio — esto explica tanto "en Chrome el
+  // Acumulado mensual sale vacío" como "no me salen los 2 meses de 2026
+  // que ya tengo metidos", ambos reportados el mismo día. Se refresca el
+  // dashboard aparte, sin tocar la lógica de arriba, para cualquier clave
+  // que alimente sus KPIs o su gráfica, si Inicio es el módulo visible.
+  var _clavesQueAfectanInicio = {
+    'facturacion:historico:patrimer': true,
+    'facturacion:historico:patricio': true,
+    'facturacion:historico:industrias': true,
+    'facturacion:facturas': true,
+    'inmuebles:alquileres_mensuales': true,
+    'inmuebles:lista': true,
+    'ingresos:otros:patricio': true,
+    'rustico:historico': true,
+    'fin:patrimonio_historico:patrimer': true,
+    'fin:patrimonio_historico:patricio': true
+  };
+  if (_clavesQueAfectanInicio[key]) {
+    var modInicio = document.getElementById('mod-inicio');
+    if (modInicio && modInicio.classList.contains('active') && typeof dash_render === 'function') {
+      dash_render();
+    }
   }
 };
 
@@ -17156,6 +17282,7 @@ function renta_render() {
   renta_renderAlquileres();
   renta_renderCapital();
   renta_renderGastos();
+  ingotros_render();
   renta_calcPrevision();
   alqmen_render();
   segibi_render();
@@ -17685,6 +17812,115 @@ function renta_guardarGasto() {
   } else {
     guardarConFoto(null);
   }
+}
+
+// ── Otros ingresos (PUNTO 101, 06/09/2026) ────────────────────────────────
+// Ledger simple, en una única clave (no por año, a diferencia de nóminas y
+// gastos), porque aquí lo que importa es sumar por año/mes según la fecha
+// de cada apunte, sin depender del selector de año de Renta Patricio.
+// Alimenta "Ingresos anuales" en Inicio (dash_render) junto con los
+// alquileres reales (inm_alqMenLoad).
+function ingotros_load() {
+  return JSON.parse(localStorage.getItem('ingresos:otros:patricio') || '[]');
+}
+function ingotros_save(arr) {
+  localStorage.setItem('ingresos:otros:patricio', JSON.stringify(arr));
+}
+function ingotros_abrirModal() {
+  document.getElementById('ingotros-id-hidden').value = '';
+  document.getElementById('ingotros-concepto').value = '';
+  document.getElementById('ingotros-importe').value = '';
+  document.getElementById('ingotros-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('renta-modal-ingreso').style.display = 'flex';
+}
+function ingotros_editar(id) {
+  var arr = ingotros_load();
+  var item = null;
+  for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) { item = arr[i]; break; } }
+  if (!item) return;
+  document.getElementById('ingotros-id-hidden').value = item.id;
+  document.getElementById('ingotros-concepto').value = item.concepto;
+  document.getElementById('ingotros-importe').value = fmtGlobal(item.importe);
+  document.getElementById('ingotros-fecha').value = item.fecha;
+  document.getElementById('renta-modal-ingreso').style.display = 'flex';
+}
+function ingotros_cerrarModal() {
+  document.getElementById('renta-modal-ingreso').style.display = 'none';
+}
+function ingotros_guardar() {
+  if (bloqueaSiViewer('Guardar un ingreso')) return;
+  var idEdit = document.getElementById('ingotros-id-hidden').value;
+  var concepto = document.getElementById('ingotros-concepto').value.trim();
+  var importe = parseFmtGlobal(document.getElementById('ingotros-importe').value);
+  var fecha = document.getElementById('ingotros-fecha').value;
+  if (!concepto || !importe || !fecha) { alert('Introduce concepto, importe y fecha.'); return; }
+  var arr = ingotros_load();
+  if (idEdit) {
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === idEdit) { arr[i].concepto = concepto; arr[i].importe = importe; arr[i].fecha = fecha; break; }
+    }
+  } else {
+    arr.push({ id: 'ing_' + Date.now(), concepto: concepto, importe: importe, fecha: fecha });
+  }
+  ingotros_save(arr);
+  ingotros_cerrarModal();
+  ingotros_render();
+  if (typeof dash_render === 'function') dash_render();
+  info('✓ Ingreso guardado.');
+}
+function ingotros_borrar(id) {
+  if (bloqueaSiViewer('Borrar un ingreso')) return;
+  showConfirm('🗑️', 'Borrar ingreso', '¿Seguro que quieres borrar este ingreso?', [
+    { label: 'Borrar', cls: 'danger', fn: function () {
+      var arr = ingotros_load();
+      arr = arr.filter(function (x) { return x.id !== id; });
+      ingotros_save(arr);
+      ingotros_render();
+      if (typeof dash_render === 'function') dash_render();
+    } }
+  ]);
+}
+function ingotros_render() {
+  var cont = document.getElementById('renta-lista-ingresos-otros');
+  if (!cont) return;
+  var arr = ingotros_load().slice().sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  if (arr.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin ingresos añadidos.</div>';
+    document.getElementById('renta-total-ingresos-otros').textContent = '— €';
+    return;
+  }
+  var total = 0;
+  var html = '';
+  for (var i = 0; i < arr.length; i++) {
+    var it = arr[i];
+    total += parseFloat(it.importe) || 0;
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + notas_esc(it.concepto) + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + (it.fecha || '') + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">+' + fmtGlobal(it.importe) + ' €</div>'
+      + '<button onclick="ingotros_editar(\'' + it.id + '\')" style="background:none;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;">✎</button>'
+      + '<button onclick="ingotros_borrar(\'' + it.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
+      + '</div></div>';
+  }
+  cont.innerHTML = html;
+  document.getElementById('renta-total-ingresos-otros').textContent = fmtGlobal(total) + ' €';
+}
+function ingotros_totalAnio(year) {
+  var arr = ingotros_load();
+  var total = 0;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].fecha && parseInt(arr[i].fecha.split('-')[0], 10) === year) total += parseFloat(arr[i].importe) || 0;
+  }
+  return total;
+}
+function ingotros_totalMes(ym) {
+  var arr = ingotros_load();
+  var total = 0;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].fecha && arr[i].fecha.slice(0, 7) === ym) total += parseFloat(arr[i].importe) || 0;
+  }
+  return total;
 }
 
 // ── Previsión IRPF (estimación simplificada 2025) ─────────────────────────
