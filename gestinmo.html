@@ -5242,7 +5242,7 @@ con editar/borrar en cada línea. -->
   </div>
 
   <!-- Tarjeta resumen previsión IRPF -->
-  <div style="background:linear-gradient(135deg,#1a2a4a,#0f1e36);border:1px solid rgba(91,141,238,0.3);border-radius:16px;padding:16px;margin-bottom:20px;">
+  <div style="background:linear-gradient(135deg,#1a2a4a,#0f1e36);border:1px solid rgba(91,141,238,0.3);border-radius:16px;padding:16px;margin-bottom:20px;text-align:center;">
     <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">Previsión IRPF a pagar / devolver</div>
     <div style="font-size:28px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-prevision-irpf">— €</div>
     <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="renta-prevision-nota">Añade datos para ver la previsión</div>
@@ -15562,8 +15562,8 @@ function finperdash_render() {
   var html = '';
   // Bloque cuentas
   html += '<div class="fin-section" style="padding:0;overflow:hidden;">';
-  html += fila('CAIXA', fin_fmt(caixa), { bold: true });
-  if (efectivo > 0) html += fila('Efectivo', fin_fmt(efectivo), { borderTop: true });
+  html += fila('CAIXA', fin_fmt(caixa), { bold: true, colorVal: 'var(--accent-blue)' });
+  if (efectivo > 0) html += fila('Efectivo', fin_fmt(efectivo), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
   html += fila('MyInvestor · Liquidez', fin_fmt(myLiq), { borderTop: true });
   html += fila('MyInvestor · Invertido', fin_fmt(myInv));
   html += fila('MyInvestor · Total', fin_fmt(myTotal), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
@@ -15578,7 +15578,7 @@ function finperdash_render() {
   html += fila('% Liquidez / % Invertido', pctLiq.toFixed(0) + '% / ' + pctInv.toFixed(0) + '%', { fsVal: '13px', colorVal: 'var(--silver-bright)', borderTop: true });
   html += '</div>';
   // Bloque patrimonio total (inmobiliario + financiero)
-  html += '<div class="fin-section" style="padding:0;overflow:hidden;margin-top:10px;">';
+  html += '<div class="fin-section" style="padding:0;overflow:hidden;margin-top:10px;text-align:center;">';
   html += '<div style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-secondary);letter-spacing:.5px;">PATRIMONIO TOTAL</div>';
   html += fila('Inmobiliario (' + pctInmob.toFixed(0) + '%)', fin_fmt(totalInmobiliario), { borderTop: true });
   html += fila('Financiero (' + pctFin.toFixed(0) + '%)', fin_fmt(totalFinanciero), { borderTop: true });
@@ -18786,19 +18786,19 @@ function renta_calcPrevision() {
   for (var ii = 0; ii < todosInm.length; ii++) {
     if ((todosInm[ii].propietario || '').toLowerCase() === 'patricio') inmPatricio.push(ii);
   }
-  var facturas = JSON.parse(localStorage.getItem('facturacion:facturas') || '[]');
+  // PUNTO 120 (06/09/2026): esto leía de 'facturacion:facturas' — el
+  // desglose por inmueble que se desactivó el 30/08/2026 (punto 88) y que
+  // Patricio nunca ha usado, así que su alquiler real quedaba siempre en
+  // 0 aquí. El dato real de Patricio vive en 'inmuebles:alquileres_mensuales'
+  // (tabla del punto 97, la misma que ya usa fac_sincronizarHistoricoPatricio
+  // para Inicio/Histórico desde el punto 99) — se lee de ahí en su lugar.
+  var registrosAlq = inm_alqMenLoad();
   var ingresosPorInm = {};
-  for (var fi = 0; fi < facturas.length; fi++) {
-    var f = facturas[fi];
-    if (!f.mes || parseInt(f.mes.split('-')[0]) !== renta_anio) continue;
-    if (f.items && f.items.length) {
-      for (var fk = 0; fk < f.items.length; fk++) {
-        var idxF = f.items[fk].idx;
-        if (inmPatricio.indexOf(idxF) >= 0) {
-          ingresosPorInm[idxF] = (ingresosPorInm[idxF] || 0) + (parseFloat(f.items[fk].precio) || 0);
-        }
-      }
-    }
+  for (var ai = 0; ai < registrosAlq.length; ai++) {
+    var ra = registrosAlq[ai];
+    if (!ra.mes || parseInt(ra.mes.split('-')[0], 10) !== renta_anio) continue;
+    if (inmPatricio.indexOf(ra.inmuebleIdx) < 0) continue;
+    ingresosPorInm[ra.inmuebleIdx] = (ingresosPorInm[ra.inmuebleIdx] || 0) + (parseFloat(ra.alquiler) || 0);
   }
 
   // Gastos deducibles generales (bloque D)
