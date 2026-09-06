@@ -1944,8 +1944,10 @@ const DATA_KEYS = [
   // (no un histórico mes a mes como el de arriba), con Liquidez/Invertido
   // separado dentro de MyInvestor y de Trade Republic. Pantalla propia,
   // independiente de la tabla de PUNTO 109 — decidiremos más adelante si
-  // se fusionan.
+  // se fusionan. Lee en vivo de Cuentas/Fondos/Acciones; esta clave solo
+  // guarda a qué cuenta/broker pertenece cada acción (por ticker).
   'fin:patrimonio_financiero_actual:patricio',
+  'fin:acciones_cuenta:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
@@ -4747,45 +4749,9 @@ Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
         <span class="header-module-name">Patrimonio Financiero</span>
       </div>
     </div>
-    <div style="padding-right:14px;cursor:pointer;font-size:20px;" onclick="finperdash_abrirEditar()">&#9998;</div>
   </header>
   <div style="padding:14px 14px 100px;">
     <div id="finperdash-content"></div>
-  </div>
-</div>
-
-<!-- MODAL EDITAR PANEL PATRIMONIO FINANCIERO (PUNTO 114, 06/09/2026) -->
-<div class="moverlay" id="finperdash-modal" style="display:none;align-items:center;justify-content:center;">
-  <div class="modal" style="max-width:380px;width:92%;">
-    <div class="mtitle">Patrimonio financiero — actualizar<span class="mclose" onclick="finperdash_cerrarEditar()">&#10005;</span></div>
-    <div style="padding:4px 0;">
-      <div style="margin-bottom:12px;">
-        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CAIXA (€)</div>
-        <input id="finperdash-caixa" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-        <div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MYINVESTOR LIQ. (€)</div>
-          <input id="finperdash-myinvestor-liq" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MYINVESTOR INV. (€)</div>
-          <input id="finperdash-myinvestor-inv" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-        <div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">TRADE REP. LIQ. (€)</div>
-          <input id="finperdash-trade-liq" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">TRADE REP. INV. (€)</div>
-          <input id="finperdash-trade-inv" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
-        </div>
-      </div>
-      <button onclick="finperdash_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
-      <button onclick="finperdash_cerrarEditar()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
-    </div>
   </div>
 </div>
 
@@ -4920,6 +4886,18 @@ abierto. -->
     <div class="mtitle">Fondo de inversion<span class="mclose" onclick="closeModalById('fin-modal-fondo')">&#10005;</span></div>
     <div class="mfield"><div class="mflabel">Nombre del fondo</div><input class="minput" id="fin-fondo-nombre" placeholder="Ej: Indexa Capital Cartera 10"></div>
     <div class="mfield"><div class="mflabel">Gestora / Plataforma</div><input class="minput" id="fin-fondo-gestora" placeholder="Ej: Indexa Capital"></div>
+    <!-- PUNTO 114 (06/09/2026): en qué cuenta/broker está metido este fondo —
+    lo usa el Panel Patrimonio Financiero para saber cuánto de cada broker es
+    "Invertido", sin que tengas que volver a escribir el importe a mano. -->
+    <div class="mfield"><div class="mflabel">Cuenta / Broker</div>
+      <select class="minput" id="fin-fondo-cuenta">
+        <option value="">Sin asignar</option>
+        <option value="caixa">Caixa</option>
+        <option value="myinvestor">MyInvestor</option>
+        <option value="traderepublic">Trade Republic</option>
+        <option value="otra">Otra</option>
+      </select>
+    </div>
     <div class="mfield"><div class="mflabel">Total aportado (euros)</div><input class="minput" id="fin-fondo-aportado" type="number" inputmode="decimal" placeholder="0"></div>
     <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-fondo-valor" type="text" inputmode="decimal" placeholder="0"></div>
     <input type="hidden" id="fin-fondo-idx" value="">
@@ -5826,6 +5804,7 @@ const BACKUP_KEYS = [
   'fin:patrimonio_financiero:patricio',
   // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — estado actual.
   'fin:patrimonio_financiero_actual:patricio',
+  'fin:acciones_cuenta:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
@@ -12073,6 +12052,42 @@ document.addEventListener('firebaseLoaded', function() {
   } catch (e) {
     console.warn('[Migración Patrimonio Financiero] fallo, no se ha tocado nada:', e);
   }
+  // PUNTO 114 (06/09/2026): asignación inicial, una sola vez, de a qué
+  // cuenta/broker pertenece cada fondo/acción que ya tenías cargado, para
+  // que el Panel Patrimonio Financiero pueda calcular el Invertido de cada
+  // broker sin pedirte que lo repitas a mano. Confirmado contigo con
+  // capturas de MyInvestor y Trade Republic el 06/09/2026: el fondo
+  // "MYINVESTOR" (el indexado + el plan de pensiones, ambos dentro de
+  // MyInvestor) va a MyInvestor; el fondo "FIDELITY MSCI WORLD" está
+  // realmente dentro de Trade Republic, no de MyInvestor (aunque el nombre
+  // pueda confundir). La acción Hermès (RMS.PA) se asigna también a Trade
+  // Republic — es una suposición razonable (Trade Republic es tu broker de
+  // acciones), pero no confirmada explícitamente contigo: revísalo en
+  // Finanzas → Acciones si no es así, tiene su propio desplegable "Cuenta /
+  // Broker" para corregirlo. Solo se ejecuta una vez, y nunca pisa una
+  // asignación que ya hayas hecho tú a mano.
+  try {
+    if (!localStorage.getItem('migracion:cuentas_fondos_acciones_patricio_v1')) {
+      var fondosMig = fin_load('fin:fondos');
+      var huboCambiosFondos = false;
+      fondosMig.forEach(function (f) {
+        if (f.cuenta) return; // ya asignado a mano — no se toca
+        var nom = ((f.nombre || '') + ' ' + (f.gestora || '')).toLowerCase();
+        if (nom.indexOf('myinvestor') !== -1) { f.cuenta = 'myinvestor'; huboCambiosFondos = true; }
+        else if (nom.indexOf('fidelity') !== -1) { f.cuenta = 'traderepublic'; huboCambiosFondos = true; }
+      });
+      if (huboCambiosFondos) fin_save('fin:fondos', fondosMig);
+      var cuentaAccionesMig = _finAccionesCuentaLoad();
+      if (!cuentaAccionesMig['RMS.PA']) {
+        cuentaAccionesMig['RMS.PA'] = 'traderepublic';
+        localStorage.setItem('fin:acciones_cuenta:patricio', JSON.stringify(cuentaAccionesMig));
+      }
+      localStorage.setItem('migracion:cuentas_fondos_acciones_patricio_v1', '1');
+      console.log('[Migración cuentas Fondos/Acciones] asignación inicial hecha.');
+    }
+  } catch (e) {
+    console.warn('[Migración cuentas Fondos/Acciones] fallo, no se ha tocado nada:', e);
+  }
   // PUNTO 99 (06/09/2026): se ejecuta en cada carga (no es una migración de
   // una sola vez, es autocorrectiva) para que Inicio/Análisis/Histórico
   // reflejen siempre el alquiler real de Patricio — ver fac_sincronizarHistoricoPatricio.
@@ -13908,6 +13923,9 @@ var FIN_NOMBRES = {
   'SAN.MC': 'Santander', 'CABK.MC': 'CaixaBank', 'TEF.MC': 'Telefonica',
   'ENG.MC': 'Enagas', 'ACS.MC': 'ACS', 'RMS.PA': 'Hermes'
 };
+// PUNTO 114 (06/09/2026): etiquetas de las 3 cuentas/brokers de Patricio,
+// usadas por Fondos/Acciones y por el Panel Patrimonio Financiero.
+var FIN_CUENTA_LABEL = { caixa: 'Caixa', myinvestor: 'MyInvestor', traderepublic: 'Trade Republic', otra: 'Otra cuenta' };
 
 // PUNTO 51 (26/08/2026): pequeño texto "Última actualización" en Finanzas.
 // Se llama tanto desde fin_render() (al entrar en el módulo) como desde
@@ -14028,8 +14046,23 @@ function fin_borrarCuenta(idx) {
 }
 
 // --- ACCIONES ---
+// PUNTO 114 (06/09/2026): a qué cuenta/broker pertenece cada valor (por
+// ticker, no por operación — un valor concreto está siempre en el mismo
+// broker) — { ticker: 'caixa'|'myinvestor'|'traderepublic'|'otra' }.
+function _finAccionesCuentaLoad() {
+  try { return JSON.parse(localStorage.getItem('fin:acciones_cuenta:patricio') || '{}'); } catch (e) { return {}; }
+}
+function fin_setAccionCuenta(ticker, cuenta) {
+  if (bloqueaSiViewer('Asignar la cuenta de un valor')) return;
+  var mapa = _finAccionesCuentaLoad();
+  if (cuenta) mapa[ticker] = cuenta; else delete mapa[ticker];
+  localStorage.setItem('fin:acciones_cuenta:patricio', JSON.stringify(mapa));
+  if (window.syncToFirestore) window.syncToFirestore('fin:acciones_cuenta:patricio', JSON.stringify(mapa));
+  if (typeof finperdash_render === 'function') finperdash_render();
+}
 function fin_renderAcciones() {
   var ops = fin_load('fin:acciones');
+  var _finAccionesCuenta = _finAccionesCuentaLoad();
   var lista = document.getElementById('fin-acciones-lista');
   var totEl = document.getElementById('fin-acciones-total');
   if (!lista) return;
@@ -14086,6 +14119,10 @@ function fin_renderAcciones() {
     html += '<div class="fin-card-nombre">' + p.nombre + cotBtn + '</div>';
     html += '<div class="fin-card-sub">' + p.num.toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:4}) + ' acc \u00b7 P.M. ' + fin_fmt(pm) + '</div>';
     html += '</div><div class="fin-card-saldo">' + (val !== null ? fin_fmt(val) : '-') + '</div></div>';
+    // PUNTO 114 (06/09/2026): a qué cuenta/broker pertenece esta posición —
+    // lo usa el Panel Patrimonio Financiero para sumar el Invertido de cada
+    // broker sin que tengas que volver a escribir el importe a mano.
+    var cuentaAccion = _finAccionesCuenta[p.ticker] || '';
     html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: ' + plHtml + '</div>';
     if (totalDivs > 0) {
       html += '<div class="fin-meta-item">Dividendos cobrados: <span class="fin-meta-val fin-plus">' + fin_fmt(totalDivs) + '</span></div>';
@@ -14096,6 +14133,12 @@ function fin_renderAcciones() {
       if (yoc !== null) html += '<div class="fin-meta-item">Yield on Cost: <span class="fin-meta-val fin-plus">' + fin_fmtPct(yoc) + '</span></div>';
     }
     html += '</div>';
+    html += '<div class="mfield" style="margin:8px 0 0;"><div class="mflabel" style="font-size:10px;">Cuenta / Broker</div>';
+    html += '<select class="minput" style="padding:6px 10px;font-size:12px;" onchange="fin_setAccionCuenta(\'' + p.ticker + '\', this.value)">';
+    ['', 'caixa', 'myinvestor', 'traderepublic', 'otra'].forEach(function(op) {
+      html += '<option value="' + op + '"' + (cuentaAccion === op ? ' selected' : '') + '>' + (op === '' ? 'Sin asignar' : FIN_CUENTA_LABEL[op]) + '</option>';
+    });
+    html += '</select></div>';
     html += '<div class="fin-card-actions">';
     html += '<div class="fin-action-btn" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'compra\')">+ Compra</div>';
     html += '<div class="fin-action-btn red" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'venta\')">- Venta</div>';
@@ -14402,7 +14445,7 @@ function fin_renderFondos() {
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top"><div>';
     html += '<div class="fin-card-nombre">' + (f.nombre || 'Fondo') + '</div>';
-    html += '<div class="fin-card-sub">' + (f.gestora || '') + '</div>';
+    html += '<div class="fin-card-sub">' + [f.gestora, FIN_CUENTA_LABEL[f.cuenta] || ''].filter(Boolean).join(' · ') + '</div>';
     html += '</div><div class="fin-card-saldo">' + fin_fmt(val) + '</div></div>';
     html += '<div class="fin-card-meta">';
     html += '<div class="fin-meta-item">Aportado: <span class="fin-meta-val">' + fin_fmt(ap) + '</span></div>';
@@ -14431,6 +14474,7 @@ function fin_renderFondos() {
 function fin_nuevoFondo() {
   document.getElementById('fin-fondo-nombre').value = '';
   document.getElementById('fin-fondo-gestora').value = '';
+  document.getElementById('fin-fondo-cuenta').value = '';
   document.getElementById('fin-fondo-aportado').value = '';
   document.getElementById('fin-fondo-valor').value = '';
   document.getElementById('fin-fondo-idx').value = '';
@@ -14446,6 +14490,7 @@ function fin_editarFondo(idx) {
   var f = data[idx];
   document.getElementById('fin-fondo-nombre').value = f.nombre || '';
   document.getElementById('fin-fondo-gestora').value = f.gestora || '';
+  document.getElementById('fin-fondo-cuenta').value = f.cuenta || '';
   document.getElementById('fin-fondo-aportado').value = f.aportado || '';
   document.getElementById('fin-fondo-valor').value = f.valor || '';
   document.getElementById('fin-fondo-idx').value = idx;
@@ -14475,6 +14520,7 @@ function fin_guardarFondo() {
   var nombre = document.getElementById('fin-fondo-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre del fondo.'); return; }
   var gestora = document.getElementById('fin-fondo-gestora').value.trim();
+  var cuenta = document.getElementById('fin-fondo-cuenta').value;
   var aportado = parseFloat(document.getElementById('fin-fondo-aportado').value) || 0;
   // "Valor actual" ahora es texto libre (para poder seleccionarlo entero al editar),
   // así que aceptamos tanto "2500.75" como "2.500,75".
@@ -14496,7 +14542,7 @@ function fin_guardarFondo() {
   // la cuenta de los ciclos ya aplicados si solo se está editando otro dato.
   var dcaUltimaAplicada = (idx !== '' && data[parseInt(idx)]) ? (data[parseInt(idx)].dcaUltimaAplicada || '') : '';
   var obj = {
-    nombre: nombre, gestora: gestora, aportado: aportado, valor: valor,
+    nombre: nombre, gestora: gestora, cuenta: cuenta, aportado: aportado, valor: valor,
     dcaActivo: dcaActivo, dcaImporte: dcaImporte, dcaPeriodicidad: dcaPeriodicidad,
     dcaFechaInicio: dcaFechaInicio, dcaUltimaAplicada: dcaUltimaAplicada
   };
@@ -15239,27 +15285,16 @@ function finper_render() {
 
 // ═══════════════════════════════════════════════════════════════════════
 // PUNTO 114 (06/09/2026): PANEL PATRIMONIO FINANCIERO — pantalla propia,
-// aparte de la tabla mensual de arriba (PUNTO 109). Guarda un único
-// registro con el ESTADO ACTUAL (no un histórico), con Liquidez e
-// Invertido separados DENTRO de cada broker (MyInvestor y Trade Republic),
-// tal y como pediste al ver tu plantilla de referencia. El valor
-// "Inmobiliario" no se guarda aquí — se calcula en vivo, igual que la
-// tarjeta "Patrim. Inmo." de Inicio, para que el panel nunca se desactualice
-// aunque cambies el precio de un inmueble. Solo para Patricio.
+// aparte de la tabla mensual de arriba (PUNTO 109). NO se rellena a mano:
+// lee en vivo lo que ya tienes cargado en Finanzas → Cuentas (Caixa,
+// MyInvestor, Trade Republic, Efectivo) y en Fondos/Acciones (para el
+// Invertido de cada broker, según la Cuenta/Broker que le hayas asignado
+// a cada fondo o acción). El valor "Inmobiliario" tampoco se guarda aquí
+// — se calcula en vivo, igual que la tarjeta "Patrim. Inmo." de Inicio.
+// Corregido 06/09/2026 (mismo día): la primera versión pedía escribir las
+// 5 cifras a mano, duplicando datos que ya tenías metidos — no tenía
+// sentido y me lo dijiste. Solo para Patricio.
 // ═══════════════════════════════════════════════════════════════════════
-function finperdash_key() {
-  return 'fin:patrimonio_financiero_actual:patricio';
-}
-function finperdash_load() {
-  try {
-    var r = JSON.parse(localStorage.getItem(finperdash_key()) || 'null');
-    return r && typeof r === 'object' ? r : {};
-  } catch (e) { return {}; }
-}
-function finperdash_save(data) {
-  localStorage.setItem(finperdash_key(), JSON.stringify(data));
-  if (window.syncToFirestore) window.syncToFirestore(finperdash_key(), JSON.stringify(data));
-}
 // Mismo cálculo que la tarjeta "Patrim. Inmo." de Inicio (punto 100.5/101):
 // suma del valor actual de los inmuebles NO vendidos de ese propietario.
 function patrim_valorInmobiliarioActual(propietario) {
@@ -15273,6 +15308,51 @@ function patrim_valorInmobiliarioActual(propietario) {
   }
   return total;
 }
+// Busca en Cuentas (Patricio) el saldo de la cuenta cuyo nombre contiene el
+// texto indicado (sin mayúsculas/acentos ni espacios de más) — así "Caixa",
+// "CaixaBank" o "CAIXA BANK" encajan todos igual.
+function finperdash_saldoCuenta(cuentas, textoBuscado) {
+  var buscado = textoBuscado.toLowerCase().replace(/\s+/g, '');
+  for (var i = 0; i < cuentas.length; i++) {
+    var nom = (cuentas[i].nombre || '').toLowerCase().replace(/\s+/g, '');
+    if (nom.indexOf(buscado) !== -1) return parseFloat(cuentas[i].saldo) || 0;
+  }
+  return 0;
+}
+// Suma, para una cuenta/broker dado ('myinvestor'/'traderepublic'/'caixa'/
+// 'otra'), el valor de los Fondos asignados a ese broker + el valor actual
+// de las Acciones asignadas a ese broker (misma cotización que usa la
+// pantalla de Acciones). Devuelve también, aparte, lo que no tiene
+// cotización puesta o cuenta asignada, para no perder de vista nada.
+function finperdash_invertidoPorCuenta() {
+  var fondos = fin_load('fin:fondos');
+  var acciones = fin_load('fin:acciones');
+  var cuentaAcciones = _finAccionesCuentaLoad();
+  var resultado = { caixa: 0, myinvestor: 0, traderepublic: 0, otra: 0, sinAsignar: 0, sinCotizacion: [] };
+  fondos.forEach(function (f) {
+    var v = parseFloat(f.valor) || 0;
+    var c = f.cuenta;
+    if (resultado[c] !== undefined) resultado[c] += v; else resultado.sinAsignar += v;
+  });
+  // Posiciones abiertas por ticker (misma lógica que fin_renderAcciones).
+  var pos = {};
+  acciones.forEach(function (op) {
+    var t = op.ticker;
+    if (!pos[t]) pos[t] = { num: 0, coste: 0 };
+    if (op.tipo === 'compra') { pos[t].num += parseFloat(op.cantidad) || 0; pos[t].coste += (parseFloat(op.cantidad) || 0) * (parseFloat(op.precio) || 0); }
+    else if (op.tipo === 'venta') { pos[t].num -= parseFloat(op.cantidad) || 0; }
+    else if (op.tipo === 'scrip') { pos[t].num += parseFloat(op.scripAcciones) || 0; }
+  });
+  Object.keys(pos).forEach(function (ticker) {
+    if (pos[ticker].num <= 0) return;
+    var cot = _finCotizaciones[ticker] || null;
+    if (!cot) { resultado.sinCotizacion.push(FIN_NOMBRES[ticker] || ticker); return; }
+    var val = cot * pos[ticker].num;
+    var c = cuentaAcciones[ticker];
+    if (resultado[c] !== undefined) resultado[c] += val; else resultado.sinAsignar += val;
+  });
+  return resultado;
+}
 function finperdash_abrirModulo() {
   showModule('finperdash');
   finperdash_render();
@@ -15280,51 +15360,25 @@ function finperdash_abrirModulo() {
 function finperdash_cerrarModulo() {
   showModule('finanzas');
 }
-function finperdash_abrirEditar() {
-  if (bloqueaSiViewer('Actualizar el Panel Patrimonio Financiero')) return;
-  var d = finperdash_load();
-  document.getElementById('finperdash-caixa').value = fmtGlobal(parseFloat(d.caixa) || 0);
-  document.getElementById('finperdash-myinvestor-liq').value = fmtGlobal(parseFloat(d.myinvestorLiq) || 0);
-  document.getElementById('finperdash-myinvestor-inv').value = fmtGlobal(parseFloat(d.myinvestorInv) || 0);
-  document.getElementById('finperdash-trade-liq').value = fmtGlobal(parseFloat(d.traderepublicLiq) || 0);
-  document.getElementById('finperdash-trade-inv').value = fmtGlobal(parseFloat(d.traderepublicInv) || 0);
-  document.getElementById('finperdash-modal').style.display = 'flex';
-}
-function finperdash_cerrarEditar() {
-  document.getElementById('finperdash-modal').style.display = 'none';
-}
-function finperdash_guardar() {
-  if (bloqueaSiViewer('Guardar el Panel Patrimonio Financiero')) return;
-  var data = {
-    caixa: parseFmtGlobal(document.getElementById('finperdash-caixa').value) || 0,
-    myinvestorLiq: parseFmtGlobal(document.getElementById('finperdash-myinvestor-liq').value) || 0,
-    myinvestorInv: parseFmtGlobal(document.getElementById('finperdash-myinvestor-inv').value) || 0,
-    traderepublicLiq: parseFmtGlobal(document.getElementById('finperdash-trade-liq').value) || 0,
-    traderepublicInv: parseFmtGlobal(document.getElementById('finperdash-trade-inv').value) || 0,
-    updatedAt: new Date().toISOString()
-  };
-  finperdash_save(data);
-  finperdash_cerrarEditar();
-  finperdash_render();
-  info('✓ Panel Patrimonio Financiero actualizado.');
-}
 function finperdash_render() {
   var cont = document.getElementById('finperdash-content');
   if (!cont) return;
-  var d = finperdash_load();
-  var hayDatos = Object.keys(d).length > 0;
-  if (!hayDatos) {
-    cont.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--silver-dim);font-size:13px;">Sin datos todavía.<br>Pulsa el lápiz de arriba para meter tus cifras actuales.</div>';
-    return;
-  }
-  var caixa = parseFloat(d.caixa) || 0;
-  var myLiq = parseFloat(d.myinvestorLiq) || 0;
-  var myInv = parseFloat(d.myinvestorInv) || 0;
-  var trLiq = parseFloat(d.traderepublicLiq) || 0;
-  var trInv = parseFloat(d.traderepublicInv) || 0;
+  // Las cotizaciones de Acciones solo se cargan en memoria al entrar en
+  // Finanzas — si el panel se abre sin haber pasado antes por ahí, sin esto
+  // el Invertido de Trade Republic saldría de menos (avisando de "sin
+  // cotización" aunque el dato sí esté guardado). Se asegura aquí, siempre.
+  if (typeof fin_loadCotizaciones === 'function') fin_loadCotizaciones();
+  var cuentas = fin_load('fin:cuentas');
+  var caixa = finperdash_saldoCuenta(cuentas, 'caixa');
+  var efectivo = finperdash_saldoCuenta(cuentas, 'efectivo');
+  var myLiq = finperdash_saldoCuenta(cuentas, 'myinvestor');
+  var trLiq = finperdash_saldoCuenta(cuentas, 'traderepublic');
+  var inv = finperdash_invertidoPorCuenta();
+  var myInv = inv.myinvestor;
+  var trInv = inv.traderepublic;
   var myTotal = myLiq + myInv;
   var trTotal = trLiq + trInv;
-  var totalLiq = caixa + myLiq + trLiq;
+  var totalLiq = caixa + efectivo + myLiq + trLiq;
   var totalInv = myInv + trInv;
   var totalFinanciero = totalLiq + totalInv;
   var pctLiq = totalFinanciero > 0 ? (totalLiq / totalFinanciero * 100) : 0;
@@ -15345,6 +15399,7 @@ function finperdash_render() {
   // Bloque cuentas
   html += '<div class="fin-section" style="padding:0;overflow:hidden;">';
   html += fila('CAIXA', fin_fmt(caixa), { bold: true });
+  if (efectivo > 0) html += fila('Efectivo', fin_fmt(efectivo), { borderTop: true });
   html += fila('MyInvestor · Liquidez', fin_fmt(myLiq), { borderTop: true });
   html += fila('MyInvestor · Invertido', fin_fmt(myInv));
   html += fila('MyInvestor · Total', fin_fmt(myTotal), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
@@ -15368,11 +15423,16 @@ function finperdash_render() {
   html += '<div style="font-size:11px;color:var(--silver-dim);letter-spacing:.5px;">TOTAL PATRIMONIO</div>';
   html += '<div style="font-size:24px;font-weight:700;color:var(--silver-bright);margin-top:4px;">' + fin_fmt(patrimonioTotal) + '</div>';
   html += '</div>';
-  if (d.updatedAt) {
-    var dU = new Date(d.updatedAt);
-    var pad2 = function(n) { return String(n).padStart(2, '0'); };
-    html += '<div style="text-align:center;font-size:10px;color:var(--silver-dim);margin-top:10px;">Actualizado el ' + pad2(dU.getDate()) + '/' + pad2(dU.getMonth() + 1) + '/' + dU.getFullYear() + '</div>';
+  // Avisos: fondos/acciones sin cuenta asignada (no se pierden, pero hay que
+  // decirle dónde están) y valores sin cotización puesta (no cuentan en el
+  // Invertido hasta que se les ponga una, igual que en Acciones).
+  if (inv.sinAsignar > 0) {
+    html += '<div style="text-align:center;font-size:11px;color:var(--accent-gold, #d4a72c);margin-top:10px;">⚠ ' + fin_fmt(inv.sinAsignar) + ' en fondos/acciones sin "Cuenta / Broker" asignada — no se han sumado a ningún banco de arriba. Asígnalos en Finanzas → Fondos/Acciones.</div>';
   }
+  if (inv.sinCotizacion.length > 0) {
+    html += '<div style="text-align:center;font-size:11px;color:var(--silver-dim);margin-top:6px;">Sin cotización puesta (no cuentan en Invertido): ' + inv.sinCotizacion.join(', ') + '.</div>';
+  }
+  html += '<div style="text-align:center;font-size:10px;color:var(--silver-dim);margin-top:10px;">Datos en vivo de Cuentas / Fondos / Acciones — para cambiarlos, actualízalos ahí.</div>';
   cont.innerHTML = html;
 }
 
@@ -16861,6 +16921,7 @@ window._refreshCurrentModule = function(key) {
     // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — pantalla propia
     // (mod-finperdash), no la de Finanzas.
     'fin:patrimonio_financiero_actual:patricio': 'finperdash',
+    'fin:acciones_cuenta:patricio': 'finanzas',
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     'ingresos:otros:patricio': 'renta',
@@ -16911,11 +16972,19 @@ window._refreshCurrentModule = function(key) {
     // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero (pantalla propia).
     if (module === 'finperdash' && typeof finperdash_render === 'function') finperdash_render();
   }
-  // PUNTO 114 (06/09/2026): el valor "Inmobiliario" del panel también
-  // depende de inmuebles:lista (no solo de su propia clave) — si cambia el
-  // precio actual de un inmueble mientras el panel está abierto, se
-  // refresca igual, aunque el módulo "dueño" de esa clave sea Inmuebles.
-  if (key === 'inmuebles:lista') {
+  // PUNTO 114 (06/09/2026): el panel lee en vivo de inmuebles:lista (valor
+  // inmobiliario) y de Cuentas/Fondos/Acciones/asignación de broker (todo
+  // lo financiero) — si cualquiera de estas claves cambia mientras el panel
+  // está abierto, se refresca igual, aunque su módulo "dueño" sea otro
+  // (Inmuebles o Finanzas).
+  var _clavesQueAfectanFinperdash = {
+    'inmuebles:lista': true,
+    'fin:cuentas:patricio': true,
+    'fin:fondos:patricio': true,
+    'fin:acciones:patricio': true,
+    'fin:acciones_cuenta:patricio': true
+  };
+  if (_clavesQueAfectanFinperdash[key]) {
     var modFinperDash = document.getElementById('mod-finperdash');
     if (modFinperDash && modFinperDash.classList.contains('active') && typeof finperdash_render === 'function') {
       finperdash_render();
