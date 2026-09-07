@@ -2829,6 +2829,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
             <span style="color:var(--silver-mid);">Rústico</span>
             <span id="dash-rustico-val" style="font-weight:700;font-size:17px;">—</span>
           </div>
+          <!-- PUNTO 135 (07/09/2026): 3ª categoría — dividendos de la cartera
+          de acciones, que hasta ahora no entraban en ninguna tarjeta de
+          Inicio. Solo con dato real en Patrimer (su cartera); en Industrias
+          se queda en "—", igual que ya pasa con Rústico. -->
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="color:var(--silver-mid);">Dividendos</span>
+            <span id="dash-dividendos-val" style="font-weight:700;font-size:17px;">—</span>
+          </div>
         </div>
         <!-- Vista Patricio — PUNTO 101 (06/09/2026): antes "Ingresos año /
         Inmuebles / Media mes" (la tarjeta se llamaba "Reparto", pero ya no
@@ -2894,6 +2902,9 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         </div>
       </div>
       <div id="bloque-ingresos" style="display:none;padding:0 16px 14px;">
+        <!-- PUNTO 132 (07/09/2026): sumatorio por concepto (Lala/Tortugas/
+        Otros), a petición tuya — antes solo se veía el total general. -->
+        <div id="ingotros-subtotales" style="display:flex;gap:8px;margin-bottom:12px;"></div>
         <div id="renta-lista-ingresos-otros" style="margin-bottom:12px;"></div>
         <button onclick="ingotros_abrirModal()" style="width:100%;background:rgba(76,175,130,0.15);border:1px dashed rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir ingreso</button>
       </div>
@@ -3895,7 +3906,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
 
   <div class="main-tabs">
     <div class="mtab active" onclick="setMTab(this,'tab-a')">Análisis</div>
-    <div class="mtab" onclick="setMTab(this,'tab-c')">Cobros</div>
+    <div class="mtab" onclick="setMTab(this,'tab-c')">Pendientes</div>
     <div class="mtab" onclick="setMTab(this,'tab-h');fac_renderHistorico()">Histórico</div>
   </div>
   <div class="main">
@@ -4015,9 +4026,9 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <!-- COBROS -->
     <div id="tab-c" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div class="slabel">Inquilinos con saldo pendiente</div>
-        <button class="cob-add-btn" onclick="cob_openSelectorInquilino()">＋</button>
+      <div style="position:relative;display:flex;align-items:center;margin-bottom:14px;">
+        <div class="slabel" style="flex:1;text-align:center;">Inquilinos con saldo pendiente</div>
+        <button class="cob-add-btn" onclick="cob_openSelectorInquilino()" style="position:absolute;right:0;top:50%;transform:translateY(-50%);">＋</button>
       </div>
       <div id="cobros-lista"></div>
       <div id="cobros-empty-deudores" style="display:none">
@@ -5327,8 +5338,8 @@ con editar/borrar en cada línea. -->
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:20px;">🏠</span>
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">ALQUILERES</div>
-          <div style="font-size:11px;color:var(--text-secondary);">Ingresos · Gastos deducibles</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">CÁLCULO FISCAL</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Alquiler · Amortización · Gastos deducibles</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -5352,7 +5363,7 @@ con editar/borrar en cada línea. -->
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:20px;">🗓️</span>
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">ALQUILERES MENSUALES</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">COBROS MENSUALES</div>
           <div style="font-size:11px;color:var(--text-secondary);">Cobro y comunidad, mes a mes</div>
         </div>
       </div>
@@ -5456,7 +5467,7 @@ con editar/borrar en cada línea. -->
 <div id="renta-modal-nomina" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
-    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💼 AÑADIR NÓMINA</div>
+    <div id="renta-modal-nomina-titulo" style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💼 AÑADIR NÓMINA</div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MES</div>
       <select id="renta-nom-mes" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;"></select>
@@ -5538,7 +5549,7 @@ con editar/borrar en cada línea. -->
 
 <!-- MODAL RENTA: OTRO INGRESO (PUNTO 101, 06/09/2026) -->
 <div id="renta-modal-ingreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
-  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
+  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:100%;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💰 AÑADIR INGRESO</div>
     <input type="hidden" id="ingotros-id-hidden">
@@ -6315,7 +6326,14 @@ function calcRent(inm) {
   const reforma = parseFloat(inm.reforma) || 0;
   const gastosAnuales = parseFloat(inm.gastosAnuales) || 0;
   if (!precio || !renta) return null;
-  const ingresoAnual = renta * 12;
+  // PUNTO 133 (07/09/2026) — BUG REAL ENCONTRADO Y CORREGIDO: en las fincas
+  // rústicas, "renta" ya es el cobro ANUAL (se paga una vez al año — así lo
+  // trata ya el resto de la app, ver el "€/año" de la tarjeta de la lista,
+  // línea ~6753). Aquí se multiplicaba por 12 igual que en pisos/locales
+  // (donde sí es mensual), lo que inflaba x12 el ingreso anual usado para la
+  // rentabilidad de cada finca rústica — por eso salían cifras como 51,6% o
+  // 77,6%, y además descuadradas entre fincas sin relación real con su coste.
+  const ingresoAnual = inm.tipo === 'rustico' ? renta : renta * 12;
   const costeTotal = precio + gastosCompra + reforma;
   const bruta = (ingresoAnual / costeTotal) * 100;
   const neta = ((ingresoAnual - gastosAnuales) / costeTotal) * 100;
@@ -6776,10 +6794,11 @@ function renderLista() {
     // Rent. neta: en Rústico sin dato de inversión, se oculta del todo (deja sitio al botón Histórico)
     // en el resto de tipos se mantiene igual que antes, con guion si no hay dato.
     const mostrarRentNeta = !(esRustico && !rent);
+    // PUNTO 134 (07/09/2026): etiqueta y % en una sola línea (antes en 2,
+    // dejando espacio en blanco de sobra en la tarjeta) — a petición tuya.
     const rentNetaBlock = mostrarRentNeta
-      ? `<div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:10px;color:var(--silver-dim);">Rent. neta</div>
-          ${rentPct}
+      ? `<div style="text-align:right;flex-shrink:0;display:flex;align-items:baseline;justify-content:flex-end;gap:5px;">
+          <span style="font-size:10px;color:var(--silver-dim);">Rent. neta</span>${rentPct}
         </div>`
       : '';
 
@@ -6992,7 +7011,14 @@ function inm_showDetail(idx) {
 
   // KPIs
   const _rentaActivaDetalle = inm_rentaActiva(inm); // PUNTO 33: contrato activo manda
-  const kpiRenta = _rentaActivaDetalle ? fmt(_rentaActivaDetalle)+' €' : (inm.rentaEst ? 'Est. '+fmt(inm.rentaEst)+' €' : '—');
+  // PUNTO 133 (07/09/2026): en fincas rústicas, _rentaActivaDetalle es el
+  // cobro ANUAL (se paga una vez al año, no mes a mes) — antes se mostraba
+  // tal cual bajo la etiqueta "Renta/mes", dando una cifra 12 veces mayor de
+  // lo que corresponde a un mes y descuadrando la rentabilidad (ver
+  // calcRent). Para que esta tarjeta sea de verdad "al mes", se reparte
+  // entre los 12 meses del año.
+  const _rentaMensualDetalle = (inm.tipo === 'rustico' && _rentaActivaDetalle) ? (_rentaActivaDetalle / 12) : _rentaActivaDetalle;
+  const kpiRenta = _rentaActivaDetalle ? fmt(_rentaMensualDetalle)+' €' : (inm.rentaEst ? 'Est. '+fmt(inm.rentaEst)+' €' : '—');
   const kpiPrecio = inm.precio ? fmt(inm.precio)+' €' : '—';
   const costeTotal = (parseFloat(inm.precio)||0) + (parseFloat(inm.gastosCompra)||0) + (parseFloat(inm.reforma)||0);
   const kpiCoste = inm.precio ? fmt(costeTotal)+' €' : '—';
@@ -7504,7 +7530,12 @@ function recalcPreview() {
   const gastosAnuales = parseFmtGlobal(document.getElementById('f-gastos-anuales').value) || 0;
   const preview = document.getElementById('rent-preview');
   if (!renta || !precio) { preview.style.display = 'none'; return; }
-  const ingresoAnual = renta * 12;
+  // PUNTO 133 (07/09/2026): mismo fallo que en calcRent — en una finca
+  // rústica, "Renta" es el cobro ANUAL, no mensual; si no se distingue el
+  // tipo, la vista previa de rentabilidad al crear/editar una rústica sale
+  // inflada x12, igual que pasaba en la lista de Inmuebles.
+  const tipoPreview = document.getElementById('f-tipo').value;
+  const ingresoAnual = tipoPreview === 'rustico' ? renta : renta * 12;
   const costeTotal = precio + gastosCompra + reforma;
   const bruta = (ingresoAnual / costeTotal) * 100;
   const neta = ((ingresoAnual - gastosAnuales) / costeTotal) * 100;
@@ -10546,23 +10577,25 @@ function fac_renderHistorico() {
     html += '<div style="margin-bottom:10px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;">';
     // Cabecera año — clickable para desplegar
     html += '<div onclick="fac_toggleAnio(this)" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.04);cursor:pointer;">';
-    html += '<div style="font-size:14px;font-weight:700;color:var(--accent-blue);">' + yr + varHtml + '</div>';
+    html += '<div style="font-size:17px;font-weight:700;color:var(--accent-blue);">' + yr + varHtml + '</div>';
     html += '<div style="display:flex;align-items:center;gap:10px;">';
-    html += '<div style="font-size:14px;font-weight:700;color:#4caf82;">' + fmtEur(totalAnio) + '</div>';
+    html += '<div style="font-size:17px;font-weight:700;color:#4caf82;">' + fmtEurDec(totalAnio) + '</div>';
     // PUNTO 91 (03/09/2026): se le pone una clase propia a la flecha para
     // poder encontrarla luego sin ambigüedad — ver el porqué en fac_toggleAnio.
     html += '<div class="fac-anio-arrow" style="font-size:12px;color:var(--silver-dim);">&#9654;</div>';
     html += '</div></div>';
     // Desglose mensual (oculto por defecto)
     html += '<div class="fac-hist-meses" style="display:none;padding:8px 14px;">';
-    for (var m = 0; m < meses.length; m++) {
+    // PUNTO 128 (07/09/2026): orden invertido a petición tuya — el mes más
+    // reciente arriba, justo debajo del total del año, en vez de Enero primero.
+    for (var m = meses.length - 1; m >= 0; m--) {
       var mesNum = parseInt(meses[m].mes.slice(5,7)) - 1;
       var mesNom = MESES[mesNum] || meses[m].mes;
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:15px;">';
       html += '<span style="color:var(--silver-mid);">' + mesNom + ' ' + yr + '</span>';
-      html += '<div style="display:flex;align-items:center;gap:10px;">';
-      html += '<span style="color:var(--silver-bright);">' + fmtEur(meses[m].importe) + '</span>';
-      html += '<span onclick="fac_editarMes(\'' + meses[m].mes + '\',' + meses[m].importe + ')" style="font-size:10px;color:var(--accent-blue);cursor:pointer;">Editar</span>';
+      html += '<div style="display:flex;align-items:center;gap:12px;">';
+      html += '<span style="color:var(--silver-bright);">' + fmtEurDec(meses[m].importe) + '</span>';
+      html += '<span onclick="fac_editarMes(\'' + meses[m].mes + '\',' + meses[m].importe + ')" style="font-size:12px;color:var(--accent-blue);cursor:pointer;">Editar</span>';
       html += '<span onclick="fac_eliminarMes(\'' + meses[m].mes + '\')" style="font-size:12px;color:var(--silver-dim);cursor:pointer;" title="Borrar mes">🗑️</span>';
       html += '</div></div>';
     }
@@ -10603,6 +10636,15 @@ function fac_toggleAnio(header) {
 }
 function fmtEur(n) {
   return fmt(n) + ' €';
+}
+// PUNTO 127 (07/09/2026): fmt()/fmtEur() muestran 0 o 2 decimales según si el
+// importe es exacto o no — a propósito, se usa así en varios sitios de la app.
+// Pero en Facturación → Histórico eso hacía que unos años salieran con
+// decimales y otros sin ellos (los años 2015-2024, cargados como un total
+// redondo, frente a 2025 en adelante, con céntimos reales), dando un aspecto
+// inconsistente. fmtEurDec fuerza siempre 2 decimales, solo para esa pantalla.
+function fmtEurDec(n) {
+  return (parseFloat(n) || 0).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
 }
 
 // ─── INMUEBLES (desde módulo Inmuebles) ───────────────────────
@@ -15879,6 +15921,62 @@ function fin_renderResumenAnual() {
   el.innerHTML = html;
 }
 
+// PUNTO 135 (07/09/2026): dividendos (efectivo + scrip, como en el resto de
+// la app — ver fin_renderResumenAnual justo arriba) para que Inicio pueda
+// contarlos en "Reparto", "Hasta [mes]", "Previsión anual" y el gráfico
+// mensual — hasta ahora ninguna tarjeta de Inicio los sumaba, aunque ya
+// tenemos histórico completo. Se lee con fin_load('fin:acciones'), que ya
+// respeta la empresa activa por su cuenta (Patrimer/Industrias) — sin nada
+// especial que hacer aquí para que cada empresa vea solo lo suyo.
+function div_valorOp(op) {
+  if (op.tipo === 'dividendo') {
+    return parseFloat(op.divImporte) || parseFloat(op.precio) || 0;
+  } else if (op.tipo === 'scrip') {
+    var ssob = parseFloat(op.scripSobrantes) || 0;
+    var sacc = parseFloat(op.scripAcciones) || 0;
+    var scripVR = parseFloat(op.scripValorReal) || 0;
+    if (!scripVR) { var cot = _finCotizaciones[op.ticker] || null; scripVR = cot ? sacc * cot : 0; }
+    return scripVR + ssob;
+  }
+  return 0;
+}
+function div_totalAnio(year) {
+  var ops = fin_load('fin:acciones');
+  var total = 0;
+  for (var i = 0; i < ops.length; i++) {
+    if ((ops[i].fecha || '').slice(0, 4) !== String(year)) continue;
+    total += div_valorOp(ops[i]);
+  }
+  return total;
+}
+// Total de un año, solo hasta un mes concreto incluido (1-12) — para poder
+// comparar "mismo periodo" con el año anterior, igual que hace fac_resumenAnual.
+function div_totalAnioHastaMes(year, mesInclusive) {
+  var ops = fin_load('fin:acciones');
+  var total = 0;
+  for (var i = 0; i < ops.length; i++) {
+    var f = ops[i].fecha || '';
+    if (f.slice(0, 4) !== String(year)) continue;
+    var mi = parseInt(f.slice(5, 7), 10);
+    if (mi >= 1 && mi <= mesInclusive) total += div_valorOp(ops[i]);
+  }
+  return total;
+}
+// 12 posiciones (Ene..Dic), cada una con el total cobrado ESE mes concreto —
+// para sumar al gráfico "Acumulado mensual" de Inicio.
+function div_totalPorMes(year) {
+  var meses = [0,0,0,0,0,0,0,0,0,0,0,0];
+  var ops = fin_load('fin:acciones');
+  for (var i = 0; i < ops.length; i++) {
+    var f = ops[i].fecha || '';
+    if (f.slice(0, 4) !== String(year)) continue;
+    var mi = parseInt(f.slice(5, 7), 10) - 1;
+    if (mi < 0 || mi > 11) continue;
+    meses[mi] += div_valorOp(ops[i]);
+  }
+  return meses;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // PUNTO 70 (30/08/2026): MÓDULO ANÁLISIS DE DIVIDENDOS
 // Vive dentro de Finanzas (respeta la empresa activa, igual que Acciones y
@@ -16497,8 +16595,20 @@ function dash_render() {
   var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   var tituloAcum = document.getElementById('dash-acum-titulo');
   if (tituloAcum && ultimoMes > 0) tituloAcum.textContent = 'HASTA ' + meses[ultimoMes-1].toUpperCase() + ' ' + year + ' · VS ' + (year-1);
+  // PUNTO 135 (07/09/2026): dividendos de la cartera de acciones — hasta
+  // ahora no entraban en ninguna cifra de Inicio. divHastaMes usa el mismo
+  // corte de mes que el resto de KPIs de esta tarjeta (ultimoMes, el mismo
+  // "hasta [mes]" de arriba), para que sumen de forma coherente con el resto
+  // del acumulado; divAnterior* son los mismos cortes pero del año anterior,
+  // para que las comparaciones (%) sigan siendo un "manzanas con manzanas".
+  // No se toca fac_resumenAnual (kpiDash) — esa función es la base
+  // compartida con Facturación, que es solo alquiler; los dividendos se
+  // suman aquí, solo para Inicio, por encima de ese dato.
+  var divHastaMes = (typeof div_totalAnioHastaMes === 'function' && ultimoMes > 0) ? div_totalAnioHastaMes(year, ultimoMes) : 0;
+  var divAnteriorMismoPeriodo = (typeof div_totalAnioHastaMes === 'function' && ultimoMes > 0) ? div_totalAnioHastaMes(year - 1, ultimoMes) : 0;
+  var divAnteriorCompleto = (typeof div_totalAnio === 'function') ? div_totalAnio(year - 1) : 0;
   var elAcum = document.getElementById('dash-acum-euros');
-  if (elAcum) elAcum.textContent = fmtE ? fmtE(kpiDash.acumActualTotal) : kpiDash.acumActualTotal.toFixed(2) + ' €';
+  if (elAcum) elAcum.textContent = fmtE ? fmtE(kpiDash.acumActualTotal + divHastaMes) : (kpiDash.acumActualTotal + divHastaMes).toFixed(2) + ' €';
   // BLINDAJE DE DATOS (Bloque 7b): línea nueva, arriba — comparación con el
   // MISMO periodo del año anterior (p.ej. hasta agosto vs hasta agosto),
   // para ver cómo va el año realmente. La línea de abajo se mantiene —
@@ -16506,22 +16616,22 @@ function dash_render() {
   // igualarlo — pero antes las dos decían "vs año anterior" sin distinguir
   // cuál era cuál.
   var elPctPeriodo = document.getElementById('dash-acum-pct-periodo');
-  if (elPctPeriodo && kpiDash.acumAnteriorMismoPeriodoTotal > 0) {
-    var diffPeriodo = kpiDash.acumActualTotal - kpiDash.acumAnteriorMismoPeriodoTotal;
-    var pctPeriodo = (diffPeriodo / kpiDash.acumAnteriorMismoPeriodoTotal * 100);
+  if (elPctPeriodo && (kpiDash.acumAnteriorMismoPeriodoTotal + divAnteriorMismoPeriodo) > 0) {
+    var diffPeriodo = (kpiDash.acumActualTotal + divHastaMes) - (kpiDash.acumAnteriorMismoPeriodoTotal + divAnteriorMismoPeriodo);
+    var pctPeriodo = (diffPeriodo / (kpiDash.acumAnteriorMismoPeriodoTotal + divAnteriorMismoPeriodo) * 100);
     var signoPeriodo = pctPeriodo >= 0 ? '+' : '';
     elPctPeriodo.textContent = signoPeriodo + pctPeriodo.toFixed(1) + '% vs mismo periodo ' + (year-1);
     elPctPeriodo.className = 'kpi-s ' + (pctPeriodo>=0?'up':'dn');
   }
   var elPct = document.getElementById('dash-acum-pct');
-  if (elPct && kpiDash.totalAnteriorCompletoTotal > 0) {
-    var pct = ((kpiDash.acumActualTotal - kpiDash.totalAnteriorCompletoTotal) / kpiDash.totalAnteriorCompletoTotal * 100);
+  if (elPct && (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) > 0) {
+    var pct = (((kpiDash.acumActualTotal + divHastaMes) - (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto)) / (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) * 100);
     elPct.textContent = (pct>=0?'+':'') + pct.toFixed(1) + '% vs total ' + (year-1);
   }
 
   // ── Reparto ────────────────────────────────────────────────────────
   var rentaRustico = kpiDash.rentaRusticoAnual;
-  var totalReparto = acumActual + rentaRustico;
+  var totalReparto = acumActual + rentaRustico + divHastaMes;
   var pctUrb = totalReparto > 0 ? Math.round(acumActual / totalReparto * 100) : 100;
   var pctRus = totalReparto > 0 ? Math.round(rentaRustico / totalReparto * 100) : 0;
 
@@ -16559,8 +16669,13 @@ function dash_render() {
     var alqAnioP = _alqP.total, alqMesP = _alqP.totalMesActual;
     var otrosAnioP = (typeof ingotros_totalAnio === 'function') ? ingotros_totalAnio(year) : 0;
     var otrosMesP = (typeof ingotros_totalMes === 'function') ? ingotros_totalMes(mesActualYm) : 0;
-    var ingAnioP = alqAnioP + otrosAnioP;
-    var ingMesP = alqMesP + otrosMesP;
+    // PUNTO 130 (07/09/2026): "Ingresos anuales" solo sumaba alquiler + Otros
+    // ingresos — no contaba el sueldo (bloque Trabajo de Renta Patricio).
+    // Se añade aquí para que el total sea de verdad todo lo que ingresas.
+    var mesesNombreP = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var _nomP = (typeof renta_totalNominaAnio === 'function') ? renta_totalNominaAnio(year, mesesNombreP[new Date().getMonth()]) : { total: 0, totalMesActual: 0 };
+    var ingAnioP = alqAnioP + otrosAnioP + _nomP.total;
+    var ingMesP = alqMesP + otrosMesP + _nomP.totalMesActual;
     var ingDiaP = ingAnioP / 365;
     // PUNTO 122 (06/09/2026): etiquetas acortadas ("Ing. Año/Mes/Día") y sin
     // símbolo € (fin_fmtSinSimbolo — mantiene los decimales, solo quita el
@@ -16583,14 +16698,25 @@ function dash_render() {
     if (dRusVal) { dRusVal.textContent = _esPatrimer ? fmtE(rentaRustico) : '—'; dRusVal.style.color = _rusReal ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
     var dRusPct = document.getElementById('dash-rustico-pct');
     if (dRusPct) { dRusPct.textContent = _esPatrimer ? ((_rusReal ? '' : '~') + pctRus + '% del total') : '—'; }
+    // PUNTO 135 (07/09/2026): dividendos como 3ª categoría del Reparto —
+    // mismo criterio visual que Rústico (solo cifra real en Patrimer, "—" en
+    // Industrias, aunque ahí ya sale 0 igualmente porque fin_load no
+    // encuentra cartera propia).
+    var dDivVal = document.getElementById('dash-dividendos-val');
+    if (dDivVal) { dDivVal.textContent = _esPatrimer ? fmtE(divHastaMes) : '—'; dDivVal.style.color = (_esPatrimer && divHastaMes > 0) ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
   }
 
   // ── Previsión — mismo dato que Facturación (fac_resumenAnual) ────────
-  var prevision = kpiDash.prevision;
+  // PUNTO 135 (07/09/2026): se le suma lo ya cobrado de dividendos este año
+  // (divHastaMes) — sin "proyectar" dividendos futuros (no siguen un ritmo
+  // mensual regular como el alquiler, así que inventar un extra por los
+  // meses que faltan daría una cifra poco fiable); es la misma variable
+  // "divHastaMes" ya calculada arriba para el resto de tarjetas.
+  var prevision = kpiDash.prevision + divHastaMes;
   var elPrev = document.getElementById('dash-prevision'); if (elPrev) elPrev.textContent = fmtE(prevision);
   var elPrevS = document.getElementById('dash-prevision-s');
-  if (elPrevS && kpiDash.totalAnteriorCompletoTotal > 0) {
-    var pctPrev = ((prevision - kpiDash.totalAnteriorCompletoTotal) / kpiDash.totalAnteriorCompletoTotal * 100);
+  if (elPrevS && (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) > 0) {
+    var pctPrev = ((prevision - (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto)) / (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) * 100);
     elPrevS.textContent = (pctPrev>=0?'+':'') + pctPrev.toFixed(1) + '% vs ' + (year-1);
     elPrevS.className = 'kpi-s ' + (pctPrev>=0?'up':'dn');
   }
@@ -17159,6 +17285,13 @@ function dash_buildChart(year, facturas, _reintentado) {
   facturas = facturas || [];
   var meses = ['E','F','M','A','M','J','J','A','S','O','N','D'];
   var hist = fac_loadHistorico ? fac_loadHistorico() : [];
+  var _empChart = localStorage.getItem('patrimer:empresa') || 'patrimer';
+  var _esPatrimerChart = (_empChart === 'patrimer');
+  // PUNTO 135 (07/09/2026): dividendos de la cartera de acciones, mes a mes
+  // — hasta ahora esta gráfica no los sumaba. Calculado una sola vez fuera
+  // del bucle (no en cada uno de los 12 meses) por eficiencia.
+  var divPorMesCur = (_esPatrimerChart && typeof div_totalPorMes === 'function') ? div_totalPorMes(year) : [0,0,0,0,0,0,0,0,0,0,0,0];
+  var divPorMesPrv = (_esPatrimerChart && typeof div_totalPorMes === 'function') ? div_totalPorMes(year - 1) : [0,0,0,0,0,0,0,0,0,0,0,0];
   var d = meses.map(function(_,i) {
     var ym = year + '-' + String(i+1).padStart(2,'0');
     var ymPrev = (year-1) + '-' + String(i+1).padStart(2,'0');
@@ -17166,7 +17299,8 @@ function dash_buildChart(year, facturas, _reintentado) {
     if (cur === 0) { var hc = hist.find(function(h){return h.mes===ym;}); if (hc) cur = hc.importe; }
     var prv = facturas.filter(function(f){return f.mes===ymPrev && !f.manual;}).reduce(function(s,f){return s+(f.total||0);},0);
     if (prv === 0) { var hp = hist.find(function(h){return h.mes===ymPrev;}); if (hp) prv = hp.importe; }
-    var _empChart = localStorage.getItem('patrimer:empresa') || 'patrimer'; var _esPatrimerChart = (_empChart === 'patrimer'); if (_esPatrimerChart) { var _rusReal=(function(){var h=rus_loadHistorico();return h[String(year)]?true:false;})(); if(_rusReal) cur += rus_totalMes(year, i+1); prv += rus_totalMes(year-1, i+1); }
+    if (_esPatrimerChart) { var _rusReal=(function(){var h=rus_loadHistorico();return h[String(year)]?true:false;})(); if(_rusReal) cur += rus_totalMes(year, i+1); prv += rus_totalMes(year-1, i+1); }
+    cur += divPorMesCur[i]; prv += divPorMesPrv[i];
     return {cur:cur,prv:prv};
   });
   var acumCur=0, acumPrv=0;
@@ -18323,11 +18457,32 @@ function renta_toggleBloque(id) {
 }
 
 // ── Nóminas ──────────────────────────────────────────────────────────────
+// PUNTO 129 (07/09/2026): índice de la nómina que se está editando (-1 = alta
+// nueva). Lo usa renta_abrirModalNomina/renta_guardarNomina para saber si hay
+// que actualizar una nómina ya guardada en vez de crear otra.
+var renta_nomEditIdx = -1;
 function renta_getNominas() {
   return JSON.parse(localStorage.getItem('renta:nominas:' + renta_anio) || '[]');
 }
 function renta_saveNominas(arr) {
   localStorage.setItem('renta:nominas:' + renta_anio, JSON.stringify(arr));
+}
+// PUNTO 130 (07/09/2026): total de nóminas (bruto) de un año concreto, y de
+// un mes concreto dentro de ese año — para que "Ingresos anuales" de Inicio
+// (punto 101/122) pueda sumar el sueldo, que hasta ahora se quedaba fuera
+// (Inicio solo sumaba alquiler + Otros ingresos). Lee directo de
+// localStorage con el año que le pasen, sin depender de renta_anio (esa
+// variable es la del año que tengas abierto en la propia pantalla de Renta
+// Patricio, que puede no coincidir con el año actual).
+function renta_totalNominaAnio(year, mesNombreActual) {
+  var arr = JSON.parse(localStorage.getItem('renta:nominas:' + year) || '[]');
+  var total = 0, totalMesActual = 0;
+  for (var i = 0; i < arr.length; i++) {
+    var bruto = parseFloat(arr[i].bruto) || 0;
+    total += bruto;
+    if (mesNombreActual && arr[i].mes === mesNombreActual) totalMesActual += bruto;
+  }
+  return { total: total, totalMesActual: totalMesActual };
 }
 
 function renta_renderNominas() {
@@ -18349,8 +18504,13 @@ function renta_renderNominas() {
     html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + n.mes + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">Bruto: ' + fmtGlobal(n.bruto) + '€ · IRPF: ' + fmtGlobal(n.retencion) + '€ · Autónomo: ' + fmtGlobal(n.ss) + '€</div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">'
+      // PUNTO 129 (07/09/2026): antes solo se podía borrar y volver a crear —
+      // ahora hay un lápiz para editar la nómina ya guardada (p.ej. para
+      // rellenar la cuota de autónomo de un mes que se guardó sin ella).
+      + '<button onclick="renta_abrirModalNomina(' + i + ')" style="background:none;border:none;color:#5b8dee;font-size:15px;cursor:pointer;">✏️</button>'
       + '<button onclick="renta_borrarNomina(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
-      + '</div>';
+      + '</div></div>';
   }
   cont.innerHTML = html;
   document.getElementById('renta-total-trabajo').textContent = fmtGlobal(totalBruto) + ' €';
@@ -18366,7 +18526,11 @@ function renta_borrarNomina(idx) {
 }
 
 // Modal nómina
-function renta_abrirModalNomina() {
+// PUNTO 129 (07/09/2026): admite un índice opcional — sin él, alta nueva
+// (como siempre); con él, abre la nómina ya guardada en ese índice para
+// editarla (renta_nomEditIdx queda marcado y renta_guardarNomina actualiza
+// en vez de crear otra).
+function renta_abrirModalNomina(idx) {
   document.getElementById('renta-modal-nomina').style.display = 'flex';
   var meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre','Extra junio','Extra diciembre'];
   var sel = document.getElementById('renta-nom-mes');
@@ -18377,9 +18541,28 @@ function renta_abrirModalNomina() {
     }
     sel.value = meses[new Date().getMonth()];
   }
+  var titEl = document.getElementById('renta-modal-nomina-titulo');
+  if (idx !== undefined && idx !== null && idx >= 0) {
+    renta_nomEditIdx = idx;
+    var n = renta_getNominas()[idx];
+    if (n) {
+      sel.value = n.mes;
+      document.getElementById('renta-nom-bruto').value = fmtGlobal(n.bruto);
+      document.getElementById('renta-nom-retencion').value = fmtGlobal(n.retencion);
+      document.getElementById('renta-nom-ss').value = fmtGlobal(n.ss);
+    }
+    if (titEl) titEl.textContent = '💼 EDITAR NÓMINA';
+  } else {
+    renta_nomEditIdx = -1;
+    document.getElementById('renta-nom-bruto').value = '';
+    document.getElementById('renta-nom-retencion').value = '';
+    document.getElementById('renta-nom-ss').value = '';
+    if (titEl) titEl.textContent = '💼 AÑADIR NÓMINA';
+  }
 }
 function renta_cerrarModalNomina() {
   document.getElementById('renta-modal-nomina').style.display = 'none';
+  renta_nomEditIdx = -1;
 }
 function renta_guardarNomina() {
   if (bloqueaSiViewer('Guardar una nómina')) return;
@@ -18389,7 +18572,12 @@ function renta_guardarNomina() {
   var ss = parseFmtGlobal(document.getElementById('renta-nom-ss').value);
   if (!mes || !bruto) { alert('Introduce al menos el mes y el salario bruto.'); return; }
   var arr = renta_getNominas();
-  arr.push({ mes: mes, bruto: bruto, retencion: retencion, ss: ss });
+  if (renta_nomEditIdx >= 0 && renta_nomEditIdx < arr.length) {
+    arr[renta_nomEditIdx] = { mes: mes, bruto: bruto, retencion: retencion, ss: ss };
+  } else {
+    arr.push({ mes: mes, bruto: bruto, retencion: retencion, ss: ss });
+  }
+  renta_nomEditIdx = -1;
   renta_saveNominas(arr);
   renta_cerrarModalNomina();
   document.getElementById('renta-nom-bruto').value = '';
@@ -18849,6 +19037,23 @@ function ingotros_onConceptoChange() {
   wrapDeclara.style.display = esOtros ? 'flex' : 'none';
   if (!esOtros) document.getElementById('ingotros-declara').checked = false;
 }
+// PUNTO 131 (07/09/2026): en el iPhone, al escribir el importe el teclado
+// numérico tapaba el propio modal — position:fixed no se entera de que el
+// teclado ha reducido la parte visible de la pantalla, así que el modal se
+// quedaba fuera de esa zona visible. Con la API visualViewport (la que
+// conoce el tamaño real de pantalla visible, teclado descontado), el modal
+// se reajusta en alto y posición cada vez que el teclado aparece/desaparece.
+function ingotros_ajustarModalTeclado() {
+  var modal = document.getElementById('renta-modal-ingreso');
+  if (!modal || modal.style.display !== 'flex' || !window.visualViewport) return;
+  var vv = window.visualViewport;
+  modal.style.height = vv.height + 'px';
+  modal.style.top = vv.offsetTop + 'px';
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', ingotros_ajustarModalTeclado);
+  window.visualViewport.addEventListener('scroll', ingotros_ajustarModalTeclado);
+}
 function ingotros_abrirModal() {
   document.getElementById('ingotros-id-hidden').value = '';
   document.getElementById('ingotros-concepto-select').value = 'Lala';
@@ -18860,6 +19065,7 @@ function ingotros_abrirModal() {
   document.getElementById('ingotros-declara').checked = false;
   ingotros_onConceptoChange();
   document.getElementById('renta-modal-ingreso').style.display = 'flex';
+  ingotros_ajustarModalTeclado();
 }
 function ingotros_editar(id) {
   var arr = ingotros_load();
@@ -18879,9 +19085,13 @@ function ingotros_editar(id) {
   document.getElementById('ingotros-declara').checked = !!item.declaraIrpf;
   ingotros_onConceptoChange();
   document.getElementById('renta-modal-ingreso').style.display = 'flex';
+  ingotros_ajustarModalTeclado();
 }
 function ingotros_cerrarModal() {
-  document.getElementById('renta-modal-ingreso').style.display = 'none';
+  var modal = document.getElementById('renta-modal-ingreso');
+  modal.style.display = 'none';
+  modal.style.height = '';
+  modal.style.top = '';
 }
 function ingotros_guardar() {
   if (bloqueaSiViewer('Guardar un ingreso')) return;
@@ -18927,14 +19137,38 @@ function ingotros_borrar(id) {
     } }
   ]);
 }
+// PUNTO 132 (07/09/2026): subtotal acumulado de cada uno de los 3 conceptos
+// (Lala / Tortugas / Otros — punto 111). "Otros" agrupa todo lo que no sea
+// exactamente "Lala" o "Tortugas" (mismo criterio que ya usa ingotros_editar
+// para decidir si un apunte es de texto libre "Otros" o uno de los 2 fijos).
+function ingotros_subtotalesPorConcepto(arr) {
+  var t = { Lala: 0, Tortugas: 0, Otros: 0 };
+  for (var i = 0; i < arr.length; i++) {
+    var importe = parseFloat(arr[i].importe) || 0;
+    var c = arr[i].concepto === 'Lala' || arr[i].concepto === 'Tortugas' ? arr[i].concepto : 'Otros';
+    t[c] += importe;
+  }
+  return t;
+}
 function ingotros_render() {
   var cont = document.getElementById('renta-lista-ingresos-otros');
   if (!cont) return;
   var arr = ingotros_load().slice().sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  var subEl = document.getElementById('ingotros-subtotales');
   if (arr.length === 0) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin ingresos añadidos.</div>';
     document.getElementById('renta-total-ingresos-otros').textContent = '— €';
+    if (subEl) subEl.innerHTML = '';
     return;
+  }
+  if (subEl) {
+    var sub = ingotros_subtotalesPorConcepto(arr);
+    var chip = function (label, val) {
+      return '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 6px;text-align:center;">'
+        + '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">' + label + '</div>'
+        + '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);">' + fmtGlobal(val) + ' €</div></div>';
+    };
+    subEl.innerHTML = chip('Lala', sub.Lala) + chip('Tortugas', sub.Tortugas) + chip('Otros', sub.Otros);
   }
   var total = 0;
   var html = '';
