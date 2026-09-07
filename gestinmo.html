@@ -983,12 +983,14 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .csitem-v{font-size:16px;font-weight:700;}
 .ttable{background:var(--navy-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;}
 .thead{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr .5fr;padding:10px 12px;border-bottom:1px solid var(--border);}
-.tth{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);}
+.tth{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);}
 .tth:not(:first-child){text-align:right;}
-.trow{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr .5fr;padding:10px 12px;border-bottom:1px solid rgba(45,61,110,.4);align-items:center;transition:background .2s;}
+.trow{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr .5fr;padding:13px 12px;border-bottom:1px solid rgba(45,61,110,.4);align-items:center;transition:background .2s;}
 .trow:last-child{border-bottom:none;}
 .trow.editing{background:rgba(91,141,238,.07);border-left:3px solid var(--blue);}
-.td{font-size:12px;color:var(--text);}
+/* PUNTO 139 (07/09/2026): números de "Movimientos" (Cobros) casi ilegibles
+   en iPhone — de 12px a 16px, con más aire vertical en la fila (10px→13px). */
+.td{font-size:16px;color:var(--text);}
 .td:not(:first-child){text-align:right;font-weight:600;}
 .td.fra{color:var(--blue);}.td.cob{color:var(--green);}
 .td.sp{color:var(--green);}.td.sn{color:var(--red);}.td.sz{color:var(--silver-dim);}
@@ -5465,7 +5467,7 @@ con editar/borrar en cada línea. -->
 
 <!-- MODAL RENTA: NÓMINA -->
 <div id="renta-modal-nomina" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
-  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
+  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:100%;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div id="renta-modal-nomina-titulo" style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💼 AÑADIR NÓMINA</div>
     <div style="margin-bottom:12px;">
@@ -11538,6 +11540,13 @@ function ipc_renderBanners(){
       // Calcular qué renovación es
       const aniosTranscurridos=anio-ini.getFullYear();
       if(aniosTranscurridos<=0) return; // primer año, sin renovación
+      // PUNTO 140 (07/09/2026): antes este aviso solo miraba la fecha —
+      // aunque ya pulsaras "Actualizar IPC" (que sí queda registrado en
+      // c.ipcAplicado), el aviso seguía saliendo el resto del mes, porque
+      // nunca comprobaba si esa anualidad ya estaba resuelta. Ahora, si ya
+      // hay un ipcAplicado de este mismo año, se da por gestionada y no sale.
+      const yaAplicadoEsteAnio=(c.ipcAplicado||[]).some(a=>a&&a.mes&&a.mes.slice(0,4)===String(anio));
+      if(yaAplicadoEsteAnio) return;
       const numRenovacion=aniosTranscurridos;
       const sufijo=numRenovacion===1?'1ª':numRenovacion===2?'2ª':numRenovacion===3?'3ª':numRenovacion+'ª';
       const nombre=c.inqNombre||c.dir||'Contrato';
@@ -17055,6 +17064,10 @@ function pend_ipcPendientes() {
       if (ini.getMonth() + 1 === mesN) {
         var aniosTranscurridos = anio - ini.getFullYear();
         if (aniosTranscurridos <= 0) return;
+        // PUNTO 140 (07/09/2026): mismo blindaje que en ipc_renderBanners —
+        // si ya se aplicó el IPC este año, se da por gestionada la anualidad.
+        var yaAplicadoEsteAnio = (c.ipcAplicado || []).some(function(a) { return a && a.mes && a.mes.slice(0,4) === String(anio); });
+        if (yaAplicadoEsteAnio) return;
         res.push({ nombre: c.inqNombre || c.dir || 'Contrato', ref: c.ref || '', id: c.id });
       }
     });
@@ -18552,8 +18565,23 @@ function renta_borrarNomina(idx) {
 // (como siempre); con él, abre la nómina ya guardada en ese índice para
 // editarla (renta_nomEditIdx queda marcado y renta_guardarNomina actualiza
 // en vez de crear otra).
+// PUNTO 139 (07/09/2026): mismo fallo que ya se arregló en "Otros ingresos"
+// (punto 132) — el teclado numérico del iPhone tapaba este modal al escribir
+// un importe. Mismo arreglo con visualViewport.
+function renta_ajustarModalNominaTeclado() {
+  var modal = document.getElementById('renta-modal-nomina');
+  if (!modal || modal.style.display !== 'flex' || !window.visualViewport) return;
+  var vv = window.visualViewport;
+  modal.style.height = vv.height + 'px';
+  modal.style.top = vv.offsetTop + 'px';
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', renta_ajustarModalNominaTeclado);
+  window.visualViewport.addEventListener('scroll', renta_ajustarModalNominaTeclado);
+}
 function renta_abrirModalNomina(idx) {
   document.getElementById('renta-modal-nomina').style.display = 'flex';
+  renta_ajustarModalNominaTeclado();
   var meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre','Extra junio','Extra diciembre'];
   var sel = document.getElementById('renta-nom-mes');
   if (sel && sel.options.length === 0) {
@@ -18583,7 +18611,10 @@ function renta_abrirModalNomina(idx) {
   }
 }
 function renta_cerrarModalNomina() {
-  document.getElementById('renta-modal-nomina').style.display = 'none';
+  var modal = document.getElementById('renta-modal-nomina');
+  modal.style.display = 'none';
+  modal.style.height = '';
+  modal.style.top = '';
   renta_nomEditIdx = -1;
 }
 function renta_guardarNomina() {
