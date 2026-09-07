@@ -2589,27 +2589,43 @@ signInAnonymously(auth).then(() => {
 // descarte disciplinado sin datos de precio, no debe contar en las
 // estadísticas). Decidido con Patry (punto 87): sin saldo en euros — el
 // capital inicial no vive en la nube, solo en el móvil de TradingOkar.
+async function _tradingConsultarModo(modo) {
+  const q = query(collection(db, 'trading_operaciones'), where('modo', '==', modo));
+  const snap = await getDocs(q);
+  let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, ultimaFecha = '';
+  snap.forEach((docSnap) => {
+    const d = docSnap.data();
+    if (d._test === true) return;
+    if (d.tipo !== 'operacion') return;
+    numOperaciones++;
+    if (typeof d.resultadoEUR === 'number' && d.resultadoEUR > 0) ganadoras++;
+    if (typeof d.resultadoR === 'number') { rAcumulada += d.resultadoR; tieneR++; }
+    const fh = (d.fecha || '') + ' ' + (d.hora || '');
+    if (fh > ultimaFecha) ultimaFecha = fh;
+  });
+  return { numOperaciones, ganadoras, rAcumulada, tieneR, ultimaFecha };
+}
 window.cargarTradingOkarStats = async function() {
   try {
-    const q = query(collection(db, 'trading_operaciones'), where('modo', '==', 'real'));
-    const snap = await getDocs(q);
-    let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, ultimaFecha = '';
-    snap.forEach((docSnap) => {
-      const d = docSnap.data();
-      if (d._test === true) return;
-      if (d.tipo !== 'operacion') return;
-      numOperaciones++;
-      if (typeof d.resultadoEUR === 'number' && d.resultadoEUR > 0) ganadoras++;
-      if (typeof d.resultadoR === 'number') { rAcumulada += d.resultadoR; tieneR++; }
-      const fh = (d.fecha || '') + ' ' + (d.hora || '');
-      if (fh > ultimaFecha) ultimaFecha = fh;
-    });
+    let stats = await _tradingConsultarModo('real');
+    // PUNTO 141 (07/09/2026): mientras no haya ninguna operación REAL
+    // registrada todavía (antes de que empieces a operar en real de
+    // verdad), se enseña la cuenta DEMO en su lugar, claramente etiquetada
+    // — así la tarjeta no se queda vacía mientras solo hay pruebas. En
+    // cuanto TradingOkar registre al menos 1 operación real, esta tarjeta
+    // cambia sola a mostrar la cuenta real, sin que haga falta tocar nada.
+    let esDemo = false;
+    if (!stats.numOperaciones) {
+      const demoStats = await _tradingConsultarModo('demo');
+      if (demoStats.numOperaciones) { stats = demoStats; esDemo = true; }
+    }
     return {
       ok: true,
-      numOperaciones,
-      winrate: numOperaciones ? (ganadoras / numOperaciones) * 100 : null,
-      rAcumulada, tieneR,
-      ultimaFecha: ultimaFecha.trim()
+      esDemo,
+      numOperaciones: stats.numOperaciones,
+      winrate: stats.numOperaciones ? (stats.ganadoras / stats.numOperaciones) * 100 : null,
+      rAcumulada: stats.rAcumulada, tieneR: stats.tieneR,
+      ultimaFecha: stats.ultimaFecha.trim()
     };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -4921,7 +4937,7 @@ Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
     <div style="font-size:12px;color:var(--silver-dim);margin-bottom:4px;" id="fin-asi-progreso"></div>
     <div style="font-size:16px;font-weight:600;color:var(--silver-bright);margin-bottom:14px;" id="fin-asi-pregunta"></div>
     <div style="font-size:12px;color:var(--silver-dim);margin-bottom:8px;" id="fin-asi-actual"></div>
-    <input class="minput" id="fin-asi-input" type="text" inputmode="decimal" placeholder="0,00" style="font-size:20px;text-align:right;padding:14px;" oninput="fin_asiFormatInput(this)">
+    <input class="minput" id="fin-asi-input" type="text" inputmode="decimal" placeholder="0,00" style="font-size:20px;text-align:right;padding:14px;" oninput="fin_asiFormatInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();fin_asiSiguiente();}">
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn2" onclick="fin_asiSaltar()" style="flex:1;">Saltar</button>
       <button class="btn1" onclick="fin_asiSiguiente()" style="flex:2;">Siguiente &#8250;</button>
@@ -10090,7 +10106,7 @@ function fac_dibujarGraficaAnual(aniosSel, todosAnios, totAnio) {
     var bx = cx - barW / 2;
     var by = PAD_T + gH - bh;
     svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="3" fill="' + col + '" opacity="0.85"/>';
-    var totalLabel = (totAnio[yr]/1000).toFixed(1) + 'k';
+    var totalLabel = (totAnio[yr]/1000).toFixed(1).replace('.', ',') + 'k';
     svg += '<text x="' + Math.round(cx) + '" y="' + (by - 5) + '" text-anchor="middle" font-size="9" font-weight="600" fill="rgba(255,255,255,0.85)">' + totalLabel + '</text>';
     svg += '<text x="' + Math.round(cx) + '" y="' + (H-4) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
   }
@@ -10597,7 +10613,7 @@ function fac_renderHistorico() {
     if (totales[yrAnterior] !== undefined && totales[yrAnterior] > 0) {
       var pct = ((totalAnio - totales[yrAnterior]) / totales[yrAnterior]) * 100;
       var color = pct >= 0 ? '#4caf82' : '#e57373';
-      varHtml = ' <span style="font-size:11px;color:' + color + ';">' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%</span>';
+      varHtml = ' <span style="font-size:11px;color:' + color + ';">' + (pct >= 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + '%</span>';
     }
     html += '<div style="margin-bottom:10px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;">';
     // Cabecera año — clickable para desplegar
@@ -10792,7 +10808,7 @@ function renderAnalisis(){
   if (val1) { val1.textContent = fmtE(kpi.acumActualTotal); val1.className = 'kpi-v g'; }
   if (pct1) {
     var signo = diffAcum >= 0 ? '+' : '';
-    pct1.textContent = signo + fmtE(diffAcum) + ' (' + signo + pctAcum.toFixed(1) + '%)';
+    pct1.textContent = signo + fmtE(diffAcum) + ' (' + signo + pctAcum.toFixed(1).replace('.', ',') + '%)';
     pct1.className = 'kpi-s ' + (diffAcum >= 0 ? 'up' : 'dn');
   }
 
@@ -10808,7 +10824,7 @@ function renderAnalisis(){
     val2.className = 'kpi-v ' + (resto <= 0 ? 'g' : 'go');
   }
   if (pct2) {
-    pct2.textContent = pctResto.toFixed(1) + '% ' + (resto >= 0 ? 'restante' : 'de exceso');
+    pct2.textContent = pctResto.toFixed(1).replace('.', ',') + '% ' + (resto >= 0 ? 'restante' : 'de exceso');
     pct2.className = 'kpi-s ' + (resto <= 0 ? 'up' : '');
   }
 
@@ -10820,7 +10836,7 @@ function renderAnalisis(){
   if (elPrev) elPrev.textContent = fmtE(prevision);
   if (elPrevS) {
     var signoPrev = pctPrev >= 0 ? '+' : '';
-    elPrevS.textContent = signoPrev + pctPrev.toFixed(1) + '% vs ' + (year-1);
+    elPrevS.textContent = signoPrev + pctPrev.toFixed(1).replace('.', ',') + '% vs ' + (year-1);
     elPrevS.className = 'kpi-s ' + (pctPrev >= 0 ? 'up' : 'dn');
   }
 
@@ -12709,10 +12725,10 @@ function calcEstudio(){
   const amort     = beneficio > 0 ? total / beneficio : 0;
 
   document.getElementById('r_bruta').textContent = alqAnual > 0 ? fmtE(alqAnual) : '—';
-  document.getElementById('r_neta').textContent  = total > 0 ? neta.toFixed(1)+'%'  : '—';
+  document.getElementById('r_neta').textContent  = total > 0 ? neta.toFixed(1).replace('.',',')+'%'  : '—';
   document.getElementById('r_anual').textContent = beneficio > 0 ? fmtE(beneficio) : '—';
   document.getElementById('r_amort').textContent = amort > 0 ? '~'+amort.toFixed(1).replace('.',',')+' años' : '—';
-  document.getElementById('sem1_pct').textContent = total > 0 ? neta.toFixed(1)+'%' : '—';
+  document.getElementById('sem1_pct').textContent = total > 0 ? neta.toFixed(1).replace('.',',')+'%' : '—';
   const lbl1 = document.getElementById('sem1_label');
   if(lbl1){ lbl1.textContent = total > 0 ? semLabel(neta) : ''; lbl1.className = 'sem-label ' + (total>0?semLabelCls(neta):''); }
 
@@ -12808,8 +12824,8 @@ function renderPaso3(){
   document.getElementById('nf-ingresos').textContent      = fmtE(alqAnual);
   document.getElementById('nf-gastos-anuales').textContent= '-' + fmtE(gastosAnu);
   document.getElementById('nf-beneficio').textContent     = fmtE(beneficio);
-  document.getElementById('nf-rb').textContent  = total > 0 ? bruta.toFixed(1)+'%' : '—';
-  document.getElementById('nf-rn').textContent  = total > 0 ? neta.toFixed(1)+'%'  : '—';
+  document.getElementById('nf-rb').textContent  = total > 0 ? bruta.toFixed(1).replace('.',',')+'%' : '—';
+  document.getElementById('nf-rn').textContent  = total > 0 ? neta.toFixed(1).replace('.',',')+'%'  : '—';
   document.getElementById('nf-amort').textContent = amort > 0 ? '~'+amort.toFixed(1).replace('.',',')+' años' : '—';
   document.getElementById('nf-sub-not').textContent  = fmtE(subNot);
   document.getElementById('nf-sub-obra').textContent = fmtE(subObra);
@@ -12819,7 +12835,7 @@ function renderPaso3(){
   // Semáforo final
   // sem-final: estilo fijo
   // sem-final mantiene su estilo fijo — el color lo da el label
-  document.getElementById('sf-pct').textContent = total > 0 ? neta.toFixed(1)+'%' : '—';
+  document.getElementById('sf-pct').textContent = total > 0 ? neta.toFixed(1).replace('.',',')+'%' : '—';
   const lblF = document.getElementById('semfinal_label');
   if(lblF){ lblF.textContent = total > 0 ? semLabel(neta) : ''; lblF.className = 'sem-label ' + (total>0?semLabelCls(neta):''); }
 
@@ -13013,7 +13029,7 @@ function cal_renderLista(){
       const clr = semColorClass(e.neta);
       row.innerHTML = `
         <div class="res-name">${e.nombre}</div>
-        <div class="res-pct ${clr}">${e.neta.toFixed(1)}%</div>
+        <div class="res-pct ${clr}">${e.neta.toFixed(1).replace('.',',')}%</div>
         <div class="res-pct" style="text-align:center;font-size:12px;color:var(--silver-dim)">${fmt(e.alquiler)}€/m</div>
         <div class="res-val">${e.beneficio > 0 ? fmtE(e.beneficio) : '—'}</div>
       `;
@@ -13046,7 +13062,7 @@ function cal_renderLista(){
             <div class="ecard-meta">Actualizado ${e.fecha}${contactoInfo}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <div class="sem ${semC}"><div class="p">${e.neta.toFixed(1)}%</div><div class="l">NETA</div></div>
+            <div class="sem ${semC}"><div class="p">${e.neta.toFixed(1).replace('.',',')}%</div><div class="l">NETA</div></div>
             <div class="ecard-del" onclick="eliminarEstudio(${idx},event)">✕</div>
           </div>
         </div>
@@ -14388,12 +14404,16 @@ function _pintarTrading(r) {
     return;
   }
   if (!r.numOperaciones) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin operaciones reales registradas todavía en TradingOkar.</div>';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin operaciones registradas todavía en TradingOkar.</div>';
     return;
   }
   var winTxt = r.winrate === null ? '—' : r.winrate.toFixed(1).replace('.', ',') + '%';
   var rTxt = (r.rAcumulada >= 0 ? '+' : '') + r.rAcumulada.toFixed(1).replace('.', ',') + 'R';
-  var html = '<div class="fin-patrimonio-rows compact">';
+  var html = '';
+  if (r.esDemo) {
+    html += '<div style="font-size:11px;color:#d9a441;background:rgba(217,164,65,0.12);border:1px dashed #d9a441;border-radius:8px;padding:6px 10px;margin-bottom:8px;text-align:center;">🧪 Cuenta demo — todavía no hay operaciones reales en TradingOkar</div>';
+  }
+  html += '<div class="fin-patrimonio-rows compact">';
   html += '<div class="row"><span>Operaciones</span><span>' + r.numOperaciones + '</span></div>';
   html += '<div class="row"><span>Winrate</span><span>' + winTxt + '</span></div>';
   html += '<div class="row"><span>R acumulada</span><span style="color:' + (r.rAcumulada >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + rTxt + '</span></div>';
@@ -16237,7 +16257,7 @@ function div_renderAcumulado(datos) {
     }
     svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.4"/>';
     var ultimoVal = serie.valores[n - 1];
-    var ultimaLbl = ultimoVal >= 1000 ? (ultimoVal / 1000).toFixed(1) + 'k' : Math.round(ultimoVal);
+    var ultimaLbl = ultimoVal >= 1000 ? (ultimoVal / 1000).toFixed(1).replace('.', ',') + 'k' : Math.round(ultimoVal);
     var ultX = PAD_L + gW;
     var ultY = PAD_T + gH - Math.round(gH * ultimoVal / maxVal);
     svg += '<circle cx="' + Math.round(ultX) + '" cy="' + Math.round(ultY) + '" r="2" fill="' + serie.color + '"/>';
@@ -16652,13 +16672,13 @@ function dash_render() {
     var diffPeriodo = (kpiDash.acumActualTotal + divHastaMes) - (kpiDash.acumAnteriorMismoPeriodoTotal + divAnteriorMismoPeriodo);
     var pctPeriodo = (diffPeriodo / (kpiDash.acumAnteriorMismoPeriodoTotal + divAnteriorMismoPeriodo) * 100);
     var signoPeriodo = pctPeriodo >= 0 ? '+' : '';
-    elPctPeriodo.textContent = signoPeriodo + pctPeriodo.toFixed(1) + '% vs mismo periodo ' + (year-1);
+    elPctPeriodo.textContent = signoPeriodo + pctPeriodo.toFixed(1).replace('.', ',') + '% vs mismo periodo ' + (year-1);
     elPctPeriodo.className = 'kpi-s ' + (pctPeriodo>=0?'up':'dn');
   }
   var elPct = document.getElementById('dash-acum-pct');
   if (elPct && (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) > 0) {
     var pct = (((kpiDash.acumActualTotal + divHastaMes) - (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto)) / (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) * 100);
-    elPct.textContent = (pct>=0?'+':'') + pct.toFixed(1) + '% vs total ' + (year-1);
+    elPct.textContent = (pct>=0?'+':'') + pct.toFixed(1).replace('.', ',') + '% vs total ' + (year-1);
   }
 
   // ── Reparto ────────────────────────────────────────────────────────
@@ -16749,7 +16769,7 @@ function dash_render() {
   var elPrevS = document.getElementById('dash-prevision-s');
   if (elPrevS && (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) > 0) {
     var pctPrev = ((prevision - (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto)) / (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) * 100);
-    elPrevS.textContent = (pctPrev>=0?'+':'') + pctPrev.toFixed(1) + '% vs ' + (year-1);
+    elPrevS.textContent = (pctPrev>=0?'+':'') + pctPrev.toFixed(1).replace('.', ',') + '% vs ' + (year-1);
     elPrevS.className = 'kpi-s ' + (pctPrev>=0?'up':'dn');
   }
 
