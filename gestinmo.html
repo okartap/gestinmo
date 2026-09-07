@@ -5802,6 +5802,19 @@ function parseFmtGlobal(s){
   if (s === undefined || s === null || s === '') return 0;
   return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
 }
+// PUNTO 138 (07/09/2026): parseFmtGlobal/parseFmt asumen SIEMPRE un texto
+// con formato español (punto de miles, coma decimal) — si se les pasa un
+// número real de JS con decimales (ej: 455.83, guardado así tras aplicar un
+// IPC) lo destrozan: "455.83" pierde el punto (que interpretan como de
+// miles) y se convierte en 45583. La renta de un contrato puede llegar
+// como texto español (al crearlo) o como número limpio (tras un IPC) —
+// esta función es la única segura para los dos casos: un número, se
+// devuelve tal cual; un texto, se interpreta como español.
+function parseRentaMixta(v){
+  if (typeof v === 'number') return v;
+  if (v === undefined || v === null || v === '') return 0;
+  return parseFloat(String(v).replace(/\./g,'').replace(',','.')) || 0;
+}
 function fmtGlobal(n){
   const v = parseFloat(n) || 0;
   if (v === 0) return '0';
@@ -6312,10 +6325,10 @@ function inm_rentaActiva(inm) {
     if (inm.ref) {
       var contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
       var activo = contratos.find(function(c) { return c.ref === inm.ref && c.estado === 'activo'; });
-      if (activo && activo.renta) return parseFloat(activo.renta) || 0;
+      if (activo && activo.renta) return parseRentaMixta(activo.renta);
     }
   } catch (e) {}
-  return parseFloat(inm.renta) || 0;
+  return parseRentaMixta(inm.renta);
 }
 
 // ─── RENTABILIDAD ──────────────────────────────────────────────────────────
@@ -7156,7 +7169,7 @@ function inm_renderTabContratos(inm) {
   cont.innerHTML = clasificados.map(c => {
     const fechaInicio = c.inicio ? new Date(c.inicio).toLocaleDateString('es-ES', {day:'2-digit', month:'short', year:'numeric'}) : '—';
     const fechaFin    = c.fin    ? new Date(c.fin).toLocaleDateString('es-ES', {day:'2-digit', month:'short', year:'numeric'}) : '—';
-    const renta       = c.renta  ? fmt(parseFloat(c.renta)) + '€' : '—';
+    const renta       = c.renta  ? fmt(parseRentaMixta(c.renta)) + '€' : '—';
     const esVigente    = c._estado === 'activo';
     const claseExpired = esVigente ? '' : ' expired';
     const diasClase = c._estado === 'proxVencer' ? ' warn' : '';
@@ -7883,8 +7896,8 @@ function renderDetalleContrato(c) {
   const elTipo = document.getElementById('det-tipo-label'); if (elTipo) elTipo.textContent = tipoLabelMap[c.tipo] || 'Contrato';
   const elNombre = document.getElementById('det-nombre'); if (elNombre) elNombre.textContent = c.inqNombre || '—';
   const elRefDir = document.getElementById('det-refdir'); if (elRefDir) elRefDir.textContent = [c.ref, c.dir].filter(Boolean).join(' · ') || '—';
-  const elRenta = document.getElementById('det-renta'); if (elRenta) elRenta.textContent = c.renta ? fmtE(parseFloat(c.renta)) + unidad : '—';
-  const elFianza = document.getElementById('det-fianza'); if (elFianza) elFianza.textContent = c.fianza ? fmtE(parseFloat(c.fianza)) : '—';
+  const elRenta = document.getElementById('det-renta'); if (elRenta) elRenta.textContent = c.renta ? fmtE(parseRentaMixta(c.renta)) + unidad : '—';
+  const elFianza = document.getElementById('det-fianza'); if (elFianza) elFianza.textContent = c.fianza ? fmtE(parseRentaMixta(c.fianza)) : '—';
   const elInicio = document.getElementById('det-inicio'); if (elInicio) elInicio.textContent = fmtDate(c.inicio);
   const elFin = document.getElementById('det-fin'); if (elFin) elFin.textContent = fmtDate(c.fin);
 
@@ -8088,8 +8101,12 @@ function det_iniciarRescision(c) {
 
     // Condiciones económicas y fechas — las del contrato original, tal cual
     // (la liquidación de fianza se calcula a partir de esta misma fianza)
-    const fRenta = document.getElementById('f-con-renta'); if (fRenta) { fRenta.value = c.renta || ''; if (typeof fmtInputEl === 'function') fmtInputEl(fRenta); }
-    const fFianza = document.getElementById('f-fianza'); if (fFianza) { fFianza.value = c.fianza || ''; if (typeof fmtInputEl === 'function') fmtInputEl(fFianza); }
+    // PUNTO 138 (07/09/2026): c.renta/c.fianza pueden venir como número
+    // limpio (455.83) o como texto español ("455,83") según cómo se
+    // guardaran — se pasa por parseRentaMixta antes de mostrarlo, para no
+    // reformatear mal un número que ya venía correcto (ej: 455.83 → 45583).
+    const fRenta = document.getElementById('f-con-renta'); if (fRenta) { fRenta.value = c.renta ? fmt(parseRentaMixta(c.renta)) : ''; }
+    const fFianza = document.getElementById('f-fianza'); if (fFianza) { fFianza.value = c.fianza ? fmt(parseRentaMixta(c.fianza)) : ''; }
     const fFirma = document.getElementById('f-firma'); if (fFirma) fFirma.value = new Date().toISOString().slice(0,10);
     const fInicio = document.getElementById('f-inicio'); if (fInicio) fInicio.value = c.inicio || '';
     const fFin = document.getElementById('f-fin'); if (fFin) fFin.value = c.fin || '';
@@ -9632,8 +9649,14 @@ async function generarPDF() {
         inqGenero: datos.inqGenero,
         inqRepNombre: datos.inqRepNombre,
         inqRepDNI: datos.inqRepDNI,
-        renta: datos.renta,
-        fianza: datos.fianza,
+        // PUNTO 138 (07/09/2026): antes se guardaba tal cual el texto del
+        // formulario (ej: "455,83", con coma española) en vez del número.
+        // Cualquier sitio que luego lo leyera con parseFloat() (el estándar
+        // de JS, que no entiende la coma) se quedaba solo con "455" —
+        // perdiendo los céntimos en la pantalla de IPC, en la rentabilidad,
+        // en las tarjetas... Ahora se guarda ya como número limpio.
+        renta: parseFmtGlobal(datos.renta) || 0,
+        fianza: parseFmtGlobal(datos.fianza) || 0,
         duracion: datos.duracion,
         inicio: datos.inicio,
         fin: datos.fin,
@@ -11518,7 +11541,7 @@ function ipc_renderBanners(){
       const numRenovacion=aniosTranscurridos;
       const sufijo=numRenovacion===1?'1ª':numRenovacion===2?'2ª':numRenovacion===3?'3ª':numRenovacion+'ª';
       const nombre=c.inqNombre||c.dir||'Contrato';
-      const renta=parseFloat(c.renta)||0;
+      const renta=parseRentaMixta(c.renta);
       const esRustica=c.tipo==='rustica';
       const rentaLabel=renta?(esRustica?' · Renta actual '+fmtE(renta)+'/año':' · Renta actual '+fmtE(renta)+'/mes'):'';
       html+=`<div class="ipc-banner">
@@ -11540,7 +11563,7 @@ function ipc_abrirModal(contratoId){
   const c=contratos.find(x=>x.id===contratoId);
   if(!c){ info('Contrato no encontrado.'); return; }
   _ipcContratoActual=c;
-  const renta=parseFloat(c.renta)||0;
+  const renta=parseRentaMixta(c.renta);
   const mes=mesActual();
   const [anioS,mesS]=mes.split('-');
   const anio=parseInt(anioS);
@@ -11567,7 +11590,7 @@ function ipc_abrirModal(contratoId){
 
 function ipc_calcular(){
   if(!_ipcContratoActual) return;
-  const renta=parseFloat(_ipcContratoActual.renta)||0;
+  const renta=parseRentaMixta(_ipcContratoActual.renta);
   const pct=parseFloat(document.getElementById('ipc-pct').value)||0;
   const nuevaRenta=Math.round((renta*(1+pct/100))*100)/100;
   const _esRusticaCalc = _ipcContratoActual && _ipcContratoActual.tipo === 'rustica';
@@ -11581,7 +11604,7 @@ function ipc_aplicar(){
   if(!_ipcContratoActual){ closeModalById('ipc-modal'); return; }
   const pct=parseFloat(document.getElementById('ipc-pct').value);
   if(!pct||isNaN(pct)){info('Introduce el % de IPC para continuar.');return;}
-  const rentaAnterior=parseFloat(_ipcContratoActual.renta)||0;
+  const rentaAnterior=parseRentaMixta(_ipcContratoActual.renta);
   const nuevaRenta=Math.round((rentaAnterior*(1+pct/100))*100)/100;
 
   // 1. Actualizar renta en contratos:lista
@@ -16390,7 +16413,7 @@ function rescis_calcNeto() {
 
 function generarContratoRescision(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma, addParty) {
   const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
-  const fianza = parseFloat(String(datos.fianza).replace(',','.')) || 0;
+  const fianza = parseRentaMixta(datos.fianza);
   const luz = parseFloat(String(datos.rescisLuz||0).replace(',','.')) || 0;
   const agua = parseFloat(String(datos.rescisAgua||0).replace(',','.')) || 0;
   const deuda = parseFloat(String(datos.rescisDeuda||0).replace(',','.')) || 0;
@@ -16459,7 +16482,7 @@ function _reunidosEstandar(arr, addParty) {
 function generarContratoRenovacion(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma, addParty) {
   const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
   const fStr = datos.fin ? formatFechaLarga(datos.fin) : '—';
-  const renta = parseFloat(String(datos.renta).replace(',', '.')) || 0;
+  const renta = parseRentaMixta(datos.renta);
 
   addTitle('REUNIDOS');
   _reunidosEstandar(arr, addParty);
@@ -17674,7 +17697,7 @@ function con_renderLista() {
     // móviles/navegadores (Safari iOS en particular), la renta podía salir sin
     // puntuación de miles ni con los 2 decimales fijos. Igualado a fmtE, como
     // el resto de importes de la app.
-    const renta       = c.renta  ? fmtE(parseFloat(c.renta)) : '—';
+    const renta       = c.renta  ? fmtE(parseRentaMixta(c.renta)) : '—';
     const estadoColor = c._estado === 'vencido' ? 'var(--accent-red)' : c._estado === 'proxVencer' ? 'var(--accent-gold)' : c._estado === 'rescindido' ? 'var(--silver-dim)' : c._estado === 'renovado' ? 'var(--accent-blue)' : 'var(--accent-green)';
     const estadoText  = c._estado === 'vencido' ? 'Vencido' : c._estado === 'proxVencer' ? 'Próx. vencer' : c._estado === 'rescindido' ? 'Rescindido' : c._estado === 'renovado' ? 'Renovado' : 'Vigente';
     const idSafe = c.id.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -17748,8 +17771,8 @@ function con_regenerarPDF(id) {
       }
 
       // 7) Rellenar condiciones económicas
-      if (document.getElementById('f-con-renta'))  document.getElementById('f-con-renta').value  = c.renta    || '';
-      if (document.getElementById('f-fianza'))     document.getElementById('f-fianza').value     = c.fianza ? fmtGlobal(parseFmtGlobal(c.fianza)) : '';
+      if (document.getElementById('f-con-renta'))  document.getElementById('f-con-renta').value  = c.renta  ? fmt(parseRentaMixta(c.renta)) : '';
+      if (document.getElementById('f-fianza'))     document.getElementById('f-fianza').value     = c.fianza ? fmt(parseRentaMixta(c.fianza)) : '';
       if (document.getElementById('f-duracion'))   document.getElementById('f-duracion').value   = c.duracion || '';
       if (document.getElementById('f-inicio'))     document.getElementById('f-inicio').value     = c.inicio   || '';
       if (document.getElementById('f-fin'))        document.getElementById('f-fin').value        = c.fin      || '';
@@ -18234,8 +18257,7 @@ function cli_renovacion() {
         if (fInicio && inmOk.inicio) fInicio.value = inmOk.inicio;
         if (fFin && inmOk.fin) fFin.value = inmOk.fin;
         if (fRenta && inmOk.renta) {
-          fRenta.value = inmOk.renta;
-          if (typeof fmtInputEl === 'function') fmtInputEl(fRenta);
+          fRenta.value = fmt(parseRentaMixta(inmOk.renta));
         }
       }
       if (typeof actualizarPreview === 'function') actualizarPreview();
