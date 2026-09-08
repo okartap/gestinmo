@@ -996,6 +996,13 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .td.sp{color:var(--green);}.td.sn{color:var(--red);}.td.sz{color:var(--silver-dim);}
 .edbtn{font-size:15px;cursor:pointer;text-align:center;color:var(--silver-dim);}
 .edbtn:active{transform:scale(.8);}
+/* PUNTO 155 (08/09/2026): cuenta KURRA — mismo estilo de tabla que el resto
+   de Cobros, pero con columna de Concepto visible (aquí sí hace falta verlo,
+   a diferencia de las cuentas de inquilinos). Reglas propias, no tocan
+   .thead/.trow del resto de la app. */
+#cob-view-kurra .thead{grid-template-columns:.8fr 1.7fr .9fr .9fr .4fr;}
+#cob-view-kurra .trow{grid-template-columns:.8fr 1.7fr .9fr .9fr .4fr;}
+#cob-view-kurra .td.concepto{font-size:12px;font-weight:600;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
 .einput{background:var(--navy-mid);border:1px solid var(--blue);border-radius:5px;padding:3px 5px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;color:var(--silver-bright);width:68px;text-align:right;outline:none;}
 .empty-state{text-align:center;padding:30px 20px;color:var(--silver-dim);font-size:13px;}
 /* NOTAS */
@@ -1985,7 +1992,17 @@ const DATA_KEYS = [
   // (ver _registrarActividad e interceptor de localStorage.setItem, más
   // abajo). Sincronizado como cualquier otro dato, para que Patricio lo vea
   // desde cualquier aparato.
-  'app:registro_actividad'
+  'app:registro_actividad',
+  // PUNTO 155 (08/09/2026): cuenta KURRA — suministros de los dos pisos de
+  // la mujer de Patry (Pedro 1K / Andrey 1J), domiciliados en la cuenta de
+  // Patry. Ledger propio e independiente de Cobros (no comparte código con
+  // los inquilinos reales), solo visible en el perfil Patricio. Histórico
+  // permanente: nunca se borra ni se resetea aunque el saldo llegue a 0€.
+  'kurra:movimientos',
+  // Bandera de que ya se hizo la carga inicial de datos (PUNTO 156) — se
+  // sincroniza para que, si abres la app en otro aparato antes de que
+  // lleguen los datos ya sincronizados, no se vuelva a duplicar la carga.
+  'kurra:seed_2026_v1'
 ];
 // BLINDAJE DE DATOS (Bloque 4): las nóminas y gastos de "Renta Patricio" se
 // guardan en una clave por año (renta:gastos:2026, renta:nominas:2026...).
@@ -4189,6 +4206,64 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <input class="minput" id="cob-selector-search" placeholder="Buscar por nombre o inmueble..." oninput="cob_filtrarSelector()" style="width:100%;margin-bottom:0;">
     </div>
     <div id="cob-selector-lista" style="overflow-y:auto;flex:1;"></div>
+  </div>
+</div>
+
+<!-- PUNTO 155 (08/09/2026): CUENTA KURRA — suministros pisos mujer de Patry -->
+<div class="view" id="cob-view-kurra">
+  <header class="header">
+    <div class="header-back" onclick="showMain()">&#8249;</div>
+    <div class="header-identity">
+      <div class="header-single-row">
+        <span class="header-module-name" style="text-transform:none;letter-spacing:normal;font-size:14px;">KURRA</span>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <div class="cuentaheader">
+      <div class="cuentaname" style="text-align:center;">KURRA</div>
+      <div class="cuentasub" style="text-align:center;">Suministros Pedro 1K / Andrey 1J</div>
+      <div class="csaldos">
+        <div class="csitem"><div class="csitem-l">Debe</div><div class="csitem-v" style="color:var(--blue)" id="kurra-total-debe">0€</div></div>
+        <div class="csitem"><div class="csitem-l">Haber</div><div class="csitem-v" style="color:var(--green)" id="kurra-total-haber">0€</div></div>
+        <div class="csitem"><div class="csitem-l">Saldo</div><div class="csitem-v" id="kurra-saldo">0€</div></div>
+      </div>
+    </div>
+    <div class="slabel" style="margin-bottom:10px">Movimientos · Toca ✎ para editar</div>
+    <div class="ttable">
+      <div class="thead">
+        <div class="tth">Fecha</div><div class="tth">Concepto</div><div class="tth">Debe</div><div class="tth">Haber</div><div class="tth"></div>
+      </div>
+      <div id="kurra-movimientos"><div class="empty-state">Sin movimientos registrados.</div></div>
+    </div>
+    <button class="btn1" onclick="kurra_abrirModalNuevo()">＋ Nuevo apunte</button>
+  </main>
+</div>
+
+<!-- MODAL APUNTE KURRA -->
+<div class="moverlay" id="kurra-modal-apunte">
+  <div class="modal">
+    <div class="mtitle"><span id="kurra-modal-titulo">Nuevo apunte KURRA</span><span class="mclose" onclick="closeModalById('kurra-modal-apunte')">✕</span></div>
+    <div class="mfield">
+      <div class="mflabel">Concepto</div>
+      <select class="minput" id="kurra-concepto" onchange="kurra_onConceptoChange()"></select>
+    </div>
+    <div class="mfield" id="kurra-otro-wrap" style="display:none;">
+      <div class="mflabel">Describe el concepto</div>
+      <input class="minput" id="kurra-otro-texto" placeholder="Ej: Derrama comunidad">
+    </div>
+    <div class="mfield" id="kurra-otro-tipo-wrap" style="display:none;">
+      <div class="mflabel">Tipo</div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="kurra-otro-tipo-debe" class="cob-tipo-btn active" onclick="kurra_setOtroTipo('debe')">Debe</button>
+        <button type="button" id="kurra-otro-tipo-haber" class="cob-tipo-btn" onclick="kurra_setOtroTipo('haber')">Haber</button>
+      </div>
+    </div>
+    <div class="mfield"><div class="mflabel">Mes</div><select class="minput" id="kurra-mes"></select></div>
+    <div class="mfield"><div class="mflabel">Día</div><select class="minput" id="kurra-dia"></select></div>
+    <div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" type="number" inputmode="decimal" step="0.01" placeholder="0,00" id="kurra-importe"></div>
+    <button class="btn1" onclick="kurra_guardarApunte()">Guardar apunte</button>
+    <button class="btn2" id="kurra-btn-borrar" style="display:none;color:var(--red);" onclick="kurra_borrarApunte()">Eliminar apunte</button>
   </div>
 </div>
 
@@ -9977,7 +10052,7 @@ function setView(id){
   document.getElementById(id).classList.add('active');
   // Ocultar/mostrar header del módulo cobros según la vista
   const cobHeader = document.querySelector('#mod-cobros > header');
-  if(cobHeader) cobHeader.style.display = (id==='cob-view-cuenta'||id==='cob-view-facturar') ? 'none' : '';
+  if(cobHeader) cobHeader.style.display = (id==='cob-view-cuenta'||id==='cob-view-facturar'||id==='cob-view-kurra') ? 'none' : '';
   window.scrollTo(0,0);
 }
 function showMain(){
@@ -11078,14 +11153,41 @@ function renderCobros(){
     return na.localeCompare(nb,'es');
   });
 
+  // PUNTO 155 (08/09/2026): tarjeta KURRA — cuenta contable independiente
+  // (suministros pisos mujer de Patry), solo visible en Patricio. A
+  // diferencia de los deudores de arriba, se muestra SIEMPRE (no solo
+  // cuando hay saldo pendiente) porque es un histórico permanente, no una
+  // lista de "pendientes".
+  let kurraCardHtml='';
+  if(_cobEmp==='patricio'){
+    const kTot=kurra_calcularTotales(kurra_load());
+    const kAlDia=Math.abs(kTot.saldo)<0.005;
+    const kCls=kAlDia?'':(kTot.saldo>0?'neg':'pos');
+    const kLabel=kAlDia?'Al día':(kTot.saldo>0?'Te debe':'Le debes');
+    kurraCardHtml=`<div class="ccard" onclick="kurra_abrirCuenta()">
+      <div class="ccard-top">
+        <div class="cavatar">K</div>
+        <div class="cinfo" style="text-align:center;">
+          <div class="cref">CUENTA</div>
+          <div class="cname">KURRA</div>
+          <div class="caddr">Suministros Pedro 1K / Andrey 1J</div>
+        </div>
+        <div class="csaldo">
+          <div class="csaldo-v ${kCls}">${fmtE(Math.abs(kTot.saldo))}</div>
+          <div class="csaldo-l">${kLabel}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   if(deudores.length===0){
-    lista.innerHTML='';
+    lista.innerHTML=kurraCardHtml;
     if(emptyEl) emptyEl.style.display='block';
     return;
   }
   if(emptyEl) emptyEl.style.display='none';
 
-  lista.innerHTML=deudores.map(({inm,idx,debe})=>{
+  lista.innerHTML=kurraCardHtml+deudores.map(({inm,idx,debe})=>{
     const nombre=inm.inquilino||inm.direccion||'Sin nombre';
     const ini=nombre.trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
     return `<div class="ccard" onclick="showCuenta(${typeof idx==='number'?idx:JSON.stringify(idx)})">
@@ -11105,6 +11207,235 @@ function renderCobros(){
     </div>`;
   }).join('');
 }
+
+// ─── CUENTA KURRA (PUNTO 155, 08/09/2026) ─────────────────────
+// Suministros de luz/agua de los dos pisos de la mujer de Patry (Pedro 1K /
+// Andrey 1J), domiciliados en la cuenta de Patry. Cuenta contable propia
+// (Debe/Haber), independiente del resto de Cobros — no comparte código con
+// los inquilinos reales, así no hay riesgo de tocar sus datos. Histórico
+// permanente: los apuntes nunca se borran automáticamente, ni siquiera
+// cuando el saldo vuelve a 0€ (así se ve cuándo pagó Kurra por última vez).
+const KURRA_CONCEPTOS=[
+  {id:'pedro_luz',label:'Pedro luz',tipo:'debe'},
+  {id:'pedro_agua',label:'Pedro agua',tipo:'debe'},
+  {id:'andrey_luz',label:'Andrey luz',tipo:'debe'},
+  {id:'andrey_agua',label:'Andrey agua',tipo:'debe'},
+  {id:'transferencia',label:'Transferencia Kurra',tipo:'haber'},
+  {id:'otro',label:'Otro…',tipo:null}
+];
+let _kurraEditId=null;
+let _kurraOtroTipo='debe';
+
+function kurra_load(){ return load('kurra:movimientos'); }
+function kurra_save(lista){ save('kurra:movimientos',lista); }
+
+function kurra_calcularTotales(lista){
+  let debe=0,haber=0;
+  lista.forEach(m=>{
+    const imp=parseFloat(m.importe)||0;
+    if(m.tipo==='haber') haber+=imp; else debe+=imp;
+  });
+  return {debe,haber,saldo:debe-haber};
+}
+
+function kurra_abrirCuenta(){
+  kurra_render();
+  setView('cob-view-kurra');
+}
+
+function kurra_render(){
+  const movs=kurra_load().slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const tot=kurra_calcularTotales(movs);
+  document.getElementById('kurra-total-debe').textContent=fmtE(tot.debe);
+  document.getElementById('kurra-total-haber').textContent=fmtE(tot.haber);
+  const saldoEl=document.getElementById('kurra-saldo');
+  saldoEl.textContent=fmtE(tot.saldo);
+  saldoEl.style.color=tot.saldo>0.005?'var(--red)':(tot.saldo<-0.005?'var(--green)':'var(--silver-bright)');
+
+  const el=document.getElementById('kurra-movimientos');
+  if(movs.length===0){
+    el.innerHTML='<div class="empty-state">Sin movimientos registrados.</div>';
+    return;
+  }
+  el.innerHTML=movs.map(m=>{
+    const debeVal=m.tipo==='debe'?fmt(m.importe):'—';
+    const haberVal=m.tipo==='haber'?fmt(m.importe):'—';
+    const fechaCorta=(m.fecha||'').slice(5).split('-').reverse().join('/');
+    return `<div class="trow" onclick="kurra_editarApunte('${m.id}')">
+      <div class="td">${fechaCorta}</div>
+      <div class="td concepto">${m.concepto||''}</div>
+      <div class="td fra">${debeVal}</div>
+      <div class="td cob">${haberVal}</div>
+      <div class="td edbtn">✎</div>
+    </div>`;
+  }).join('');
+}
+
+function kurra_poblarSelectFechas(mesSel,diaSel){
+  const mesEl=document.getElementById('kurra-mes');
+  mesEl.innerHTML=RUS_MESES_NOMBRE.slice(1).map((n,i)=>`<option value="${i+1}">${n}</option>`).join('');
+  mesEl.value=mesSel;
+  const diaEl=document.getElementById('kurra-dia');
+  let diaHtml='';
+  for(let dd=1;dd<=31;dd++) diaHtml+=`<option value="${dd}">${dd}</option>`;
+  diaEl.innerHTML=diaHtml;
+  diaEl.value=diaSel;
+}
+
+function kurra_setOtroTipo(tipo){
+  _kurraOtroTipo=tipo;
+  document.getElementById('kurra-otro-tipo-debe').classList.toggle('active',tipo==='debe');
+  document.getElementById('kurra-otro-tipo-haber').classList.toggle('active',tipo==='haber');
+}
+
+function kurra_onConceptoChange(){
+  const esOtro=document.getElementById('kurra-concepto').value==='otro';
+  document.getElementById('kurra-otro-wrap').style.display=esOtro?'':'none';
+  document.getElementById('kurra-otro-tipo-wrap').style.display=esOtro?'':'none';
+}
+
+function kurra_abrirModalNuevo(){
+  _kurraEditId=null;
+  document.getElementById('kurra-modal-titulo').textContent='Nuevo apunte KURRA';
+  const selConcepto=document.getElementById('kurra-concepto');
+  selConcepto.innerHTML=KURRA_CONCEPTOS.map(c=>`<option value="${c.id}">${c.label}</option>`).join('');
+  selConcepto.value='pedro_luz';
+  document.getElementById('kurra-otro-texto').value='';
+  kurra_setOtroTipo('debe');
+  kurra_onConceptoChange();
+  const now=new Date();
+  kurra_poblarSelectFechas(now.getMonth()+1,now.getDate());
+  document.getElementById('kurra-importe').value='';
+  document.getElementById('kurra-btn-borrar').style.display='none';
+  document.getElementById('kurra-modal-apunte').classList.add('open');
+}
+
+function kurra_editarApunte(id){
+  const lista=kurra_load();
+  const m=lista.find(x=>x.id===id);
+  if(!m) return;
+  _kurraEditId=id;
+  document.getElementById('kurra-modal-titulo').textContent='Editar apunte KURRA';
+  const selConcepto=document.getElementById('kurra-concepto');
+  selConcepto.innerHTML=KURRA_CONCEPTOS.map(c=>`<option value="${c.id}">${c.label}</option>`).join('');
+  const fijo=KURRA_CONCEPTOS.find(c=>c.id!=='otro'&&c.label===m.concepto);
+  if(fijo){
+    selConcepto.value=fijo.id;
+    document.getElementById('kurra-otro-texto').value='';
+  } else {
+    selConcepto.value='otro';
+    document.getElementById('kurra-otro-texto').value=m.concepto||'';
+  }
+  kurra_setOtroTipo(m.tipo==='haber'?'haber':'debe');
+  kurra_onConceptoChange();
+  const partes=(m.fecha||'').split('-'); // [AAAA, MM, DD]
+  const now=new Date();
+  kurra_poblarSelectFechas(partes[1]?parseInt(partes[1],10):now.getMonth()+1, partes[2]?parseInt(partes[2],10):now.getDate());
+  document.getElementById('kurra-importe').value=m.importe!=null?m.importe:'';
+  document.getElementById('kurra-btn-borrar').style.display='';
+  document.getElementById('kurra-modal-apunte').classList.add('open');
+}
+
+function kurra_guardarApunte(){
+  if (bloqueaSiViewer('Guardar un apunte de KURRA')) return;
+  const conceptoId=document.getElementById('kurra-concepto').value;
+  const esOtro=conceptoId==='otro';
+  const conceptoDef=KURRA_CONCEPTOS.find(c=>c.id===conceptoId);
+  let conceptoTexto,tipo;
+  if(esOtro){
+    conceptoTexto=document.getElementById('kurra-otro-texto').value.trim();
+    if(!conceptoTexto){ info('Escribe una descripción para "Otro".'); return; }
+    tipo=_kurraOtroTipo;
+  } else {
+    conceptoTexto=conceptoDef.label;
+    tipo=conceptoDef.tipo;
+  }
+  const importe=parseFloat(document.getElementById('kurra-importe').value)||0;
+  if(importe<=0){ info('Introduce un importe válido.'); return; }
+  const mes=parseInt(document.getElementById('kurra-mes').value,10);
+  const dia=parseInt(document.getElementById('kurra-dia').value,10);
+  const anio=new Date().getFullYear();
+  const fecha=anio+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+
+  const lista=kurra_load();
+  if(_kurraEditId){
+    const idx=lista.findIndex(x=>x.id===_kurraEditId);
+    if(idx>=0){
+      lista[idx].fecha=fecha;
+      lista[idx].concepto=conceptoTexto;
+      lista[idx].tipo=tipo;
+      lista[idx].importe=importe;
+    }
+  } else {
+    lista.push({id:_finGenId(),fecha,concepto:conceptoTexto,tipo,importe});
+  }
+  kurra_save(lista);
+  closeModalById('kurra-modal-apunte');
+  kurra_render();
+  renderCobros();
+  info('✓ Apunte guardado correctamente.');
+}
+
+function kurra_borrarApunte(){
+  if (bloqueaSiViewer('Eliminar un apunte de KURRA')) return;
+  if(!_kurraEditId) return;
+  const idBorrar=_kurraEditId;
+  const m=kurra_load().find(x=>x.id===idBorrar);
+  closeModalById('kurra-modal-apunte');
+  showConfirm('🗑️','¿Eliminar este apunte?',(m?m.concepto+' · '+fmtE(m.importe):'')+' — esta acción no se puede deshacer.',[
+    {label:'Cancelar',cls:'c',fn:()=>{}},
+    {label:'Borrar',cls:'r',fn:()=>{
+      const lista2=kurra_load().filter(x=>x.id!==idBorrar);
+      kurra_save(lista2);
+      kurra_render();
+      renderCobros();
+    }}
+  ]);
+}
+
+// PUNTO 156 (08/09/2026): carga inicial de los datos de KURRA que pasó Patry
+// (hoja de suministros jun-sep 2026: 5 recibos de luz/agua, repartidos entre
+// Pedro 1K y Andrey 1J = 10 apuntes al Debe, total 658,22 €). Se ejecuta una
+// sola vez — si ya hay movimientos guardados, o esta carga ya se hizo antes
+// (aunque los hayas borrado todos después), no vuelve a tocar nada.
+(function kurra_seedInicial(){
+  try{
+    if(localStorage.getItem('kurra:seed_2026_v1')) return;
+    if(kurra_load().length===0){
+      const datosIniciales=[
+        {fecha:'2026-06-04',concepto:'Pedro luz',tipo:'debe',importe:78.38},
+        {fecha:'2026-06-04',concepto:'Andrey luz',tipo:'debe',importe:45.41},
+        {fecha:'2026-07-06',concepto:'Pedro luz',tipo:'debe',importe:68.15},
+        {fecha:'2026-07-06',concepto:'Andrey luz',tipo:'debe',importe:53.42},
+        {fecha:'2026-07-29',concepto:'Pedro agua',tipo:'debe',importe:96.91},
+        {fecha:'2026-07-29',concepto:'Andrey agua',tipo:'debe',importe:86.54},
+        {fecha:'2026-08-05',concepto:'Pedro luz',tipo:'debe',importe:57.73},
+        {fecha:'2026-08-05',concepto:'Andrey luz',tipo:'debe',importe:47.10},
+        {fecha:'2026-09-05',concepto:'Pedro luz',tipo:'debe',importe:73.34},
+        {fecha:'2026-09-05',concepto:'Andrey luz',tipo:'debe',importe:51.24}
+      ];
+      // BUG REAL CORREGIDO (08/09/2026, mismo día): esta carga se ejecuta muy
+      // pronto, mientras el navegador todavía está leyendo el archivo de
+      // arriba abajo — y `_finGenId` vive dentro del bloque `<script
+      // type="module">` de más arriba, que el navegador retrasa a propósito
+      // hasta que termina de leer TODO el archivo (así funcionan los módulos
+      // JS). Resultado: al llegar aquí, `_finGenId` todavía no existe, y la
+      // consola marcaba "ReferenceError: _finGenId is not defined" — los 10
+      // apuntes NO se llegaban a guardar. Se genera el id con la misma
+      // fórmula pero sin depender de esa función.
+      const generarIdApunte=()=>'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+      datosIniciales.forEach(d=>{ d.id=generarIdApunte(); });
+      kurra_save(datosIniciales);
+      // Esta carga ocurre muy pronto en el arranque (antes de que se instale
+      // el interceptor que sube automáticamente a Firebase todo lo que se
+      // guarda), así que aquí se sube a mano — mismo patrón que otras
+      // migraciones de arranque de la app.
+      if (window.syncToFirestore) window.syncToFirestore('kurra:movimientos', JSON.stringify(datosIniciales));
+    }
+    localStorage.setItem('kurra:seed_2026_v1','1');
+    if (window.syncToFirestore) window.syncToFirestore('kurra:seed_2026_v1', '1');
+  }catch(e){ console.error('Error cargando datos iniciales KURRA', e); }
+})();
 
 // ─── SELECTOR DE INQUILINO (botón +) ─────────────────────────
 let _cobSelectorData=[];
