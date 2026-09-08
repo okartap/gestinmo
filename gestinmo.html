@@ -5141,16 +5141,20 @@ abierto. -->
   </div>
 </div>
 
-<!-- PUNTO 148 (08/09/2026): MODAL ACCIÓN EN MODO SIMPLE — 3 campos editables
-(Coste, Nº acciones, Valor actual), sin registro de operaciones. Mismo estilo
-que el modal de Fondos, que ya sigue este mismo patrón. -->
+<!-- PUNTO 148 (08/09/2026), CAMPOS REDISEÑADOS PUNTO 158 (09/09/2026): MODAL
+ACCIÓN EN MODO SIMPLE. Antes pedía "Coste total" y "Valor actual" en euros —
+con compras periódicas (DCA) eso obligaba a Patry a multiplicar él mismo
+nº de acciones × precio cada vez que actualizaba. Ahora se piden los 2
+precios por acción tal cual los da el broker (precio medio de compra y
+precio de mercado actual) y la app hace la multiplicación por dentro — cero
+cálculo a mano. -->
 <div class="moverlay" id="fin-modal-accion-simple">
   <div class="modal">
     <div class="mtitle" id="fin-accsimple-titulo">Acción (modo simple)<span class="mclose" onclick="closeModalById('fin-modal-accion-simple')">&#10005;</span></div>
     <div class="mfield"><div class="mflabel">Nombre de la acción</div><input class="minput" id="fin-accsimple-nombre" placeholder="Ej: Hermès"></div>
     <div class="mfield"><div class="mflabel">Nº de acciones</div><input class="minput" id="fin-accsimple-num" type="text" inputmode="decimal" placeholder="0"></div>
-    <div class="mfield"><div class="mflabel">Coste total (euros)</div><input class="minput" id="fin-accsimple-coste" type="text" inputmode="decimal" placeholder="0"></div>
-    <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-accsimple-valor" type="text" inputmode="decimal" placeholder="0"></div>
+    <div class="mfield"><div class="mflabel">Precio medio de compra (€/acción)</div><input class="minput" id="fin-accsimple-pmedio" type="text" inputmode="decimal" placeholder="0"></div>
+    <div class="mfield"><div class="mflabel">Precio de mercado actual (€/acción)</div><input class="minput" id="fin-accsimple-pmercado" type="text" inputmode="decimal" placeholder="0"></div>
     <input type="hidden" id="fin-accsimple-idx" value="">
     <button class="btn1" onclick="fin_guardarAccionSimple()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-accion-simple')" style="margin-top:8px;">Cancelar</button>
@@ -14987,7 +14991,11 @@ function fin_renderAcciones() {
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top"><div>';
     html += '<div class="fin-card-nombre">' + notas_esc(rs.nombre) + ' <span style="font-size:9px;color:var(--silver-dim);border:1px solid var(--border);border-radius:6px;padding:1px 5px;">SIMPLE</span></div>';
-    html += '<div class="fin-card-sub">' + (parseFloat(rs.num)||0).toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:4}) + ' acc · Coste ' + fin_fmt(rs.coste) + '</div>';
+    // PUNTO 158 (09/09/2026): el subtítulo ahora muestra el precio medio de
+    // compra por acción (el dato que se escribe a mano), no el coste total
+    // — coherente con el nuevo formulario, que ya no pide totales.
+    var pMedioS = rs.precioMedioCompra != null ? rs.precioMedioCompra : ((parseFloat(rs.num)||0) > 0 ? (parseFloat(rs.coste)||0) / parseFloat(rs.num) : 0);
+    html += '<div class="fin-card-sub">' + (parseFloat(rs.num)||0).toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:4}) + ' acc · PMC ' + fin_fmt(pMedioS) + '/acc</div>';
     html += '</div><div class="fin-card-saldo">' + fin_fmt(rs.valorActual) + '</div></div>';
     html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (plS>=0?'fin-plus':'fin-minus') + '">' + fin_fmt(plS) + (plpS!==null ? ' (' + fin_fmtPct(plpS) + ')' : '') + '</span></div></div>';
     html += '<div class="fin-card-actions">';
@@ -15214,8 +15222,8 @@ function fin_nuevaAccionSimple() {
   document.getElementById('fin-accsimple-titulo').textContent = 'Acción (modo simple)';
   document.getElementById('fin-accsimple-nombre').value = '';
   document.getElementById('fin-accsimple-num').value = '';
-  document.getElementById('fin-accsimple-coste').value = '';
-  document.getElementById('fin-accsimple-valor').value = '';
+  document.getElementById('fin-accsimple-pmedio').value = '';
+  document.getElementById('fin-accsimple-pmercado').value = '';
   document.getElementById('fin-accsimple-idx').value = '';
   document.getElementById('fin-modal-accion-simple').classList.add('open');
 }
@@ -15226,24 +15234,47 @@ function fin_editarAccionSimple(idx) {
   document.getElementById('fin-accsimple-titulo').textContent = 'Editar ' + (r.nombre || 'acción');
   document.getElementById('fin-accsimple-nombre').value = r.nombre || '';
   document.getElementById('fin-accsimple-num').value = r.num != null ? r.num : '';
-  document.getElementById('fin-accsimple-coste').value = r.coste != null ? r.coste : '';
-  document.getElementById('fin-accsimple-valor').value = r.valorActual != null ? r.valorActual : '';
+  // PUNTO 158 (09/09/2026): si el registro ya tiene los precios por acción
+  // guardados (los que se piden ahora), se usan tal cual. Si viene de antes
+  // del cambio (solo tenía coste/valorActual totales, o de un "Pasar a
+  // simple" que solo calcula totales), se derivan dividiendo entre el
+  // número de acciones — así nunca se pierde el dato al editar.
+  var num = parseFloat(r.num) || 0;
+  var pMedio = r.precioMedioCompra != null ? r.precioMedioCompra : (num > 0 && r.coste != null ? (parseFloat(r.coste) / num) : '');
+  var pMercado = r.precioMercado != null ? r.precioMercado : (num > 0 && r.valorActual != null ? (parseFloat(r.valorActual) / num) : '');
+  document.getElementById('fin-accsimple-pmedio').value = pMedio;
+  document.getElementById('fin-accsimple-pmercado').value = pMercado;
   document.getElementById('fin-accsimple-idx').value = idx;
   document.getElementById('fin-modal-accion-simple').classList.add('open');
-  setTimeout(function() { var el = document.getElementById('fin-accsimple-valor'); if (el) { el.focus(); el.select(); } }, 150);
+  setTimeout(function() { var el = document.getElementById('fin-accsimple-pmercado'); if (el) { el.focus(); el.select(); } }, 150);
 }
 function fin_guardarAccionSimple() {
   if (bloqueaSiViewer('Guardar una acción en modo simple')) return;
   var nombre = document.getElementById('fin-accsimple-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre de la acción.'); return; }
   var num = parseImporteFlexible(document.getElementById('fin-accsimple-num').value);
-  var coste = parseImporteFlexible(document.getElementById('fin-accsimple-coste').value);
-  var valorActual = parseImporteFlexible(document.getElementById('fin-accsimple-valor').value);
+  var pMedio = parseImporteFlexible(document.getElementById('fin-accsimple-pmedio').value);
+  var pMercado = parseImporteFlexible(document.getElementById('fin-accsimple-pmercado').value);
   var idx = document.getElementById('fin-accsimple-idx').value;
   var lista = fin_accSimpleLoad();
-  var obj = { nombre: nombre, num: num, coste: coste, valorActual: valorActual };
-  if (idx !== '' && lista[parseInt(idx)]) { obj.id = lista[parseInt(idx)].id || _finGenId(); }
-  else { obj.id = _finGenId(); }
+  // PUNTO 158 (09/09/2026): se guardan los 2 precios por acción tal cual se
+  // han escrito (para poder editarlos sin perder precisión la próxima vez)
+  // Y, además, el coste/valorActual totales ya calculados — el resto de la
+  // app (tarjeta, Patrimonio Total, Patrimonio Financiero...) sigue leyendo
+  // coste/valorActual exactamente igual que antes, sin tocar nada más.
+  var obj = { nombre: nombre, num: num, precioMedioCompra: pMedio, precioMercado: pMercado, coste: num * pMedio, valorActual: num * pMercado };
+  if (idx !== '' && lista[parseInt(idx)]) {
+    var anterior = lista[parseInt(idx)];
+    obj.id = anterior.id || _finGenId();
+    // BUG EVITADO (09/09/2026): si esta posición viene de "Pasar a simple"
+    // (origenTicker enlaza con su historial de operaciones/dividendos para
+    // el Análisis de Dividendos), había que conservar ese enlace al editar
+    // — si no, se perdía en silencio y la acción podía acabar contando dos
+    // veces (una como simple, otra como detallada) en el Patrimonio Total.
+    if (anterior.origenTicker) obj.origenTicker = anterior.origenTicker;
+  } else {
+    obj.id = _finGenId();
+  }
   obj.updatedAt = new Date().toISOString();
   if (idx !== '') lista[parseInt(idx)] = obj; else lista.push(obj);
   fin_accSimpleSave(lista);
