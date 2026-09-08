@@ -851,10 +851,10 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .mth-row{display:grid;grid-template-columns:2fr 1fr;padding:9px 14px;border-bottom:1px solid var(--border);}
 .mth{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);}
 .mth:not(:first-child){text-align:right;}
-.mtr{display:grid;grid-template-columns:2fr 1fr;padding:10px 14px;border-bottom:1px solid rgba(45,61,110,.4);cursor:pointer;transition:background .2s;}
+.mtr{display:grid;grid-template-columns:2fr 1fr;padding:10px 22px;border-bottom:1px solid rgba(45,61,110,.4);cursor:pointer;transition:background .2s;}
 .mtr:last-child{border-bottom:none;}
 .mtr:active{background:var(--navy-hover);}
-.mtd{font-size:13px;color:var(--text);}
+.mtd{font-size:14.5px;color:var(--text);}
 .mtd:not(:first-child){text-align:right;font-weight:600;}
 .mtd.up{color:var(--green);}.mtd.dn{color:var(--red);}.mtd.cur{color:var(--gold);}
 .prev-card{background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03));border:1px solid rgba(201,168,76,.22);border-radius:14px;padding:16px;margin-bottom:20px;}
@@ -896,7 +896,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .fin-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
 .fin-card-nombre{font-size:13px;font-weight:700;color:var(--silver-bright);}
 .fin-card-sub{font-size:11px;color:var(--silver-mid);margin-top:2px;}
-.fin-card-saldo{font-size:16px;font-weight:700;color:var(--accent-green);text-align:right;}
+.fin-card-saldo{font-size:16px;font-weight:700;color:var(--accent-green);text-align:right;white-space:nowrap;}
 .fin-card-meta{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;}
 .fin-meta-item{font-size:11px;color:var(--silver-dim);}
 .fin-meta-val{font-weight:700;color:var(--silver-mid);}
@@ -1926,6 +1926,13 @@ const DATA_KEYS = [
   'fin:acciones:patrimer',
   'fin:acciones:patricio',
   'fin:acciones:industrias',
+  // PUNTO 148 (08/09/2026): posiciones de Acciones en modo simple (Coste/Nº
+  // acciones/Valor actual) — clave aparte del registro de operaciones de
+  // arriba, misma estructura por empresa.
+  'fin:acciones_simple:empresa',
+  'fin:acciones_simple:patrimer',
+  'fin:acciones_simple:patricio',
+  'fin:acciones_simple:industrias',
   'fin:fondos:empresa',
   'fin:fondos:patrimer',
   'fin:fondos:patricio',
@@ -3051,7 +3058,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <span class="header-module-name">Detalle</span>
       </div>
     </div>
-    <div class="header-action"><div class="btn-add" style="font-size:16px">✏️</div></div>
+    <div class="header-action"><div class="btn-add" style="font-size:16px">✎</div></div>
   </header>
   <div class="detail-hero-compact">
     <div class="detail-hero-icon" id="detail-hero-icon">🏠</div>
@@ -3964,16 +3971,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
                 <span style="color:var(--silver-dim);">Urbano</span>
                 <span id="kpi-urbano-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
               </div>
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
-                <span style="color:var(--silver-dim);"></span>
+              <div style="display:flex;justify-content:center;font-size:13px;margin-bottom:6px;">
                 <span id="kpi-urbano-pct" style="color:var(--silver-dim);">—</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;">
                 <span style="color:var(--silver-dim);">Rústico</span>
                 <span id="kpi-rustico-val" style="color:var(--silver-bright);font-weight:700;font-size:16px;">—</span>
               </div>
-              <div style="display:flex;justify-content:space-between;font-size:13px;">
-                <span style="color:var(--silver-dim);"></span>
+              <div style="display:flex;justify-content:center;font-size:13px;">
                 <span id="kpi-rustico-pct" style="color:var(--silver-dim);">—</span>
               </div>
             </div>
@@ -4133,7 +4138,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="csitem"><div class="csitem-l">Saldo</div><div class="csitem-v" id="cta-saldo">0€</div></div>
       </div>
     </div>
-    <div class="slabel" style="margin-bottom:10px">Movimientos · Toca ✏️ para editar</div>
+    <div class="slabel" style="margin-bottom:10px">Movimientos · Toca ✎ para editar</div>
     <div class="ttable">
       <div class="thead">
         <div class="tth">Fecha</div><div class="tth">Fra.</div><div class="tth">Cobro</div><div class="tth">Saldo</div><div class="tth"></div>
@@ -4651,7 +4656,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         Descargar
       </div>
       <div class="action-btn" onclick="renombrarDoc()">
-        <span class="action-icon">✏️</span>
+        <span class="action-icon">✎</span>
         Renombrar
       </div>
       <div class="action-btn danger" onclick="confirmarEliminar()">
@@ -4704,8 +4709,13 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div id="fin-cuentas-body">
     <div id="fin-cuentas-lista"></div>
-    <div class="fin-total-row" id="fin-cuentas-total" style="display:none">
-      <span>Total liquidez</span><span id="fin-cuentas-total-val" style="color:var(--accent-green);font-weight:700;">-</span>
+    <!-- PUNTO 151 (08/09/2026): a petición tuya, esta fila deja de ser dos
+    columnas pequeñas (etiqueta a la izquierda, importe a la derecha) y pasa
+    a una sola línea centrada y más grande — el resto de totales de Finanzas
+    (Fondos/Acciones/Urbanitae) se quedan con el estilo de antes, esto es
+    solo para "Total liquidez". -->
+    <div class="fin-total-row" id="fin-cuentas-total" style="display:none;justify-content:center;padding:14px 4px 4px;">
+      <span id="fin-cuentas-total-val" style="color:var(--accent-green);font-weight:700;font-size:17px;">-</span>
     </div>
     </div>
   </div>
@@ -4726,7 +4736,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div class="fin-section-header">
       <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-acciones-chev" onclick="fin_toggleSeccion('acciones')">&#9660;</button>
       <div class="fin-section-title">&#128200; Acciones</div>
-      <button class="fin-add-btn" onclick="fin_nuevaAccion()">&#xFF0B;</button>
+      <button class="fin-add-btn" onclick="fin_nuevaAccionElegirModo()">&#xFF0B;</button>
     </div>
     <div id="fin-acciones-body">
     <div id="fin-acciones-lista"></div>
@@ -4740,7 +4750,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   el capital invertido de los proyectos "En curso" sumando en Patrimonio
   total (ver fin_calcPatrimonio) — un proyecto "Cobrado" deja de contar
   ahí, porque ese dinero ya habrá vuelto a una cuenta normal. -->
-  <div class="fin-section">
+  <div class="fin-section" id="fin-urbanitae-section">
     <div class="fin-section-header">
       <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-urbanitae-chev" onclick="fin_toggleSeccion('urbanitae')">&#9660;</button>
       <div class="fin-section-title">&#127970; Urbanitae</div>
@@ -5056,6 +5066,22 @@ abierto. -->
   </div>
 </div>
 
+<!-- PUNTO 148 (08/09/2026): MODAL ACCIÓN EN MODO SIMPLE — 3 campos editables
+(Coste, Nº acciones, Valor actual), sin registro de operaciones. Mismo estilo
+que el modal de Fondos, que ya sigue este mismo patrón. -->
+<div class="moverlay" id="fin-modal-accion-simple">
+  <div class="modal">
+    <div class="mtitle" id="fin-accsimple-titulo">Acción (modo simple)<span class="mclose" onclick="closeModalById('fin-modal-accion-simple')">&#10005;</span></div>
+    <div class="mfield"><div class="mflabel">Nombre de la acción</div><input class="minput" id="fin-accsimple-nombre" placeholder="Ej: Hermès"></div>
+    <div class="mfield"><div class="mflabel">Nº de acciones</div><input class="minput" id="fin-accsimple-num" type="text" inputmode="decimal" placeholder="0"></div>
+    <div class="mfield"><div class="mflabel">Coste total (euros)</div><input class="minput" id="fin-accsimple-coste" type="text" inputmode="decimal" placeholder="0"></div>
+    <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-accsimple-valor" type="text" inputmode="decimal" placeholder="0"></div>
+    <input type="hidden" id="fin-accsimple-idx" value="">
+    <button class="btn1" onclick="fin_guardarAccionSimple()">Guardar</button>
+    <button class="btn2" onclick="closeModalById('fin-modal-accion-simple')" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
 <!-- MODAL URBANITAE (PUNTO 89, 03/09/2026) -->
 <div class="moverlay" id="fin-modal-urbanitae">
   <div class="modal">
@@ -5150,7 +5176,7 @@ con editar/borrar en cada línea. -->
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
     <button onclick="cli_cerrarDetalle()" style="background:none;border:none;color:var(--silver-mid);font-size:22px;cursor:pointer;padding:0;">&#8249;</button>
     <div style="font-size:19px;font-weight:700;color:var(--text-primary);flex:1;text-align:center;" id="cli-det-nombre">—</div>
-    <button onclick="cli_abrirEdicion()" style="background:none;border:1px solid var(--border);border-radius:10px;color:var(--silver-mid);font-size:13px;font-weight:600;padding:6px 12px;cursor:pointer;letter-spacing:.5px;">✏️ Editar</button>
+    <button onclick="cli_abrirEdicion()" style="background:none;border:1px solid var(--border);border-radius:10px;color:var(--silver-mid);font-size:13px;font-weight:600;padding:6px 12px;cursor:pointer;letter-spacing:.5px;">✎ Editar</button>
   </div>
 
   <!-- FORMULARIO DE EDICIÓN (oculto por defecto) -->
@@ -10374,7 +10400,7 @@ function rus_renderModalContent() {
     if (d) {
       total += d.importe;
       var mesTxt = d.mes ? RUS_MESES_NOMBRE[parseInt(d.mes)] : '<span style="color:var(--silver-dim);">Jul/Ago (est.)</span>';
-      html += '<tr><td style="font-size:13px;color:var(--silver-bright);padding:5px 0;">' + anio + '</td><td style="font-size:12px;color:var(--silver-dim);padding:5px 0;">' + mesTxt + '</td><td style="text-align:right;font-size:13px;color:var(--accent-green);font-weight:600;">' + fmtGlobal(d.importe) + ' €</td><td style="text-align:right;padding-left:8px;"><span style="cursor:pointer;font-size:13px;" onclick="rus_prepararEdicion(\'' + anio + '\',' + d.importe + ',\'' + (d.mes || '') + '\')" title="Editar">✏️</span></td></tr>';
+      html += '<tr><td style="font-size:13px;color:var(--silver-bright);padding:5px 0;">' + anio + '</td><td style="font-size:12px;color:var(--silver-dim);padding:5px 0;">' + mesTxt + '</td><td style="text-align:right;font-size:13px;color:var(--accent-green);font-weight:600;">' + fmtGlobal(d.importe) + ' €</td><td style="text-align:right;padding-left:8px;"><span style="cursor:pointer;font-size:13px;" onclick="rus_prepararEdicion(\'' + anio + '\',' + d.importe + ',\'' + (d.mes || '') + '\')" title="Editar">✎</span></td></tr>';
     }
   });
   if (total === 0) {
@@ -10462,7 +10488,7 @@ function rus_renderAvisoPendiente() {
   box.innerHTML =
     '<div class="fsection" style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:12px;padding:14px;">' +
       '<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">🌾 Rústico pendiente de cobrar — ' + year + '</div>' +
-      '<div style="font-size:12px;color:var(--silver-dim);margin-bottom:6px;">Estas fincas todavía no tienen el importe de ' + year + ' registrado. Estimado según ' + (year - 1) + ' — desaparece de esta lista en cuanto guardes el importe real de cada una (✏️ en la ficha del rústico, o en Inmuebles).</div>' +
+      '<div style="font-size:12px;color:var(--silver-dim);margin-bottom:6px;">Estas fincas todavía no tienen el importe de ' + year + ' registrado. Estimado según ' + (year - 1) + ' — desaparece de esta lista en cuanto guardes el importe real de cada una (✎ en la ficha del rústico, o en Inmuebles).</div>' +
       filas +
       '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-top:8px;margin-top:6px;border-top:1px solid rgba(201,168,76,.2);"><span style="color:var(--silver-bright);">Total estimado pendiente</span><span style="color:var(--gold);">~' + fmtE(totalEst) + '</span></div>' +
     '</div>';
@@ -10684,8 +10710,19 @@ function fmtEur(n) {
 // decimales y otros sin ellos (los años 2015-2024, cargados como un total
 // redondo, frente a 2025 en adelante, con céntimos reales), dando un aspecto
 // inconsistente. fmtEurDec fuerza siempre 2 decimales, solo para esa pantalla.
+// PUNTO 146 (08/09/2026) — BUG REAL ENCONTRADO: toLocaleString('es-ES') se
+// comprobó (con el mismo motor JS que usa la app) que en algunos navegadores
+// devuelve el número SIN el punto de los miles para importes de 4 cifras
+// (1.000-9.999) — por ejemplo, 8830 → "8830,00" en vez de "8.830,00" — aunque
+// para 5 cifras o más sí funciona bien. Por eso en Facturación → Histórico se
+// veían los años/meses de 4 cifras sin puntuación y el resto correctamente.
+// Se sustituye por el mismo formateo manual "a prueba de navegador" que ya
+// usa fmt() (ver comentario "robusto en Safari iOS", más abajo en el archivo).
 function fmtEurDec(n) {
-  return (parseFloat(n) || 0).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+  var v = parseFloat(n) || 0;
+  var neg = v < 0; v = Math.abs(v);
+  var parts = v.toFixed(2).split('.');
+  return (neg ? '-' : '') + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + parts[1] + ' €';
 }
 
 // ─── INMUEBLES (desde módulo Inmuebles) ───────────────────────
@@ -11636,7 +11673,22 @@ function ipc_aplicar(){
   const contratos=JSON.parse(localStorage.getItem('contratos:lista')||'[]');
   const idx=contratos.findIndex(x=>x.id===_ipcContratoActual.id);
   var finAnteriorIpc = null, finNuevoIpc = null;
-  if(idx>=0){
+  // PUNTO 149 (08/09/2026) — BUG REAL ENCONTRADO: si el contrato no se
+  // encontraba en contratos:lista (idx=-1), este bloque se saltaba entero SIN
+  // avisar de nada — el código seguía adelante y generaba igualmente el PDF
+  // de la adenda (con la fecha y renta nuevas, así que parecía haber
+  // funcionado), pero la renta/fecha de fin/ipcAplicado del contrato real
+  // nunca se actualizaban. Resultado: tienes el PDF en la mano pero el
+  // contrato sigue "Vencido" con los datos antiguos, y el aviso de IPC
+  // pendiente nunca se apaga. Ahora, si esto vuelve a pasar, se avisa
+  // claramente y NO se genera el PDF (para no dar una falsa sensación de que
+  // ya está hecho) — así queda constancia de que hay que reintentarlo.
+  if(idx<0){
+    info('No se ha encontrado el contrato en la lista — no se ha aplicado ningún cambio ni generado la adenda. Cierra esta pantalla, vuelve a abrir el contrato desde Contratos y prueba de nuevo; si se repite, avísame.');
+    closeModalById('ipc-modal');
+    return;
+  }
+  {
     contratos[idx].renta=nuevaRenta;
     contratos[idx].rentaAnterior=rentaAnterior;
     contratos[idx].ipcAplicado=(contratos[idx].ipcAplicado||[]).concat({mes:mesActual(),pct,rentaAnterior,rentaNueva:nuevaRenta});
@@ -14454,7 +14506,7 @@ function fin_renderCuentas() {
   if (totEl) {
     totEl.style.display = 'flex';
     var tv = document.getElementById('fin-cuentas-total-val');
-    if (tv) tv.textContent = fin_fmt(total);
+    if (tv) tv.textContent = 'Total Liquidez: ' + fin_fmt(total);
   }
   fin_calcPatrimonio();
   fin_renderUltimaActualizacion();
@@ -14527,7 +14579,18 @@ function fin_renderAcciones() {
   var lista = document.getElementById('fin-acciones-lista');
   var totEl = document.getElementById('fin-acciones-total');
   if (!lista) return;
-  if (ops.length === 0) {
+  // PUNTO 148 (08/09/2026): posiciones en modo simple (Coste/Nº acciones/
+  // Valor actual, sin registro de operaciones) — se pintan aparte y no
+  // pasan por el bucle de abajo. Si una posición simple viene de convertir
+  // una detallada (fin_pasarASimple), su ticker original se salta al agrupar
+  // "ops" para no duplicarla en pantalla (el histórico de esas operaciones
+  // se conserva igualmente para el Análisis de Dividendos).
+  var simples = fin_accSimpleLoad();
+  var tickersOrigenSimple = {};
+  for (var si = 0; si < simples.length; si++) {
+    if (simples[si].origenTicker) tickersOrigenSimple[simples[si].origenTicker] = true;
+  }
+  if (ops.length === 0 && simples.length === 0) {
     lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin acciones. Pulsa + para añadir.</div>';
     if (totEl) totEl.style.display = 'none';
     fin_calcPatrimonio(); fin_renderUltimaActualizacion(); return;
@@ -14536,6 +14599,7 @@ function fin_renderAcciones() {
   for (var i = 0; i < ops.length; i++) {
     var op = ops[i];
     var t = op.ticker;
+    if (tickersOrigenSimple[t]) continue;
     if (!pos[t]) pos[t] = { ticker: t, nombre: FIN_NOMBRES[t] || t, num: 0, coste: 0, divsEfectivo: 0, divsScrip: 0, divsSobrantes: 0 };
     if (op.tipo === 'compra') { pos[t].num += parseFloat(op.cantidad) || 0; pos[t].coste += (parseFloat(op.cantidad) || 0) * (parseFloat(op.precio) || 0); }
     else if (op.tipo === 'venta') { pos[t].num -= parseFloat(op.cantidad) || 0; }
@@ -14555,6 +14619,26 @@ function fin_renderAcciones() {
   }
   var totalValor = 0;
   var html = '';
+  // PUNTO 148 (08/09/2026): tarjetas de las posiciones en modo simple,
+  // pintadas primero — mismo estilo de tarjeta que el resto de Finanzas.
+  for (var sk = 0; sk < simples.length; sk++) {
+    var rs = simples[sk];
+    var idxS = sk;
+    var plS = (parseFloat(rs.valorActual)||0) - (parseFloat(rs.coste)||0);
+    var plpS = (parseFloat(rs.coste)||0) > 0 ? (plS / parseFloat(rs.coste) * 100) : null;
+    totalValor += parseFloat(rs.valorActual) || 0;
+    html += '<div class="fin-card">';
+    html += '<div class="fin-card-top"><div>';
+    html += '<div class="fin-card-nombre">' + notas_esc(rs.nombre) + ' <span style="font-size:9px;color:var(--silver-dim);border:1px solid var(--border);border-radius:6px;padding:1px 5px;">SIMPLE</span></div>';
+    html += '<div class="fin-card-sub">' + (parseFloat(rs.num)||0).toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:4}) + ' acc · Coste ' + fin_fmt(rs.coste) + '</div>';
+    html += '</div><div class="fin-card-saldo">' + fin_fmt(rs.valorActual) + '</div></div>';
+    html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (plS>=0?'fin-plus':'fin-minus') + '">' + fin_fmt(plS) + (plpS!==null ? ' (' + fin_fmtPct(plpS) + ')' : '') + '</span></div></div>';
+    html += '<div class="fin-card-actions">';
+    html += '<div class="fin-action-btn" onclick="fin_editarAccionSimple(' + idxS + ')">Editar</div>';
+    html += '<div class="fin-action-btn" onclick="fin_pasarADetallado(' + idxS + ')">Pasar a detallado</div>';
+    html += '<div class="fin-action-btn red" onclick="fin_borrarAccionSimple(' + idxS + ')">Eliminar</div>';
+    html += '</div></div>';
+  }
   var tickers = Object.keys(pos);
   for (var j = 0; j < tickers.length; j++) {
     var p = pos[tickers[j]];
@@ -14605,6 +14689,10 @@ function fin_renderAcciones() {
     html += '<div class="fin-action-btn red" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'venta\')">- Venta</div>';
     html += '<div class="fin-action-btn green" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'dividendo\')">Dividendo</div>';
     html += '<div class="fin-action-btn" onclick="fin_verHistorico(\'' + p.ticker + '\')">Historico</div>';
+    // PUNTO 148 (08/09/2026): pasar esta posición a modo simple — se le pasan
+    // los datos actuales ya calculados (num/coste/valor) para precargar el
+    // registro simple, sin que tengas que volver a escribirlos.
+    html += '<div class="fin-action-btn" onclick="fin_pasarASimple(\'' + p.ticker + '\',\'' + p.nombre.replace(/'/g,"\\'") + '\',' + p.num + ',' + p.coste + ',' + (val||0) + ')">Pasar a simple</div>';
     html += '</div></div>';
   }
   lista.innerHTML = html || '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin posiciones activas.</div>';
@@ -14667,7 +14755,7 @@ function fin_verHistorico(ticker) {
       var d = listaAnio[m].op;
       var origIdx = listaAnio[m].idx;
       var iconos = '<span style="float:right;white-space:nowrap;">' +
-        '<span onclick="fin_editarAccion(' + origIdx + ')" style="cursor:pointer;padding:2px 4px;" title="Editar">✏️</span>' +
+        '<span onclick="fin_editarAccion(' + origIdx + ')" style="cursor:pointer;padding:2px 4px;" title="Editar">✎</span>' +
         '<span onclick="fin_borrarAccionMov(' + origIdx + ',\'' + ticker + '\')" style="cursor:pointer;padding:2px 4px;" title="Borrar">🗑️</span>' +
         '</span>';
       if (d.tipo === 'dividendo') {
@@ -14740,6 +14828,117 @@ function fin_tipoChange() {
   document.getElementById('fin-campos-compraventa').style.display = (tipo === 'compra' || tipo === 'venta') ? 'block' : 'none';
   document.getElementById('fin-campos-dividendo').style.display = tipo === 'dividendo' ? 'block' : 'none';
   document.getElementById('fin-campos-scrip').style.display = tipo === 'scrip' ? 'block' : 'none';
+}
+// PUNTO 148 (08/09/2026): a petición tuya, al pulsar "+" en Acciones ahora se
+// pregunta primero si quieres llevar esta acción en modo Simple (3 campos:
+// Coste, Nº acciones, Valor actual — sin registrar cada compra/dividendo por
+// separado) o Detallado (el registro completo de siempre, el que necesita la
+// cartera heredada de Patrimer para el Análisis de Dividendos). fin_nuevaAccion()
+// (más abajo) sigue abriendo directamente el formulario detallado tal cual —
+// lo siguen usando fin_editarAccion/fin_nuevaAccionPre — así que no se toca;
+// el selector Simple/Detallado vive solo aquí, en el botón "+".
+function fin_nuevaAccionElegirModo() {
+  if (bloqueaSiViewer('Añadir una acción')) return;
+  showConfirm('📈', '¿Modo simple o detallado?',
+    'Simple: solo 3 campos (Coste, Nº acciones, Valor actual) — rápido de mantener, ideal si no vas a apuntar cada compra. Detallado: registro completo de compras/ventas/dividendos, como ya llevas la cartera heredada de Patrimer.',
+    [
+      { label: '⚡ Simple', cls: 'g', fn: fin_nuevaAccionSimple },
+      { label: '📋 Detallado', cls: '', fn: fin_nuevaAccion }
+    ]);
+}
+// ── ACCIONES MODO SIMPLE (PUNTO 148, 08/09/2026) ──────────────────────────
+// Guardadas aparte de fin:acciones (el registro de operaciones) para no
+// mezclar los dos modelos — cada posición simple es una fila suelta con solo
+// Coste/Nº acciones/Valor actual, sin histórico de movimientos. fin_load/
+// fin_save ya resuelven solas la empresa activa (Patrimer/Patricio/Industrias).
+function fin_accSimpleLoad() { return fin_load('fin:acciones_simple'); }
+function fin_accSimpleSave(lista) { fin_save('fin:acciones_simple', lista); }
+function fin_nuevaAccionSimple() {
+  document.getElementById('fin-accsimple-titulo').textContent = 'Acción (modo simple)';
+  document.getElementById('fin-accsimple-nombre').value = '';
+  document.getElementById('fin-accsimple-num').value = '';
+  document.getElementById('fin-accsimple-coste').value = '';
+  document.getElementById('fin-accsimple-valor').value = '';
+  document.getElementById('fin-accsimple-idx').value = '';
+  document.getElementById('fin-modal-accion-simple').classList.add('open');
+}
+function fin_editarAccionSimple(idx) {
+  var lista = fin_accSimpleLoad();
+  var r = lista[idx];
+  if (!r) { alert('Esa acción ya no existe (puede que se haya borrado en otro sitio).'); return; }
+  document.getElementById('fin-accsimple-titulo').textContent = 'Editar ' + (r.nombre || 'acción');
+  document.getElementById('fin-accsimple-nombre').value = r.nombre || '';
+  document.getElementById('fin-accsimple-num').value = r.num != null ? r.num : '';
+  document.getElementById('fin-accsimple-coste').value = r.coste != null ? r.coste : '';
+  document.getElementById('fin-accsimple-valor').value = r.valorActual != null ? r.valorActual : '';
+  document.getElementById('fin-accsimple-idx').value = idx;
+  document.getElementById('fin-modal-accion-simple').classList.add('open');
+  setTimeout(function() { var el = document.getElementById('fin-accsimple-valor'); if (el) { el.focus(); el.select(); } }, 150);
+}
+function fin_guardarAccionSimple() {
+  if (bloqueaSiViewer('Guardar una acción en modo simple')) return;
+  var nombre = document.getElementById('fin-accsimple-nombre').value.trim();
+  if (!nombre) { alert('Introduce el nombre de la acción.'); return; }
+  var num = parseImporteFlexible(document.getElementById('fin-accsimple-num').value);
+  var coste = parseImporteFlexible(document.getElementById('fin-accsimple-coste').value);
+  var valorActual = parseImporteFlexible(document.getElementById('fin-accsimple-valor').value);
+  var idx = document.getElementById('fin-accsimple-idx').value;
+  var lista = fin_accSimpleLoad();
+  var obj = { nombre: nombre, num: num, coste: coste, valorActual: valorActual };
+  if (idx !== '' && lista[parseInt(idx)]) { obj.id = lista[parseInt(idx)].id || _finGenId(); }
+  else { obj.id = _finGenId(); }
+  obj.updatedAt = new Date().toISOString();
+  if (idx !== '') lista[parseInt(idx)] = obj; else lista.push(obj);
+  fin_accSimpleSave(lista);
+  closeModalById('fin-modal-accion-simple');
+  fin_renderAcciones();
+}
+function fin_borrarAccionSimple(idx) {
+  if (bloqueaSiViewer('Eliminar una acción')) return;
+  var lista = fin_accSimpleLoad();
+  var r = lista[idx];
+  if (!r) return;
+  showConfirm('🗑️', '¿Eliminar ' + (r.nombre || 'esta acción') + '?', 'Se borrará esta posición en modo simple. Esta acción no se puede deshacer.', [
+    { label: 'Cancelar', cls: 'c', fn: function(){} },
+    { label: 'Borrar', cls: 'r', fn: function() {
+      lista.splice(idx, 1);
+      fin_accSimpleSave(lista);
+      fin_renderAcciones();
+    }}
+  ]);
+}
+// Convierte una posición Detallado (con historial de operaciones en
+// fin:acciones) a modo Simple — el histórico de operaciones/dividendos de
+// ese ticker NO se borra (sigue contando en el Análisis de Dividendos), solo
+// deja de usarse para calcular la posición actual: a partir de aquí, Coste/
+// Nº acciones/Valor actual se llevan a mano en el nuevo registro simple.
+function fin_pasarASimple(ticker, nombre, num, coste, valorActual) {
+  if (bloqueaSiViewer('Pasar una acción a modo simple')) return;
+  showConfirm('⚡', '¿Pasar ' + nombre + ' a modo simple?',
+    'A partir de ahora, Coste/Nº acciones/Valor actual se editan a mano con 3 campos, sin apuntar cada operación. El historial de dividendos ya registrado se conserva para el Análisis de Dividendos. Puedes revertirlo cuando quieras.',
+    [
+      { label: 'Cancelar', cls: 'c', fn: function(){} },
+      { label: 'Pasar a simple', cls: 'g', fn: function() {
+        var lista = fin_accSimpleLoad();
+        lista.push({ id: _finGenId(), nombre: nombre, num: num, coste: coste, valorActual: valorActual || 0, updatedAt: new Date().toISOString(), origenTicker: ticker });
+        fin_accSimpleSave(lista);
+        fin_renderAcciones();
+      }}
+    ]);
+}
+function fin_pasarADetallado(idx) {
+  if (bloqueaSiViewer('Pasar una acción a modo detallado')) return;
+  var lista = fin_accSimpleLoad();
+  var r = lista[idx];
+  if (!r) return;
+  showConfirm('📋', '¿Pasar ' + (r.nombre||'esta acción') + ' a modo detallado?', 'Se quita del modo simple. Si ya tenía operaciones registradas antes de pasarla a simple, volverán a verse; si no, tendrás que darla de alta de nuevo con "+ Compra".', [
+    { label: 'Cancelar', cls: 'c', fn: function(){} },
+    { label: 'Pasar a detallado', cls: '', fn: function() {
+      lista.splice(idx, 1);
+      fin_accSimpleSave(lista);
+      fin_renderAcciones();
+    }}
+  ]);
 }
 function fin_nuevaAccion() {
   var hoy = new Date().toISOString().slice(0, 10);
@@ -15166,6 +15365,16 @@ function fin_urbanitaeActualizarPreview() {
   el.textContent = 'Resultado previsto al vencimiento: ' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos (tras 19% IRPF)';
 }
 function fin_renderUrbanitae() {
+  // PUNTO 152 (08/09/2026): a petición tuya, Urbanitae solo existe para
+  // Patricio — en Patrimer/Industrias ni siquiera se muestra la sección
+  // (antes salía vacía igualmente, invitando a añadir algo que no aplica ahí).
+  var secUrb = document.getElementById('fin-urbanitae-section');
+  if (fin_emp() !== 'patricio') {
+    if (secUrb) secUrb.style.display = 'none';
+    fin_calcPatrimonio(); fin_renderUltimaActualizacion();
+    return;
+  }
+  if (secUrb) secUrb.style.display = '';
   var data = fin_load('fin:urbanitae');
   var lista = document.getElementById('fin-urbanitae-lista');
   var totEl = document.getElementById('fin-urbanitae-total');
@@ -15319,17 +15528,29 @@ function fin_calcPatrimonio() {
   // si se vendía toda una posición, ese texto se quedaba con el último
   // valor no-cero (la fila se ocultaba pero nadie lo borraba), y el
   // Patrimonio financiero total seguía sumando un valor fantasma.
+  // PUNTO 148 (08/09/2026): las posiciones en modo simple no se calculan con
+  // la cotización — su "Valor actual" ya es un número fijo que se edita a
+  // mano, así que se suma directamente. Si una posición simple viene de
+  // convertir una detallada, su ticker original se salta abajo para no
+  // contarla dos veces.
+  var simplesPatr = fin_accSimpleLoad();
+  var tickersOrigenSimplePatr = {};
+  var acciones = 0;
+  for (var sp = 0; sp < simplesPatr.length; sp++) {
+    acciones += parseFloat(simplesPatr[sp].valorActual) || 0;
+    if (simplesPatr[sp].origenTicker) tickersOrigenSimplePatr[simplesPatr[sp].origenTicker] = true;
+  }
   var opsAcc = fin_load('fin:acciones');
   var posAcc = {};
   for (var i = 0; i < opsAcc.length; i++) {
     var op = opsAcc[i];
     var t = op.ticker;
+    if (tickersOrigenSimplePatr[t]) continue;
     if (!posAcc[t]) posAcc[t] = 0;
     if (op.tipo === 'compra') posAcc[t] += parseFloat(op.cantidad) || 0;
     else if (op.tipo === 'venta') posAcc[t] -= parseFloat(op.cantidad) || 0;
     else if (op.tipo === 'scrip') posAcc[t] += parseFloat(op.scripAcciones) || 0;
   }
-  var acciones = 0;
   Object.keys(posAcc).forEach(function(tk) {
     if (posAcc[tk] <= 0) return;
     var cot = _finCotizaciones[tk] || null;
@@ -15471,16 +15692,26 @@ function fin_patHist_calcularActual() {
   var cuentas = fin_load('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
   var fondos = fin_load('fin:fondos').reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
   var opsAcc = fin_load('fin:acciones');
+  // PUNTO 148 (08/09/2026): mismo criterio que fin_calcPatrimonio — las
+  // posiciones en modo simple suman su "Valor actual" directo, y su ticker
+  // de origen (si venían de una detallada) se salta para no duplicar.
+  var simplesHist = fin_accSimpleLoad();
+  var tickersOrigenSimpleHist = {};
+  var acciones = 0;
+  for (var sh = 0; sh < simplesHist.length; sh++) {
+    acciones += parseFloat(simplesHist[sh].valorActual) || 0;
+    if (simplesHist[sh].origenTicker) tickersOrigenSimpleHist[simplesHist[sh].origenTicker] = true;
+  }
   var posAcc = {};
   for (var i = 0; i < opsAcc.length; i++) {
     var op = opsAcc[i];
     var t = op.ticker;
+    if (tickersOrigenSimpleHist[t]) continue;
     if (!posAcc[t]) posAcc[t] = 0;
     if (op.tipo === 'compra') posAcc[t] += parseFloat(op.cantidad) || 0;
     else if (op.tipo === 'venta') posAcc[t] -= parseFloat(op.cantidad) || 0;
     else if (op.tipo === 'scrip') posAcc[t] += parseFloat(op.scripAcciones) || 0;
   }
-  var acciones = 0;
   Object.keys(posAcc).forEach(function(tk) {
     if (posAcc[tk] <= 0) return;
     var cot = _finCotizaciones[tk] || null;
@@ -16103,7 +16334,7 @@ function div_renderBarras(datos) {
     var rv = Math.round(maxVal * r / 3);
     var rvL = rv >= 1000 ? (rv / 1000).toFixed(0) + 'k' : rv;
     svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W - PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
-    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry + 3) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)">' + rvL + '</text>';
+    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry + 3) + '" text-anchor="end" font-size="8" fill="#96a8c8">' + rvL + '</text>';
   }
   for (var i = 0; i < n; i++) {
     var yr = anios[i];
@@ -16114,7 +16345,7 @@ function div_renderBarras(datos) {
     var by = PAD_T + gH - bh;
     svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" fill="#5b8dee" opacity="0.85"/>';
     if (i % paso === 0 || i === n - 1) {
-      svg += '<text x="' + Math.round(cx) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
+      svg += '<text x="' + Math.round(cx) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="7" fill="#b8c4d8">' + yr + '</text>';
     }
   }
   svg += '</svg>';
@@ -16162,13 +16393,13 @@ function div_renderLineas(datos) {
     var rv2 = Math.round(maxVal * r2 / 3);
     var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
     svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
-    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
+    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="#96a8c8">' + rvL2 + '</text>';
   }
   for (var ix = 0; ix < n; ix++) {
     if (ix % paso !== 0 && ix !== n - 1) continue;
     var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
     var ancla = (ix === n - 1) ? 'end' : (ix === 0 ? 'start' : 'middle');
-    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 4) + '" text-anchor="' + ancla + '" font-size="7" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 4) + '" text-anchor="' + ancla + '" font-size="7" fill="#b8c4d8">' + anios[ix] + '</text>';
   }
   for (var sq = 0; sq < seriesVisibles.length; sq++) {
     var serie = seriesVisibles[sq];
@@ -16238,13 +16469,13 @@ function div_renderAcumulado(datos) {
     var rv2 = Math.round(maxVal * r2 / 3);
     var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
     svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
-    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)">' + rvL2 + '</text>';
+    svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="#96a8c8">' + rvL2 + '</text>';
   }
   for (var ix = 0; ix < n; ix++) {
     if (ix % paso !== 0 && ix !== n - 1) continue;
     var lx = PAD_L + (n > 1 ? (gW / (n - 1)) * ix : gW / 2);
     var ancla = (ix === n - 1) ? 'end' : (ix === 0 ? 'start' : 'middle');
-    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 4) + '" text-anchor="' + ancla + '" font-size="7" fill="rgba(255,255,255,0.5)">' + anios[ix] + '</text>';
+    svg += '<text x="' + Math.round(lx) + '" y="' + (H - 4) + '" text-anchor="' + ancla + '" font-size="7" fill="#b8c4d8">' + anios[ix] + '</text>';
   }
   var etiquetasFinales = [];
   for (var sq = 0; sq < seriesVisibles.length; sq++) {
@@ -16656,9 +16887,15 @@ function dash_render() {
   // No se toca fac_resumenAnual (kpiDash) — esa función es la base
   // compartida con Facturación, que es solo alquiler; los dividendos se
   // suman aquí, solo para Inicio, por encima de ese dato.
-  var divHastaMes = (typeof div_totalAnioHastaMes === 'function' && ultimoMes > 0) ? div_totalAnioHastaMes(year, ultimoMes) : 0;
-  var divAnteriorMismoPeriodo = (typeof div_totalAnioHastaMes === 'function' && ultimoMes > 0) ? div_totalAnioHastaMes(year - 1, ultimoMes) : 0;
-  var divAnteriorCompleto = (typeof div_totalAnio === 'function') ? div_totalAnio(year - 1) : 0;
+  // PUNTO 145 (08/09/2026): los dividendos del punto 135 solo tenían sentido
+  // para la cartera heredada de Patrimer — al no filtrar por empresa, estas 3
+  // variables también sumaban tus propias acciones (ej. Hermès) cuando el
+  // perfil activo era Patricio, descuadrando "Hasta [mes]" y "Previsión anual"
+  // de Inicio frente a los mismos datos en Facturación → Análisis (que sí son
+  // solo alquiler). Ahora quedan a 0 salvo en el perfil Patrimer.
+  var divHastaMes = (_esPatrimer && typeof div_totalAnioHastaMes === 'function' && ultimoMes > 0) ? div_totalAnioHastaMes(year, ultimoMes) : 0;
+  var divAnteriorMismoPeriodo = (_esPatrimer && typeof div_totalAnioHastaMes === 'function' && ultimoMes > 0) ? div_totalAnioHastaMes(year - 1, ultimoMes) : 0;
+  var divAnteriorCompleto = (_esPatrimer && typeof div_totalAnio === 'function') ? div_totalAnio(year - 1) : 0;
   var elAcum = document.getElementById('dash-acum-euros');
   if (elAcum) elAcum.textContent = fmtE ? fmtE(kpiDash.acumActualTotal + divHastaMes) : (kpiDash.acumActualTotal + divHastaMes).toFixed(2) + ' €';
   // BLINDAJE DE DATOS (Bloque 7b): línea nueva, arriba — comparación con el
@@ -17701,7 +17938,22 @@ function con_renderLista() {
       rescisiones: ['rescision']
     };
     const tipos = mapa[con_filtroTab];
-    if (tipos) filtrados = filtrados.filter(c => tipos.includes((c.tipo || '').toLowerCase()));
+    // PUNTO 149 (08/09/2026) — BUG REAL ENCONTRADO: el botón que de verdad
+    // usas para renovar ("Actualizar IPC y generar adenda", tanto desde el
+    // aviso como desde "Generar renovación" en la ficha del contrato) nunca
+    // crea un contrato nuevo con tipo:'renov' — actualiza la renta/fecha fin
+    // del MISMO contrato (ver ipc_aplicar). Solo el asistente completo de
+    // contrato nuevo crea ese tipo. Resultado: esta pestaña se quedaba
+    // siempre en "0 contratos" por mucho que renovaras, aunque la renovación
+    // sí se hubiera aplicado de verdad. Ahora también cuenta como
+    // "renovación" cualquier contrato con al menos un IPC aplicado
+    // (c.ipcAplicado), que es como de verdad queda constancia de una
+    // renovación en esta app.
+    if (con_filtroTab === 'renovaciones') {
+      filtrados = filtrados.filter(c => (c.tipo||'').toLowerCase()==='renov' || (c.ipcAplicado && c.ipcAplicado.length>0));
+    } else if (tipos) {
+      filtrados = filtrados.filter(c => tipos.includes((c.tipo || '').toLowerCase()));
+    }
   }
 
   // Ordenar
@@ -18563,7 +18815,7 @@ function renta_renderNominas() {
       // PUNTO 129 (07/09/2026): antes solo se podía borrar y volver a crear —
       // ahora hay un lápiz para editar la nómina ya guardada (p.ej. para
       // rellenar la cuota de autónomo de un mes que se guardó sin ella).
-      + '<button onclick="renta_abrirModalNomina(' + i + ')" style="background:none;border:none;color:#5b8dee;font-size:15px;cursor:pointer;">✏️</button>'
+      + '<button onclick="renta_abrirModalNomina(' + i + ')" style="background:none;border:none;color:#5b8dee;font-size:15px;cursor:pointer;">✎</button>'
       + '<button onclick="renta_borrarNomina(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
       + '</div></div>';
   }
