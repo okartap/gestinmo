@@ -10596,7 +10596,16 @@ function fac_loadHistorico() {
     try {
       var parsed = JSON.parse(raw);
       // Si es empresa principal, devolver tal cual
-      if (emp === 'patrimer') return parsed;
+      if (emp === 'patrimer') {
+        // PUNTO 157 (09/09/2026): en cuanto vemos que ya hay dato real
+        // guardado, dejamos puesta la marca de "ya sembrado" — así, si en
+        // el futuro esta clave se llegara a leer vacía por cualquier fallo
+        // puntual, la seed de más abajo ya no se dispara ni pisa nada.
+        if (!localStorage.getItem('migracion:facturacion_historico_patrimer_v1')) {
+          localStorage.setItem('migracion:facturacion_historico_patrimer_v1', '1');
+        }
+        return parsed;
+      }
       // Para otras empresas: detectar si el dato guardado es el histórico inicial
       // de Patrimer (contaminado). Lo identificamos por el primer valor conocido.
       if (parsed.length > 0 && parsed[0].mes === '2023-01' && parsed[0].importe === 13546.17) {
@@ -10609,7 +10618,24 @@ function fac_loadHistorico() {
   }
   // Sin dato guardado
   if (emp === 'patrimer') {
-    localStorage.setItem(FAC_HIST_KEY(), JSON.stringify(FAC_HIST_INICIAL));
+    // BUG REAL ENCONTRADO Y CORREGIDO (09/09/2026) — PUNTO 157: mismo fallo
+    // de fondo que el punto 113 (alquileres de Patricio / patrimonio
+    // histórico), pero aquí nunca se había puesto el candado. Esta función
+    // se llama constantemente (cada vez que abres Cobros→Histórico, Inicio,
+    // etc.) y ANTES, cada vez que encontraba la clave vacía — por ejemplo,
+    // justo tras un fallo puntual de sincronización, o al abrir la app antes
+    // de que la nube terminara de confirmar un cambio reciente — rellenaba
+    // TODO el histórico con los datos fijos de 2023 a junio de 2026 y lo
+    // subía a Firebase, tapando en silencio cualquier mes real metido a
+    // mano después de esa fecha (julio/agosto/septiembre 2026 incluidos).
+    // Ahora, igual que en el punto 113: esto solo se rellena UNA VEZ EN LA
+    // VIDA — en cuanto queda la marca de que ya se sembró, nunca se vuelve
+    // a tocar el histórico real aunque se lea vacío en el futuro.
+    if (localStorage.getItem('migracion:facturacion_historico_patrimer_v1')) return [];
+    var val = JSON.stringify(FAC_HIST_INICIAL);
+    localStorage.setItem(FAC_HIST_KEY(), val);
+    if (window.syncToFirestore) window.syncToFirestore(FAC_HIST_KEY(), val);
+    localStorage.setItem('migracion:facturacion_historico_patrimer_v1', '1');
     return FAC_HIST_INICIAL;
   }
   return [];
