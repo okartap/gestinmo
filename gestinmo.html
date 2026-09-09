@@ -2473,12 +2473,10 @@ function _esListaPorIdClave(key) {
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
 // filas con el mismo mes (todos sus puntos de guardado comprueban antes de
 // escribir) — mismo criterio que _patHistMerge, pero el campo estable se
-// llama "mes" en vez de "id". OJO: "facturacion:facturas" queda FUERA a
-// propósito — el cargo manual desde Cobros (guardarCobro) puede meter más de
-// una factura con el mismo mes sin comprobar antes, así que "mes" no es un
-// campo único ahí y usarlo aquí habría fusionado por error varias facturas
-// distintas del mismo mes en una sola. Se queda con la protección genérica
-// de bloque completo que ya tenía (más floja, pero sin este riesgo).
+// llama "mes" en vez de "id". "facturacion:facturas" NO usa esta función
+// (ahí "mes" no es único — puede haber varios cargos el mismo mes) — se
+// blinda con id propio en vez de por mes, ver PUNTO 162 y
+// _tipoGenericoDeClave más abajo.
 function _esListaPorCampoClave(key) {
   return key === 'facturacion:historico:patrimer' ||
          key === 'facturacion:historico:patricio' || key === 'facturacion:historico:industrias';
@@ -2495,6 +2493,12 @@ function _huellaGenerica(tipo, it) {
   if (tipo === 'notas') return (it.inmuebleIdx != null ? it.inmuebleIdx : '') + '|' + (it.texto || '') + '|' + (it.fecha || '');
   if (tipo === 'nominas') return (it.mes || '');
   if (tipo === 'gastos') return (it.concepto || '') + '|' + (it.fecha || '') + '|' + (it.categoria || '');
+  // PUNTO 162 (10/09/2026): facturas (Cobros→Factura/Cargo, y la pantalla
+  // "Facturar" ya retirada) — "mes" NO es único aquí (puede haber varios
+  // cargos el mismo mes), así que la huella usa también la fecha exacta y
+  // los inmuebles a los que afecta. Deliberadamente sin el importe, igual
+  // que el resto de huellas de esta función.
+  if (tipo === 'facturas') return (it.mes || '') + '|' + (it.fecha || '') + '|' + JSON.stringify((it.items || []).map(function(x) { return x.idx; }));
   return JSON.stringify(it);
 }
 function _conIdsGenerico(tipo, arr) {
@@ -2533,6 +2537,11 @@ window._mergeGenerico = _mergeGenerico; // expuesta para pruebas automáticas
 function _tipoGenericoDeClave(key) {
   if (key === 'facturacion:cobros') return 'cobros';
   if (key === 'facturacion:notas') return 'notas';
+  // PUNTO 162 (10/09/2026): ahora que cada factura/cargo tiene su propio id
+  // (ver guardarCobro y confirmFactura), "facturacion:facturas" ya puede
+  // blindarse igual que Cobros/Notas — dejó de estar excluida (ver el
+  // punto 160 más arriba, donde se dejó fuera a propósito por este motivo).
+  if (key === 'facturacion:facturas') return 'facturas';
   if (/^renta:nominas:/.test(key || '')) return 'nominas';
   if (/^renta:gastos:/.test(key || '')) return 'gastos';
   return null;
@@ -12069,9 +12078,11 @@ function confirmFactura(){
       const facturas=load(KEYS.facturas);
       // Eliminar factura del mismo mes si existía
       const filtered=facturas.filter(f=>f.mes!==mes);
-      // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
-      // sincronización de Facturación — mismo motivo que Contratos.
-      filtered.push({mes,fecha:hoy(),total,items,updatedAt:new Date().toISOString()});
+      // PUNTO 162 (10/09/2026): id propio y sello de modificación — ver nota
+      // completa en el otro punto de guardado de facturas (guardarCobro,
+      // más abajo). Aquí el mes SÍ es único (se filtra arriba antes de
+      // añadir), pero se le da id igualmente por coherencia con el resto.
+      filtered.push({id:_finGenId(),mes,fecha:hoy(),total,items,updatedAt:new Date().toISOString()});
       save(KEYS.facturas,filtered);
       // Sincronizar con histórico global
       // PUNTO 37 (25/08/2026): se marca origen:'individual' para poder distinguir
@@ -12524,13 +12535,24 @@ function guardarCobro(){
     // Cargo / factura manual
     const facturas=load(KEYS.facturas);
     const mesStr=fecha.substring(0,7);
-    // Añadir como factura manual sin mes duplicado — con flag 'manual'
+    // PUNTO 162 (10/09/2026): BUG REAL ENCONTRADO (revisando el punto 160,
+    // sin llegar a aplicarlo esa noche) — el comentario decía "sin mes
+    // duplicado" pero el código nunca comprobaba nada: se podía crear más
+    // de un cargo con el mismo mes (normal, uno por cada cobro/cargo que
+    // registres en la cuenta del inquilino) sin que "mes" sirviera para
+    // identificar cada uno por separado. Este dato alimenta el saldo
+    // pendiente de cada inquilino (Facturado/Cobrado/Saldo en su cuenta),
+    // así que se le da un id propio y estable — igual que a Cuentas/
+    // Acciones/Fondos (punto 93) — para poder blindar la sincronización
+    // sin arriesgarse a confundir dos cargos distintos del mismo mes.
     facturas.push({
+      id:_finGenId(),
       mes:mesStr,
       fecha:fecha,
       total:importe,
       manual:true,
-      items:[{idx:ctaInmuebleIdx,precio:importe,concepto:concepto||'Cargo manual'}]
+      items:[{idx:ctaInmuebleIdx,precio:importe,concepto:concepto||'Cargo manual'}],
+      updatedAt:new Date().toISOString()
     });
     save(KEYS.facturas,facturas);
   }
