@@ -2237,6 +2237,56 @@ function _inmueblesMerge(localJSON, remoteJSON) {
 }
 window._inmueblesMerge = _inmueblesMerge; // expuesta para pruebas automáticas
 
+// PUNTO 159 (10/09/2026) — BUG REAL CONFIRMADO CON DATOS REALES: la
+// renovación/IPC de un contrato (ej. Rahma Derfuifi, VIV01) se aplicaba bien
+// — se veía correcta en el aparato esa misma noche, con su PDF y su
+// contador de Renovaciones — pero al día siguiente había vuelto a su estado
+// anterior (renta y fecha de fin antiguas, 0 en Renovaciones), sin ningún
+// aviso de error. Mismo fallo de fondo que Inmuebles (67/71), Finanzas (93)
+// e Ideas (49), nunca extendido a Contratos: "contratos:lista" se guardaba
+// en la nube como UN SOLO BLOQUE con todos los contratos dentro. Si el
+// cambio local no llegaba a confirmarse en la nube a tiempo (un corte de
+// cobertura de un instante, o la PWA recargándose antes de que la subida
+// terminara — nada raro, pasa con un solo aparato, sin que haga falta tener
+// dos sitios abiertos a la vez), la siguiente carga de datos traía la copia
+// vieja de la nube y sustituía a la lista entera, borrando en silencio la
+// renovación recién aplicada.
+//
+// Arreglo: mismo mecanismo que Inmuebles — fusión contrato a contrato (por
+// su "id", que nunca cambia una vez creado), nunca sustitución del bloque
+// completo. A partir de ahora, cada función que modifica un contrato existente
+// también le pone la fecha de sello (updatedAt) — así, el contrato que se
+// acaba de tocar en un aparato nunca puede ser pisado por una copia de la
+// nube más vieja, la traiga quien la traiga.
+function _contratosMerge(localJSON, remoteJSON) {
+  try {
+    const locales = localJSON ? JSON.parse(localJSON) : [];
+    const remotos = remoteJSON ? JSON.parse(remoteJSON) : [];
+    const mapa = {};
+    const orden = [];
+    (locales || []).forEach(function(c) {
+      if (!c || !c.id) return;
+      if (!(c.id in mapa)) orden.push(c.id);
+      mapa[c.id] = c;
+    });
+    (remotos || []).forEach(function(c) {
+      if (!c || !c.id) return;
+      const actual = mapa[c.id];
+      if (!actual) { orden.push(c.id); mapa[c.id] = c; }
+      // Mismo criterio que Inmuebles/Finanzas: solo se decide por fecha
+      // cuando LAS DOS versiones ya tienen sello — un contrato local recién
+      // tocado, todavía sin sello confirmado, nunca se deja pisar por la
+      // copia de la nube, sea esta la que sea.
+      else if (actual.updatedAt && String(c.updatedAt || '') > String(actual.updatedAt)) mapa[c.id] = c;
+    });
+    return JSON.stringify(orden.map(function(id) { return mapa[id]; }));
+  } catch (e) {
+    console.warn('Fusión de contratos fallida, se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._contratosMerge = _contratosMerge; // expuesta para pruebas automáticas
+
 // PUNTO 93 (03/09/2026) — BUG REAL CONFIRMADO CON DATOS REALES: "creo una
 // cuenta nueva en Patricio y desaparece", "actualizo el saldo y vuelve al
 // antiguo". Misma causa de fondo que ya se corrigió en Inmuebles (67/71) e
@@ -2277,6 +2327,11 @@ function _finHuella(tipo, it) {
   // nombre y la fecha en la que se invirtió — nunca por el capital (mismo
   // criterio que el resto: no usar datos que puedan estar recién editados).
   if (tipo === 'urbanitae') return (it.nombre || '') + '|' + (it.fecha || '');
+  // PUNTO 160 (10/09/2026): posiciones de Acciones en modo simple (punto 148)
+  // — se identifican por su nombre (y, si viene de "Pasar a simple", por el
+  // ticker de origen, que nunca cambia) — nunca por Coste/Nº acciones/Valor
+  // actual, que es justo lo que se edita a mano en esta pantalla.
+  if (tipo === 'acciones_simple') return (it.nombre || '') + '|' + (it.origenTicker || '');
   // acciones: un movimiento se identifica por el valor, el tipo y la fecha.
   // Si algún día hay dos movimientos con exactamente los tres iguales (caso
   // raro), se resuelve igual que cualquier otra fusión: gana el más
@@ -2355,7 +2410,11 @@ window._finListaMerge = _finListaMerge; // expuesta para pruebas automáticas
 // fusionarse elemento a elemento (cuentas/acciones/fondos/urbanitae,
 // cualquier empresa) — y de qué tipo, para elegir la huella correcta.
 function _finTipoDeClave(key) {
-  const m = /^fin:(cuentas|acciones|fondos|urbanitae):/.exec(key || '');
+  // PUNTO 160 (10/09/2026): "acciones_simple" tiene que comprobarse igual que
+  // "acciones" — antes se colaba sin blindaje porque esta clave nunca
+  // encajaba con ninguna de las alternativas de la lista (el ":" que exige
+  // el patrón justo después del nombre nunca llegaba a coincidir).
+  const m = /^fin:(cuentas|acciones_simple|acciones|fondos|urbanitae):/.exec(key || '');
   return m ? m[1] : null;
 }
 
@@ -2401,6 +2460,114 @@ window._patHistMerge = _patHistMerge; // expuesta para pruebas automáticas
 function _esInmRegistroClave(key) {
   return key === 'inmuebles:alquileres_mensuales' || key === 'inmuebles:seguro_ibi';
 }
+
+// PUNTO 160 (10/09/2026): mismo blindaje ("fusión por id, nunca sustitución
+// en bloque") extendido a Clientes, Documentos y la tabla de Patrimonio
+// Financiero (fin:patrimonio_financiero:patricio) — las tres ya guardan un
+// "id" estable por registro (cli-<fecha>, doc-<fecha>, el propio mes), así
+// que reutilizan _patHistMerge tal cual, sin necesitar una función propia.
+function _esListaPorIdClave(key) {
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio';
+}
+
+// PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
+// filas con el mismo mes (todos sus puntos de guardado comprueban antes de
+// escribir) — mismo criterio que _patHistMerge, pero el campo estable se
+// llama "mes" en vez de "id". OJO: "facturacion:facturas" queda FUERA a
+// propósito — el cargo manual desde Cobros (guardarCobro) puede meter más de
+// una factura con el mismo mes sin comprobar antes, así que "mes" no es un
+// campo único ahí y usarlo aquí habría fusionado por error varias facturas
+// distintas del mismo mes en una sola. Se queda con la protección genérica
+// de bloque completo que ya tenía (más floja, pero sin este riesgo).
+function _esListaPorCampoClave(key) {
+  return key === 'facturacion:historico:patrimer' ||
+         key === 'facturacion:historico:patricio' || key === 'facturacion:historico:industrias';
+}
+
+// PUNTO 160 (10/09/2026): mismo blindaje ("fusión registro a registro") para
+// las listas que todavía no tienen ningún campo estable propio — Cobros,
+// Notas (de Facturación) y Nóminas/Gastos (Renta Patricio). Se les calcula
+// un "id" a partir de sus propios datos ESTABLES (nunca importe/precio, que
+// es justo lo que puede estar recién editado y sin sincronizar todavía en
+// otro aparato) — mismo criterio que ya usa Finanzas (_finHuella, PUNTO 93).
+function _huellaGenerica(tipo, it) {
+  if (tipo === 'cobros') return (it.inmuebleIdx != null ? it.inmuebleIdx : '') + '|' + (it.fecha || '') + '|' + (it.concepto || '');
+  if (tipo === 'notas') return (it.inmuebleIdx != null ? it.inmuebleIdx : '') + '|' + (it.texto || '') + '|' + (it.fecha || '');
+  if (tipo === 'nominas') return (it.mes || '');
+  if (tipo === 'gastos') return (it.concepto || '') + '|' + (it.fecha || '') + '|' + (it.categoria || '');
+  return JSON.stringify(it);
+}
+function _conIdsGenerico(tipo, arr) {
+  const vistos = {};
+  return (arr || []).filter(function(it) { return !!it; }).map(function(it) {
+    if (!it.id) {
+      const base = 'leg_' + tipo + '_' + _huellaGenerica(tipo, it);
+      let id = base, n = 2;
+      while (vistos[id]) { id = base + '_' + n; n++; }
+      it.id = id;
+    }
+    vistos[it.id] = true;
+    if (!it.updatedAt) it.updatedAt = '';
+    return it;
+  });
+}
+function _mergeGenerico(tipo, localJSON, remoteJSON) {
+  try {
+    const locales = _conIdsGenerico(tipo, localJSON ? JSON.parse(localJSON) : []);
+    const remotas = _conIdsGenerico(tipo, remoteJSON ? JSON.parse(remoteJSON) : []);
+    const mapa = {};
+    const orden = [];
+    locales.forEach(function(it) { if (!(it.id in mapa)) orden.push(it.id); mapa[it.id] = it; });
+    remotas.forEach(function(it) {
+      const actual = mapa[it.id];
+      if (!actual) { orden.push(it.id); mapa[it.id] = it; }
+      else if (actual.updatedAt && String(it.updatedAt || '') > String(actual.updatedAt)) mapa[it.id] = it;
+    });
+    return JSON.stringify(orden.map(function(id) { return mapa[id]; }));
+  } catch (e) {
+    console.warn('Fusión genérica fallida (' + tipo + '), se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._mergeGenerico = _mergeGenerico; // expuesta para pruebas automáticas
+function _tipoGenericoDeClave(key) {
+  if (key === 'facturacion:cobros') return 'cobros';
+  if (key === 'facturacion:notas') return 'notas';
+  if (/^renta:nominas:/.test(key || '')) return 'nominas';
+  if (/^renta:gastos:/.test(key || '')) return 'gastos';
+  return null;
+}
+
+// PUNTO 160 (10/09/2026): mismo mecanismo que _patHistMerge/_inmueblesMerge/
+// _contratosMerge (fusión por un campo estable que nunca cambia), pero
+// generalizado para poder indicar el nombre del campo — aquí "mes" en vez
+// de "id", para reutilizarlo en Facturación sin duplicar la misma lógica.
+function _mergePorCampo(campo, localJSON, remoteJSON) {
+  try {
+    const locales = localJSON ? JSON.parse(localJSON) : [];
+    const remotas = remoteJSON ? JSON.parse(remoteJSON) : [];
+    const mapa = {};
+    const orden = [];
+    (locales || []).forEach(function(r) {
+      if (!r || r[campo] == null) return;
+      const k = r[campo];
+      if (!(k in mapa)) orden.push(k);
+      mapa[k] = r;
+    });
+    (remotas || []).forEach(function(r) {
+      if (!r || r[campo] == null) return;
+      const k = r[campo];
+      const actual = mapa[k];
+      if (!actual) { orden.push(k); mapa[k] = r; }
+      else if (actual.updatedAt && String(r.updatedAt || '') > String(actual.updatedAt)) mapa[k] = r;
+    });
+    return JSON.stringify(orden.map(function(k) { return mapa[k]; }));
+  } catch (e) {
+    console.warn('Fusión genérica fallida (campo ' + campo + '), se usa la copia de la nube tal cual:', e.message);
+    return remoteJSON;
+  }
+}
+window._mergePorCampo = _mergePorCampo; // expuesta para pruebas automáticas
 
 // ── ESCRIBIR EN FIRESTORE ──────────────────────────────────────────
 window.syncToFirestore = async function(key, value) {
@@ -2460,6 +2627,12 @@ window.loadFromFirestore = async function() {
             const fusionado = _inmueblesMerge(actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
+          } else if (key === 'contratos:lista') {
+            // PUNTO 159: fusión contrato a contrato, nunca sustitución en bloque.
+            const actual = localStorage.getItem(key);
+            const fusionado = _contratosMerge(actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
           } else if (_finTipoDeClave(key)) {
             // PUNTO 93: fusión elemento a elemento (cuenta/movimiento/fondo),
             // nunca sustitución del bloque completo de la empresa.
@@ -2467,11 +2640,26 @@ window.loadFromFirestore = async function() {
             const fusionado = _finListaMerge(_finTipoDeClave(key), actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
-          } else if (_esPatHistClave(key) || _esInmRegistroClave(key)) {
-            // PUNTO 92/97: fusión fila a fila (una por mes o por año), nunca
+          } else if (_esPatHistClave(key) || _esInmRegistroClave(key) || _esListaPorIdClave(key)) {
+            // PUNTO 92/97/160: fusión fila a fila (por mes, año o id), nunca
             // sustitución del bloque completo — ver _patHistMerge más arriba.
             const actual = localStorage.getItem(key);
             const fusionado = _patHistMerge(actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
+          } else if (_esListaPorCampoClave(key)) {
+            // PUNTO 160: fusión fila a fila por "mes" (Facturación) — mismo
+            // motivo que arriba, campo distinto.
+            const actual = localStorage.getItem(key);
+            const fusionado = _mergePorCampo('mes', actual, data.value);
+            if (fusionado !== actual) localStorage.setItem(key, fusionado);
+            loaded++;
+          } else if (_tipoGenericoDeClave(key)) {
+            // PUNTO 160: fusión fila a fila con id calculado a partir de
+            // datos estables (Cobros/Notas/Nóminas/Gastos, sin id propio
+            // todavía) — mismo criterio que Finanzas (PUNTO 93).
+            const actual = localStorage.getItem(key);
+            const fusionado = _mergeGenerico(_tipoGenericoDeClave(key), actual, data.value);
             if (fusionado !== actual) localStorage.setItem(key, fusionado);
             loaded++;
           } else {
@@ -2541,6 +2729,18 @@ window.startFirebaseSync = function() {
           }
           return;
         }
+        if (key === 'contratos:lista') {
+          // PUNTO 159: fusión contrato a contrato, nunca sustitución en
+          // bloque — mismo motivo que Inmuebles justo arriba (ver el bug de
+          // la renovación de Rahma, 10/09/2026).
+          const actual = localStorage.getItem(key);
+          const fusionado = _contratosMerge(actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
         if (_finTipoDeClave(key)) {
           // PUNTO 93: fusión elemento a elemento (cuenta/movimiento/fondo),
           // nunca sustitución del bloque completo de la empresa — mismo
@@ -2553,11 +2753,33 @@ window.startFirebaseSync = function() {
           }
           return;
         }
-        if (_esPatHistClave(key) || _esInmRegistroClave(key)) {
-          // PUNTO 92/97: fusión fila a fila (una por mes o por año) — mismo
+        if (_esPatHistClave(key) || _esInmRegistroClave(key) || _esListaPorIdClave(key)) {
+          // PUNTO 92/97/160: fusión fila a fila (por mes, año o id) — mismo
           // motivo que en Finanzas justo arriba.
           const actual = localStorage.getItem(key);
           const fusionado = _patHistMerge(actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (_esListaPorCampoClave(key)) {
+          // PUNTO 160: fusión fila a fila por "mes" (Facturación) — mismo
+          // motivo que arriba, campo distinto.
+          const actual = localStorage.getItem(key);
+          const fusionado = _mergePorCampo('mes', actual, data.value);
+          if (fusionado !== actual) {
+            localStorage.setItem(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (_tipoGenericoDeClave(key)) {
+          // PUNTO 160: fusión fila a fila con id calculado (Cobros/Notas/
+          // Nóminas/Gastos) — mismo criterio que Finanzas (PUNTO 93).
+          const actual = localStorage.getItem(key);
+          const fusionado = _mergeGenerico(_tipoGenericoDeClave(key), actual, data.value);
           if (fusionado !== actual) {
             localStorage.setItem(key, fusionado);
             window._refreshCurrentModule && window._refreshCurrentModule(key);
@@ -2721,7 +2943,11 @@ window.cargarTradingOkarStats = async function() {
 <div id="splash" style="display:none">
 
   <!-- Volver a la pantalla de usuario/PIN, sin tener que cerrar la app -->
-  <div class="header-back" onclick="cerrarSesion()" title="Volver al inicio de sesión" style="position:absolute;top:16px;left:16px;">&#8592;</div>
+  <!-- PUNTO 161 (10/09/2026): mismo icono "‹" que usa el resto de la app —
+       este seguía con la flecha "←" antigua (retomando el punto 8, parcado
+       el 23/08/2026 para hacer una pasada visual completa; se corrige aquí
+       porque ya se ha identificado el hueco exacto). -->
+  <div class="header-back" onclick="cerrarSesion()" title="Volver al inicio de sesión" style="position:absolute;top:16px;left:16px;">&#8249;</div>
 
   <div class="splash-wordmark">
     <div class="splash-monogram">
@@ -2821,7 +3047,9 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   <!-- ── MÓDULO: INICIO ── -->
   <div id="mod-inicio" class="module-view active">
   <header class="header">
-    <button class="header-back" onclick="resetProfile()" title="Cambiar empresa">&#8592;</button>
+    <!-- PUNTO 161 (10/09/2026): mismo icono "‹" que usa el resto de la app —
+         ver nota en cerrarSesion() más arriba, mismo motivo. -->
+    <button class="header-back" onclick="resetProfile()" title="Cambiar empresa">&#8249;</button>
     <div class="header-identity">
       <div class="header-logo-row">
         <div class="header-logo-badge" id="hdrBadge"></div>
@@ -6534,9 +6762,11 @@ function fac_sincronizarHistoricoPatricio() {
     var idxData = -1;
     for (var d = 0; d < data.length; d++) { if (data[d].mes === mes) { idxData = d; break; } }
     if (idxData >= 0) {
-      if (data[idxData].origen !== 'manual') { data[idxData].importe = total; data[idxData].origen = 'alqmen'; }
+      // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje de
+      // sincronización que Contratos, aplicado al Histórico de Facturación.
+      if (data[idxData].origen !== 'manual') { data[idxData].importe = total; data[idxData].origen = 'alqmen'; data[idxData].updatedAt = new Date().toISOString(); }
     } else {
-      data.push({ mes: mes, importe: total, origen: 'alqmen' });
+      data.push({ mes: mes, importe: total, origen: 'alqmen', updatedAt: new Date().toISOString() });
     }
   }
   data.sort(function(a, b) { return a.mes.localeCompare(b.mes); });
@@ -8302,6 +8532,10 @@ function sp_guardar() {
   if (!contratos[idx].subidasPactadas) contratos[idx].subidasPactadas = [];
   contratos[idx].subidasPactadas.push({ fecha: fecha, importe: importe, aplicada: false });
   contratos[idx].subidasPactadas.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  // PUNTO 159 (10/09/2026): sello de fecha para el blindaje de sincronización
+  // (_contratosMerge) — sin esto, una copia vieja de la nube podría volver a
+  // pisar este cambio en silencio, igual que le pasó a la renovación de Rahma.
+  contratos[idx].updatedAt = new Date().toISOString();
   localStorage.setItem('contratos:lista', JSON.stringify(contratos));
   _detalleContratoActual = contratos[idx];
 
@@ -8317,6 +8551,9 @@ function sp_marcarAplicada(i) {
   const idx = contratos.findIndex(x => x.id === _detalleContratoActual.id);
   if (idx < 0 || !contratos[idx].subidasPactadas || !contratos[idx].subidasPactadas[i]) return;
   contratos[idx].subidasPactadas[i].aplicada = true;
+  // PUNTO 159 (10/09/2026): sello para el blindaje de sincronización — ver
+  // _contratosMerge.
+  contratos[idx].updatedAt = new Date().toISOString();
   localStorage.setItem('contratos:lista', JSON.stringify(contratos));
   _detalleContratoActual = contratos[idx];
   renderDetalleContrato(contratos[idx]);
@@ -8330,6 +8567,9 @@ function sp_eliminar(i) {
   const idx = contratos.findIndex(x => x.id === _detalleContratoActual.id);
   if (idx < 0 || !contratos[idx].subidasPactadas) return;
   contratos[idx].subidasPactadas.splice(i, 1);
+  // PUNTO 159 (10/09/2026): sello para el blindaje de sincronización — ver
+  // _contratosMerge.
+  contratos[idx].updatedAt = new Date().toISOString();
   localStorage.setItem('contratos:lista', JSON.stringify(contratos));
   _detalleContratoActual = contratos[idx];
   renderDetalleContrato(contratos[idx]);
@@ -9753,7 +9993,10 @@ async function generarPDF() {
       if (datos.tipo === 'renov' || datos.tipo === 'rescision') {
         const estadoAnterior = datos.tipo === 'renov' ? 'renovado' : 'rescindido';
         contratos.forEach(c => {
-          if (c.ref === datos.ref && c.estado === 'activo') c.estado = estadoAnterior;
+          // PUNTO 159 (10/09/2026): sello de fecha al cambiar el estado del
+          // contrato anterior — para el blindaje de sincronización, ver
+          // _contratosMerge.
+          if (c.ref === datos.ref && c.estado === 'activo') { c.estado = estadoAnterior; c.updatedAt = ahora; }
         });
       }
 
@@ -9812,7 +10055,10 @@ async function generarPDF() {
         // El propio documento de Rescisión no es una tenencia en vigor —
         // se guarda como "rescindido" desde el principio.
         estado: (datos.tipo === 'rescision') ? 'rescindido' : 'activo',
-        creadoEn: ahora
+        creadoEn: ahora,
+        // PUNTO 159 (10/09/2026): sello de fecha desde el momento de creación
+        // — para el blindaje de sincronización, ver _contratosMerge.
+        updatedAt: ahora
       };
       contratos.unshift(nuevoContrato);
       localStorage.setItem('contratos:lista', JSON.stringify(contratos));
@@ -9853,7 +10099,11 @@ async function generarPDF() {
           // BLINDAJE DE DATOS: empresa a la que pertenece este cliente —
           // sin esto, Clientes mostraba mezclados los inquilinos de las 3
           // empresas sin importar cuál estuviera activa.
-          propietario: existe >= 0 ? (clientes[existe].propietario || arrendadorActivo) : arrendadorActivo
+          propietario: existe >= 0 ? (clientes[existe].propietario || arrendadorActivo) : arrendadorActivo,
+          // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje
+          // de sincronización de Clientes — ver _contratosMerge (mismo
+          // motivo, misma solución, ahora extendida aquí).
+          updatedAt: ahora
         };
         if (existe >= 0) {
           clientes[existe] = clienteData;
@@ -10698,7 +10948,9 @@ function fac_guardarHistorico() {
   var data = fac_loadHistorico();
   var idx = -1;
   for (var i = 0; i < data.length; i++) { if (data[i].mes === mes) { idx = i; break; } }
-  if (idx >= 0) { data[idx].importe = imp; data[idx].origen = 'manual'; } else { data.push({mes: mes, importe: imp, origen: 'manual'}); }
+  // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje de
+  // sincronización que Contratos, aplicado al Histórico de Facturación.
+  if (idx >= 0) { data[idx].importe = imp; data[idx].origen = 'manual'; data[idx].updatedAt = new Date().toISOString(); } else { data.push({mes: mes, importe: imp, origen: 'manual', updatedAt: new Date().toISOString()}); }
   data.sort(function(a,b){ return a.mes.localeCompare(b.mes); });
   fac_saveHistorico(data);
   closeModalById('fac-modal-historico');
@@ -11388,6 +11640,10 @@ function kurra_guardarApunte(){
   const fecha=anio+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
 
   const lista=kurra_load();
+  // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+  // sincronización de KURRA (ya tenía "id" propio, pero le faltaba este
+  // sello) — mismo motivo que Contratos/Clientes/Documentos.
+  const _kurraAhora=new Date().toISOString();
   if(_kurraEditId){
     const idx=lista.findIndex(x=>x.id===_kurraEditId);
     if(idx>=0){
@@ -11395,9 +11651,10 @@ function kurra_guardarApunte(){
       lista[idx].concepto=conceptoTexto;
       lista[idx].tipo=tipo;
       lista[idx].importe=importe;
+      lista[idx].updatedAt=_kurraAhora;
     }
   } else {
-    lista.push({id:_finGenId(),fecha,concepto:conceptoTexto,tipo,importe});
+    lista.push({id:_finGenId(),fecha,concepto:conceptoTexto,tipo,importe,updatedAt:_kurraAhora});
   }
   kurra_save(lista);
   closeModalById('kurra-modal-apunte');
@@ -11656,6 +11913,9 @@ function tickNota(localIdx){
   if(!propias[localIdx])return;
   const globalIdx=notas.indexOf(propias[localIdx]);
   notas[globalIdx].done=!notas[globalIdx].done;
+  // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+  // sincronización de Notas — mismo motivo que Contratos/Clientes/KURRA.
+  notas[globalIdx].updatedAt=new Date().toISOString();
   save(KEYS.notas,notas);
   renderNotasCuenta(ctaInmuebleIdx);
 }
@@ -11809,7 +12069,9 @@ function confirmFactura(){
       const facturas=load(KEYS.facturas);
       // Eliminar factura del mismo mes si existía
       const filtered=facturas.filter(f=>f.mes!==mes);
-      filtered.push({mes,fecha:hoy(),total,items});
+      // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+      // sincronización de Facturación — mismo motivo que Contratos.
+      filtered.push({mes,fecha:hoy(),total,items,updatedAt:new Date().toISOString()});
       save(KEYS.facturas,filtered);
       // Sincronizar con histórico global
       // PUNTO 37 (25/08/2026): se marca origen:'individual' para poder distinguir
@@ -11818,7 +12080,9 @@ function confirmFactura(){
       var hist = fac_loadHistorico();
       var idx = -1;
       for (var hi = 0; hi < hist.length; hi++) { if (hist[hi].mes === mes) { idx = hi; break; } }
-      if (idx >= 0) { hist[idx].importe = total; hist[idx].origen = 'individual'; } else { hist.push({mes: mes, importe: total, origen: 'individual'}); hist.sort(function(a,b){return a.mes.localeCompare(b.mes);}); }
+      // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje que el
+      // resto del Histórico de Facturación.
+      if (idx >= 0) { hist[idx].importe = total; hist[idx].origen = 'individual'; hist[idx].updatedAt = new Date().toISOString(); } else { hist.push({mes: mes, importe: total, origen: 'individual', updatedAt: new Date().toISOString()}); hist.sort(function(a,b){return a.mes.localeCompare(b.mes);}); }
       fac_saveHistorico(hist);
       info('✓ Factura de '+mesNombre(mes)+' guardada correctamente.');
       showMain();
@@ -11897,7 +12161,9 @@ function facCobro_guardar(){
   const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
   if(cobrado>0){
     const cobros=load(KEYS.cobros);
-    cobros.push({inmuebleIdx:it.idx,fecha:hoy(),importe:cobrado,concepto:'Cobro '+mesNombre(mesActual())});
+    // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+    // sincronización de Cobros — mismo motivo que Contratos.
+    cobros.push({inmuebleIdx:it.idx,fecha:hoy(),importe:cobrado,concepto:'Cobro '+mesNombre(mesActual()),updatedAt:new Date().toISOString()});
     save(KEYS.cobros,cobros);
     renderAnalisis();
     renderCobros();
@@ -12066,6 +12332,14 @@ function ipc_aplicar(){
       finNuevoIpc = _finD.toISOString().slice(0,10);
       contratos[idx].fin = finNuevoIpc;
     }
+    // PUNTO 159 (10/09/2026) — BUG REAL ENCONTRADO Y CORREGIDO: esta era la
+    // renovación de Rahma Derfuifi que "desaparecía" al día siguiente. Se
+    // guardaba bien en el aparato, pero al no llevar sello de fecha, una
+    // copia vieja de la nube (por ejemplo si la subida no llegó a
+    // confirmarse a tiempo) podía volver a pisarla sin avisar en la
+    // siguiente carga. Con el sello puesto, el blindaje de sincronización
+    // (_contratosMerge) ya no deja que eso vuelva a pasar.
+    contratos[idx].updatedAt = new Date().toISOString();
     localStorage.setItem('contratos:lista',JSON.stringify(contratos));
   }
 
@@ -12792,7 +13066,9 @@ document.addEventListener('firebaseLoaded', function() {
       var aniosAnadidos = [];
       Object.keys(TOTAL_ANUAL_PATRICIO_2015_2024).forEach(function (yr) {
         if (aniosAntes[yr]) return; // ya hay algo ese año — no se toca
-        histAnualData.push({ mes: yr + '-12', importe: TOTAL_ANUAL_PATRICIO_2015_2024[yr], origen: 'manual-anual' });
+        // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje que
+        // el resto del Histórico de Facturación.
+        histAnualData.push({ mes: yr + '-12', importe: TOTAL_ANUAL_PATRICIO_2015_2024[yr], origen: 'manual-anual', updatedAt: new Date().toISOString() });
         aniosAnadidos.push(yr);
       });
       if (aniosAnadidos.length > 0) {
@@ -14060,7 +14336,10 @@ async function guardarEntrada(tipo, inmueble, nombre, reemplazar = false) {
     dataUrl:   a.dataUrl,
     // BLINDAJE DE DATOS: empresa activa al subir el documento — ver
     // doc_renderLista() para el filtrado.
-    propietario: localStorage.getItem('patrimer:empresa') || 'patrimer'
+    propietario: localStorage.getItem('patrimer:empresa') || 'patrimer',
+    // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+    // sincronización de Documentos — mismo motivo que Contratos/Clientes.
+    updatedAt: new Date().toISOString()
   };
 
   docs.unshift(doc);
@@ -14128,7 +14407,11 @@ function renombrarDoc() {
   const existe = docs.find(d => d.id !== docSeleccionado.id && d.nombre.toLowerCase() === nombre.toLowerCase());
   if (existe) { showToast('⚠️ Ya existe un documento con ese nombre', 'warning'); return; }
   const nombreAnterior = docSeleccionado.nombre;
+  const updatedAtAnterior = docSeleccionado.updatedAt;
   docSeleccionado.nombre = nombre;
+  // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje que el
+  // resto de Documentos.
+  docSeleccionado.updatedAt = new Date().toISOString();
   saveDocs(docs).then(ok => {
     if (ok) {
       document.getElementById('detail-nombre').textContent = nombre;
@@ -14136,6 +14419,7 @@ function renombrarDoc() {
       showToast('✅ Renombrado', 'success');
     } else {
       docSeleccionado.nombre = nombreAnterior; // revertir — no se ha podido guardar
+      docSeleccionado.updatedAt = updatedAtAnterior;
       showToast('❌ No se ha podido guardar el cambio de nombre', 'error');
     }
   });
@@ -16301,7 +16585,10 @@ function finper_guardar() {
   if (existente && !idEdit) {
     if (!confirm('Ya hay datos guardados para ese mes. ¿Los sustituyo?')) return;
   }
-  var row = { id: mesId, caixa: caixa, myinvestor: myinvestor, traderepublic: traderepublic };
+  // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje de
+  // sincronización que Contratos, aplicado a la tabla de Patrimonio
+  // Financiero (ya tenía "id" propio, pero le faltaba este sello).
+  var row = { id: mesId, caixa: caixa, myinvestor: myinvestor, traderepublic: traderepublic, updatedAt: new Date().toISOString() };
   if (existente) {
     lista = lista.map(function (x) { return x.id === mesId ? row : x; });
   } else {
@@ -18547,6 +18834,9 @@ function cli_guardarEdicion() {
   clientes[idx].email    = document.getElementById('cli-edit-email').value.trim();
   clientes[idx].domicilio = document.getElementById('cli-edit-dom').value.trim();
   clientes[idx].notas    = document.getElementById('cli-edit-notas').value.trim();
+  // PUNTO 160 (10/09/2026): sello de modificación — ver nota en el guardado
+  // automático desde Contratos, mismo blindaje.
+  clientes[idx].updatedAt = new Date().toISOString();
 
   localStorage.setItem('clientes:lista', JSON.stringify(clientes));
   cli_clienteActivo = clientes[idx];
@@ -18670,7 +18960,10 @@ function cli_guardarNuevo() {
     creadoEn: ahora,
     // BLINDAJE DE DATOS: empresa activa en el momento de crearlo — ver nota
     // en el guardado automático desde Contratos.
-    propietario: localStorage.getItem('patrimer:empresa') || 'patrimer'
+    propietario: localStorage.getItem('patrimer:empresa') || 'patrimer',
+    // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje que el
+    // resto de Clientes.
+    updatedAt: ahora
   };
   clientes.unshift(nuevoCliente);
   localStorage.setItem('clientes:lista', JSON.stringify(clientes));
@@ -18804,6 +19097,9 @@ function cli_marcarAntiguo() {
   if (idx < 0) return;
   const nuevoEstado = clientes[idx].estado === 'antiguo' ? 'activo' : 'antiguo';
   clientes[idx].estado = nuevoEstado;
+  // PUNTO 160 (10/09/2026): sello de modificación — mismo blindaje que el
+  // resto de Clientes.
+  clientes[idx].updatedAt = new Date().toISOString();
   localStorage.setItem('clientes:lista', JSON.stringify(clientes));
   showToast(nuevoEstado === 'antiguo' ? '📦 Cliente movido a Antiguos' : '✅ Cliente marcado como Activo', 'success');
   cli_cerrarDetalle();
@@ -19285,10 +19581,13 @@ function renta_guardarNomina() {
   var ss = parseFmtGlobal(document.getElementById('renta-nom-ss').value);
   if (!mes || !bruto) { alert('Introduce al menos el mes y el salario bruto.'); return; }
   var arr = renta_getNominas();
+  // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+  // sincronización de Nóminas — mismo motivo que Contratos.
+  var _rentaAhora = new Date().toISOString();
   if (renta_nomEditIdx >= 0 && renta_nomEditIdx < arr.length) {
-    arr[renta_nomEditIdx] = { mes: mes, bruto: bruto, retencion: retencion, ss: ss };
+    arr[renta_nomEditIdx] = { mes: mes, bruto: bruto, retencion: retencion, ss: ss, updatedAt: _rentaAhora };
   } else {
-    arr.push({ mes: mes, bruto: bruto, retencion: retencion, ss: ss });
+    arr.push({ mes: mes, bruto: bruto, retencion: retencion, ss: ss, updatedAt: _rentaAhora });
   }
   renta_nomEditIdx = -1;
   renta_saveNominas(arr);
@@ -19696,7 +19995,9 @@ function renta_guardarGasto() {
 
   function guardarConFoto(fotoUrl) {
     var arr = renta_getGastos();
-    arr.push({ concepto: concepto, importe: importe, fecha: fecha, categoria: categoria, fotoUrl: fotoUrl || null });
+    // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+    // sincronización de Gastos — mismo motivo que Contratos.
+    arr.push({ concepto: concepto, importe: importe, fecha: fecha, categoria: categoria, fotoUrl: fotoUrl || null, updatedAt: new Date().toISOString() });
     renta_saveGastos(arr);
     renta_cerrarModalGasto();
     document.getElementById('renta-gasto-concepto').value = '';
@@ -19825,12 +20126,15 @@ function ingotros_guardar() {
   var declaraIrpf = esOtros ? document.getElementById('ingotros-declara').checked : false;
   if (!concepto || !importe || !fecha) { alert('Introduce concepto, importe y fecha.'); return; }
   var arr = ingotros_load();
+  // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
+  // sincronización de "Otros ingresos" — mismo motivo que Contratos.
+  var _ingotrosAhora = new Date().toISOString();
   if (idEdit) {
     for (var i = 0; i < arr.length; i++) {
-      if (arr[i].id === idEdit) { arr[i].concepto = concepto; arr[i].importe = importe; arr[i].fecha = fecha; arr[i].declaraIrpf = declaraIrpf; break; }
+      if (arr[i].id === idEdit) { arr[i].concepto = concepto; arr[i].importe = importe; arr[i].fecha = fecha; arr[i].declaraIrpf = declaraIrpf; arr[i].updatedAt = _ingotrosAhora; break; }
     }
   } else {
-    arr.push({ id: 'ing_' + Date.now(), concepto: concepto, importe: importe, fecha: fecha, declaraIrpf: declaraIrpf });
+    arr.push({ id: 'ing_' + Date.now(), concepto: concepto, importe: importe, fecha: fecha, declaraIrpf: declaraIrpf, updatedAt: _ingotrosAhora });
   }
   ingotros_save(arr);
   ingotros_cerrarModal();
@@ -19854,6 +20158,22 @@ function ingotros_borrar(id) {
 // (Lala / Tortugas / Otros — punto 111). "Otros" agrupa todo lo que no sea
 // exactamente "Lala" o "Tortugas" (mismo criterio que ya usa ingotros_editar
 // para decidir si un apunte es de texto libre "Otros" o uno de los 2 fijos).
+// PUNTO 161 (10/09/2026): BUG REAL ENCONTRADO — fmtGlobal() (más arriba en
+// el archivo) omite a propósito los ",00" cuando el importe es un número
+// redondo (sin céntimos), pensado para totales grandes donde eso queda más
+// limpio. En la lista de "Otros ingresos" eso provoca justo la
+// inconsistencia que reportaste: filas con céntimos muestran "385,68 €" y
+// filas sin céntimos muestran "495 €" en la misma lista, sin ningún criterio
+// visible para quien la mira. Mismo tipo de fallo de fondo que el punto 146
+// (una función de formato que se comporta de forma distinta según el
+// importe), pero aquí no toca fmtGlobal() en sí — cambiarla habría afectado
+// también a Nóminas, Gastos y otras pantallas que no has pedido tocar. Este
+// formateador, solo para esta lista, siempre muestra los 2 decimales.
+function ingotros_fmt2(n) {
+  var v = parseFloat(n) || 0;
+  var parts = v.toFixed(2).split('.');
+  return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + parts[1];
+}
 function ingotros_subtotalesPorConcepto(arr) {
   var t = { Lala: 0, Tortugas: 0, Otros: 0 };
   for (var i = 0; i < arr.length; i++) {
@@ -19879,7 +20199,7 @@ function ingotros_render() {
     var chip = function (label, val) {
       return '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 6px;text-align:center;">'
         + '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">' + label + '</div>'
-        + '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);">' + fmtGlobal(val) + ' €</div></div>';
+        + '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);">' + ingotros_fmt2(val) + ' €</div></div>';
     };
     subEl.innerHTML = chip('Lala', sub.Lala) + chip('Tortugas', sub.Tortugas) + chip('Otros', sub.Otros);
   }
@@ -19893,13 +20213,13 @@ function ingotros_render() {
       + (it.declaraIrpf ? ' <span style="font-size:9px;font-weight:700;color:#5b8dee;background:rgba(91,141,238,0.15);border-radius:4px;padding:2px 5px;vertical-align:middle;">IRPF</span>' : '') + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">' + (it.fecha || '') + '</div></div>'
       + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">+' + fmtGlobal(it.importe) + ' €</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">+' + ingotros_fmt2(it.importe) + ' €</div>'
       + '<button onclick="ingotros_editar(\'' + it.id + '\')" style="background:none;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;">✎</button>'
       + '<button onclick="ingotros_borrar(\'' + it.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
       + '</div></div>';
   }
   cont.innerHTML = html;
-  document.getElementById('renta-total-ingresos-otros').textContent = fmtGlobal(total) + ' €';
+  document.getElementById('renta-total-ingresos-otros').textContent = ingotros_fmt2(total) + ' €';
 }
 function ingotros_totalAnio(year) {
   var arr = ingotros_load();
