@@ -2847,7 +2847,8 @@ signInAnonymously(auth).then(() => {
 async function _tradingConsultarModo(modo) {
   const q = query(collection(db, 'trading_operaciones'), where('modo', '==', modo));
   const snap = await getDocs(q);
-  let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, ultimaFecha = '';
+  let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, eurAcumulado = 0, tieneEUR = 0, ultimaFecha = '';
+  let ops = [];
   snap.forEach((docSnap) => {
     const d = docSnap.data();
     if (d._test === true) return;
@@ -2855,10 +2856,26 @@ async function _tradingConsultarModo(modo) {
     numOperaciones++;
     if (typeof d.resultadoEUR === 'number' && d.resultadoEUR > 0) ganadoras++;
     if (typeof d.resultadoR === 'number') { rAcumulada += d.resultadoR; tieneR++; }
+    if (typeof d.resultadoEUR === 'number') { eurAcumulado += d.resultadoEUR; tieneEUR++; }
     const fh = (d.fecha || '') + ' ' + (d.hora || '');
     if (fh > ultimaFecha) ultimaFecha = fh;
+    ops.push({ fh: fh, eur: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR : null });
   });
-  return { numOperaciones, ganadoras, rAcumulada, tieneR, ultimaFecha };
+  // PUNTO 165 (10/09/2026): serie cronológica del € acumulado, para la
+  // gráfica de líneas pedida en este punto — se ordena por fecha+hora
+  // (formato 'YYYY-MM-DD HH:MM', ordenable como texto) y se va acumulando
+  // resultadoEUR operación a operación en ese orden. No usa "capital
+  // inicial" (no vive en la nube, solo en el móvil de TradingOkar — punto
+  // 87) — es un acumulado de resultados, no un saldo de cuenta.
+  ops.sort(function(a, b) { return a.fh < b.fh ? -1 : (a.fh > b.fh ? 1 : 0); });
+  let serieEUR = [];
+  let acumSerie = 0;
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i].eur === null) continue;
+    acumSerie += ops[i].eur;
+    serieEUR.push(acumSerie);
+  }
+  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, serieEUR, ultimaFecha };
 }
 window.cargarTradingOkarStats = async function() {
   try {
@@ -2880,6 +2897,7 @@ window.cargarTradingOkarStats = async function() {
       numOperaciones: stats.numOperaciones,
       winrate: stats.numOperaciones ? (stats.ganadoras / stats.numOperaciones) * 100 : null,
       rAcumulada: stats.rAcumulada, tieneR: stats.tieneR,
+      eurAcumulado: stats.eurAcumulado, tieneEUR: stats.tieneEUR, serieEUR: stats.serieEUR,
       ultimaFecha: stats.ultimaFecha.trim()
     };
   } catch (e) {
@@ -3081,7 +3099,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="kpi-s" id="dash-acum-pct" style="font-size:11px;text-align:center;color:var(--silver-mid);">—</div>
       </div>
       <div class="kpi" onclick="showModule('cobros')" style="cursor:pointer;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;display:flex;flex-direction:column;justify-content:center;">
-        <div class="kpi-l" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:6px;text-align:center;">PREVISIÓN ANUAL</div>
+        <div class="kpi-l" id="dash-prevision-titulo" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:6px;text-align:center;">PREVISIÓN ANUAL</div>
         <div class="kpi-v" id="dash-prevision" style="font-size:22px;font-weight:700;text-align:center;">—</div>
         <div class="kpi-s up" id="dash-prevision-s" style="font-size:12px;text-align:center;">—</div>
       </div>
@@ -5039,8 +5057,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div id="fin-fondos-body">
     <div id="fin-fondos-lista"></div>
-    <div class="fin-total-row" id="fin-fondos-total" style="display:none">
-      <span>Total fondos</span><span id="fin-fondos-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    <!-- PUNTO 163 (10/09/2026): mismo estilo que "Total Liquidez" (punto 151)
+    — una sola línea centrada, en verde y más grande — a petición tuya,
+    extendido también a Acciones y Urbanitae más abajo. -->
+    <div class="fin-total-row" id="fin-fondos-total" style="display:none;justify-content:center;padding:14px 4px 4px;">
+      <span id="fin-fondos-total-val" style="color:var(--accent-green);font-weight:700;font-size:17px;">-</span>
     </div>
     </div>
   </div>
@@ -5052,8 +5073,9 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div id="fin-acciones-body">
     <div id="fin-acciones-lista"></div>
-    <div class="fin-total-row" id="fin-acciones-total" style="display:none">
-      <span>Total acciones</span><span id="fin-acciones-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    <!-- PUNTO 163 (10/09/2026): mismo estilo que "Total Liquidez". -->
+    <div class="fin-total-row" id="fin-acciones-total" style="display:none;justify-content:center;padding:14px 4px 4px;">
+      <span id="fin-acciones-total-val" style="color:var(--accent-green);font-weight:700;font-size:17px;">-</span>
     </div>
     </div>
   </div>
@@ -5070,8 +5092,9 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div id="fin-urbanitae-body">
     <div id="fin-urbanitae-lista"></div>
-    <div class="fin-total-row" id="fin-urbanitae-total" style="display:none">
-      <span>Total invertido (en curso)</span><span id="fin-urbanitae-total-val" style="color:var(--accent-blue);font-weight:700;">-</span>
+    <!-- PUNTO 163 (10/09/2026): mismo estilo que "Total Liquidez". -->
+    <div class="fin-total-row" id="fin-urbanitae-total" style="display:none;justify-content:center;padding:14px 4px 4px;">
+      <span id="fin-urbanitae-total-val" style="color:var(--accent-green);font-weight:700;font-size:17px;">-</span>
     </div>
     </div>
   </div>
@@ -13173,6 +13196,70 @@ document.addEventListener('firebaseLoaded', function() {
   } catch (e) {
     console.warn('[Migración cuentas Fondos/Acciones] fallo, no se ha tocado nada:', e);
   }
+  // PUNTO 164 (10/09/2026): separación de "MyInvestor" en Finanzas → Fondos.
+  // Estaba metido como una sola posición combinada (nombre "MYINVESTOR"),
+  // pero según tus 2 capturas de MyInvestor son en realidad dos productos
+  // distintos con su propio ISIN/código, valor y aportado. Se sustituye esa
+  // única ficha por dos fichas nuevas, con los datos exactos de tus capturas
+  // (confirmados por ti el 10/09/2026 tras revisar una diferencia en el
+  // aportado que no cuadraba con la ficha combinada). Solo se ejecuta una
+  // vez, y solo si sigue existiendo la ficha combinada (si ya la separaste
+  // tú a mano antes de que llegara este archivo, no se toca nada).
+  try {
+    if (!localStorage.getItem('migracion:myinvestor_split_v1')) {
+      var fondosMy = fin_load('fin:fondos');
+      var idxMy = -1;
+      for (var iMy = 0; iMy < fondosMy.length; iMy++) {
+        var fMy = fondosMy[iMy];
+        var nomMy = ((fMy.nombre || '') + ' ' + (fMy.gestora || '')).toLowerCase();
+        // Excluye por seguridad cualquier ficha que ya lleve el código de
+        // uno de los dos productos nuevos (evita duplicar si esto se
+        // ejecutara dos veces por algún motivo).
+        if (nomMy.indexOf('myinvestor') !== -1 && nomMy.indexOf('n5394') === -1 && nomMy.indexOf('ie000zyrh0q7') === -1) {
+          idxMy = iMy;
+          break;
+        }
+      }
+      if (idxMy !== -1) {
+        var origMy = fondosMy[idxMy];
+        var ahoraMy = new Date().toISOString();
+        // Se conserva la configuración de DCA (si la tenía activada) en la
+        // ficha del fondo indexado — es el caso más habitual para una
+        // aportación periódica automática. Si la tenías puesta en el plan
+        // de pensiones, revísalo tras esta actualización.
+        var planPensionesMy = {
+          id: _finGenId(),
+          nombre: 'MyInvestor Indexado — Plan de Pensiones (N5394)',
+          gestora: 'MyInvestor',
+          cuenta: 'myinvestor',
+          aportado: 16653.58,
+          valor: 18250.32,
+          dcaActivo: false, dcaImporte: 0, dcaPeriodicidad: 0, dcaFechaInicio: '', dcaUltimaAplicada: '',
+          updatedAt: ahoraMy
+        };
+        var fondoIndexadoMy = {
+          id: _finGenId(),
+          nombre: 'iShares Developed World Index (IE) Acc EUR S (IE000ZYRH0Q7)',
+          gestora: 'MyInvestor',
+          cuenta: 'myinvestor',
+          aportado: 3387.52,
+          valor: 3618.11,
+          dcaActivo: !!origMy.dcaActivo,
+          dcaImporte: origMy.dcaImporte || 0,
+          dcaPeriodicidad: origMy.dcaPeriodicidad || 0,
+          dcaFechaInicio: origMy.dcaFechaInicio || '',
+          dcaUltimaAplicada: origMy.dcaUltimaAplicada || '',
+          updatedAt: ahoraMy
+        };
+        fondosMy.splice(idxMy, 1, planPensionesMy, fondoIndexadoMy);
+        fin_save('fin:fondos', fondosMy);
+        console.log('[Migración MyInvestor] ficha combinada sustituida por Plan de Pensiones + Fondo indexado.');
+      }
+      localStorage.setItem('migracion:myinvestor_split_v1', '1');
+    }
+  } catch (e) {
+    console.warn('[Migración MyInvestor] fallo, no se ha tocado nada:', e);
+  }
   // PUNTO 99 (06/09/2026): se ejecuta en cada carga (no es una migración de
   // una sola vez, es autocorrectiva) para que Inicio/Análisis/Histórico
   // reflejen siempre el alquiler real de Patricio — ver fac_sincronizarHistoricoPatricio.
@@ -15128,6 +15215,12 @@ function _pintarTrading(r) {
   }
   var winTxt = r.winrate === null ? '—' : r.winrate.toFixed(1).replace('.', ',') + '%';
   var rTxt = (r.rAcumulada >= 0 ? '+' : '') + r.rAcumulada.toFixed(1).replace('.', ',') + 'R';
+  // PUNTO 165 (10/09/2026): a petición tuya, el € ganado/perdido pasa a ser
+  // el dato principal de esta tarjeta (es lo que de verdad te dice cómo va
+  // tu rentabilidad) — la R acumulada se mantiene debajo, porque sigues
+  // queriéndola para analizar tu operativa (calidad de las entradas/salidas
+  // respecto al riesgo asumido), solo que ya no es el dato destacado.
+  var eurTxt = (typeof r.eurAcumulado === 'number') ? ((r.eurAcumulado >= 0 ? '+' : '') + fmtE(r.eurAcumulado)) : '—';
   var html = '';
   if (r.esDemo) {
     html += '<div style="font-size:11px;color:#d9a441;background:rgba(217,164,65,0.12);border:1px dashed #d9a441;border-radius:8px;padding:6px 10px;margin-bottom:8px;text-align:center;">🧪 Cuenta demo — todavía no hay operaciones reales en TradingOkar</div>';
@@ -15135,12 +15228,49 @@ function _pintarTrading(r) {
   html += '<div class="fin-patrimonio-rows compact">';
   html += '<div class="row"><span>Operaciones</span><span>' + r.numOperaciones + '</span></div>';
   html += '<div class="row"><span>Winrate</span><span>' + winTxt + '</span></div>';
+  html += '<div class="row"><span>Resultado (€)</span><span style="color:' + (r.eurAcumulado >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';font-weight:700;">' + eurTxt + '</span></div>';
   html += '<div class="row"><span>R acumulada</span><span style="color:' + (r.rAcumulada >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + rTxt + '</span></div>';
   html += '</div>';
   if (r.tieneR < r.numOperaciones) {
     html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:8px;">' + (r.numOperaciones - r.tieneR) + ' operación(es) sin stop puesto — no cuentan en la R acumulada.</div>';
   }
+  // PUNTO 165 (10/09/2026): gráfica de líneas del € acumulado, operación a
+  // operación en orden cronológico ("las entradas" que pediste) — SVG
+  // dibujado a mano, mismo criterio que el resto de la app (nada de
+  // librerías externas de gráficas). Con menos de 2 puntos no se dibuja
+  // (no hay línea que trazar).
+  var chartHtml = _tradingBuildChart(r.serieEUR);
+  if (chartHtml) {
+    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:10px;margin-bottom:2px;">Evolución del resultado acumulado (€) por operación</div>';
+    html += chartHtml;
+  }
   cont.innerHTML = html;
+}
+// PUNTO 165 (10/09/2026): dibuja la línea de € acumulado (serie ya viene
+// ordenada cronológicamente desde _tradingConsultarModo). SVG simple sin
+// librerías — mismo criterio "vanilla" que el resto de la app. El color
+// de la línea depende del signo del último punto (verde si el acumulado
+// termina en positivo, rojo si termina en negativo); la línea discontinua
+// marca el 0 para ver de un vistazo si estás por encima o por debajo.
+function _tradingBuildChart(serie) {
+  if (!serie || serie.length < 2) return '';
+  var w = 280, h = 70, pad = 4;
+  var valores = serie.concat([0]);
+  var mn = Math.min.apply(null, valores), mx = Math.max.apply(null, valores);
+  var rango = (mx - mn) || 1;
+  var stepX = (w - pad * 2) / (serie.length - 1);
+  var pts = serie.map(function(v, i) {
+    var x = pad + i * stepX;
+    var y = h - pad - ((v - mn) / rango) * (h - pad * 2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  var zeroY = h - pad - ((0 - mn) / rango) * (h - pad * 2);
+  var ultimo = serie[serie.length - 1];
+  var colorVar = ultimo >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:60px;display:block;">' +
+    '<line x1="' + pad + '" y1="' + zeroY.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + zeroY.toFixed(1) + '" style="stroke:var(--border);stroke-width:1;stroke-dasharray:2,2;"/>' +
+    '<polyline points="' + pts + '" style="fill:none;stroke:' + colorVar + ';stroke-width:2;" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '</svg>';
 }
 
 // --- CUENTAS ---
@@ -15370,7 +15500,7 @@ function fin_renderAcciones() {
   if (totEl && totalValor > 0) {
     totEl.style.display = 'flex';
     var av = document.getElementById('fin-acciones-total-val');
-    if (av) av.textContent = fin_fmt(totalValor);
+    if (av) av.textContent = 'Total acciones: ' + fin_fmt(totalValor);
   }
   fin_calcPatrimonio();
   fin_renderUltimaActualizacion();
@@ -15820,7 +15950,7 @@ function fin_renderFondos() {
   if (totEl) {
     totEl.style.display = 'flex';
     var tv = document.getElementById('fin-fondos-total-val');
-    if (tv) tv.textContent = fin_fmt(total);
+    if (tv) tv.textContent = 'Total fondos: ' + fin_fmt(total);
   }
   fin_calcPatrimonio();
   fin_renderUltimaActualizacion();
@@ -16125,7 +16255,7 @@ function fin_renderUrbanitae() {
   if (totEl) {
     totEl.style.display = 'flex';
     var tv = document.getElementById('fin-urbanitae-total-val');
-    if (tv) tv.textContent = fin_fmt(totalEnCurso);
+    if (tv) tv.textContent = 'Total invertido (en curso): ' + fin_fmt(totalEnCurso);
   }
   fin_calcPatrimonio();
   fin_renderUltimaActualizacion();
@@ -17574,7 +17704,15 @@ function dash_render() {
   var acumActual = kpiDash.acumActualUrbano; // urbano puro, para el reparto de abajo
   var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   var tituloAcum = document.getElementById('dash-acum-titulo');
-  if (tituloAcum && ultimoMes > 0) tituloAcum.textContent = 'HASTA ' + meses[ultimoMes-1].toUpperCase() + ' ' + year + ' · VS ' + (year-1);
+  // PUNTO 165 (10/09/2026): etiqueta "Inc. Dvdos." junto al título — a
+  // petición tuya, para dejar claro sin ambigüedad que esta cifra (a
+  // diferencia de la misma en Facturación → Análisis) incluye los
+  // dividendos de la cartera de acciones (punto 135/145). Va en minúscula
+  // y sin negrita para distinguirse visualmente del resto del título, que
+  // va en mayúsculas. Solo aparece con el perfil Patrimer activo, que es
+  // el único donde estas cifras suman dividendos de verdad.
+  var _dvdLabel = _esPatrimer ? ' <span style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0;color:var(--silver-mid);">(Inc. Dvdos.)</span>' : '';
+  if (tituloAcum && ultimoMes > 0) tituloAcum.innerHTML = 'HASTA ' + meses[ultimoMes-1].toUpperCase() + ' ' + year + ' · VS ' + (year-1) + _dvdLabel;
   // PUNTO 135 (07/09/2026): dividendos de la cartera de acciones — hasta
   // ahora no entraban en ninguna cifra de Inicio. divHastaMes usa el mismo
   // corte de mes que el resto de KPIs de esta tarjeta (ultimoMes, el mismo
@@ -17699,6 +17837,8 @@ function dash_render() {
   // meses que faltan daría una cifra poco fiable); es la misma variable
   // "divHastaMes" ya calculada arriba para el resto de tarjetas.
   var prevision = kpiDash.prevision + divHastaMes;
+  var elPrevTitulo = document.getElementById('dash-prevision-titulo');
+  if (elPrevTitulo) elPrevTitulo.innerHTML = 'PREVISIÓN ANUAL' + _dvdLabel;
   var elPrev = document.getElementById('dash-prevision'); if (elPrev) elPrev.textContent = fmtE(prevision);
   var elPrevS = document.getElementById('dash-prevision-s');
   if (elPrevS && (kpiDash.totalAnteriorCompletoTotal + divAnteriorCompleto) > 0) {
