@@ -3707,7 +3707,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
      era un formulario siempre visible dentro de la pestaña Docs, ahora se
      abre desde la tarjeta "＋ AÑADIR DOCUMENTO", mismo patrón que el modal
      de "Añadir gasto" de Renta Patricio. -->
-<div id="inmdoc-modal-form" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+<div id="inmdoc-modal-form" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:90dvh;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">📎 AÑADIR DOCUMENTO</div>
@@ -5931,7 +5931,7 @@ con editar/borrar en cada línea. -->
 </div><!-- mod-renta -->
 
 <!-- MODAL RENTA: NÓMINA -->
-<div id="renta-modal-nomina" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+<div id="renta-modal-nomina" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:100%;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div id="renta-modal-nomina-titulo" style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">💼 AÑADIR NÓMINA</div>
@@ -5965,7 +5965,7 @@ con editar/borrar en cada línea. -->
 </div>
 
 <!-- MODAL RENTA: GASTO CON FACTURA -->
-<div id="renta-modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+<div id="renta-modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">🧾 AÑADIR GASTO</div>
@@ -6038,7 +6038,7 @@ con editar/borrar en cada línea. -->
 </div>
 
 <!-- MODAL RENTA: OTRO INGRESO (PUNTO 101, 06/09/2026) -->
-<div id="renta-modal-ingreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
+<div id="renta-modal-ingreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:100%;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">💰 AÑADIR INGRESO</div>
@@ -7894,6 +7894,10 @@ function inmdoc_render(idx) {
       + '<button onclick="inmdoc_compartir(\'' + d.id + '\')" title="Compartir" style="background:none;border:none;color:#5b8dee;cursor:pointer;padding:0;display:flex;align-items:center;">' + _svgCompartir(16) + '</button>'
       + '</div></div>';
   }).join('');
+  // PUNTO 174 (14/09/2026): precarga en segundo plano de los archivos de
+  // esta lista, para que "compartir" no dependa de la velocidad de la
+  // conexión en el momento justo de pulsarlo — ver _precargarBlobDrive.
+  docs.forEach(function(d) { _precargarBlobDrive(d.url); });
 }
 
 function inm_showLista() {
@@ -19798,6 +19802,11 @@ var DRIVE_CLIENT_ID = '463008463367-iqm20ga20dhkg9b6mqgr4dpk0n5oni4f.apps.google
 var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 var _driveToken = null;
 var _fotoArchivo = null; // archivo pendiente de subir
+// PUNTO 174 (14/09/2026): caché en memoria de archivos ya descargados de
+// Drive para compartir — ver _precargarBlobDrive y compartirArchivoDrive
+// más abajo para el porqué (evitar que el permiso de "compartir" del
+// móvil caduque mientras se espera la descarga).
+var _shareBlobCache = {};
 
 function renta_conectarDrive() {
   if (!window.google || !window.google.accounts) {
@@ -20008,6 +20017,42 @@ function _extFromMime(mime) {
 //     se abre el enlace como alternativa. Si TÚ cierras el panel de
 //     compartir sin elegir nada, eso no se trata como error — no se
 //     abre ningún enlace de más, tal y como se espera.
+//
+// PUNTO 174 (14/09/2026): BUG encontrado y corregido — "a veces va y a
+// veces no" con Drive conectado. Causa real: el permiso del móvil para
+// abrir el panel nativo de compartir solo dura un momento MUY breve
+// después de que pulsas el botón — y este código, antes de poder abrir
+// ese panel, primero tenía que descargar el archivo entero de Drive. Si la
+// descarga tardaba un poco (cobertura floja, archivo algo más pesado),
+// para cuando terminaba de bajar ya había pasado ese momento y el móvil
+// ya no dejaba abrir el panel — de ahí que unas veces funcionara (descarga
+// rápida) y otras no (descarga más lenta), sin que tuviera nada que ver
+// con si Drive estaba conectado.
+//
+// Arreglo: en cuanto se abre la lista de gastos/documentos, la app empieza
+// a bajar en segundo plano (sin que tengas que hacer nada) los archivos
+// que tienen botón de compartir — ver _precargarBlobDrive más abajo. Así,
+// cuando de verdad pulsas "compartir", el archivo ya está descargado la
+// mayoría de las veces y el panel se abre al instante, sin esperar a la
+// red. Si aun así no estuviera ya descargado (por ejemplo, la primera vez
+// que entras a la lista), se descarga en el momento, como antes — así que
+// en el peor caso sigue funcionando igual que hasta ahora, nunca peor.
+function _precargarBlobDrive(url) {
+  var fileId = _driveFileIdFromUrl(url);
+  if (!fileId || !_driveToken || _shareBlobCache[fileId]) return;
+  var p = fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+    headers: { 'Authorization': 'Bearer ' + _driveToken }
+  }).then(function(r) {
+    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'drive-token-caducado' : 'drive-fetch-failed');
+    return r.blob();
+  });
+  _shareBlobCache[fileId] = p;
+  // Observador aparte solo para limpiar la caché si falla la precarga en
+  // segundo plano (por ejemplo, el token caducó entre medias) — así la
+  // próxima vez que se pinte la lista se reintenta, y no se avisa de nada
+  // porque esto es solo una preparación silenciosa, no una acción tuya.
+  p.catch(function() { delete _shareBlobCache[fileId]; });
+}
 function compartirArchivoDrive(url, nombreSugerido) {
   var fileId = _driveFileIdFromUrl(url);
   if (!fileId) { window.open(url, '_blank'); return; }
@@ -20021,10 +20066,14 @@ function compartirArchivoDrive(url, nombreSugerido) {
     window.open(url, '_blank');
     return;
   }
-  fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+  var yaPrecargado = !!_shareBlobCache[fileId];
+  var blobPromise = _shareBlobCache[fileId] || fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
     headers: { 'Authorization': 'Bearer ' + _driveToken }
-  })
-  .then(function(r) { if (!r.ok) throw new Error('No se ha podido descargar el archivo de Drive.'); return r.blob(); })
+  }).then(function(r) {
+    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'drive-token-caducado' : 'drive-fetch-failed');
+    return r.blob();
+  });
+  blobPromise
   .then(function(blob) {
     var nombre = (nombreSugerido || 'documento').replace(/[^a-zA-Z0-9._\- ]/g, '_');
     if (!/\.[a-zA-Z0-9]+$/.test(nombre)) nombre += _extFromMime(blob.type);
@@ -20034,7 +20083,11 @@ function compartirArchivoDrive(url, nombreSugerido) {
         // AbortError = has cerrado tú el panel de compartir sin elegir nada
         // — eso no es un fallo, no hace falta hacer nada más.
         if (err && err.name === 'AbortError') return;
-        alert('No se ha podido abrir el panel de compartir. Se abre el enlace en su lugar.');
+        if (yaPrecargado) {
+          alert('No se ha podido abrir el panel de compartir. Se abre el enlace en su lugar.');
+        } else {
+          alert('No se ha podido abrir el panel de compartir a tiempo (puede que la conexión haya ido lenta justo ahora). Se abre el enlace en su lugar — prueba a compartir otra vez en unos segundos, suele bastar.');
+        }
         window.open(url, '_blank');
       });
     } else {
@@ -20042,8 +20095,13 @@ function compartirArchivoDrive(url, nombreSugerido) {
       window.open(url, '_blank');
     }
   })
-  .catch(function() {
-    alert('No se ha podido preparar el archivo para compartir. Se abre el enlace en su lugar.');
+  .catch(function(err) {
+    delete _shareBlobCache[fileId];
+    if (err && err.message === 'drive-token-caducado') {
+      alert('La conexión con Google Drive ha caducado (dura un tiempo limitado). Pulsa otra vez "Conectar Google Drive" y prueba de nuevo. Mientras tanto, se abre el enlace.');
+    } else {
+      alert('No se ha podido preparar el archivo para compartir. Se abre el enlace en su lugar.');
+    }
     window.open(url, '_blank');
   });
 }
@@ -20636,6 +20694,10 @@ function renta_renderGastos() {
   }
   cont.innerHTML = html;
   document.getElementById('renta-total-gastos').textContent = fmtGlobal(total) + ' €';
+  // PUNTO 174 (14/09/2026): precarga en segundo plano de las fotos/facturas
+  // de esta lista, para que "compartir" no dependa de la velocidad de la
+  // conexión en el momento justo de pulsarlo — ver _precargarBlobDrive.
+  gastos.forEach(function(g) { if (g.fotoUrl) _precargarBlobDrive(g.fotoUrl); });
 }
 
 // PUNTO 167 (14/09/2026): compartir la foto/factura de un gasto a
