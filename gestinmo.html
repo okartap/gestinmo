@@ -5882,22 +5882,27 @@ con editar/borrar en cada línea. -->
 <div id="renta-modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
-    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">🧾 AÑADIR GASTO</div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">🧾 AÑADIR GASTO</div>
     <input type="hidden" id="renta-gasto-tipo-hidden">
+    <!-- PUNTO 166 (14/09/2026): a petición tuya, toda la información de este
+         modal (etiquetas y textos de estado) queda centrada. Los propios
+         campos (dónde escribes/eliges) se dejan como estaban — centrar el
+         texto que se está escribiendo dentro de una caja de texto no es
+         buena práctica habitual y dificulta la lectura mientras escribes. -->
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CONCEPTO</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CONCEPTO</div>
       <input id="renta-gasto-concepto" type="text" placeholder="Ej: IBI, reparación caldera..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">IMPORTE (€)</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">IMPORTE (€)</div>
       <input id="renta-gasto-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA</div>
       <input id="renta-gasto-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
     </div>
     <div style="margin-bottom:20px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CATEGORÍA</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CATEGORÍA</div>
       <select id="renta-gasto-categoria" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
         <option value="IBI">IBI</option>
         <option value="Reparación">Reparación / Conservación</option>
@@ -5909,16 +5914,31 @@ con editar/borrar en cada línea. -->
       </select>
     </div>
     <div style="margin-bottom:20px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FOTO DE FACTURA (Google Drive)</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FOTO DE FACTURA (Google Drive)</div>
       <!-- Estado conexión Drive -->
-      <div id="renta-drive-estado" style="font-size:11px;margin-bottom:8px;color:var(--text-secondary);">⚪ No conectado a Drive</div>
+      <div id="renta-drive-estado" style="font-size:11px;margin-bottom:8px;color:var(--text-secondary);text-align:center;">⚪ No conectado a Drive</div>
       <!-- Botón conectar / foto -->
       <div id="renta-drive-noauth" style="display:block;">
         <button onclick="renta_conectarDrive()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">🔗 Conectar Google Drive</button>
       </div>
       <div id="renta-drive-auth" style="display:none;">
-        <input type="file" id="renta-foto-input" accept="image/*" capture="environment" style="display:none;" onchange="renta_previsualizarFoto(this)">
-        <button onclick="document.getElementById('renta-foto-input').click()" style="width:100%;background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">📷 Hacer foto / Seleccionar imagen</button>
+        <!-- PUNTO 166 (14/09/2026): antes había un único botón con
+             capture="environment", que en el iPhone salta directo a la
+             cámara y no deja elegir ni Fotos ni Archivos (el atributo
+             "capture" fuerza la cámara, sin más opciones). A petición
+             tuya, se separa en 3 botones/3 inputs con distinto
+             accept/capture cada uno, para que cada uno haga una sola cosa
+             sin ambigüedad — incluida la opción de coger un PDF/foto que
+             ya tengas guardado en Files/iCloud (imposible con el botón
+             anterior). -->
+        <input type="file" id="renta-foto-input-camara" accept="image/*" capture="environment" style="display:none;" onchange="renta_previsualizarFoto(this)">
+        <input type="file" id="renta-foto-input-imagen" accept="image/*" style="display:none;" onchange="renta_previsualizarFoto(this)">
+        <input type="file" id="renta-foto-input-archivo" accept="image/*,application/pdf" style="display:none;" onchange="renta_previsualizarFoto(this)">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <button onclick="document.getElementById('renta-foto-input-camara').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;text-align:center;">📷<br>Hacer foto</button>
+          <button onclick="document.getElementById('renta-foto-input-imagen').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;text-align:center;">🖼️<br>Seleccionar imagen</button>
+          <button onclick="document.getElementById('renta-foto-input-archivo').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;text-align:center;">📄<br>Seleccionar archivo</button>
+        </div>
         <div id="renta-foto-preview" style="margin-top:8px;display:none;text-align:center;">
           <img id="renta-foto-img" style="max-width:100%;max-height:120px;border-radius:8px;object-fit:contain;" src="">
           <div style="font-size:11px;color:var(--accent-green);margin-top:4px;" id="renta-foto-nombre"></div>
@@ -19482,17 +19502,26 @@ function renta_driveConectado() {
   if (estado) { estado.textContent = '🟢 Drive conectado'; estado.style.color = 'var(--accent-green)'; }
 }
 
+// PUNTO 166 (14/09/2026): ahora que "Seleccionar archivo" permite elegir
+// también un PDF (antes solo se podían adjuntar imágenes), un PDF no se
+// puede previsualizar como si fuera una foto — se muestra un icono de
+// documento y el nombre del archivo en vez de intentar pintarlo dentro
+// del <img> (que se quedaría roto con un PDF).
 function renta_previsualizarFoto(input) {
   if (!input.files || !input.files[0]) return;
   _fotoArchivo = input.files[0];
+  var esImagen = (_fotoArchivo.type || '').indexOf('image/') === 0;
   var reader = new FileReader();
   reader.onload = function(e) {
     var img = document.getElementById('renta-foto-img');
     var prev = document.getElementById('renta-foto-preview');
     var nom = document.getElementById('renta-foto-nombre');
-    if (img) img.src = e.target.result;
+    if (img) {
+      if (esImagen) { img.style.display = ''; img.src = e.target.result; }
+      else { img.style.display = 'none'; img.src = ''; }
+    }
     if (prev) prev.style.display = 'block';
-    if (nom) nom.textContent = _fotoArchivo.name;
+    if (nom) nom.textContent = (esImagen ? '' : '📄 ') + _fotoArchivo.name;
   };
   reader.readAsDataURL(_fotoArchivo);
 }
@@ -19638,24 +19667,43 @@ function renta_totalNominaAnio(year, mesNombreActual) {
   return { total: total, totalMesActual: totalMesActual };
 }
 
+// PUNTO 166 (14/09/2026): orden de meses "más reciente arriba" pedido por
+// ti — de diciembre a enero, con cada paga extra justo al lado de su mes
+// (extra de junio pegada a junio, extra de diciembre pegada a diciembre).
+// Es solo el ORDEN EN QUE SE PINTA la lista — el array guardado en
+// localStorage/Firestore no se reordena ni se toca, así que los índices
+// que usan los botones ✎/✕ (que apuntan a una posición del array real,
+// no de la lista en pantalla) siguen siendo correctos.
+var RENTA_ORDEN_MESES = ['Diciembre','Extra diciembre','Noviembre','Octubre','Septiembre','Agosto','Julio','Junio','Extra junio','Mayo','Abril','Marzo','Febrero','Enero'];
 function renta_renderNominas() {
   var nominas = renta_getNominas();
   var cont = document.getElementById('renta-lista-nominas');
   if (!cont) return;
   if (nominas.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin nóminas introducidas.</div>';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;text-align:center;">Sin nóminas introducidas.</div>';
     document.getElementById('renta-total-trabajo').textContent = '— €';
     return;
   }
   var totalBruto = 0, totalRetencion = 0, totalSS = 0;
+  for (var t = 0; t < nominas.length; t++) {
+    totalBruto += parseFloat(nominas[t].bruto) || 0;
+    totalRetencion += parseFloat(nominas[t].retencion) || 0;
+    totalSS += parseFloat(nominas[t].ss) || 0;
+  }
+  // Índices del array original, ordenados por mes (más reciente primero) —
+  // no se toca el array en sí, solo el orden en que se recorre para pintar.
+  var idxOrdenados = nominas.map(function(_, i) { return i; }).sort(function(a, b) {
+    return RENTA_ORDEN_MESES.indexOf(nominas[a].mes) - RENTA_ORDEN_MESES.indexOf(nominas[b].mes);
+  });
   var html = '';
-  for (var i = 0; i < nominas.length; i++) {
+  for (var k = 0; k < idxOrdenados.length; k++) {
+    var i = idxOrdenados[k];
     var n = nominas[i];
-    totalBruto += parseFloat(n.bruto) || 0;
-    totalRetencion += parseFloat(n.retencion) || 0;
-    totalSS += parseFloat(n.ss) || 0;
+    // PUNTO 166 (14/09/2026): "centra la info" — el bloque de mes+detalle
+    // pasa a centrarse dentro del hueco que le queda (flex:1), con los
+    // botones ✎/✕ siempre pegados a la derecha, igual que antes.
     html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + n.mes + '</div>'
+      + '<div style="flex:1;text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + n.mes + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">Bruto: ' + fmtGlobal(n.bruto) + '€ · IRPF: ' + fmtGlobal(n.retencion) + '€ · Autónomo: ' + fmtGlobal(n.ss) + '€</div></div>'
       + '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">'
       // PUNTO 129 (07/09/2026): antes solo se podía borrar y volver a crear —
