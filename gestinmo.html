@@ -19992,12 +19992,31 @@ function _extFromMime(mime) {
   };
   return mapa[mime] || '';
 }
+// PUNTO 171 (14/09/2026): BUG encontrado y corregido — "compartir" hacía
+// exactamente lo mismo que "ver" (abrir el enlace) sin avisarte de por qué,
+// así que parecía que los dos botones eran el mismo. Tres causas posibles,
+// las tres silenciosas antes de este arreglo:
+//  1) Drive no estaba conectado en ese momento (_driveToken se reinicia
+//     cada vez que abres la app — hay que reconectar una vez por sesión) →
+//     antes se abría el enlace sin decir nada; ahora se avisa.
+//  2) El propio navegador/dispositivo no soporta compartir un archivo real
+//     (la API "Web Share" con archivos no está en todos los navegadores,
+//     sobre todo en la versión de escritorio) → antes lo mismo; ahora avisa.
+//  3) El panel nativo de compartir fallaba por una causa técnica (no por
+//     haberlo cerrado tú) → antes no pasaba nada visible; ahora se avisa y
+//     se abre el enlace como alternativa. Si TÚ cierras el panel de
+//     compartir sin elegir nada, eso no se trata como error — no se
+//     abre ningún enlace de más, tal y como se espera.
 function compartirArchivoDrive(url, nombreSugerido) {
   var fileId = _driveFileIdFromUrl(url);
-  // Sin id reconocible, sin conexión a Drive activa, o sin soporte del
-  // navegador para compartir archivos: abrimos el enlace de Drive como
-  // alternativa, para que el propio Drive lo descargue/comparta.
-  if (!fileId || !_driveToken || typeof navigator.share !== 'function') {
+  if (!fileId) { window.open(url, '_blank'); return; }
+  if (!_driveToken) {
+    alert('Para compartir el archivo directamente hace falta tener Google Drive conectado en esta sesión (hay que reconectar cada vez que abres la app). Mientras tanto, se abre el enlace.');
+    window.open(url, '_blank');
+    return;
+  }
+  if (typeof navigator.share !== 'function') {
+    alert('Este navegador no permite compartir un archivo directamente. Se abre el enlace en su lugar.');
     window.open(url, '_blank');
     return;
   }
@@ -20010,12 +20029,20 @@ function compartirArchivoDrive(url, nombreSugerido) {
     if (!/\.[a-zA-Z0-9]+$/.test(nombre)) nombre += _extFromMime(blob.type);
     var file = new File([blob], nombre, { type: blob.type || 'application/octet-stream' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file] }).catch(function() {});
+      navigator.share({ files: [file] }).catch(function(err) {
+        // AbortError = has cerrado tú el panel de compartir sin elegir nada
+        // — eso no es un fallo, no hace falta hacer nada más.
+        if (err && err.name === 'AbortError') return;
+        alert('No se ha podido abrir el panel de compartir. Se abre el enlace en su lugar.');
+        window.open(url, '_blank');
+      });
     } else {
+      alert('Este archivo no se puede compartir directamente desde este dispositivo. Se abre el enlace en su lugar.');
       window.open(url, '_blank');
     }
   })
   .catch(function() {
+    alert('No se ha podido preparar el archivo para compartir. Se abre el enlace en su lugar.');
     window.open(url, '_blank');
   });
 }
