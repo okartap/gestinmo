@@ -357,10 +357,13 @@ corta (sin CP ni población, ya los sabe de memoria) + tipo. De propina, los
 "badges" de estado/empresa (antes fijos en el HTML y borrados sin querer
 cada vez que se pintaba el emoji — nunca llegaban a verse en la app real)
 pasan a mostrar el dato de verdad de cada inmueble. */
-.detail-hero-compact { display: flex; align-items: center; gap: 14px; padding: 16px 16px 0; }
+/* PUNTO 169 (14/09/2026): a petición tuya, la misma cabecera centrada
+   (icono arriba, nombre debajo) que ya te gustaba en la tarjeta de un
+   inmueble vendido, aplicada también aquí, al entrar a ver la ficha. */
+.detail-hero-compact { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 16px 16px 0; }
 .detail-hero-icon { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, var(--navy-mid), var(--navy-hover)); display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
-.detail-header-info { padding: 0; margin: 0; min-width: 0; flex: 1; }
-.detail-edificio { font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--accent-blue); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-header-info { padding: 0; margin: 0; min-width: 0; }
+.detail-edificio { font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--accent-blue); margin-bottom: 2px; }
 .detail-address { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
 .detail-type { font-size: 13px; color: var(--text-secondary); }
 .detail-badges-row { display: flex; gap: 8px; padding: 10px 16px 0; margin-bottom: 16px; }
@@ -379,10 +382,10 @@ pasan a mostrar el dato de verdad de cada inmueble. */
 .semaforo-gold { border-color: var(--accent-gold); background: rgba(201,168,76,0.1); color: var(--accent-gold); }
 .semaforo-info { flex: 1; }
 .semaforo-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
-.semaforo-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.semaforo-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 3px; }
 .semaforo-row-label { font-size: 12px; color: var(--text-secondary); }
 .semaforo-row-value { font-size: 12px; font-weight: 600; color: var(--silver-mid); }
-.detail-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
+.detail-tabs { display: flex; justify-content: center; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
 .detail-tabs::-webkit-scrollbar { display: none; }
 .detail-tab { flex-shrink: 0; padding: 10px 16px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
 .detail-tab.active { color: var(--silver-bright); border-bottom-color: var(--silver-bright); }
@@ -390,10 +393,10 @@ pasan a mostrar el dato de verdad de cada inmueble. */
 .tab-content.active { display: block; }
 .info-section { margin-bottom: 20px; }
 .info-section-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--silver-dim); margin-bottom: 10px; }
-.info-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid rgba(45,61,110,0.5); }
+.info-row { display: flex; justify-content: center; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid rgba(45,61,110,0.5); }
 .info-row:last-child { border-bottom: none; }
 .info-label { font-size: 13px; color: var(--text-secondary); }
-.info-value { font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: right; }
+.info-value { font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: left; }
 .info-value.ok { color: var(--accent-green); }
 .info-value.warn { color: var(--accent-amber); }
 .doc-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
@@ -1564,7 +1567,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
   animation: fadeUp 0.4s ease both; animation-delay: 0.05s;
 }
 .info-row {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: center; align-items: center; gap: 10px;
   padding: 8px 0; border-bottom: 1px solid rgba(45,61,110,0.5);
 }
 .info-row:last-child { border-bottom: none; padding-bottom: 0; }
@@ -1574,7 +1577,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 }
 .info-val {
   font-size: 13px; font-weight: 700; color: var(--silver-bright);
-  text-align: right; max-width: 60%;
+  text-align: left; max-width: 60%;
   word-break: break-word;
 }
 
@@ -3408,6 +3411,13 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           <option value="Otros">Otros</option>
         </select>
       </div>
+      <!-- PUNTO 168 (14/09/2026): fecha del documento original (no de
+      subida) — por defecto hoy, editable. Sirve además para ordenar la
+      lista dentro de "Otros". -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA DEL DOCUMENTO</div>
+        <input id="inmdoc-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      </div>
       <div id="inmdoc-drive-estado" style="font-size:11px;margin-bottom:8px;color:var(--text-secondary);text-align:center;">⚪ No conectado a Drive</div>
       <div id="inmdoc-drive-noauth" style="display:block;">
         <button onclick="inmdoc_conectarDrive()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">🔗 Conectar Google Drive</button>
@@ -3452,6 +3462,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="modal-close" onclick="closeModal()">✕</div>
     </div>
     <div class="modal-body">
+
+      <!-- PUNTO 169 (14/09/2026): mismo icono+nombre centrados de la ficha,
+      al entrar a editar un inmueble — solo se muestra si ya existe (en
+      "Nuevo inmueble" todavía no hay ni icono ni nombre que mostrar). -->
+      <div id="inm-form-hero" style="display:none;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16px 0 8px;">
+        <div id="inm-form-hero-icon" style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg, var(--navy-mid), var(--navy-hover));display:flex;align-items:center;justify-content:center;font-size:26px;">🏠</div>
+        <div id="inm-form-hero-nombre" style="font-size:16px;font-weight:700;color:var(--silver-bright);"></div>
+      </div>
 
       <div class="form-section-title">Identificación</div>
       <!-- BLINDAJE: antes había aquí un segundo campo "Tipo" (select oculto,
@@ -7707,6 +7725,8 @@ function inmdoc_guardar() {
   if (!_inmdocArchivo) { alert('Elige primero un archivo (foto o documento).'); return; }
   if (!_driveToken) { alert('Conecta Google Drive primero.'); return; }
   var tipo = document.getElementById('inmdoc-tipo').value;
+  var fechaEl = document.getElementById('inmdoc-fecha');
+  var fechaDoc = (fechaEl && fechaEl.value) ? fechaEl.value : new Date().toISOString().split('T')[0];
   var inmuebles = loadInmuebles();
   var inm = inmuebles[currentDetailIdx];
   if (!inm) return;
@@ -7726,13 +7746,14 @@ function inmdoc_guardar() {
       tipo: tipo,
       nombre: _inmdocArchivo ? _inmdocArchivo.name : '',
       url: url,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fechaDoc,
       updatedAt: new Date().toISOString()
     });
     inmdoc_save(arr);
     _inmdocArchivo = null;
     var prev = document.getElementById('inmdoc-archivo-preview'); if (prev) prev.style.display = 'none';
     var nom = document.getElementById('inmdoc-archivo-nombre'); if (nom) nom.textContent = '';
+    if (fechaEl) fechaEl.value = new Date().toISOString().split('T')[0];
     inmdoc_render(idxGuardado);
     if (typeof info === 'function') info('✓ Documento subido a Drive.');
   });
@@ -7794,20 +7815,39 @@ function inmdoc_subirArchivo(archivo, nombreInmueble, tipo, cb) {
   });
 }
 
+// PUNTO 168 (14/09/2026): orden fijo — escritura de compra primero, de
+// venta después (si la hay), y el resto por fecha del documento (la más
+// reciente arriba), en vez de solo por orden de subida.
+var INMDOC_ORDEN_TIPO = { 'Escritura compra': 0, 'Escritura venta': 1 };
+function _inmdocPrioridadTipo(tipo) {
+  return INMDOC_ORDEN_TIPO.hasOwnProperty(tipo) ? INMDOC_ORDEN_TIPO[tipo] : 2;
+}
 function inmdoc_render(idx) {
   var cont = document.getElementById('tab-docs-lista');
+  var fechaEl = document.getElementById('inmdoc-fecha');
+  if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().split('T')[0];
   if (!cont) return;
   var docs = inmdoc_load().filter(function(d) { return d.inmuebleIdx === idx; })
-    .sort(function(a, b) { return new Date(b.fecha || 0) - new Date(a.fecha || 0); });
+    .sort(function(a, b) {
+      var pa = _inmdocPrioridadTipo(a.tipo), pb = _inmdocPrioridadTipo(b.tipo);
+      if (pa !== pb) return pa - pb;
+      return new Date(b.fecha || 0) - new Date(a.fecha || 0);
+    });
   if (docs.length === 0) {
     cont.innerHTML = '<div class="empty-state">Aún no hay documentos registrados para este inmueble.</div>';
     return;
   }
+  // PUNTO 168 (14/09/2026): centrado real respecto a toda la tarjeta (antes
+  // se centraba solo en el hueco que quedaba tras los iconos). Con una
+  // rejilla de 3 columnas 1fr/auto/1fr, la columna vacía de la izquierda
+  // compensa el ancho de los iconos de la derecha, así el texto queda en
+  // el centro real de la tarjeta y los iconos se quedan pegados al borde.
   cont.innerHTML = docs.map(function(d) {
-    return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div style="text-align:center;flex:1;"><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + d.tipo + '</div>'
+    return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;">'
+      + '<div></div>'
+      + '<div style="text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + d.tipo + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + ' · ' + d.nombre + '</div></div>'
-      + '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">'
+      + '<div style="display:flex;align-items:center;gap:10px;justify-self:end;">'
       + '<a href="' + d.url + '" target="_blank" style="color:#5b8dee;font-size:15px;text-decoration:none;">📎</a>'
       + '<button onclick="inmdoc_compartir(\'' + d.id + '\')" title="Compartir" style="background:none;border:none;color:#5b8dee;cursor:pointer;padding:0;display:flex;align-items:center;">' + _svgCompartir(16) + '</button>'
       + '<button onclick="inmdoc_borrar(\'' + d.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
@@ -8035,6 +8075,17 @@ function openModal(editIdx) {
   if (editIdx !== undefined) {
     const inm = loadInmuebles()[editIdx];
     document.getElementById('modal-title-text').textContent = 'Editar inmueble';
+    // PUNTO 169 (14/09/2026): icono + nombre centrados arriba del
+    // formulario, igual que en la ficha — solo al editar un inmueble ya
+    // existente.
+    const heroElInm = document.getElementById('inm-form-hero');
+    if (heroElInm) {
+      const emojisFormInm = { piso:'🏠', local:'🏪', garaje:'🚗', rustico:'🌾', otro:'📦' };
+      document.getElementById('inm-form-hero-icon').textContent = emojisFormInm[inm.tipo] || '🏠';
+      document.getElementById('inm-form-hero-nombre').textContent =
+        [inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ') || inm.ref || 'Inmueble';
+      heroElInm.style.display = 'flex';
+    }
     document.getElementById('f-ref-inm').value = inm.ref || '';
     document.getElementById('f-direccion').value = inm.direccionCalle || inm.direccion || '';
     document.getElementById('f-edificio').value = inm.edificio || '';
@@ -8110,6 +8161,10 @@ function openModal(editIdx) {
     recalcPreview();
   } else {
     document.getElementById('modal-title-text').textContent = 'Nuevo inmueble';
+    // PUNTO 169 (14/09/2026): al dar de alta uno nuevo todavía no hay ni
+    // icono ni nombre que mostrar, así que se oculta la cabecera.
+    const heroElInmNuevo = document.getElementById('inm-form-hero');
+    if (heroElInmNuevo) heroElInmNuevo.style.display = 'none';
     delete modal.dataset.editIdx;
     // PUNTO 79b (29/08/2026): clearForm() deja el desplegable de Propietario
     // siempre en la primera opción (Patrimer), sin mirar qué empresa tienes
