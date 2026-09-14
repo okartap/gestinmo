@@ -1971,6 +1971,12 @@ const DATA_KEYS = [
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
   'inmuebles:alquileres_mensuales',
   'inmuebles:seguro_ibi',
+  // PUNTO 166 (14/09/2026): documentos por inmueble (escritura de compra,
+  // de venta, etc.), subidos a Google Drive desde la pestaña "Documentos"
+  // de la ficha — de las 3 empresas, no solo Patricio. Aquí solo se guarda
+  // el enlace y los metadatos (tipo, nombre, fecha), nunca el archivo en
+  // sí (eso vive en Drive).
+  'inmuebles:documentos',
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
   // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
   // anuales" de Inicio junto con los alquileres reales.
@@ -2467,7 +2473,11 @@ function _esInmRegistroClave(key) {
 // "id" estable por registro (cli-<fecha>, doc-<fecha>, el propio mes), así
 // que reutilizan _patHistMerge tal cual, sin necesitar una función propia.
 function _esListaPorIdClave(key) {
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio';
+  // PUNTO 166 (14/09/2026): 'inmuebles:documentos' se suma a esta lista
+  // desde el primer día (nunca ha vivido sin este blindaje) — cada
+  // documento ya nace con un id propio (ver inmdoc_guardar), igual que
+  // Clientes/Documentos.
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -3383,7 +3393,40 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
   </div>
   <div class="tab-content" id="tab-docs">
     <div class="info-section-title" style="margin-bottom:14px">Documentación</div>
-    <div class="empty-state">Aún no hay documentos registrados para este inmueble.</div>
+    <!-- PUNTO 166 (14/09/2026): antes esta pestaña era un mensaje fijo, sin
+         nada real detrás. Reutiliza la conexión de Google Drive ya
+         construida en Renta Patricio (mismo _driveToken compartido — si ya
+         la conectaste ahí en esta sesión, aquí no hace falta reconectar). -->
+    <div id="tab-docs-lista" style="margin-bottom:16px;"></div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-bottom:10px;text-align:center;letter-spacing:.5px;">＋ AÑADIR DOCUMENTO</div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">TIPO DE DOCUMENTO</div>
+        <select id="inmdoc-tipo" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;">
+          <option value="Escritura compra">Escritura de compra</option>
+          <option value="Escritura venta">Escritura de venta</option>
+          <option value="Otros">Otros</option>
+        </select>
+      </div>
+      <div id="inmdoc-drive-estado" style="font-size:11px;margin-bottom:8px;color:var(--text-secondary);text-align:center;">⚪ No conectado a Drive</div>
+      <div id="inmdoc-drive-noauth" style="display:block;">
+        <button onclick="inmdoc_conectarDrive()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">🔗 Conectar Google Drive</button>
+      </div>
+      <div id="inmdoc-drive-auth" style="display:none;">
+        <input type="file" id="inmdoc-foto-input-camara" accept="image/*" capture="environment" style="display:none;" onchange="inmdoc_previsualizar(this)">
+        <input type="file" id="inmdoc-foto-input-imagen" accept="image/*" style="display:none;" onchange="inmdoc_previsualizar(this)">
+        <input type="file" id="inmdoc-foto-input-archivo" accept="image/*,application/pdf" style="display:none;" onchange="inmdoc_previsualizar(this)">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+          <button onclick="document.getElementById('inmdoc-foto-input-camara').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;text-align:center;">📷<br>Hacer foto</button>
+          <button onclick="document.getElementById('inmdoc-foto-input-imagen').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;text-align:center;">🖼️<br>Seleccionar imagen</button>
+          <button onclick="document.getElementById('inmdoc-foto-input-archivo').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;text-align:center;">📄<br>Seleccionar archivo</button>
+        </div>
+        <div id="inmdoc-archivo-preview" style="margin-bottom:10px;display:none;text-align:center;">
+          <div style="font-size:11px;color:var(--accent-green);" id="inmdoc-archivo-nombre"></div>
+        </div>
+        <button id="inmdoc-btn-guardar" onclick="inmdoc_guardar()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:12px;cursor:pointer;">GUARDAR</button>
+      </div>
+    </div>
   </div>
   <div class="tab-content" id="tab-gastos">
     <div class="info-section-title" style="margin-bottom:14px">Gastos anuales recurrentes</div>
@@ -5850,18 +5893,20 @@ con editar/borrar en cada línea. -->
 <div id="renta-modal-nomina" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:100%;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
-    <div id="renta-modal-nomina-titulo" style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💼 AÑADIR NÓMINA</div>
+    <div id="renta-modal-nomina-titulo" style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">💼 AÑADIR NÓMINA</div>
+    <!-- PUNTO 166 (14/09/2026): centrado a petición tuya, mismo criterio que
+         el resto de modales de Renta Patricio. -->
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MES</div>
-      <select id="renta-nom-mes" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;"></select>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">MES</div>
+      <select id="renta-nom-mes" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;"></select>
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">SALARIO BRUTO (€)</div>
-      <input id="renta-nom-bruto" type="text" inputmode="decimal" placeholder="3.500" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">SALARIO BRUTO (€)</div>
+      <input id="renta-nom-bruto" type="text" inputmode="decimal" placeholder="3.500" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">RETENCIÓN IRPF (€)</div>
-      <input id="renta-nom-retencion" type="text" inputmode="decimal" placeholder="420" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">RETENCIÓN IRPF (€)</div>
+      <input id="renta-nom-retencion" type="text" inputmode="decimal" placeholder="420" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:20px;">
       <!-- PUNTO 126 (06/09/2026): este campo se llamaba "Seguridad Social" —
@@ -5870,8 +5915,8 @@ con editar/borrar en cada línea. -->
            que se reaprovecha para tu cuota RETA en vez de crear uno nuevo).
            El id y el nombre interno del dato (ss) se mantienen igual para no
            romper nada de lo que ya tengas guardado. -->
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CUOTA DE AUTÓNOMO (€)</div>
-      <input id="renta-nom-ss" type="text" inputmode="decimal" placeholder="290" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CUOTA DE AUTÓNOMO (€)</div>
+      <input id="renta-nom-ss" type="text" inputmode="decimal" placeholder="290" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <button onclick="renta_guardarNomina()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
     <button onclick="renta_cerrarModalNomina()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
@@ -5885,25 +5930,26 @@ con editar/borrar en cada línea. -->
     <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">🧾 AÑADIR GASTO</div>
     <input type="hidden" id="renta-gasto-tipo-hidden">
     <!-- PUNTO 166 (14/09/2026): a petición tuya, toda la información de este
-         modal (etiquetas y textos de estado) queda centrada. Los propios
-         campos (dónde escribes/eliges) se dejan como estaban — centrar el
-         texto que se está escribiendo dentro de una caja de texto no es
-         buena práctica habitual y dificulta la lectura mientras escribes. -->
+         modal (etiquetas, campos y textos de estado) queda centrada, a
+         petición tuya del 14/09/2026 — incluidos los propios campos donde
+         escribes/eliges (antes se habían dejado a la izquierda a
+         propósito, por ser lo habitual en un formulario; me pediste
+         centrarlos también y así se ha dejado). -->
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CONCEPTO</div>
-      <input id="renta-gasto-concepto" type="text" placeholder="Ej: IBI, reparación caldera..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <input id="renta-gasto-concepto" type="text" placeholder="Ej: IBI, reparación caldera..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">IMPORTE (€)</div>
-      <input id="renta-gasto-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <input id="renta-gasto-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA</div>
-      <input id="renta-gasto-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <input id="renta-gasto-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CATEGORÍA</div>
-      <select id="renta-gasto-categoria" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <select id="renta-gasto-categoria" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;">
         <option value="IBI">IBI</option>
         <option value="Reparación">Reparación / Conservación</option>
         <option value="Seguro">Seguro</option>
@@ -5954,36 +6000,38 @@ con editar/borrar en cada línea. -->
 <div id="renta-modal-ingreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:100%;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
-    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;">💰 AÑADIR INGRESO</div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">💰 AÑADIR INGRESO</div>
     <input type="hidden" id="ingotros-id-hidden">
     <!-- PUNTO 111 (06/09/2026): a petición tuya, el concepto pasa de texto
     libre a un desplegable con Lala / Tortugas / Otros — Lala y Tortugas van
     siempre fuera de la declaración (ni se pregunta), y solo con "Otros" se
     pide el detalle (ej. "Sueldo", "Dividendo Patrimer") y aparece el check
     de si entra en la declaración (IRPF). -->
+    <!-- PUNTO 166 (14/09/2026): a petición tuya, TODOS los campos del
+    formulario (no solo las etiquetas) quedan centrados. -->
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CONCEPTO</div>
-      <select id="ingotros-concepto-select" onchange="ingotros_onConceptoChange()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CONCEPTO</div>
+      <select id="ingotros-concepto-select" onchange="ingotros_onConceptoChange()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;">
         <option value="Lala">Lala</option>
         <option value="Tortugas">Tortugas</option>
         <option value="Otros">Otros</option>
       </select>
     </div>
     <div id="ingotros-otros-detalle-wrap" style="display:none;margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">ESPECIFICA</div>
-      <input id="ingotros-otros-detalle" type="text" placeholder="Ej: Sueldo, Dividendo Patrimer..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">ESPECIFICA</div>
+      <input id="ingotros-otros-detalle" type="text" placeholder="Ej: Sueldo, Dividendo Patrimer..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">IMPORTE (€)</div>
-      <input id="ingotros-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">IMPORTE (€)</div>
+      <input id="ingotros-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:20px;">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA</div>
-      <input id="ingotros-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA</div>
+      <input id="ingotros-fecha" type="date" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <!-- PUNTO 106.1/111 (06/09/2026): solo se muestra con "Otros" — Lala y
     Tortugas nunca entran en la declaración, no hace falta ni preguntarlo. -->
-    <div id="ingotros-declara-wrap" style="display:none;margin-bottom:20px;align-items:center;gap:10px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px;">
+    <div id="ingotros-declara-wrap" style="display:none;margin-bottom:20px;align-items:center;justify-content:center;gap:10px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px;">
       <input id="ingotros-declara" type="checkbox" style="width:18px;height:18px;flex-shrink:0;accent-color:#4caf82;">
       <label for="ingotros-declara" style="font-size:13px;color:var(--silver-bright);cursor:pointer;">Entra en la declaración (IRPF)</label>
     </div>
@@ -6365,6 +6413,8 @@ const BACKUP_KEYS = [
   'fin:acciones_cuenta:patricio',
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
+  // PUNTO 166 (14/09/2026): documentos por inmueble (enlaces a Drive).
+  'inmuebles:documentos',
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
   'ingresos:otros:patricio',
   'fin:cotizaciones',
@@ -7539,6 +7589,9 @@ function inm_showDetail(idx) {
 
   // Tab contratos: historial real de contratos de este inmueble
   inm_renderTabContratos(inm);
+  // PUNTO 166 (14/09/2026): pestaña Documentos — documentos ya subidos de
+  // este inmueble (escritura de compra/venta, etc.).
+  if (typeof inmdoc_render === 'function') inmdoc_render(idx);
 
   document.getElementById('inm-view-lista').classList.remove('active');
   document.getElementById('inm-view-detalle').classList.add('active');
@@ -7594,6 +7647,171 @@ function inm_renderTabContratos(inm) {
         <div class="contrato-right"><div class="contrato-renta"${colorInactivo}>${renta}</div><div class="contrato-days${diasClase}"${colorInactivo}>${diasTxt}</div></div>
       </div>
     </div>`;
+  }).join('');
+}
+
+// ── PUNTO 166 (14/09/2026): DOCUMENTOS POR INMUEBLE ────────────────────────
+// Pestaña "Documentación" de la ficha de un inmueble — hasta ahora era un
+// mensaje fijo, sin nada real detrás (ver pendientes_proxima_sesion.md).
+// Pedido explícito de Patry: poder subir la escritura de compra/venta de
+// cualquier inmueble, de las 3 empresas (no solo los de Renta Patricio).
+// Reutiliza la MISMA conexión de Google Drive ya construida y probada en
+// Renta Patricio (variable compartida _driveToken, renta_obtenerCarpeta,
+// renta_comprimirImagen definidas más abajo en este mismo script) — no
+// hace falta un segundo sistema de subida, ni reconectar Drive si ya lo
+// conectaste desde Renta Patricio en esta misma sesión. Solo se guarda
+// aquí el enlace y los metadatos (tipo, nombre, fecha) — el archivo en sí
+// vive en Drive, en la carpeta "Inmuebles/<nombre del inmueble>".
+function inmdoc_load() {
+  return JSON.parse(localStorage.getItem('inmuebles:documentos') || '[]');
+}
+function inmdoc_save(arr) {
+  localStorage.setItem('inmuebles:documentos', JSON.stringify(arr));
+  if (window.syncToFirestore) window.syncToFirestore('inmuebles:documentos', JSON.stringify(arr));
+}
+var _inmdocArchivo = null; // archivo pendiente de subir, mismo patrón que _fotoArchivo de Renta Patricio
+
+function inmdoc_previsualizar(input) {
+  if (!input.files || !input.files[0]) return;
+  _inmdocArchivo = input.files[0];
+  var esImagen = (_inmdocArchivo.type || '').indexOf('image/') === 0;
+  var nom = document.getElementById('inmdoc-archivo-nombre');
+  if (nom) nom.textContent = (esImagen ? '🖼️ ' : '📄 ') + _inmdocArchivo.name;
+  var prev = document.getElementById('inmdoc-archivo-preview');
+  if (prev) prev.style.display = 'block';
+}
+
+// Un único flujo de conexión con Google Drive para toda la app (mismo
+// _driveToken, definido más abajo junto a renta_conectarDrive) — si ya lo
+// conectaste desde Renta Patricio en esta sesión, aquí no hace falta
+// volver a pulsar "Conectar".
+function inmdoc_conectarDrive() {
+  renta_conectarDrive();
+}
+function inmdoc_driveConectado() {
+  var noauth = document.getElementById('inmdoc-drive-noauth');
+  var auth = document.getElementById('inmdoc-drive-auth');
+  var estado = document.getElementById('inmdoc-drive-estado');
+  if (noauth) noauth.style.display = 'none';
+  if (auth) auth.style.display = 'block';
+  if (estado) { estado.textContent = '🟢 Drive conectado'; estado.style.color = 'var(--accent-green)'; }
+}
+
+// PUNTO 166-ter (14/09/2026): mismo guardado anti-doble-pulsación que en
+// "Añadir gasto" (renta_guardarGasto) — ver comentario allí.
+var _inmdocSubiendo = false;
+function inmdoc_guardar() {
+  if (bloqueaSiViewer('Subir un documento del inmueble')) return;
+  if (_inmdocSubiendo) return;
+  if (currentDetailIdx === null || currentDetailIdx === undefined) return;
+  if (!_inmdocArchivo) { alert('Elige primero un archivo (foto o documento).'); return; }
+  if (!_driveToken) { alert('Conecta Google Drive primero.'); return; }
+  var tipo = document.getElementById('inmdoc-tipo').value;
+  var inmuebles = loadInmuebles();
+  var inm = inmuebles[currentDetailIdx];
+  if (!inm) return;
+  var nombreInmueble = inm.direccion || inm.ref || ('Inmueble ' + (currentDetailIdx + 1));
+  var idxGuardado = currentDetailIdx;
+  var btn = document.getElementById('inmdoc-btn-guardar');
+  _inmdocSubiendo = true;
+  if (btn) { btn.textContent = 'Subiendo...'; btn.disabled = true; btn.style.opacity = '0.6'; }
+  inmdoc_subirArchivo(_inmdocArchivo, nombreInmueble, tipo, function(err, url) {
+    _inmdocSubiendo = false;
+    if (btn) { btn.textContent = 'GUARDAR'; btn.disabled = false; btn.style.opacity = ''; }
+    if (err) { alert('Error al subir el archivo: ' + (err.message || err)); return; }
+    var arr = inmdoc_load();
+    arr.push({
+      id: 'idoc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      inmuebleIdx: idxGuardado,
+      tipo: tipo,
+      nombre: _inmdocArchivo ? _inmdocArchivo.name : '',
+      url: url,
+      fecha: new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString()
+    });
+    inmdoc_save(arr);
+    _inmdocArchivo = null;
+    var prev = document.getElementById('inmdoc-archivo-preview'); if (prev) prev.style.display = 'none';
+    var nom = document.getElementById('inmdoc-archivo-nombre'); if (nom) nom.textContent = '';
+    inmdoc_render(idxGuardado);
+    if (typeof info === 'function') info('✓ Documento subido a Drive.');
+  });
+}
+
+// PUNTO 167 (14/09/2026): compartir un documento del inmueble a
+// WhatsApp/correo con el archivo real adjunto.
+function inmdoc_compartir(id) {
+  var docs = inmdoc_load().filter(function(d) { return d.id === id; });
+  var d = docs[0];
+  if (!d) return;
+  compartirArchivoDrive(d.url, d.nombre || d.tipo || 'documento');
+}
+
+function inmdoc_borrar(id) {
+  if (bloqueaSiViewer('Quitar un documento del inmueble')) return;
+  if (!confirm('¿Quitar este documento de la lista?\n\nEl archivo seguirá guardado en tu Google Drive — esto solo lo quita de la ficha del inmueble.')) return;
+  var arr = inmdoc_load().filter(function(d) { return d.id !== id; });
+  inmdoc_save(arr);
+  inmdoc_render(currentDetailIdx);
+}
+
+// Subir a Drive en Inmuebles/<nombre del inmueble>/ — mismo patrón que
+// renta_subirFoto (carpeta automática + compresión solo si es imagen; un
+// PDF se sube tal cual, sin pasar por el lienzo de compresión), para no
+// duplicar esa misma lógica dos veces en el archivo.
+function inmdoc_subirArchivo(archivo, nombreInmueble, tipo, cb) {
+  renta_obtenerCarpeta('Inmuebles', null, function(err, rootId) {
+    if (err) { cb(err); return; }
+    renta_obtenerCarpeta(nombreInmueble, rootId, function(err2, carpetaId) {
+      if (err2) { cb(err2); return; }
+      function subirBlob(blob, extension) {
+        var fecha = new Date().toISOString().split('T')[0];
+        var nombreArchivo = fecha + '_' + tipo.replace(/[^a-zA-Z0-9]/g, '_') + extension;
+        var meta = { name: nombreArchivo, parents: [carpetaId] };
+        var form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+        form.append('file', blob, nombreArchivo);
+        fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + _driveToken },
+          body: form
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(f) { cb(null, f.webViewLink || ('https://drive.google.com/file/d/' + f.id + '/view')); })
+        .catch(function(e) { cb(e); });
+      }
+      var esImagen = (archivo.type || '').indexOf('image/') === 0;
+      if (esImagen) {
+        renta_comprimirImagen(archivo, function(blob) { subirBlob(blob, '.jpg'); });
+      } else {
+        var extOriginal = '';
+        var m = /\.[a-zA-Z0-9]+$/.exec(archivo.name || '');
+        if (m) extOriginal = m[0];
+        else if ((archivo.type || '') === 'application/pdf') extOriginal = '.pdf';
+        subirBlob(archivo, extOriginal);
+      }
+    });
+  });
+}
+
+function inmdoc_render(idx) {
+  var cont = document.getElementById('tab-docs-lista');
+  if (!cont) return;
+  var docs = inmdoc_load().filter(function(d) { return d.inmuebleIdx === idx; })
+    .sort(function(a, b) { return new Date(b.fecha || 0) - new Date(a.fecha || 0); });
+  if (docs.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Aún no hay documentos registrados para este inmueble.</div>';
+    return;
+  }
+  cont.innerHTML = docs.map(function(d) {
+    return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div style="text-align:center;flex:1;"><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + d.tipo + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + ' · ' + d.nombre + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">'
+      + '<a href="' + d.url + '" target="_blank" style="color:#5b8dee;font-size:15px;text-decoration:none;">📎</a>'
+      + '<button onclick="inmdoc_compartir(\'' + d.id + '\')" title="Compartir" style="background:none;border:none;color:#5b8dee;cursor:pointer;padding:0;display:flex;align-items:center;">' + _svgCompartir(16) + '</button>'
+      + '<button onclick="inmdoc_borrar(\'' + d.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
+      + '</div></div>';
   }).join('');
 }
 
@@ -18585,6 +18803,9 @@ window._refreshCurrentModule = function(key) {
     'fin:acciones_cuenta:patricio': 'finanzas',
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
+    // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
+    // Inmuebles (pestaña Documentos de la ficha), no en Renta Patricio.
+    'inmuebles:documentos': 'inmuebles',
     'ingresos:otros:patricio': 'renta',
     'fin:cotizaciones': 'finanzas',
     'app:notas_mejoras': 'inicio',
@@ -18603,6 +18824,15 @@ window._refreshCurrentModule = function(key) {
   if (mod && mod.classList.contains('active')) {
     // Llamar a la función de render del módulo correspondiente
     if (module === 'inmuebles' && typeof renderLista === 'function') renderLista();
+    // PUNTO 166 (14/09/2026): si tienes la ficha de un inmueble abierta
+    // cuando llega un documento nuevo de otro dispositivo, se refresca la
+    // pestaña Documentos de esa misma ficha en vez de nada — mismo criterio
+    // que ya se usa arriba con la ficha de Clientes.
+    if (key === 'inmuebles:documentos' && typeof currentDetailIdx === 'number' && currentDetailIdx >= 0
+        && document.getElementById('inm-view-detalle') && document.getElementById('inm-view-detalle').classList.contains('active')
+        && typeof inmdoc_render === 'function') {
+      inmdoc_render(currentDetailIdx);
+    }
     if (module === 'cobros' && typeof renderMain === 'function') { fac_loadHistorico(); renderMain(); }
     if (module === 'analisis' && typeof cal_renderLista === 'function') cal_renderLista();
     if (module === 'documentos' && typeof doc_renderLista === 'function') doc_renderLista();
@@ -19500,6 +19730,11 @@ function renta_driveConectado() {
   if (noauth) noauth.style.display = 'none';
   if (auth) auth.style.display = 'block';
   if (estado) { estado.textContent = '🟢 Drive conectado'; estado.style.color = 'var(--accent-green)'; }
+  // PUNTO 166 (14/09/2026): _driveToken es una única conexión compartida
+  // para toda la app — si la pestaña Documentos de un inmueble está usando
+  // este mismo botón "Conectar", se actualiza igual, sin que haga falta
+  // conectar dos veces en la misma sesión.
+  if (typeof inmdoc_driveConectado === 'function') inmdoc_driveConectado();
 }
 
 // PUNTO 166 (14/09/2026): ahora que "Seleccionar archivo" permite elegir
@@ -19554,17 +19789,26 @@ function renta_obtenerCarpeta(nombre, parentId, cb) {
   .catch(function(e) { cb(e); });
 }
 
-// Subir foto a Drive en Renta Patricio/<año>/
+// Subir foto/archivo a Drive en Renta Patricio/<año>/
+// PUNTO 166 (14/09/2026): FALLO ENCONTRADO Y CORREGIDO al revisar este
+// código con motivo del nuevo botón "Seleccionar archivo" — esta función
+// SIEMPRE pasaba el archivo por renta_comprimirImagen (que carga el
+// archivo dentro de una <img> del navegador para volver a dibujarlo).
+// Eso funciona con una foto, pero con un PDF la <img> nunca llega a
+// "cargar" (no es una imagen) — su evento onload no salta nunca, así que
+// el archivo se quedaba subiendo para siempre, sin guardarse el gasto y
+// sin ningún aviso de error. Ahora solo se comprime si el archivo es
+// realmente una imagen; un PDF (u otro archivo) se sube tal cual, con su
+// extensión y tipo originales.
 function renta_subirFoto(archivo, anio, concepto, cb) {
   // Crear estructura de carpetas: Renta Patricio → <año>
   renta_obtenerCarpeta('Renta Patricio', null, function(err, rootId) {
     if (err) { cb(err); return; }
     renta_obtenerCarpeta(String(anio), rootId, function(err2, anioId) {
       if (err2) { cb(err2); return; }
-      // Comprimir imagen antes de subir
-      renta_comprimirImagen(archivo, function(blob) {
+      function subirBlob(blob, extension, mimeType) {
         var fecha = new Date().toISOString().split('T')[0];
-        var nombreArchivo = fecha + '_' + concepto.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30) + '.jpg';
+        var nombreArchivo = fecha + '_' + concepto.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30) + extension;
         var meta = { name: nombreArchivo, parents: [anioId] };
         var form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
@@ -19577,7 +19821,20 @@ function renta_subirFoto(archivo, anio, concepto, cb) {
         .then(function(r) { return r.json(); })
         .then(function(f) { cb(null, f.webViewLink || ('https://drive.google.com/file/d/' + f.id + '/view')); })
         .catch(function(e) { cb(e); });
-      });
+      }
+      var esImagen = (archivo.type || '').indexOf('image/') === 0;
+      if (esImagen) {
+        // Comprimir imagen antes de subir (solo tiene sentido con fotos).
+        renta_comprimirImagen(archivo, function(blob) { subirBlob(blob, '.jpg', 'image/jpeg'); });
+      } else {
+        // PDF u otro archivo: se sube tal cual, sin pasar por el lienzo de
+        // compresión — extensión tomada del nombre original si existe.
+        var extOriginal = '';
+        var m = /\.[a-zA-Z0-9]+$/.exec(archivo.name || '');
+        if (m) extOriginal = m[0];
+        else if ((archivo.type || '') === 'application/pdf') extOriginal = '.pdf';
+        subirBlob(archivo, extOriginal, archivo.type);
+      }
     });
   });
 }
@@ -19600,6 +19857,63 @@ function renta_comprimirImagen(archivo, cb) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(archivo);
+}
+
+// PUNTO 167 (14/09/2026): compartir un documento/foto ya subido a Drive
+// directamente a WhatsApp, correo, etc., con el archivo real adjunto (no
+// solo un enlace) — usado tanto por los gastos de Renta Patricio como por
+// los Documentos por inmueble.
+// PUNTO 167-bis (14/09/2026): a petición tuya, el icono de compartir pasa
+// del emoji 📤 (que se confundía con el de copia de seguridad) al icono
+// clásico de compartir de Apple/iOS — un cuadrado abierto por arriba con
+// una flecha saliendo hacia arriba.
+function _svgCompartir(size) {
+  size = size || 15;
+  return '<svg viewBox="0 0 24 24" width="' + size + '" height="' + size + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">'
+    + '<path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>'
+    + '</svg>';
+}
+function _driveFileIdFromUrl(url) {
+  if (!url) return null;
+  var m = /\/file\/d\/([a-zA-Z0-9_-]+)/.exec(url) || /[?&]id=([a-zA-Z0-9_-]+)/.exec(url);
+  return m ? m[1] : null;
+}
+function _extFromMime(mime) {
+  var mapa = {
+    'image/jpeg': '.jpg', 'image/png': '.png', 'image/heic': '.heic',
+    'image/webp': '.webp', 'image/gif': '.gif',
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx'
+  };
+  return mapa[mime] || '';
+}
+function compartirArchivoDrive(url, nombreSugerido) {
+  var fileId = _driveFileIdFromUrl(url);
+  // Sin id reconocible, sin conexión a Drive activa, o sin soporte del
+  // navegador para compartir archivos: abrimos el enlace de Drive como
+  // alternativa, para que el propio Drive lo descargue/comparta.
+  if (!fileId || !_driveToken || typeof navigator.share !== 'function') {
+    window.open(url, '_blank');
+    return;
+  }
+  fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+    headers: { 'Authorization': 'Bearer ' + _driveToken }
+  })
+  .then(function(r) { if (!r.ok) throw new Error('No se ha podido descargar el archivo de Drive.'); return r.blob(); })
+  .then(function(blob) {
+    var nombre = (nombreSugerido || 'documento').replace(/[^a-zA-Z0-9._\- ]/g, '_');
+    if (!/\.[a-zA-Z0-9]+$/.test(nombre)) nombre += _extFromMime(blob.type);
+    var file = new File([blob], nombre, { type: blob.type || 'application/octet-stream' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(function() {});
+    } else {
+      window.open(url, '_blank');
+    }
+  })
+  .catch(function() {
+    window.open(url, '_blank');
+  });
 }
 
 // ─── JS MÓDULO RENTA PATRICIO ─────────────────────────────────────────────
@@ -20162,8 +20476,11 @@ function renta_renderGastos() {
   for (var i = 0; i < gastos.length; i++) {
     var g = gastos[i];
     total += parseFloat(g.importe) || 0;
+    // PUNTO 167 (14/09/2026): además del "ver", un botón de compartir
+    // (WhatsApp, correo...) con el archivo real, cuando hay foto/factura.
     var fotoLink = g.fotoUrl
       ? ' <a href="' + g.fotoUrl + '" target="_blank" style="color:#5b8dee;font-size:11px;">📎 ver</a>'
+        + ' <button onclick="renta_compartirGasto(' + i + ')" title="Compartir" style="background:none;border:none;color:#5b8dee;font-size:11px;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">' + _svgCompartir(12) + ' compartir</button>'
       : '';
     html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + g.concepto + fotoLink + '</div>'
@@ -20175,6 +20492,15 @@ function renta_renderGastos() {
   }
   cont.innerHTML = html;
   document.getElementById('renta-total-gastos').textContent = fmtGlobal(total) + ' €';
+}
+
+// PUNTO 167 (14/09/2026): compartir la foto/factura de un gasto a
+// WhatsApp/correo con el archivo real adjunto.
+function renta_compartirGasto(idx) {
+  var arr = renta_getGastos();
+  var g = arr[idx];
+  if (!g || !g.fotoUrl) return;
+  compartirArchivoDrive(g.fotoUrl, g.concepto || 'gasto');
 }
 
 function renta_borrarGasto(idx) {
@@ -20195,8 +20521,17 @@ function renta_abrirModalGasto(tipo) {
 function renta_cerrarModalGasto() {
   document.getElementById('renta-modal-gasto').style.display = 'none';
 }
+// PUNTO 166-ter (14/09/2026): nos contaste que al subir un PDF, la primera
+// pulsación se quedó "colgada" y al pulsar una segunda vez sí subió, pero
+// duplicó el archivo. Causa: el botón cambiaba de texto a "Subiendo
+// foto..." pero seguía siendo pulsable — una segunda pulsación mientras la
+// primera aún no había terminado lanzaba una SEGUNDA subida en paralelo del
+// mismo archivo. Con _gastoSubiendo, cualquier pulsación mientras ya hay
+// una subida en curso se ignora.
+var _gastoSubiendo = false;
 function renta_guardarGasto() {
   if (bloqueaSiViewer('Guardar un gasto')) return;
+  if (_gastoSubiendo) return;
   var concepto = document.getElementById('renta-gasto-concepto').value.trim();
   var importe = parseFmtGlobal(document.getElementById('renta-gasto-importe').value);
   var fecha = document.getElementById('renta-gasto-fecha').value;
@@ -20225,9 +20560,11 @@ function renta_guardarGasto() {
   // Si hay foto y Drive conectado, subir primero
   if (_fotoArchivo && _driveToken) {
     var btn = document.querySelector('#renta-modal-gasto button');
-    if (btn) btn.textContent = 'Subiendo foto...';
+    _gastoSubiendo = true;
+    if (btn) { btn.textContent = 'Subiendo foto...'; btn.disabled = true; btn.style.opacity = '0.6'; }
     renta_subirFoto(_fotoArchivo, renta_anio, concepto, function(err, url) {
-      if (btn) btn.textContent = 'GUARDAR';
+      _gastoSubiendo = false;
+      if (btn) { btn.textContent = 'GUARDAR'; btn.disabled = false; btn.style.opacity = ''; }
       if (err) {
         alert('Error al subir la foto: ' + (err.message || err) + '. El gasto se guardará sin foto.');
         guardarConFoto(null);
