@@ -7879,18 +7879,19 @@ function inmdoc_render(idx) {
     cont.innerHTML = '<div class="empty-state">Aún no hay documentos registrados para este inmueble.</div>';
     return;
   }
-  // PUNTO 170 (14/09/2026): a petición tuya, un icono (ver, el ojo) pasa a
-  // la izquierda de la tarjeta, y los otros dos (compartir/borrar) se
-  // quedan a la derecha — en vez de los 3 juntos a la derecha, que dejaba
-  // el texto descentrado.
+  // PUNTO 172 (14/09/2026): a petición tuya, "borrar" (que SÍ pide
+  // confirmación — ver inmdoc_borrar) se separa a la izquierda, solo, y
+  // "ver"+"compartir" (las dos acciones inofensivas) se quedan juntas a la
+  // derecha — así el dedo no puede rozar borrar sin querer al ir a ver o
+  // compartir. Antes estaban los 3 iconos pegados en el mismo lado.
   cont.innerHTML = docs.map(function(d) {
     return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:8px;">'
-      + '<a href="' + d.url + '" target="_blank" title="Ver" style="color:#5b8dee;display:flex;align-items:center;text-decoration:none;">' + _svgVer(18) + '</a>'
+      + '<button onclick="inmdoc_borrar(\'' + d.id + '\')" title="Borrar" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;padding:0;">✕</button>'
       + '<div style="text-align:center;"><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + d.tipo + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + ' · ' + d.nombre + '</div></div>'
-      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<div style="display:flex;align-items:center;gap:12px;">'
+      + '<a href="' + d.url + '" target="_blank" title="Ver" style="color:#5b8dee;display:flex;align-items:center;text-decoration:none;">' + _svgVer(18) + '</a>'
       + '<button onclick="inmdoc_compartir(\'' + d.id + '\')" title="Compartir" style="background:none;border:none;color:#5b8dee;cursor:pointer;padding:0;display:flex;align-items:center;">' + _svgCompartir(16) + '</button>'
-      + '<button onclick="inmdoc_borrar(\'' + d.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
       + '</div></div>';
   }).join('');
 }
@@ -20162,13 +20163,25 @@ function renta_renderNominas() {
   document.getElementById('renta-total-trabajo').textContent = fmtGlobal(totalBruto) + ' €';
 }
 
+// PUNTO 173 (14/09/2026): BUG encontrado y corregido — a diferencia de
+// "Otro ingreso" (ingotros_borrar) y de "Documentos por inmueble"
+// (inmdoc_borrar), borrar una nómina no pedía ninguna confirmación: se
+// borraba al primer toque en la ✕. Se añade el mismo aviso de
+// Cancelar/Borrar que ya usa el resto de la app.
 function renta_borrarNomina(idx) {
   if (bloqueaSiViewer('Borrar una nómina')) return;
   var arr = renta_getNominas();
-  arr.splice(idx, 1);
-  renta_saveNominas(arr);
-  renta_renderNominas();
-  renta_calcPrevision();
+  var n = arr[idx];
+  showConfirm('🗑️', '¿Borrar esta nómina?', (n ? n.mes : '') + ' — esta acción no se puede deshacer.', [
+    { label: 'Cancelar', cls: 'c', fn: function () {} },
+    { label: 'Borrar', cls: 'r', fn: function () {
+      var arr2 = renta_getNominas();
+      arr2.splice(idx, 1);
+      renta_saveNominas(arr2);
+      renta_renderNominas();
+      renta_calcPrevision();
+    } }
+  ]);
 }
 
 // Modal nómina
@@ -20634,13 +20647,22 @@ function renta_compartirGasto(idx) {
   compartirArchivoDrive(g.fotoUrl, g.concepto || 'gasto');
 }
 
+// PUNTO 173 (14/09/2026): mismo fallo que en nóminas (ver comentario en
+// renta_borrarNomina) — borrar un gasto tampoco pedía confirmación.
 function renta_borrarGasto(idx) {
   if (bloqueaSiViewer('Borrar un gasto')) return;
   var arr = renta_getGastos();
-  arr.splice(idx, 1);
-  renta_saveGastos(arr);
-  renta_renderGastos();
-  renta_calcPrevision();
+  var g = arr[idx];
+  showConfirm('🗑️', '¿Borrar este gasto?', (g ? g.concepto + ' · ' + fmtGlobal(g.importe) + ' €' : '') + ' — esta acción no se puede deshacer.', [
+    { label: 'Cancelar', cls: 'c', fn: function () {} },
+    { label: 'Borrar', cls: 'r', fn: function () {
+      var arr2 = renta_getGastos();
+      arr2.splice(idx, 1);
+      renta_saveGastos(arr2);
+      renta_renderGastos();
+      renta_calcPrevision();
+    } }
+  ]);
 }
 
 function renta_abrirModalGasto(tipo) {
