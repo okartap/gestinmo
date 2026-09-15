@@ -19808,6 +19808,102 @@ var _fotoArchivo = null; // archivo pendiente de subir
 // móvil caduque mientras se espera la descarga).
 var _shareBlobCache = {};
 
+// PUNTO 175 (15/09/2026): antes había que "Conectar Google Drive" cada vez
+// que se cerraba y abría la app, aunque hubiera pasado un minuto. Google
+// solo entrega un permiso temporal (unos 60 minutos) y la app no guardaba
+// nada de un cierre al siguiente. Se añaden dos mejoras, sin tocar cómo
+// funciona el botón manual de "Conectar":
+//  1) Se guarda ese permiso en el propio dispositivo, con su caducidad —
+//     si cierras y vuelves a abrir la app dentro de esa hora, se reutiliza
+//     solo, sin pedir nada.
+//  2) Si ya ha caducado, al abrir la app se intenta reconectar en
+//     silencio (sin ninguna ventana emergente) por si Google ya te
+//     reconoce; si no lo consigue, se queda tal cual estaba — el botón
+//     manual de "Conectar Google Drive" sigue ahí, como siempre.
+// Ninguna de las dos evita tener que reconectar el 100% de las veces (eso
+// exigiría montar una pieza nueva de servidor, un proyecto aparte), pero sí
+// reduce mucho la frecuencia.
+var DRIVE_TOKEN_STORAGE_KEY = 'gestinmo_drive_token';
+
+function _guardarTokenDrive(token, expiresInSeg) {
+  try {
+    var margenSeg = 120; // colchón de 2 minutos para no usarlo justo al filo de caducar
+    var datos = { token: token, expiraEn: Date.now() + Math.max(0, (expiresInSeg || 3600) - margenSeg) * 1000 };
+    localStorage.setItem(DRIVE_TOKEN_STORAGE_KEY, JSON.stringify(datos));
+  } catch (e) { /* localStorage puede fallar (modo privado, cuota llena...) — no es grave, simplemente no se recuerda */ }
+}
+
+function _cargarTokenDrivePersistido() {
+  try {
+    var raw = localStorage.getItem(DRIVE_TOKEN_STORAGE_KEY);
+    if (!raw) return false;
+    var datos = JSON.parse(raw);
+    if (!datos || !datos.token || !datos.expiraEn || datos.expiraEn <= Date.now()) {
+      localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY);
+      return false;
+    }
+    _driveToken = datos.token;
+    return true;
+  } catch (e) { return false; }
+}
+
+// Se llama cuando una petición real a Drive responde que el permiso ya no
+// vale (401/403) — limpia el token guardado y deja la app en "no
+// conectado" en las dos pantallas que lo usan, para que la próxima vez se
+// intente reconectar en vez de seguir pensando que sigue conectada cuando
+// ya no lo está.
+function _marcarTokenDriveInvalido() {
+  _driveToken = null;
+  try { localStorage.removeItem(DRIVE_TOKEN_STORAGE_KEY); } catch (e) {}
+  [
+    { estado: 'renta-drive-estado', noauth: 'renta-drive-noauth', auth: 'renta-drive-auth' },
+    { estado: 'inmdoc-drive-estado', noauth: 'inmdoc-drive-noauth', auth: 'inmdoc-drive-auth' }
+  ].forEach(function(ids) {
+    var estado = document.getElementById(ids.estado);
+    var noauth = document.getElementById(ids.noauth);
+    var auth = document.getElementById(ids.auth);
+    if (estado) { estado.textContent = '⚪ No conectado a Drive'; estado.style.color = 'var(--text-secondary)'; }
+    if (noauth) noauth.style.display = 'block';
+    if (auth) auth.style.display = 'none';
+  });
+}
+
+// Al abrir la app: 1) reutiliza el permiso guardado si todavía es válido;
+// 2) si no, intenta reconectar en silencio (sin ventana emergente) por si
+// Google ya reconoce el dispositivo. Si ninguna de las dos funciona, no se
+// avisa de nada — es una comprobación de fondo, no algo pedido por ti en
+// ese momento, así que se queda como siempre: a la espera de que pulses
+// "Conectar Google Drive".
+var _driveReconexionIntentada = false;
+function _iniciarReconexionDriveSilenciosa() {
+  if (_driveReconexionIntentada) return;
+  _driveReconexionIntentada = true;
+  if (_cargarTokenDrivePersistido()) { renta_driveConectado(); return; }
+  var intentos = 0;
+  var esperar = setInterval(function() {
+    intentos++;
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+      clearInterval(esperar);
+      try {
+        var client = google.accounts.oauth2.initTokenClient({
+          client_id: DRIVE_CLIENT_ID,
+          scope: DRIVE_SCOPE,
+          callback: function(resp) {
+            if (resp.error || !resp.access_token) return; // fallo silencioso: se queda como estaba
+            _driveToken = resp.access_token;
+            _guardarTokenDrive(resp.access_token, resp.expires_in);
+            renta_driveConectado();
+          }
+        });
+        client.requestAccessToken({ prompt: '' });
+      } catch (e) { /* fallo silencioso */ }
+    } else if (intentos >= 20) {
+      clearInterval(esperar); // ~6s sin cargar la librería de Google: se deja como está
+    }
+  }, 300);
+}
+document.addEventListener('DOMContentLoaded', _iniciarReconexionDriveSilenciosa);
+
 function renta_conectarDrive() {
   if (!window.google || !window.google.accounts) {
     alert('La librería de Google aún se está cargando. Espera unos segundos y vuelve a intentarlo.');
@@ -19822,6 +19918,7 @@ function renta_conectarDrive() {
         return;
       }
       _driveToken = resp.access_token;
+      _guardarTokenDrive(resp.access_token, resp.expires_in);
       renta_driveConectado();
     }
   });
@@ -20051,7 +20148,14 @@ function _precargarBlobDrive(url) {
   // segundo plano (por ejemplo, el token caducó entre medias) — así la
   // próxima vez que se pinte la lista se reintenta, y no se avisa de nada
   // porque esto es solo una preparación silenciosa, no una acción tuya.
-  p.catch(function() { delete _shareBlobCache[fileId]; });
+  // PUNTO 175 (15/09/2026): si el motivo es que el permiso ya no vale, se
+  // limpia también el permiso guardado y se refleja "no conectado" en
+  // pantalla — así no se queda una luz verde falsa mientras en realidad ya
+  // no funciona.
+  p.catch(function(err) {
+    delete _shareBlobCache[fileId];
+    if (err && err.message === 'drive-token-caducado') _marcarTokenDriveInvalido();
+  });
 }
 function compartirArchivoDrive(url, nombreSugerido) {
   var fileId = _driveFileIdFromUrl(url);
@@ -20098,6 +20202,11 @@ function compartirArchivoDrive(url, nombreSugerido) {
   .catch(function(err) {
     delete _shareBlobCache[fileId];
     if (err && err.message === 'drive-token-caducado') {
+      // PUNTO 175 (15/09/2026): además de avisar, se limpia el permiso
+      // guardado y se refleja "no conectado" en pantalla — así el estado
+      // que ves coincide con la realidad, en vez de seguir mostrando
+      // "conectado" cuando ya no lo está.
+      _marcarTokenDriveInvalido();
       alert('La conexión con Google Drive ha caducado (dura un tiempo limitado). Pulsa otra vez "Conectar Google Drive" y prueba de nuevo. Mientras tanto, se abre el enlace.');
     } else {
       alert('No se ha podido preparar el archivo para compartir. Se abre el enlace en su lugar.');
