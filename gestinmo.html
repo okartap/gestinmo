@@ -2021,10 +2021,16 @@ const DATA_KEYS = [
   // lleguen los datos ya sincronizados, no se vuelva a duplicar la carga.
   'kurra:seed_2026_v1',
   // PUNTO 177 (17/09/2026): bandera del rescate de "Otros ingresos"/"Gastos"
-  // hacia la nube (ver _rescateGastosOtrosIngresos más abajo) — sincronizada
+  // hacia la nube (ver más abajo, dentro de 'firebaseLoaded') — sincronizada
   // igual que la de Kurra justo arriba, para que en cuanto se haga el
   // rescate desde UN aparato, el resto no lo repita innecesariamente.
-  'app:rescate_gastos_otros_v1'
+  'app:rescate_gastos_otros_v1',
+  // PUNTO 178 (17/09/2026): segunda versión de la misma bandera — ver
+  // _rescateGastosOtrosIngresosV2 más abajo. Nota: 'app:diag_178_visto'
+  // (la comprobación de conteo que la acompaña) NO se incluye aquí a
+  // propósito — tiene que quedar en cada aparato por separado, para que se
+  // muestre una vez en CADA uno y así poder comparar sus cifras entre sí.
+  'app:rescate_gastos_otros_v2'
 ];
 // BLINDAJE DE DATOS (Bloque 4): las nóminas y gastos de "Renta Patricio" se
 // guardan en una clave por año (renta:gastos:2026, renta:nominas:2026...).
@@ -13068,27 +13074,75 @@ document.addEventListener('firebaseLoaded', function() {
   loadStorage();
   inyectarFincasRusticas();
   limpiarContratoPrueba();
-  // PUNTO 177 (17/09/2026): red de rescate, una sola vez por aparato, para
-  // "Otros ingresos" y "Gastos" de Renta Patricio que se hubieran quedado
-  // guardados solo en el aparato sin llegar nunca a subirse a la nube (ver
-  // el comentario largo junto a kurra_seedInicial, más arriba en el
-  // archivo, con el porqué). Aquí, dentro de 'firebaseLoaded',
-  // window.syncToFirestore ya existe siempre, así que el rescate se
-  // ejecuta de verdad. Solo reenvía, nunca toca ni borra nada localmente.
-  (function _rescateGastosOtrosIngresos() {
+  // PUNTO 178 (17/09/2026): el rescate del PUNTO 177 (arriba, ya corregido
+  // de sitio) sigue sin resolverlo según Patry, tras comprobarlo en el
+  // iPhone y en Chrome. Como no hay forma de ver la consola del navegador
+  // en su día a día, esta versión hace lo mismo que la anterior PERO
+  // comprueba de verdad si el envío a la nube llegó a confirmarse (no solo
+  // "se ha llamado a la función"), y avisa en pantalla, una sola vez, con
+  // el resultado real — así se puede saber con certeza si el fallo está en
+  // el envío (este aparato) o en la recepción (el aparato que no lo ve).
+  // Usa una bandera nueva ('...v2') para forzar un intento fresco aunque la
+  // anterior ('...v1') ya se hubiera guardado.
+  (function _rescateGastosOtrosIngresosV2() {
     try {
-      if (localStorage.getItem('app:rescate_gastos_otros_v1')) return;
-      if (!window.syncToFirestore) return; // por si acaso; no se marca como hecho, se reintenta en el próximo arranque
+      if (localStorage.getItem('app:rescate_gastos_otros_v2')) return;
+      if (!window.syncToFirestore) return; // se reintenta en el próximo arranque
+      var candidatos = [];
       var otros = localStorage.getItem('ingresos:otros:patricio');
-      if (otros && otros !== '[]') window.syncToFirestore('ingresos:otros:patricio', otros);
+      if (otros && otros !== '[]') candidatos.push('ingresos:otros:patricio');
       for (var _rAnioResc = 2022; _rAnioResc <= 2036; _rAnioResc++) {
         var gastosAnio = localStorage.getItem('renta:gastos:' + _rAnioResc);
-        if (gastosAnio && gastosAnio !== '[]') window.syncToFirestore('renta:gastos:' + _rAnioResc, gastosAnio);
+        if (gastosAnio && gastosAnio !== '[]') candidatos.push('renta:gastos:' + _rAnioResc);
       }
-      localStorage.setItem('app:rescate_gastos_otros_v1', '1');
-      window.syncToFirestore('app:rescate_gastos_otros_v1', '1');
-    } catch (e) { console.error('Error en el rescate de Otros ingresos/Gastos', e); }
+      if (candidatos.length === 0) {
+        // Este aparato no tiene nada local que rescatar (es el que recibe,
+        // no el que envía) — queda comprobado, sin aviso en pantalla.
+        localStorage.setItem('app:rescate_gastos_otros_v2', '1');
+        window.syncToFirestore('app:rescate_gastos_otros_v2', '1');
+        return;
+      }
+      Promise.all(candidatos.map(function(k) {
+        return window.syncToFirestore(k, localStorage.getItem(k));
+      })).then(function() {
+        var pendientes = {};
+        try { pendientes = JSON.parse(localStorage.getItem('_sync:pendientes_subida') || '{}'); } catch (e) {}
+        var fallidos = candidatos.filter(function(k) { return pendientes[k]; });
+        if (fallidos.length === 0) {
+          localStorage.setItem('app:rescate_gastos_otros_v2', '1');
+          window.syncToFirestore('app:rescate_gastos_otros_v2', '1');
+          setTimeout(function() {
+            alert('Sincronización confirmada: se han reenviado a la nube ' + candidatos.length + ' apartado(s) de "Otros ingresos"/"Gastos". En un momento deberían verse ya en tus otros aparatos.');
+          }, 600);
+        } else {
+          // No se marca como hecho del todo — se reintenta solo (buzón de
+          // reintentos / próximo arranque), y se avisa de que algo no se
+          // pudo confirmar en este intento.
+          setTimeout(function() {
+            alert('Aviso: al reenviar "Otros ingresos"/"Gastos" a la nube, ' + fallidos.length + ' de ' + candidatos.length + ' no se ha podido confirmar ahora mismo (probable fallo de conexión en este instante). Se reintentará solo la próxima vez.');
+          }, 600);
+        }
+      });
+    } catch (e) { console.error('Error en el rescate V2 de Otros ingresos/Gastos', e); }
   })();
+  // Comprobación de una sola vez, en CUALQUIER aparato (incluido el que
+  // recibe): cuántos apuntes ve este aparato ahora mismo en "Otros
+  // ingresos" y en "Gastos" (todos los años), después de cargar todo lo
+  // que hay en la nube. Sirve para comparar de un vistazo entre el iPhone
+  // y Chrome si el rescate de arriba no fuera suficiente por sí solo.
+  if (!localStorage.getItem('app:diag_178_visto')) {
+    localStorage.setItem('app:diag_178_visto', '1');
+    setTimeout(function() {
+      try {
+        var totOtros = JSON.parse(localStorage.getItem('ingresos:otros:patricio') || '[]').length;
+        var totGastos = 0;
+        for (var _dAnio = 2022; _dAnio <= 2036; _dAnio++) {
+          totGastos += JSON.parse(localStorage.getItem('renta:gastos:' + _dAnio) || '[]').length;
+        }
+        alert('Comprobación: este aparato tiene ahora mismo ' + totOtros + ' apunte(s) en "Otros ingresos" y ' + totGastos + ' en "Gastos" (todos los años).');
+      } catch (e) {}
+    }, 1200);
+  }
   // Migración: corregir estado 'ocupado' a 'alquilado' en fincas rústicas
   (function() {
     var rusRefs = ['RUS02','RUS03','RUS04','RUS05','RUS06','RUS07'];
