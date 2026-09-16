@@ -12109,31 +12109,17 @@ function kurra_borrarApunte(){
 // nadie ha vuelto a tocar esos mismos datos desde entonces, nunca ha
 // habido una "segunda oportunidad" de subirlos — se quedan viviendo solo
 // en ese aparato, tal y como sospechaba Patry.
-// Arreglo — red de rescate, una sola vez por aparato: si ESTE aparato
-// tiene datos guardados en "Otros ingresos" o en "Gastos" de cualquier
-// año, se reenvían a la nube tal cual están, sin tocar ni borrar nada
-// localmente. Es seguro repetirlo o ejecutarlo en un aparato que no tenga
-// nada que rescatar (la fusión en la nube es fila a fila, nunca sustituye
-// el bloque completo — ver _esListaPorIdClave/_tipoGenericoDeClave), así
-// que si ya estaban bien sincronizados esto no cambia nada de nada.
-(function _rescateGastosOtrosIngresos() {
-  try {
-    if (localStorage.getItem('app:rescate_gastos_otros_v1')) return;
-    // Si Firebase todavía no está listo en este instante (arranque muy
-    // rápido, o sin red en este momento concreto), no se marca como hecho
-    // — así se reintenta solo en el próximo arranque, en vez de darse por
-    // vencido para siempre sin haber llegado a intentarlo de verdad.
-    if (!window.syncToFirestore) return;
-    var otros = localStorage.getItem('ingresos:otros:patricio');
-    if (otros && otros !== '[]') window.syncToFirestore('ingresos:otros:patricio', otros);
-    for (var _rAnioResc = 2022; _rAnioResc <= 2036; _rAnioResc++) {
-      var gastosAnio = localStorage.getItem('renta:gastos:' + _rAnioResc);
-      if (gastosAnio && gastosAnio !== '[]') window.syncToFirestore('renta:gastos:' + _rAnioResc, gastosAnio);
-    }
-    localStorage.setItem('app:rescate_gastos_otros_v1', '1');
-    window.syncToFirestore('app:rescate_gastos_otros_v1', '1');
-  } catch (e) { console.error('Error en el rescate de Otros ingresos/Gastos', e); }
-})();
+// CORRECCIÓN 17/09/2026 (mismo día, tras comprobar que el primer intento
+// no funcionó): la primera versión de este rescate se ejecutaba aquí
+// mismo, nada más arrancar la página — pero "aquí mismo" resultó ser
+// SIEMPRE antes de que window.syncToFirestore exista todavía (esa función
+// se define más abajo, en el bloque que se carga el último de todos, ver
+// comentario en la línea ~2389), así que la condición "si Firebase no
+// está listo, no hacer nada" se cumplía SIEMPRE, en todos los arranques,
+// y el rescate real nunca llegaba a ejecutarse. Movido ahora dentro del
+// listener 'firebaseLoaded' (línea ~13081), el mismo sitio ya probado
+// donde esta app hace el resto de sus migraciones de arranque — ahí sí
+// está garantizado que syncToFirestore ya existe.
 
 // ─── SELECTOR DE INQUILINO (botón +) ─────────────────────────
 let _cobSelectorData=[];
@@ -13082,6 +13068,27 @@ document.addEventListener('firebaseLoaded', function() {
   loadStorage();
   inyectarFincasRusticas();
   limpiarContratoPrueba();
+  // PUNTO 177 (17/09/2026): red de rescate, una sola vez por aparato, para
+  // "Otros ingresos" y "Gastos" de Renta Patricio que se hubieran quedado
+  // guardados solo en el aparato sin llegar nunca a subirse a la nube (ver
+  // el comentario largo junto a kurra_seedInicial, más arriba en el
+  // archivo, con el porqué). Aquí, dentro de 'firebaseLoaded',
+  // window.syncToFirestore ya existe siempre, así que el rescate se
+  // ejecuta de verdad. Solo reenvía, nunca toca ni borra nada localmente.
+  (function _rescateGastosOtrosIngresos() {
+    try {
+      if (localStorage.getItem('app:rescate_gastos_otros_v1')) return;
+      if (!window.syncToFirestore) return; // por si acaso; no se marca como hecho, se reintenta en el próximo arranque
+      var otros = localStorage.getItem('ingresos:otros:patricio');
+      if (otros && otros !== '[]') window.syncToFirestore('ingresos:otros:patricio', otros);
+      for (var _rAnioResc = 2022; _rAnioResc <= 2036; _rAnioResc++) {
+        var gastosAnio = localStorage.getItem('renta:gastos:' + _rAnioResc);
+        if (gastosAnio && gastosAnio !== '[]') window.syncToFirestore('renta:gastos:' + _rAnioResc, gastosAnio);
+      }
+      localStorage.setItem('app:rescate_gastos_otros_v1', '1');
+      window.syncToFirestore('app:rescate_gastos_otros_v1', '1');
+    } catch (e) { console.error('Error en el rescate de Otros ingresos/Gastos', e); }
+  })();
   // Migración: corregir estado 'ocupado' a 'alquilado' en fincas rústicas
   (function() {
     var rusRefs = ['RUS02','RUS03','RUS04','RUS05','RUS06','RUS07'];
