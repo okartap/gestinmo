@@ -18116,8 +18116,19 @@ function dash_render() {
     // año / mes / día. Suma el alquiler real (tabla del punto 97) más
     // cualquier otro ingreso que apuntes en el bloque "Otros ingresos" de
     // Renta Patricio (sueldo, u otro cualquiera, con su fecha — punto 101).
-    // "Día" = ingresos del año ÷ 365, igual que en tu hoja de Economía
-    // personal (no es una media de lo que llevas del año, es el ritmo anual).
+    //
+    // PUNTO 176 (16/09/2026): BUG DE CONCEPTO encontrado y corregido —
+    // "Ing. Mes" sumaba solo lo que tuviera fecha del mes en curso (alquiler
+    // + otros ingresos + nómina de ESE mes concreto), mientras que "Ing.
+    // Día" siempre fue Año ÷ 365. Como uno era "lo real de este mes" y el
+    // otro "el año repartido", las tres cifras no tenían por qué cuadrar
+    // entre sí — y además "Ing. Mes" salía bajo simplemente si algún dato
+    // del mes en curso todavía no se había metido, pareciendo un fallo sin
+    // serlo. Nos dijiste el criterio correcto: "Ing. Año" es todo lo
+    // cobrado en el año (eso no cambia) e "Ing. Mes" debe ser ese mismo
+    // total repartido entre los 12 meses — igual que "Ing. Día" ya lo
+    // repartía entre 365. Ahora los tres salen siempre coherentes entre sí:
+    // Año, Año÷12 y Año÷365.
     var todosInmP = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
     var idxP = [];
     for (var pi = 0; pi < todosInmP.length; pi++) {
@@ -18126,18 +18137,14 @@ function dash_render() {
     // PUNTO 121 (06/09/2026): antes este bucle recalculaba por su cuenta lo
     // mismo que ya hace inm_alqMenTotalAnioPorInm — unificado para que solo
     // haya un sitio que mantener si mañana cambia algo de esta cuenta.
-    var mesActualYm = year + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
-    var _alqP = (typeof inm_alqMenTotalAnioPorInm === 'function') ? inm_alqMenTotalAnioPorInm(idxP, year) : { total: 0, totalMesActual: 0 };
-    var alqAnioP = _alqP.total, alqMesP = _alqP.totalMesActual;
+    var alqAnioP = (typeof inm_alqMenTotalAnioPorInm === 'function') ? inm_alqMenTotalAnioPorInm(idxP, year).total : 0;
     var otrosAnioP = (typeof ingotros_totalAnio === 'function') ? ingotros_totalAnio(year) : 0;
-    var otrosMesP = (typeof ingotros_totalMes === 'function') ? ingotros_totalMes(mesActualYm) : 0;
     // PUNTO 130 (07/09/2026): "Ingresos anuales" solo sumaba alquiler + Otros
     // ingresos — no contaba el sueldo (bloque Trabajo de Renta Patricio).
     // Se añade aquí para que el total sea de verdad todo lo que ingresas.
-    var mesesNombreP = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    var _nomP = (typeof renta_totalNominaAnio === 'function') ? renta_totalNominaAnio(year, mesesNombreP[new Date().getMonth()]) : { total: 0, totalMesActual: 0 };
-    var ingAnioP = alqAnioP + otrosAnioP + _nomP.total;
-    var ingMesP = alqMesP + otrosMesP + _nomP.totalMesActual;
+    var nomAnioP = (typeof renta_totalNominaAnio === 'function') ? renta_totalNominaAnio(year).total : 0;
+    var ingAnioP = alqAnioP + otrosAnioP + nomAnioP;
+    var ingMesP = ingAnioP / 12;
     var ingDiaP = ingAnioP / 365;
     // PUNTO 122 (06/09/2026): etiquetas acortadas ("Ing. Año/Mes/Día") y sin
     // símbolo € (fin_fmtSinSimbolo — mantiene los decimales, solo quita el
