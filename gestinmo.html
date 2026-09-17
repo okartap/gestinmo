@@ -10568,6 +10568,35 @@ async function generarPDF() {
   const label = document.getElementById('pdf-progress-label');
   btn.classList.add('generating'); btn.innerHTML = 'Generando...'; progress.classList.add('show');
 
+  // PUNTO 192 (17/09/2026): "VIGILANTE" anti-colgado — el Punto 188 (justo
+  // debajo) ya garantiza que, si algo lanza un error de verdad, se vea un
+  // aviso en vez de quedarse callado. Pero Patry ha visto el botón quedarse
+  // en "Generando..." para siempre SIN ningún error (avisado dos veces,
+  // 17/09/2026), lo cual encaja con la sincronización en segundo plano con
+  // la nube (Firebase) — cada contrato guardado se sube solo, y si en ese
+  // preciso instante hay un corte de cobertura o la nube tarda en
+  // responder, ese tramo puede alargarse sin que salte ningún error (no es
+  // un fallo del código, es una espera de red que nunca deberíamos dejar
+  // sin salida). Antes, la única forma de salir de ahí era cerrar la app
+  // entera y volver a meter los datos.
+  //
+  // Con este vigilante: si han pasado más de 12 segundos (lo normal son
+  // 2-3) y el proceso no ha terminado ni bien ni mal, se avisa con un
+  // mensaje claro y se libera el botón para reintentar con un solo clic,
+  // sin perder los datos ya escritos en el asistente ni tener que recargar
+  // nada. Si el proceso termina antes de esos 12 segundos (el caso de
+  // siempre), este aviso se cancela solo y no se nota en nada.
+  let _vigilanteDisparado = false;
+  const _vigilanteId = setTimeout(() => {
+    _vigilanteDisparado = true;
+    bar.style.width = '0%';
+    label.textContent = '⚠️ Esto está tardando más de lo normal — puede ser un corte de conexión con la nube. Tus datos no se han perdido: pulsa "Generar PDF" para reintentar.';
+    btn.classList.remove('generating');
+    btn.innerHTML = '<span>📄</span> Generar PDF';
+    progress.classList.add('show');
+  }, 12000);
+  const _pararVigilante = () => { if (!_vigilanteDisparado) clearTimeout(_vigilanteId); };
+
   // PUNTO 188 (17/09/2026): blindaje — antes, todo lo que va desde aquí
   // hasta el "try" de más abajo (leer los datos del formulario, calcular
   // los firmantes, la barra de progreso) quedaba FUERA de cualquier
@@ -11222,14 +11251,26 @@ async function generarPDF() {
       }
     }
     // ── FIN GUARDAR ────────────────────────────────────────────────
+    // PUNTO 192: proceso terminado con éxito dentro de los 12 segundos —
+    // se desactiva el vigilante para que no salte de más.
+    _pararVigilante();
 
   } catch(e) {
+    // PUNTO 192: también aquí, para que un error "normal" (Punto 188) no
+    // se vea pisado unos segundos después por el aviso del vigilante.
+    _pararVigilante();
+    if (_vigilanteDisparado) {
+      // El vigilante ya avisó y liberó el botón — no hace falta duplicar
+      // el aviso encima con el mensaje de error genérico.
+      console.error(e);
+    } else {
     console.error(e);
     bar.style.width = '0%';
     label.textContent = 'Error: ' + (e && e.message ? e.message : String(e));
     btn.classList.remove('generating');
     btn.innerHTML = '<span>📄</span> Generar PDF';
     progress.classList.add('show');
+    }
   }
 }
 
