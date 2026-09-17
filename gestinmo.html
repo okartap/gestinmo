@@ -8726,6 +8726,11 @@ function showWizard() {
   if (typeof selectArrendador === 'function') {
     selectArrendador(localStorage.getItem('patrimer:empresa') || 'patrimer');
   }
+  // PUNTO 186 (17/09/2026): al abrir el asistente en blanco se suelta
+  // cualquier "modo edición" que hubiera quedado marcado — solo
+  // con_regenerarPDF() lo vuelve a marcar, justo después de llamar aquí,
+  // cuando de verdad se está reabriendo un contrato guardado para corregirlo.
+  _contratoEditandoId = null;
   // PUNTO 180 (17/09/2026): varios firmantes por contrato — vuelve siempre
   // a "1 firmante" al abrir el asistente en blanco, para que un contrato
   // anterior con cotitulares no deje restos en el siguiente.
@@ -8771,6 +8776,10 @@ function volverAlWizard() {
   window.scrollTo(0,0);
 }
 let _detalleContratoActual = null;
+// PUNTO 186 (17/09/2026): id del contrato que se está corrigiendo (marcado
+// por con_regenerarPDF cuando se reabre uno ya guardado) — ver generarPDF().
+// null significa "esto es un contrato nuevo", como siempre.
+let _contratoEditandoId = null;
 
 function showDetalle(contratoId) {
   const contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
@@ -10883,7 +10892,26 @@ async function generarPDF() {
       // 1) Guardar contrato en historial (evitar duplicados: por nombre de
       // archivo, o por mismo inmueble + mismo DNI + misma fecha de inicio)
       const contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
-      const yaExiste = contratos.some(c => c.archivo === nombreArchivo ||
+      // PUNTO 186 (17/09/2026): "Modificar contrato" — antes, la única forma
+      // de tocar un contrato ya guardado era "Ver / Descargar contrato"
+      // (que reabre el asistente con sus datos), pero al pulsar "Generar
+      // PDF" la comprobación de "evitar duplicados" de justo abajo
+      // reconocía que ese contrato "ya existía" y se quedaba callada — el
+      // PDF descargado sí llevaba la corrección, pero la ficha guardada se
+      // quedaba con el dato antiguo (bug real avisado por Patry: "no me
+      // deja modificar el contrato"). con_regenerarPDF() marca en
+      // _contratoEditandoId el id del contrato que se ha reabierto para
+      // editar — si al generar el PDF ese id sigue existiendo, se
+      // actualiza esa misma ficha en vez de comprobar duplicados. Un
+      // contrato nuevo de verdad (o una Renovación/Rescisión, que crean
+      // siempre un documento aparte) nunca marca este id, así que su
+      // comportamiento no cambia en nada.
+      const idxEnEdicion = (typeof _contratoEditandoId === 'string' && _contratoEditandoId)
+        ? contratos.findIndex(c => c.id === _contratoEditandoId)
+        : -1;
+      const esEdicion = idxEnEdicion >= 0;
+      const contratoPrevio = esEdicion ? contratos[idxEnEdicion] : null;
+      const yaExiste = !esEdicion && contratos.some(c => c.archivo === nombreArchivo ||
         (dniNorm && c.ref === datos.ref && normalizarDocId(c.inqDNI) === dniNorm && c.inicio === datos.inicio));
       if (!yaExiste) {
 
@@ -10903,7 +10931,7 @@ async function generarPDF() {
       }
 
       const nuevoContrato = {
-        id: 'ctr-' + Date.now(),
+        id: esEdicion ? contratoPrevio.id : ('ctr-' + Date.now()),
         ref: datos.ref,
         dir: datos.dir,
         tipo: datos.tipo,
@@ -10961,15 +10989,26 @@ async function generarPDF() {
           return arr;
         })(),
         // El propio documento de Rescisión no es una tenencia en vigor —
-        // se guarda como "rescindido" desde el principio.
-        estado: (datos.tipo === 'rescision') ? 'rescindido' : 'activo',
-        creadoEn: ahora,
+        // se guarda como "rescindido" desde el principio. Al MODIFICAR un
+        // contrato ya existente, se respeta el estado que ya tenía (activo,
+        // renovado o rescindido) — corregir un dato no debe revivir ni
+        // cerrar un contrato por sí solo.
+        estado: esEdicion ? contratoPrevio.estado : ((datos.tipo === 'rescision') ? 'rescindido' : 'activo'),
+        creadoEn: esEdicion ? contratoPrevio.creadoEn : ahora,
         // PUNTO 159 (10/09/2026): sello de fecha desde el momento de creación
         // — para el blindaje de sincronización, ver _contratosMerge.
         updatedAt: ahora
       };
-      contratos.unshift(nuevoContrato);
+      if (esEdicion) {
+        contratos[idxEnEdicion] = nuevoContrato;
+      } else {
+        contratos.unshift(nuevoContrato);
+      }
       localStorage.setItem('contratos:lista', JSON.stringify(contratos));
+      // Ya se ha guardado la corrección — se suelta la marca de edición
+      // para que no se quede "pegada" a la siguiente vez que se genere un
+      // PDF en este mismo asistente.
+      _contratoEditandoId = null;
 
       // Si es Rescisión: el inmueble vuelve a estar Vacío y se limpia el
       // inquilino mostrado en su ficha, para que vuelva a aparecer como
@@ -19844,6 +19883,13 @@ function con_regenerarPDF(id) {
     if (typeof showWizard === 'function') showWizard();
 
     setTimeout(() => {
+      // PUNTO 186 (17/09/2026): se marca que este contrato se está
+      // reabriendo para CORREGIRLO — si se cambia algo y se pulsa "Generar
+      // PDF", generarPDF() actualizará esta misma ficha en vez de crear
+      // (o silenciosamente no crear) una nueva. showWizard(), justo
+      // arriba, ya ha soltado cualquier marca anterior.
+      _contratoEditandoId = c.id;
+
       // 3) Seleccionar arrendador
       const arrKey = Object.keys(ARRENDADORES).find(k => ARRENDADORES[k].label === c.arrendador);
       if (arrKey && typeof selectArrendador === 'function') selectArrendador(arrKey);
