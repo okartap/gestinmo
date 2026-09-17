@@ -8013,7 +8013,7 @@ function inm_asignarInquilino() {
   setTimeout(() => {
     if (typeof showWizard === 'function') showWizard();
     setTimeout(() => {
-      if (typeof seleccionarInmueble === 'function') seleccionarInmueble(inm.ref, inm.direccion, wizardTipo);
+      if (typeof seleccionarInmueble === 'function') seleccionarInmueble(inm.ref, inm.direccion, wizardTipo, inm.catastral);
       if (typeof actualizarPreview === 'function') actualizarPreview();
       showToast('✅ Vivienda seleccionada — completa los datos del inquilino', 'success');
     }, 400);
@@ -9304,14 +9304,14 @@ function filtrarInmueblesPorTipo() {
   // Si solo hay un inmueble compatible, preseleccionarlo automáticamente
   if (window._inmueblesFiltrados.length === 1) {
     const inm = window._inmueblesFiltrados[0];
-    seleccionarInmueble(inm.ref, inm.dir, inm.tipo);
+    seleccionarInmueble(inm.ref, inm.dir, inm.tipo, inm.catastral);
   } else {
     // Limpiar selección previa si no es compatible con el nuevo tipo
     const refActual = document.getElementById('f-ref').value;
     const esCompatible = window._inmueblesFiltrados.some(i => i.ref === refActual);
     if (!esCompatible && window._inmueblesFiltrados.length > 0) {
       const primero = window._inmueblesFiltrados[0];
-      seleccionarInmueble(primero.ref, primero.dir, primero.tipo);
+      seleccionarInmueble(primero.ref, primero.dir, primero.tipo, primero.catastral);
     }
   }
 }
