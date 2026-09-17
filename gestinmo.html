@@ -13529,8 +13529,25 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
       industrias:{legalName:'Industrias Gómez y Cayuela S.L.',cif:'B30137418',address:'Calle Cordobanes Nº15 (Carretera de Caravaca), 30800 Lorca (Murcia)',rep:'D. Patricio Gómez García',repDNI:'23.257.330-Y'}
     };
     // Determinar empresa arrendadora
-    const arrKey=c.arrendador&&c.arrendador.toLowerCase().includes('patrimer')?'patrimer':c.arrendador&&c.arrendador.toLowerCase().includes('patricio')?'patricio':'patrimer';
+    // PUNTO 193 (17/09/2026) — BUG REAL ENCONTRADO Y CORREGIDO: si el
+    // arrendador del contrato era "Industrias Gómez y Cayuela S.L.", este
+    // texto no contiene ni "patrimer" ni "patricio", así que antes caía
+    // siempre en el "por defecto" y la adenda salía a nombre de Patrimer
+    // Levante — una empresa completamente distinta a la que de verdad
+    // arrienda ese inmueble. Se añade la comprobación de "industrias" que
+    // faltaba, en el mismo orden que ya usa el resto de la app.
+    const arrKey=c.arrendador&&c.arrendador.toLowerCase().includes('patrimer')?'patrimer':(c.arrendador&&c.arrendador.toLowerCase().includes('industrias')?'industrias':(c.arrendador&&c.arrendador.toLowerCase().includes('patricio')?'patricio':'patrimer'));
     const emp=EMPRESAS[arrKey]||EMPRESAS.patrimer;
+    // PUNTO 193: cuando el arrendador es Patricio actuando A TÍTULO
+    // PERSONAL (no una empresa), no hay ninguna "representación" que
+    // explicar — él mismo ES el arrendador, con su propio nombre y NIF.
+    // Antes, el texto y la firma trataban este caso exactamente igual que
+    // cuando SÍ hay una empresa de por medio (alguien representando a
+    // otra), lo cual generaba frases sin sentido ("actuando en nombre y
+    // representación de D. Patricio Gómez García" hablando de sí mismo) y
+    // su nombre repetido dos veces en el bloque de firma — bug real
+    // avisado por Patry en la adenda de renovación de Hicham (8ª prórroga).
+    const esPersonaFisica = (arrKey === 'patricio');
 
     const mesActualObj=new Date();
     const mes=mesActual();
@@ -13579,7 +13596,15 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
 
     // REUNIDOS
     ln('REUNIDOS',11,true);sp(5);
-    lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, actuando en nombre y representación de ${emp.legalName}${emp.cif?', con CIF '+emp.cif:''},  en calidad de ARRENDADOR.`);
+    // PUNTO 193: persona física → "en su propio nombre y derecho" (mismo
+    // criterio que ya usan el resto de contratos de la app para Patricio a
+    // título personal); empresa → se mantiene el texto de representación
+    // de siempre.
+    if (esPersonaFisica) {
+      lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, actuando en su propio nombre y derecho, en calidad de ARRENDADOR.`);
+    } else {
+      lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, actuando en nombre y representación de ${emp.legalName}${emp.cif?', con CIF '+emp.cif:''},  en calidad de ARRENDADOR.`);
+    }
     sp(3);
     const inqTratamiento=(c.inqGenero||'D.')+' ';
     lnW(`De otra parte, ${inqTratamiento}${c.inqNombre||'—'}, con DNI ${c.inqDNI||'—'}, en calidad de ARRENDATARIO/A.`);
@@ -13618,8 +13643,15 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
     sp(5);
     doc.text(emp.legalName,col1,y);
     doc.text(`${inqTratamiento}${c.inqNombre||'—'}`,col2,y);
-    sp(4);
-    doc.text(emp.rep,col1,y);
+    // PUNTO 193: con una empresa de por medio, esta segunda línea identifica
+    // a QUIÉN firma en su nombre (ej. "Patrimer Levante, S.L." + debajo "D.
+    // Patricio Gómez García"). Con Patricio a título personal, la línea de
+    // arriba YA es su propio nombre — repetirlo aquí debajo era el mismo
+    // nombre dos veces, tal y como avisó Patry.
+    if (!esPersonaFisica) {
+      sp(4);
+      doc.text(emp.rep,col1,y);
+    }
 
     const fecha=new Date().toISOString().slice(0,10);
     const nombre=`adenda_ipc_${(c.ref||'contrato').toLowerCase()}_${fecha}.pdf`;
