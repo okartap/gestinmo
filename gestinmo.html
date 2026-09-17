@@ -8790,6 +8790,35 @@ function showWizard() {
   const _fecReset = document.getElementById('firmantes-extra-container');
   if (_fecReset) _fecReset.innerHTML = '';
   if (typeof wizardSetNumFirmantes === 'function') wizardSetNumFirmantes(1);
+  // PUNTO 191 (17/09/2026): bug real y grave avisado por Patry, con capturas
+  // reales — al abrir el asistente en blanco para un contrato nuevo, los
+  // datos del INQUILINO del contrato anterior (nombre, DNI, domicilio,
+  // teléfono) seguían escritos en la pantalla, aunque el inmueble elegido
+  // fuera otro distinto y estuviera vacío. Causa: estos campos son
+  // elementos fijos de la página (no se recrean al abrir el asistente), así
+  // que lo último que se escribió en ellos se quedaba ahí para siempre
+  // hasta que alguien lo sobrescribía a mano — con el riesgo real de
+  // guardar, sin darse cuenta, los datos de un inquilino en el contrato de
+  // OTRA vivienda. El inmueble (referencia/dirección) no sufre este
+  // problema porque se vuelve a rellenar siempre al elegir uno nuevo en su
+  // propio paso — pero por si acaso, y para que el asistente arranque
+  // siempre 100% en blanco, se limpia aquí también.
+  if (typeof setInqTipo === 'function') setInqTipo('persona');
+  ['f-inq-nombre','f-inq-dni','f-inq-dom','f-inq-tel','f-inq-email',
+   'f-inq-empresa-nombre','f-inq-cif','f-inq-empresa-dom','f-inq-empresa-tel','f-inq-empresa-email',
+   'f-inq-rep-nombre','f-inq-rep-dni',
+   'f-con-renta','f-fianza','f-catastral','f-renta-especial','f-anexo-motivo','f-aprovechamiento',
+   'f-rescis-luz','f-rescis-agua','f-rescis-deuda'
+  ].forEach(function(_id) { const _el = document.getElementById(_id); if (_el) _el.value = ''; });
+  const _fInqGenero = document.getElementById('f-inq-genero'); if (_fInqGenero) _fInqGenero.value = 'D.';
+  const _fRef = document.getElementById('f-ref'); if (_fRef) _fRef.value = '';
+  const _fDir = document.getElementById('f-dir'); if (_fDir) _fDir.value = '';
+  const _fRefDisplay = document.getElementById('f-ref-display'); if (_fRefDisplay) _fRefDisplay.textContent = '—';
+  const _fDuracion = document.getElementById('f-duracion'); if (_fDuracion) _fDuracion.value = '1';
+  const _hoyISO = new Date().toISOString().slice(0, 10);
+  const _fFirma = document.getElementById('f-firma'); if (_fFirma) _fFirma.value = _hoyISO;
+  const _fInicio = document.getElementById('f-inicio'); if (_fInicio) _fInicio.value = _hoyISO;
+  const _fFin = document.getElementById('f-fin'); if (_fFin) _fFin.value = '';
   wGoStep(0);
   pdfDoc = null;
   padronBajas = [];
