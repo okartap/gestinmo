@@ -10482,6 +10482,18 @@ async function generarPDF() {
   const label = document.getElementById('pdf-progress-label');
   btn.classList.add('generating'); btn.innerHTML = 'Generando...'; progress.classList.add('show');
 
+  // PUNTO 188 (17/09/2026): blindaje — antes, todo lo que va desde aquí
+  // hasta el "try" de más abajo (leer los datos del formulario, calcular
+  // los firmantes, la barra de progreso) quedaba FUERA de cualquier
+  // try/catch. Si algo ahí lanzaba un error, el botón se quedaba para
+  // siempre diciendo "Generando..." sin ningún aviso — el usuario lo veía
+  // como que la app se había quedado "colgada" (bug real avisado por
+  // Patry). Ahora todo el proceso, desde este punto hasta el final, está
+  // dentro de un único try/catch: si algo falla, siempre se ve un mensaje
+  // de error y el botón vuelve a estar disponible, en vez de quedarse
+  // congelado sin explicación.
+  try {
+
   // PUNTO 180 (17/09/2026): con varios firmantes, el inquilino "de siempre"
   // (inqNombre/inqDNI/...) pasa a ser el del Responsable de cobro elegido
   // — así el resto de la app (PDF, tarjeta del contrato, Clientes, Cobros,
@@ -10544,7 +10556,6 @@ async function generarPDF() {
   for (const s of steps) { await sleep(300); bar.style.width = s.p + '%'; label.textContent = s.t; }
   await sleep(150);
 
-  try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const margin = 22, pageW = 210, maxW = pageW - margin * 2;
