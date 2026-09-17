@@ -5757,15 +5757,27 @@ con editar/borrar en cada línea. -->
 
   <!-- Acciones -->
   <div style="display:grid;gap:10px;">
-    <button onclick="cli_nuevoContrato()" style="background:var(--navy-card);border:1px solid var(--accent-gold);border-radius:14px;color:var(--accent-gold);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;padding:14px;cursor:pointer;letter-spacing:1px;">
-      📄 Nuevo contrato
-    </button>
-    <button onclick="cli_renovacion()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;padding:14px;cursor:pointer;letter-spacing:1px;">
-      🔄 Renovación / Prórroga
-    </button>
-    <button onclick="cli_rescision()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;padding:14px;cursor:pointer;letter-spacing:1px;">
-      ❌ Rescisión de contrato
-    </button>
+    <!-- PUNTO 189 (17/09/2026): los 3 botones de gestión solo se muestran
+         para el Responsable de cobro de al menos un contrato — un
+         cotitular (Firmante 2, 3...) ve en su lugar el aviso de abajo, ver
+         cli_verDetalle(). -->
+    <div id="cli-acciones-plenas" style="display:grid;gap:10px;">
+      <button onclick="cli_nuevoContrato()" style="background:var(--navy-card);border:1px solid var(--accent-gold);border-radius:14px;color:var(--accent-gold);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;padding:14px;cursor:pointer;letter-spacing:1px;">
+        📄 Nuevo contrato
+      </button>
+      <button onclick="cli_renovacion()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;padding:14px;cursor:pointer;letter-spacing:1px;">
+        🔄 Renovación / Prórroga
+      </button>
+      <button onclick="cli_rescision()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;padding:14px;cursor:pointer;letter-spacing:1px;">
+        ❌ Rescisión de contrato
+      </button>
+    </div>
+    <div id="cli-aviso-cotitular" style="display:none;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;">
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;margin-bottom:12px;">🤝 Firma como cofirmante de un contrato — la gestión (nuevo contrato, renovación, rescisión) se hace desde la ficha del Responsable de cobro.</div>
+      <button onclick="cli_verContratoCotitular()" style="width:100%;background:none;border:1px solid var(--accent-gold);border-radius:12px;color:var(--accent-gold);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;padding:12px;cursor:pointer;letter-spacing:1px;">
+        📄 Ver contrato
+      </button>
+    </div>
     <button onclick="cli_marcarAntiguo()" id="cli-btn-estado" style="background:none;border:1px solid var(--accent-red);border-radius:14px;color:var(--accent-red);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:12px;cursor:pointer;letter-spacing:1px;">
       Marcar como cliente antiguo
     </button>
@@ -8712,6 +8724,44 @@ function _confirmarReiniciarWizard(continuar) {
 function abrirWizardNuevo() {
   _confirmarReiniciarWizard(() => { if (typeof showWizard === 'function') showWizard(); });
 }
+// PUNTO 190 (17/09/2026): recupera en el asistente a los demás firmantes
+// (cotitulares) de un contrato ya guardado — el Responsable ocupa siempre
+// el Firmante 1 (los campos de arriba, rellenados aparte por quien llama a
+// esta función); los cotitulares se colocan en el mismo orden en los
+// Firmantes 2, 3... Extraída del arreglo del punto 187 (que solo cubría
+// "Ver/Descargar contrato") para reutilizarla también en Rescisión desde la
+// ficha del contrato y en Renovación/Rescisión desde la ficha de un cliente
+// — antes, esos 3 caminos abrían el asistente como si el contrato solo
+// hubiera tenido un inquilino, perdiendo a los demás firmantes.
+function _wizardRestaurarCotitulares(c) {
+  if (!c || !c.cotitulares || !c.cotitulares.length || typeof wizardSetNumFirmantes !== 'function') return;
+  const totalFirmantes = Math.min(5, c.numFirmantes || (c.cotitulares.length + 1));
+  wizardSetNumFirmantes(totalFirmantes);
+  wizardResponsableIdx = 1;
+  if (typeof renderResponsableSelector === 'function') renderResponsableSelector();
+  c.cotitulares.forEach((f, i) => {
+    const idx = i + 2; // los cotitulares ocupan los Firmantes 2, 3, 4, 5
+    if (idx > totalFirmantes) return;
+    if (typeof setInqTipoExtra === 'function') setInqTipoExtra(idx, f.esEmpresa ? 'empresa' : 'persona');
+    if (f.esEmpresa) {
+      const e1 = document.getElementById('f-inq-empresa-nombre-' + idx); if (e1) e1.value = f.nombre || '';
+      const e2 = document.getElementById('f-inq-cif-' + idx); if (e2) e2.value = f.dni || '';
+      const e3 = document.getElementById('f-inq-empresa-dom-' + idx); if (e3) e3.value = f.dom || '';
+      const e4 = document.getElementById('f-inq-empresa-tel-' + idx); if (e4) e4.value = f.tel || '';
+      const e5 = document.getElementById('f-inq-empresa-email-' + idx); if (e5) e5.value = f.email || '';
+      const e6 = document.getElementById('f-inq-rep-nombre-' + idx); if (e6) e6.value = f.repNombre || '';
+      const e7 = document.getElementById('f-inq-rep-dni-' + idx); if (e7) e7.value = f.repDNI || '';
+    } else {
+      const p1 = document.getElementById('f-inq-nombre-' + idx); if (p1) p1.value = f.nombre || '';
+      const p2 = document.getElementById('f-inq-genero-' + idx); if (p2) p2.value = f.genero || 'D.';
+      const p3 = document.getElementById('f-inq-dni-' + idx); if (p3) p3.value = f.dni || '';
+      const p4 = document.getElementById('f-inq-dom-' + idx); if (p4) p4.value = f.dom || '';
+      const p5 = document.getElementById('f-inq-tel-' + idx); if (p5) p5.value = f.tel || '';
+      const p6 = document.getElementById('f-inq-email-' + idx); if (p6) p6.value = f.email || '';
+    }
+  });
+  if (typeof renderResponsableSelector === 'function') renderResponsableSelector();
+}
 function showWizard() {
   ['con-view-lista','con-view-wizard','con-view-detalle','con-view-revision'].forEach(v => { const el=document.getElementById(v); if(el) el.classList.remove('active'); });
   document.getElementById('con-view-wizard').classList.add('active');
@@ -9019,6 +9069,13 @@ function det_iniciarRescision(c) {
         const f5 = document.getElementById('f-inq-tel'); if (f5) f5.value = c.inqTel || '';
         const f6 = document.getElementById('f-inq-email'); if (f6) f6.value = c.inqEmail || '';
       }
+
+      // PUNTO 190 (17/09/2026): recuperar también a los demás firmantes
+      // (cotitulares) del contrato original — antes, iniciar una rescisión
+      // desde la ficha de un contrato con varios firmantes abría el
+      // asistente como si solo hubiera existido el Responsable de cobro,
+      // perdiendo al resto (ver _wizardRestaurarCotitulares).
+      if (typeof _wizardRestaurarCotitulares === 'function') _wizardRestaurarCotitulares(c);
 
       // Condiciones económicas y fechas — las del contrato original, tal cual
       // (la liquidación de fianza se calcula a partir de esta misma fianza)
@@ -11061,7 +11118,13 @@ async function generarPDF() {
           // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje
           // de sincronización de Clientes — ver _contratosMerge (mismo
           // motivo, misma solución, ahora extendida aquí).
-          updatedAt: ahora
+          updatedAt: ahora,
+          // PUNTO 189 (17/09/2026): este cliente lleva la gestión de al
+          // menos un contrato como Responsable de cobro — su ficha muestra
+          // los botones completos (Nuevo contrato/Renovación/Rescisión).
+          // Ver el bloque de cotitulares justo debajo para el caso
+          // contrario ("ficha ligera").
+          esCotitular: false
         };
         if (existe >= 0) {
           clientes[existe] = clienteData;
@@ -11069,6 +11132,50 @@ async function generarPDF() {
           clientes.unshift(clienteData);
         }
         localStorage.setItem('clientes:lista', JSON.stringify(clientes));
+      }
+
+      // 2b) PUNTO 189 (17/09/2026): dar también de alta (o actualizar) una
+      // ficha de Cliente para cada cotitular (Firmante 2, 3...), no solo
+      // para el Responsable de cobro — antes solo quedaban guardados dentro
+      // del propio contrato, sin poder localizarlos por nombre/DNI en
+      // Clientes. Se guardan como "ficha ligera": aparecen en el listado
+      // con sus datos de contacto y un enlace al contrato que firmaron,
+      // pero sin los botones de gestión propia (Nuevo contrato/Renovación/
+      // Rescisión) — esa gestión se hace desde la ficha del Responsable,
+      // para no duplicar acciones que no tienen sentido para un cofirmante.
+      // Si esta misma persona ya lleva la gestión de otro contrato como
+      // Responsable (esCotitular:false guardado antes), no se le "degrada".
+      if (datos.cotitulares && datos.cotitulares.length) {
+        const clientesCotit = JSON.parse(localStorage.getItem('clientes:lista') || '[]');
+        let huboCambiosCotit = false;
+        datos.cotitulares.forEach(function(f) {
+          const dniCotNorm = normalizarDocId(f.dni);
+          if (!f.nombre || !dniCotNorm) return; // sin nombre o DNI no se puede localizar como cliente
+          const idxCot = clientesCotit.findIndex(c => normalizarDocId(c.dni) === dniCotNorm);
+          const yaEraResponsableEnOtroSitio = idxCot >= 0 && clientesCotit[idxCot].esCotitular === false;
+          const cotitularData = {
+            id: idxCot >= 0 ? clientesCotit[idxCot].id : ('cli-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)),
+            nombre: f.nombre,
+            dni: dniCotNorm,
+            domicilio: f.dom || '',
+            tel: f.tel || '',
+            email: f.email || '',
+            esEmpresa: !!f.esEmpresa,
+            genero: f.genero || 'D.',
+            repNombre: f.repNombre || '',
+            repDNI: f.repDNI ? normalizarDocId(f.repDNI) : '',
+            estado: 'activo',
+            ultimoContrato: ahora,
+            creadoEn: idxCot >= 0 ? clientesCotit[idxCot].creadoEn : ahora,
+            notas: idxCot >= 0 ? (clientesCotit[idxCot].notas || '') : '',
+            propietario: idxCot >= 0 ? (clientesCotit[idxCot].propietario || arrendadorActivo) : arrendadorActivo,
+            updatedAt: ahora,
+            esCotitular: yaEraResponsableEnOtroSitio ? false : true
+          };
+          if (idxCot >= 0) { clientesCotit[idxCot] = cotitularData; } else { clientesCotit.unshift(cotitularData); }
+          huboCambiosCotit = true;
+        });
+        if (huboCambiosCotit) localStorage.setItem('clientes:lista', JSON.stringify(clientesCotit));
       }
 
       console.log('✅ Contrato y cliente guardados');
@@ -19944,34 +20051,11 @@ function con_regenerarPDF(id) {
       // la ficha del contrato sí los conservaban bien). El Responsable
       // ocupa siempre el Firmante 1 (los campos de arriba, ya rellenos);
       // los cotitulares se colocan en el mismo orden en los Firmantes 2, 3...
-      if (c.cotitulares && c.cotitulares.length && typeof wizardSetNumFirmantes === 'function') {
-        const totalFirmantes = Math.min(5, c.numFirmantes || (c.cotitulares.length + 1));
-        wizardSetNumFirmantes(totalFirmantes);
-        wizardResponsableIdx = 1;
-        if (typeof renderResponsableSelector === 'function') renderResponsableSelector();
-        c.cotitulares.forEach((f, i) => {
-          const idx = i + 2; // los cotitulares ocupan los Firmantes 2, 3, 4, 5
-          if (idx > totalFirmantes) return;
-          if (typeof setInqTipoExtra === 'function') setInqTipoExtra(idx, f.esEmpresa ? 'empresa' : 'persona');
-          if (f.esEmpresa) {
-            const e1 = document.getElementById('f-inq-empresa-nombre-' + idx); if (e1) e1.value = f.nombre || '';
-            const e2 = document.getElementById('f-inq-cif-' + idx); if (e2) e2.value = f.dni || '';
-            const e3 = document.getElementById('f-inq-empresa-dom-' + idx); if (e3) e3.value = f.dom || '';
-            const e4 = document.getElementById('f-inq-empresa-tel-' + idx); if (e4) e4.value = f.tel || '';
-            const e5 = document.getElementById('f-inq-empresa-email-' + idx); if (e5) e5.value = f.email || '';
-            const e6 = document.getElementById('f-inq-rep-nombre-' + idx); if (e6) e6.value = f.repNombre || '';
-            const e7 = document.getElementById('f-inq-rep-dni-' + idx); if (e7) e7.value = f.repDNI || '';
-          } else {
-            const p1 = document.getElementById('f-inq-nombre-' + idx); if (p1) p1.value = f.nombre || '';
-            const p2 = document.getElementById('f-inq-genero-' + idx); if (p2) p2.value = f.genero || 'D.';
-            const p3 = document.getElementById('f-inq-dni-' + idx); if (p3) p3.value = f.dni || '';
-            const p4 = document.getElementById('f-inq-dom-' + idx); if (p4) p4.value = f.dom || '';
-            const p5 = document.getElementById('f-inq-tel-' + idx); if (p5) p5.value = f.tel || '';
-            const p6 = document.getElementById('f-inq-email-' + idx); if (p6) p6.value = f.email || '';
-          }
-        });
-        if (typeof renderResponsableSelector === 'function') renderResponsableSelector();
-      }
+      // PUNTO 190 (17/09/2026): este bloque ahora vive en la función
+      // compartida _wizardRestaurarCotitulares(), reutilizada también desde
+      // Rescisión (ficha del contrato) y Renovación/Rescisión (ficha de un
+      // cliente) — ver esa función para el detalle.
+      if (typeof _wizardRestaurarCotitulares === 'function') _wizardRestaurarCotitulares(c);
 
       // 7) Rellenar condiciones económicas
       if (document.getElementById('f-con-renta'))  document.getElementById('f-con-renta').value  = c.renta  ? fmt(parseRentaMixta(c.renta)) : '';
@@ -20266,7 +20350,7 @@ function cli_renderLista() {
     return `<div onclick="cli_verDetalle('${c.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer;transition:background .15s;" onmouseenter="this.style.background='var(--navy-hover)'" onmouseleave="this.style.background='var(--navy-card)'">
       <div style="width:40px;height:40px;border-radius:50%;background:var(--navy-hover);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--patrimer-color);flex-shrink:0;">${ini}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:2px;">${c.nombre || '—'}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:2px;">${c.nombre || '—'}${c.esCotitular ? ' <span style="font-size:10px;font-weight:600;color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;padding:1px 5px;letter-spacing:.3px;">COFIRMANTE</span>' : ''}</div>
         <div style="font-size:11px;color:var(--text-secondary);">${c.tel ? '📞 ' + c.tel : ''}${c.tel && c.email ? '  ·  ' : ''}${c.email ? '✉️ ' + c.email : ''}</div>
       </div>
       <div style="font-size:10px;color:var(--silver-dim);text-align:right;flex-shrink:0;">${fecha}</div>
@@ -20323,6 +20407,40 @@ function cli_verDetalle(id) {
     btnEstado.style.borderColor = 'var(--accent-red)';
     btnEstado.style.color = 'var(--accent-red)';
   }
+
+  // PUNTO 189 (17/09/2026): ficha "ligera" para un cotitular — se ocultan
+  // los 3 botones de gestión propia (no tienen sentido para quien no lleva
+  // el contrato) y se muestra en su lugar el aviso con acceso al contrato.
+  const accionesPlenas = document.getElementById('cli-acciones-plenas');
+  const avisoCotit = document.getElementById('cli-aviso-cotitular');
+  const esCotit = !!c.esCotitular;
+  if (accionesPlenas) accionesPlenas.style.display = esCotit ? 'none' : 'grid';
+  if (avisoCotit) avisoCotit.style.display = esCotit ? 'block' : 'none';
+}
+
+// PUNTO 189 (17/09/2026): desde la ficha "ligera" de un cotitular, lleva al
+// detalle del contrato donde firma — se busca por su DNI, tanto si aparece
+// como Responsable de cobro (por si su situación cambió) como si aparece
+// dentro de "cotitulares". Si hay varios, prioriza uno activo y, entre
+// varios activos, el más reciente.
+function cli_verContratoCotitular() {
+  if (!cli_clienteActivo) return;
+  const dniNorm = normalizarDocId(cli_clienteActivo.dni);
+  const contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
+  const candidatos = contratos.filter(c =>
+    normalizarDocId(c.inqDNI) === dniNorm ||
+    (c.cotitulares || []).some(f => normalizarDocId(f.dni) === dniNorm)
+  );
+  if (!candidatos.length) {
+    if (typeof showToast === 'function') showToast('No se ha encontrado ningún contrato con este firmante', 'warning');
+    return;
+  }
+  const activos = candidatos.filter(c => c.estado === 'activo');
+  const lista = activos.length ? activos : candidatos;
+  lista.sort((a, b) => new Date(b.updatedAt || b.creadoEn || 0) - new Date(a.updatedAt || a.creadoEn || 0));
+  const elegido = lista[0];
+  showModule('contratos');
+  setTimeout(function() { if (typeof showDetalle === 'function') showDetalle(elegido.id); }, 250);
 }
 
 function cli_cerrarDetalle() {
@@ -20475,6 +20593,12 @@ function cli_renovacion() {
         if (fRenta && inmOk.renta) {
           fRenta.value = fmt(parseRentaMixta(inmOk.renta));
         }
+        // PUNTO 190 (17/09/2026): si el contrato original tenía más
+        // firmantes aparte de este cliente, recuperarlos también — antes,
+        // renovar desde la ficha de un cliente abría el asistente como si
+        // el contrato solo hubiera tenido un inquilino (ver
+        // _wizardRestaurarCotitulares).
+        if (typeof _wizardRestaurarCotitulares === 'function') _wizardRestaurarCotitulares(inmOk);
       }
       if (typeof actualizarPreview === 'function') actualizarPreview();
       showToast(inmOk
@@ -20525,6 +20649,9 @@ function cli_rescision() {
         if (emailField) emailField.value = c.email || '';
       }
       const inmOk = cli_prefillInmuebleDesdeCliente(c);
+      // PUNTO 190 (17/09/2026): recuperar también a los demás firmantes del
+      // contrato original, si los tenía (ver _wizardRestaurarCotitulares).
+      if (inmOk && typeof _wizardRestaurarCotitulares === 'function') _wizardRestaurarCotitulares(inmOk);
       if (typeof actualizarPreview === 'function') actualizarPreview();
       showToast(inmOk
         ? '❌ Datos cargados para rescisión'
