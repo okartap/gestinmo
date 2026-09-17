@@ -9646,6 +9646,41 @@ function updateLAU(arr, inicio, dur) {
 
 // =========== GENERADORES DE CONTRATO POR TIPO ===========
 
+// PUNTO 184 (17/09/2026): EL PDF NOMBRA A TODOS LOS FIRMANTES COMO
+// ARRENDATARIOS ─────────────────────────────────────────────────────────
+// Hasta ahora (entrega del Punto 180), con varios firmantes el PDF solo
+// recogía al Responsable de cobro — el resto se guardaba en el contrato
+// pero no aparecía en el documento legal. Pedido de Patry: que el PDF
+// liste a TODOS como arrendatarios, con sus datos completos, igual que ya
+// hace con uno solo.
+//
+// Los siguientes 4 helpers se usan desde los 6 generadores de contrato de
+// abajo (vivienda, local, garaje, rústica, temporada, rústica-temporada) y
+// desde el bloque de firmas al final del documento. Con 1 solo firmante
+// (el caso de toda la vida) cada generador sigue produciendo EXACTAMENTE
+// el mismo texto que antes de este cambio — el código antiguo no se toca,
+// solo se añade un camino nuevo para 2 o más.
+function _firmantesParaPDF(datos) {
+  if (datos.todosFirmantes && datos.todosFirmantes.length) return datos.todosFirmantes;
+  // Red de seguridad: si algún día se llama a un generador sin que "datos"
+  // traiga todosFirmantes (por ejemplo, código antiguo o de pruebas), se
+  // reconstruye un único firmante a partir de los campos de siempre — así
+  // nunca se rompe nada por falta de este dato.
+  return [{
+    esEmpresa: !!datos.inqEsEmpresa, nombre: datos.inqNombre, dni: datos.inqDNI,
+    dom: datos.inqDom, tel: datos.inqTel, email: datos.inqEmail, genero: datos.inqGenero,
+    repNombre: datos.inqRepNombre, repDNI: datos.inqRepDNI
+  }];
+}
+function _nombreConGenero(f) { return (f.genero || 'D.') + ' ' + (f.nombre || '—'); }
+// Nombre tal y como se usa en la línea de "Firma: ..." (sin tratamiento si es empresa)
+function _nombreFirmaPersona(f) { return (f.esEmpresa ? '' : ((f.genero || 'D.') + ' ')) + (f.nombre || '—'); }
+// Une una lista de textos en formato "a, b y c" (o "a" si solo hay uno)
+function _listaConY(textos) {
+  if (textos.length <= 1) return textos[0] || '—';
+  return textos.slice(0, -1).join(', ') + ' y ' + textos[textos.length - 1];
+}
+
 function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma, addParty) {
   const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
   const fStr = datos.fin ? formatFechaLarga(datos.fin) : '—';
@@ -9664,7 +9699,22 @@ function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, 
     addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
   }
   addBlock('Y, de otra parte:');
-  addParty('', datos.inqNombre ? (datos.inqEsEmpresa ? datos.inqNombre : (datos.inqGenero||'D.') + ' ' + datos.inqNombre) : (datos.inqGenero||'D.') + ' —', (datos.inqEsEmpresa ? (', representada por ' + (datos.inqRepNombre || '—') + ', con DNI/NIE ' + (datos.inqRepDNI || '—') + ', con domicilio en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con CIF/NIF ' + (datos.inqDNI || '—') + '.') : (', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (datos.inqDNI || '—') + '.')));
+  // PUNTO 184 (17/09/2026): con 2-5 firmantes se nombra a todos, uno por
+  // uno, cerrando solo el último con el punto final. Con 1 solo firmante
+  // (rama "else") el texto es exactamente el de siempre.
+  const _firmantesTenant = _firmantesParaPDF(datos);
+  if (_firmantesTenant.length > 1) {
+    _firmantesTenant.forEach((f, i) => {
+      const esUlt = i === _firmantesTenant.length - 1;
+      addParty('', f.esEmpresa ? (f.nombre || '—') : _nombreConGenero(f),
+        (f.esEmpresa
+          ? (', representada por ' + (f.repNombre || '—') + ', con DNI/NIE ' + (f.repDNI || '—') + ', con domicilio en ' + (f.dom || 'Lorca (Murcia)') + ', con CIF/NIF ' + (f.dni || '—'))
+          : (', mayor de edad, domiciliado/a en ' + (f.dom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (f.dni || '—'))
+        ) + (esUlt ? '.' : '; y '));
+    });
+  } else {
+    addParty('', datos.inqNombre ? (datos.inqEsEmpresa ? datos.inqNombre : (datos.inqGenero||'D.') + ' ' + datos.inqNombre) : (datos.inqGenero||'D.') + ' —', (datos.inqEsEmpresa ? (', representada por ' + (datos.inqRepNombre || '—') + ', con DNI/NIE ' + (datos.inqRepDNI || '—') + ', con domicilio en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con CIF/NIF ' + (datos.inqDNI || '—') + '.') : (', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (datos.inqDNI || '—') + '.')));
+  }
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
@@ -9676,7 +9726,16 @@ function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, 
   } else {
     addParty('', 'D. Patricio Gómez García', ' actúa en su propio nombre y representación (en adelante el ARRENDADOR).');
   }
-  if (datos.inqEsEmpresa) {
+  if (_firmantesTenant.length > 1) {
+    _firmantesTenant.forEach((f, i) => {
+      const esUlt = i === _firmantesTenant.length - 1;
+      if (f.esEmpresa) {
+        addParty('', f.nombre || '—', ', representada por ' + (f.repNombre || '—') + ', en su condición de representante legal' + (esUlt ? ', (en adelante, conjunta y solidariamente, los/las ARRENDATARIOS/AS).' : '; y '));
+      } else {
+        addParty('', _nombreConGenero(f), ' en su propio nombre y representación' + (esUlt ? ' (en adelante, conjunta y solidariamente, los/las ARRENDATARIOS/AS).' : '; y '));
+      }
+    });
+  } else if (datos.inqEsEmpresa) {
     addParty('', datos.inqNombre || '—', ', representada por ' + (datos.inqRepNombre || '—') + ', en su condición de representante legal, (en adelante, el/la ARRENDATARIO/A).');
   } else {
     addParty('', datos.inqNombre ? (datos.inqGenero||'D.') + ' ' + datos.inqNombre : (datos.inqGenero||'D.') + ' —', ' en su propio nombre y representación (en adelante, el/la ARRENDATARIO/A).');
@@ -9773,7 +9832,22 @@ function generarContratoLocal(doc, datos, arr, margin, pageW, maxW, addText, add
     addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
   }
   addBlock('Y, de otra parte:');
-  addParty('', datos.inqNombre ? (datos.inqEsEmpresa ? datos.inqNombre : (datos.inqGenero||'D.') + ' ' + datos.inqNombre) : (datos.inqGenero||'D.') + ' —', (datos.inqEsEmpresa ? (', representada por ' + (datos.inqRepNombre || '—') + ', con DNI/NIE ' + (datos.inqRepDNI || '—') + ', con domicilio en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con CIF/NIF ' + (datos.inqDNI || '—') + '.') : (', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (datos.inqDNI || '—') + '.')));
+  // PUNTO 184 (17/09/2026): con 2-5 firmantes se nombra a todos, uno por
+  // uno, cerrando solo el último con el punto final. Con 1 solo firmante
+  // (rama "else") el texto es exactamente el de siempre.
+  const _firmantesTenant = _firmantesParaPDF(datos);
+  if (_firmantesTenant.length > 1) {
+    _firmantesTenant.forEach((f, i) => {
+      const esUlt = i === _firmantesTenant.length - 1;
+      addParty('', f.esEmpresa ? (f.nombre || '—') : _nombreConGenero(f),
+        (f.esEmpresa
+          ? (', representada por ' + (f.repNombre || '—') + ', con DNI/NIE ' + (f.repDNI || '—') + ', con domicilio en ' + (f.dom || 'Lorca (Murcia)') + ', con CIF/NIF ' + (f.dni || '—'))
+          : (', mayor de edad, domiciliado/a en ' + (f.dom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (f.dni || '—'))
+        ) + (esUlt ? '.' : '; y '));
+    });
+  } else {
+    addParty('', datos.inqNombre ? (datos.inqEsEmpresa ? datos.inqNombre : (datos.inqGenero||'D.') + ' ' + datos.inqNombre) : (datos.inqGenero||'D.') + ' —', (datos.inqEsEmpresa ? (', representada por ' + (datos.inqRepNombre || '—') + ', con DNI/NIE ' + (datos.inqRepDNI || '—') + ', con domicilio en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con CIF/NIF ' + (datos.inqDNI || '—') + '.') : (', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (datos.inqDNI || '—') + '.')));
+  }
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
@@ -9785,7 +9859,16 @@ function generarContratoLocal(doc, datos, arr, margin, pageW, maxW, addText, add
   } else {
     addParty('', 'D. Patricio Gómez García', ' actúa en su propio nombre y representación (en adelante el ARRENDADOR).');
   }
-  if (datos.inqEsEmpresa) {
+  if (_firmantesTenant.length > 1) {
+    _firmantesTenant.forEach((f, i) => {
+      const esUlt = i === _firmantesTenant.length - 1;
+      if (f.esEmpresa) {
+        addParty('', f.nombre || '—', ', representada por ' + (f.repNombre || '—') + ', en su condición de representante legal' + (esUlt ? ', (en adelante, conjunta y solidariamente, los/las ARRENDATARIOS/AS).' : '; y '));
+      } else {
+        addParty('', _nombreConGenero(f), ' en su propio nombre y representación' + (esUlt ? ' (en adelante, conjunta y solidariamente, los/las ARRENDATARIOS/AS).' : '; y '));
+      }
+    });
+  } else if (datos.inqEsEmpresa) {
     addParty('', datos.inqNombre || '—', ', representada por ' + (datos.inqRepNombre || '—') + ', en su condición de representante legal, (en adelante, el/la ARRENDATARIO/A).');
   } else {
     addParty('', datos.inqNombre ? (datos.inqGenero||'D.') + ' ' + datos.inqNombre : (datos.inqGenero||'D.') + ' —', ' en su propio nombre y representación (en adelante, el/la ARRENDATARIO/A).');
@@ -9871,7 +9954,18 @@ function generarContratoGaraje(doc, datos, arr, margin, pageW, maxW, addText, ad
     addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
   }
   addBlock('Y de otra parte:');
-  addParty('', datos.inqNombre ? (datos.inqGenero||'D.') + ' ' + datos.inqNombre : (datos.inqGenero||'D.') + ' —', ', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (datos.inqDNI || '—') + '.');
+  // PUNTO 184 (17/09/2026): con 2-5 firmantes se nombra a todos (el garaje
+  // no distingue empresa, igual que ya pasaba antes de este cambio). Con 1
+  // solo firmante (rama "else") el texto es exactamente el de siempre.
+  const _firmantesTenantG = _firmantesParaPDF(datos);
+  if (_firmantesTenantG.length > 1) {
+    _firmantesTenantG.forEach((f, i) => {
+      const esUlt = i === _firmantesTenantG.length - 1;
+      addParty('', _nombreConGenero(f), ', mayor de edad, domiciliado/a en ' + (f.dom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (f.dni || '—') + (esUlt ? '.' : '; y '));
+    });
+  } else {
+    addParty('', datos.inqNombre ? (datos.inqGenero||'D.') + ' ' + datos.inqNombre : (datos.inqGenero||'D.') + ' —', ', mayor de edad, domiciliado/a en ' + (datos.inqDom || 'Lorca (Murcia)') + ', con DNI/NIE ' + (datos.inqDNI || '—') + '.');
+  }
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
@@ -9883,7 +9977,14 @@ function generarContratoGaraje(doc, datos, arr, margin, pageW, maxW, addText, ad
   } else {
     addParty('', 'D. Patricio Gómez García', ' actúa en su propio nombre y representación (en adelante el ARRENDADOR).');
   }
-  addParty('', datos.inqNombre ? (datos.inqGenero||'D.') + ' ' + datos.inqNombre : (datos.inqGenero||'D.') + ' —', ' en su propio nombre y representación (en adelante, el/la ARRENDATARIO/A).');
+  if (_firmantesTenantG.length > 1) {
+    _firmantesTenantG.forEach((f, i) => {
+      const esUlt = i === _firmantesTenantG.length - 1;
+      addParty('', _nombreConGenero(f), ' en su propio nombre y representación' + (esUlt ? ' (en adelante, conjunta y solidariamente, los/las ARRENDATARIOS/AS).' : '; y '));
+    });
+  } else {
+    addParty('', datos.inqNombre ? (datos.inqGenero||'D.') + ' ' + datos.inqNombre : (datos.inqGenero||'D.') + ' —', ' en su propio nombre y representación (en adelante, el/la ARRENDATARIO/A).');
+  }
   addBlock('Las partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
 
   addTitle('EXPONEN');
@@ -9955,7 +10056,14 @@ function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, a
   } else {
     addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
   }
-  addBlock('De otra parte, ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+  // PUNTO 184 (17/09/2026): con 2-5 firmantes se nombra a todos; con 1 solo
+  // (rama "else") el texto es exactamente el de siempre.
+  var _firmantesTenantR = _firmantesParaPDF(datos);
+  if (_firmantesTenantR.length > 1) {
+    addBlock('De otra parte, ' + _firmantesTenantR.map(function(f) { return _nombreConGenero(f) + ', mayor de edad, con D.N.I. ' + (f.dni || '—') + ' y domicilio a efectos de este contrato en ' + (f.dom || '—'); }).join('; y ') + '.');
+  } else {
+    addBlock('De otra parte, ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+  }
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
@@ -9963,7 +10071,11 @@ function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, a
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
   }
-  addBlock((datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante, indistintamente, "el arrendatario" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  if (_firmantesTenantR.length > 1) {
+    addBlock(_listaConY(_firmantesTenantR.map(_nombreConGenero)) + ' actúan en su propio nombre y representación, en adelante, indistintamente y conjunta y solidariamente, "los/las arrendatarios/as" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  } else {
+    addBlock((datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante, indistintamente, "el arrendatario" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  }
 
   addTitle('EXPONEN');
   addBlock('I. – Que la sociedad mercantil ' + arr.label + ' es propietaria de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
@@ -10031,7 +10143,14 @@ function generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText,
   } else {
     addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. 23.257.329-M y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
   }
-  addBlock('De otra parte, ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+  // PUNTO 184 (17/09/2026): con 2-5 firmantes se nombra a todos; con 1 solo
+  // (rama "else") el texto es exactamente el de siempre.
+  var _firmantesTenantR = _firmantesParaPDF(datos);
+  if (_firmantesTenantR.length > 1) {
+    addBlock('De otra parte, ' + _firmantesTenantR.map(function(f) { return _nombreConGenero(f) + ', mayor de edad, con D.N.I. ' + (f.dni || '—') + ' y domicilio a efectos de este contrato en ' + (f.dom || '—'); }).join('; y ') + '.');
+  } else {
+    addBlock('De otra parte, ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+  }
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
@@ -10039,7 +10158,11 @@ function generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText,
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante, indistintamente, "la arrendadora", "el arrendador" o "la parte arrendadora".');
   }
-  addBlock((datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante, indistintamente, "el arrendatario", "la arrendataria" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  if (_firmantesTenantR.length > 1) {
+    addBlock(_listaConY(_firmantesTenantR.map(_nombreConGenero)) + ' actúan en su propio nombre y representación, en adelante, indistintamente y conjunta y solidariamente, "los arrendatarios", "las arrendatarias" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  } else {
+    addBlock((datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante, indistintamente, "el arrendatario", "la arrendataria" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  }
 
   addTitle('EXPONEN');
   addBlock('I. – Que la sociedad mercantil ' + arr.label + ', es propietaria de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
@@ -10115,7 +10238,14 @@ function generarContratoRusticoTemporada(doc, datos, arr, margin, pageW, maxW, a
   } else {
     addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. 23.257.329-M y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
   }
-  addBlock('De otra parte, ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+  // PUNTO 184 (17/09/2026): con 2-5 firmantes se nombra a todos; con 1 solo
+  // (rama "else") el texto es exactamente el de siempre.
+  var _firmantesTenantR = _firmantesParaPDF(datos);
+  if (_firmantesTenantR.length > 1) {
+    addBlock('De otra parte, ' + _firmantesTenantR.map(function(f) { return _nombreConGenero(f) + ', mayor de edad, con D.N.I. ' + (f.dni || '—') + ' y domicilio a efectos de este contrato en ' + (f.dom || '—'); }).join('; y ') + '.');
+  } else {
+    addBlock('De otra parte, ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ', mayor de edad, con D.N.I. ' + (datos.inqDNI || '—') + ' y domicilio a efectos de este contrato en ' + (datos.inqDom || '—') + '.');
+  }
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
@@ -10123,7 +10253,11 @@ function generarContratoRusticoTemporada(doc, datos, arr, margin, pageW, maxW, a
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante "el arrendador" o "la parte arrendadora".');
   }
-  addBlock((datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante "el arrendatario" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  if (_firmantesTenantR.length > 1) {
+    addBlock(_listaConY(_firmantesTenantR.map(_nombreConGenero)) + ' actúan en su propio nombre y representación, en adelante, conjunta y solidariamente, "los/las arrendatarios/as" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  } else {
+    addBlock((datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en su propio nombre y representación, en adelante "el arrendatario" o "la parte arrendataria".\n\nLas partes se reconocen capacidad legal suficiente para la celebración del presente acuerdo.');
+  }
 
   addTitle('EXPONEN');
   addBlock('I. – Que la sociedad mercantil ' + arr.label + ' es propietaria de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
@@ -10314,6 +10448,12 @@ async function generarPDF() {
     inqRepDNI: _respFirmantePDF.repDNI || '',
     numFirmantes: _numFirmantesPDF,
     cotitulares: _cotitularesPDF,
+    // PUNTO 184 (17/09/2026): todos los firmantes en su orden original
+    // (1..N, no "responsable primero") — lo usan los generadores de cada
+    // tipo de contrato para nombrar a TODOS como arrendatarios en el PDF,
+    // no solo al Responsable de cobro. Con 1 solo firmante trae un único
+    // elemento, exactamente los mismos datos que inqNombre/inqDNI/etc.
+    todosFirmantes: _todosFirmantesPDF,
     renta: document.getElementById('f-con-renta').value || '0',
     fianza: document.getElementById('f-fianza').value || '0',
     rescisLuz: document.getElementById('f-rescis-luz') ? parseFmtGlobal(document.getElementById('f-rescis-luz').value||'0') : 0,
@@ -10518,25 +10658,50 @@ async function generarPDF() {
     y += 10;
 
     const c1 = margin + 5, c2 = pageW / 2 + 10;
+    // PUNTO 184 (17/09/2026): con varios firmantes, cada uno necesita su
+    // propio hueco de firma — antes solo había uno para "EL/LA
+    // ARRENDATARIO/A". Con 1 solo firmante el resultado es idéntico al de
+    // siempre (misma posición, mismo texto).
+    const _firmantesFirma = _firmantesParaPDF(datos);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 50, 120);
     doc.text('EL ARRENDADOR', c1, y);
-    doc.text('EL/LA ARRENDATARIO/A', c2, y);
+    doc.text(_firmantesFirma.length > 1 ? 'LOS/LAS ARRENDATARIOS/AS' : 'EL/LA ARRENDATARIO/A', c2, y);
     y += 5;
 
     y += 28;
     doc.setDrawColor(100, 120, 180);
     doc.setLineWidth(0.4);
     doc.line(c1, y, c1 + 75, y);
-    doc.line(c2, y, c2 + 75, y);
+    if (_firmantesFirma.length <= 1) doc.line(c2, y, c2 + 75, y);
     doc.setLineWidth(0.2);
     y += 5;
 
     doc.setFontSize(8);
     doc.setTextColor(120, 130, 160);
     doc.text('Firma: D. Patricio Gómez García', c1, y);
-    doc.text('Firma: ' + (datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—'), c2, y);
+    if (_firmantesFirma.length <= 1) {
+      doc.text('Firma: ' + (datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—'), c2, y);
+    } else {
+      // Una línea de firma por cada firmante, apiladas en la columna del
+      // arrendatario, empezando en la misma altura que el arrendador. Si no
+      // caben todas en la página, se continúa en una nueva.
+      let yArr = y - 5;
+      _firmantesFirma.forEach((f, idx) => {
+        if (idx > 0) {
+          yArr += 20;
+          if (yArr + 5 > 272) { doc.addPage(); yArr = margin + 15; }
+        }
+        doc.setDrawColor(100, 120, 180);
+        doc.setLineWidth(0.4);
+        doc.line(c2, yArr, c2 + 75, yArr);
+        doc.setLineWidth(0.2);
+        doc.setFontSize(8);
+        doc.setTextColor(120, 130, 160);
+        doc.text('Firma: ' + _nombreFirmaPersona(f), c2, yArr + 5);
+      });
+    }
 
     // ---- ANEXO PADRÓN con texto legal real ----
     // (si tipo==='padron' ya se ha generado como contenido PRINCIPAL más
@@ -10560,14 +10725,31 @@ async function generarPDF() {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 50, 120);
         doc.text('EL ARRENDADOR', c1, yF);
-        doc.text('EL/LA ARRENDATARIO/A', c2, yF);
+        doc.text(_firmantesFirma.length > 1 ? 'LOS/LAS ARRENDATARIOS/AS' : 'EL/LA ARRENDATARIO/A', c2, yF);
         doc.setDrawColor(100, 120, 180);
         doc.line(c1, yF + 17, c1 + 75, yF + 17);
-        doc.line(c2, yF + 17, c2 + 75, yF + 17);
+        if (_firmantesFirma.length <= 1) doc.line(c2, yF + 17, c2 + 75, yF + 17);
         doc.setFontSize(8);
         doc.setTextColor(120, 130, 160);
         doc.text('Firma: D. Patricio Gómez García', c1, yF + 22);
-        doc.text('Firma: ' + (datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—'), c2, yF + 22);
+        if (_firmantesFirma.length <= 1) {
+          doc.text('Firma: ' + (datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—'), c2, yF + 22);
+        } else {
+          // PUNTO 184 (17/09/2026): mismo criterio que en el bloque de firmas
+          // principal, adaptado al poco espacio fijo que tiene este anexo.
+          let yArrF = yF + 17;
+          _firmantesFirma.forEach((f, idx) => {
+            if (idx > 0) {
+              yArrF += 12;
+              if (yArrF + 5 > 285) { doc.addPage(); yArrF = margin + 15; }
+            }
+            doc.setDrawColor(100, 120, 180);
+            doc.line(c2, yArrF, c2 + 75, yArrF);
+            doc.setFontSize(8);
+            doc.setTextColor(120, 130, 160);
+            doc.text('Firma: ' + _nombreFirmaPersona(f), c2, yArrF + 5);
+          });
+        }
       }
     }
 
