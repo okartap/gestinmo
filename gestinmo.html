@@ -3321,7 +3321,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div onclick="showModule('finanzas');fin_abrirAsistente();" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">ACTUALIZAR FINANZAS</div>
       </div>
-      <div onclick="showModule('contratos');showWizard();" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
+      <div onclick="showModule('contratos');abrirWizardNuevo();" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">NUEVO CONTRATO</div>
       </div>
       <div onclick="showModule('cobros');" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:center;">
@@ -3833,7 +3833,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
   </div>
   <div class="header-action">
-    <button class="btn-new" onclick="showWizard()">＋ Nuevo</button>
+    <button class="btn-new" onclick="abrirWizardNuevo()">＋ Nuevo</button>
   </div>
 </header>
 <div class="view active" id="con-view-lista">
@@ -8011,12 +8011,14 @@ function inm_asignarInquilino() {
   const wizardTipo = tipoMapWizard[inm.tipo] || 'viv';
   showModule('contratos');
   setTimeout(() => {
-    if (typeof showWizard === 'function') showWizard();
-    setTimeout(() => {
-      if (typeof seleccionarInmueble === 'function') seleccionarInmueble(inm.ref, inm.direccion, wizardTipo, inm.catastral);
-      if (typeof actualizarPreview === 'function') actualizarPreview();
-      showToast('✅ Vivienda seleccionada — completa los datos del inquilino', 'success');
-    }, 400);
+    _confirmarReiniciarWizard(() => {
+      if (typeof showWizard === 'function') showWizard();
+      setTimeout(() => {
+        if (typeof seleccionarInmueble === 'function') seleccionarInmueble(inm.ref, inm.direccion, wizardTipo, inm.catastral);
+        if (typeof actualizarPreview === 'function') actualizarPreview();
+        showToast('✅ Vivienda seleccionada — completa los datos del inquilino', 'success');
+      }, 400);
+    });
   }, 300);
 }
 
@@ -8660,6 +8662,56 @@ function showLista() {
   document.getElementById('con-view-lista').classList.add('active');
   window.scrollTo(0,0);
 }
+// PUNTO 185 (17/09/2026): showWizard() vacía SIEMPRE el asistente para
+// empezar un contrato en blanco — incluido el segundo/tercer/etc. firmante
+// que se hubiera escrito, aunque no toca los campos clásicos del Firmante 1
+// (por eso, si esto pasaba mientras había datos sin guardar, el Firmante 1
+// parecía "sobrevivir" y el resto desaparecía sin avisar: bug real avisado
+// por Patry — al ir a "Nuevo contrato" desde la ficha de un cliente con el
+// asistente ya abierto y con datos de más de un firmante escritos, esos
+// datos se perdían sin preguntar). Hay 8 sitios de la app que abren el
+// asistente "desde cero" (Nuevo contrato, Asignar inquilino, Rescisión,
+// Renovación, Regenerar PDF, etc.) — en vez de tocar cada uno por separado,
+// se centraliza aquí: antes de vaciar el asistente, se comprueba si ya
+// había algo sin guardar y, si lo había, se pregunta primero.
+function _wizardTieneDatosSinGuardar() {
+  const wizardVisible = document.getElementById('con-view-wizard') && document.getElementById('con-view-wizard').classList.contains('active');
+  if (!wizardVisible) return false;
+  const nombre1 = (document.getElementById('f-inq-nombre')?.value || '').trim();
+  const nombreEmp1 = (document.getElementById('f-inq-empresa-nombre')?.value || '').trim();
+  if (nombre1 || nombreEmp1) return true;
+  if (typeof wizardNumFirmantes === 'number' && wizardNumFirmantes > 1) {
+    for (let i = 2; i <= wizardNumFirmantes; i++) {
+      const n = (document.getElementById('f-inq-nombre-' + i)?.value || '').trim();
+      const ne = (document.getElementById('f-inq-empresa-nombre-' + i)?.value || '').trim();
+      if (n || ne) return true;
+    }
+  }
+  return false;
+}
+// Envuelve cualquier acción que vaya a abrir el asistente "desde cero"
+// (showWizard() + precarga de datos). Si no hay nada sin guardar, ejecuta
+// la acción tal cual, sin ningún cambio respecto a como funcionaba antes.
+// Si SÍ había algo sin guardar, pregunta antes de continuar — y si el
+// usuario cancela, no se toca nada: el asistente se queda exactamente como
+// estaba, con todos sus datos.
+function _confirmarReiniciarWizard(continuar) {
+  if (_wizardTieneDatosSinGuardar()) {
+    showConfirm('⚠️', 'Hay datos de un contrato sin guardar', 'Vas a abrir un contrato distinto y se perderán los datos del inquilino/firmantes que has escrito y que todavía no se han guardado. ¿Quieres continuar igualmente?', [
+      { label: 'Cancelar', cls: 'c', fn: () => {} },
+      { label: 'Continuar', cls: 'r', fn: continuar }
+    ]);
+  } else {
+    continuar();
+  }
+}
+// Punto de entrada único para "abrir el asistente en blanco" desde botones
+// sueltos (accesos rápidos de inicio, botón "＋ Nuevo" de Contratos) — los
+// flujos que además precargan datos (cliente, rescisión, etc.) usan
+// _confirmarReiniciarWizard() directamente, envolviendo su propia precarga.
+function abrirWizardNuevo() {
+  _confirmarReiniciarWizard(() => { if (typeof showWizard === 'function') showWizard(); });
+}
 function showWizard() {
   ['con-view-lista','con-view-wizard','con-view-detalle','con-view-revision'].forEach(v => { const el=document.getElementById(v); if(el) el.classList.remove('active'); });
   document.getElementById('con-view-wizard').classList.add('active');
@@ -8925,59 +8977,61 @@ function det_generarRenovacionORescision() {
 
 function det_iniciarRescision(c) {
   if (bloqueaSiViewer('Iniciar la rescisión de un contrato')) return;
-  if (typeof showWizard === 'function') showWizard();
-  setTimeout(() => {
-    // Arrendador: el mismo que ya tiene el contrato
-    const arrTxt = (c.arrendador || '').toLowerCase();
-    const arrKey = arrTxt.includes('patrimer') ? 'patrimer' : arrTxt.includes('industrias') ? 'industrias' : arrTxt.includes('patricio') ? 'patricio' : 'patrimer';
-    if (typeof selectArrendador === 'function') selectArrendador(arrKey);
+  _confirmarReiniciarWizard(() => {
+    if (typeof showWizard === 'function') showWizard();
+    setTimeout(() => {
+      // Arrendador: el mismo que ya tiene el contrato
+      const arrTxt = (c.arrendador || '').toLowerCase();
+      const arrKey = arrTxt.includes('patrimer') ? 'patrimer' : arrTxt.includes('industrias') ? 'industrias' : arrTxt.includes('patricio') ? 'patricio' : 'patrimer';
+      if (typeof selectArrendador === 'function') selectArrendador(arrKey);
 
-    // Inmueble (directo, sin pasar por seleccionarInmueble() para no
-    // arrastrar de paso el tipo de inmueble como tipo de documento)
-    const fRef = document.getElementById('f-ref'); if (fRef) fRef.value = c.ref || '';
-    const fRefDisp = document.getElementById('f-ref-display'); if (fRefDisp) fRefDisp.textContent = c.ref || '—';
-    const fDir = document.getElementById('f-dir'); if (fDir) fDir.value = c.dir || '';
-    const fCatastral = document.getElementById('f-catastral'); if (fCatastral) fCatastral.value = c.catastral || '';
+      // Inmueble (directo, sin pasar por seleccionarInmueble() para no
+      // arrastrar de paso el tipo de inmueble como tipo de documento)
+      const fRef = document.getElementById('f-ref'); if (fRef) fRef.value = c.ref || '';
+      const fRefDisp = document.getElementById('f-ref-display'); if (fRefDisp) fRefDisp.textContent = c.ref || '—';
+      const fDir = document.getElementById('f-dir'); if (fDir) fDir.value = c.dir || '';
+      const fCatastral = document.getElementById('f-catastral'); if (fCatastral) fCatastral.value = c.catastral || '';
 
-    // Inquilino
-    if (typeof setInqTipo === 'function') setInqTipo(c.inqEsEmpresa ? 'empresa' : 'persona');
-    if (c.inqEsEmpresa) {
-      const f1 = document.getElementById('f-inq-empresa-nombre'); if (f1) f1.value = c.inqNombre || '';
-      const f2 = document.getElementById('f-inq-cif'); if (f2) f2.value = c.inqDNI || '';
-      const f3 = document.getElementById('f-inq-empresa-dom'); if (f3) f3.value = c.inqDom || '';
-      const f4 = document.getElementById('f-inq-empresa-tel'); if (f4) f4.value = c.inqTel || '';
-      const f5 = document.getElementById('f-inq-empresa-email'); if (f5) f5.value = c.inqEmail || '';
-      const f6 = document.getElementById('f-inq-rep-nombre'); if (f6) f6.value = c.inqRepNombre || '';
-      const f7 = document.getElementById('f-inq-rep-dni'); if (f7) f7.value = c.inqRepDNI || '';
-    } else {
-      const f1 = document.getElementById('f-inq-nombre'); if (f1) f1.value = c.inqNombre || '';
-      const f2 = document.getElementById('f-inq-genero'); if (f2) f2.value = c.inqGenero || 'D.';
-      const f3 = document.getElementById('f-inq-dni'); if (f3) f3.value = c.inqDNI || '';
-      const f4 = document.getElementById('f-inq-dom'); if (f4) f4.value = c.inqDom || '';
-      const f5 = document.getElementById('f-inq-tel'); if (f5) f5.value = c.inqTel || '';
-      const f6 = document.getElementById('f-inq-email'); if (f6) f6.value = c.inqEmail || '';
-    }
+      // Inquilino
+      if (typeof setInqTipo === 'function') setInqTipo(c.inqEsEmpresa ? 'empresa' : 'persona');
+      if (c.inqEsEmpresa) {
+        const f1 = document.getElementById('f-inq-empresa-nombre'); if (f1) f1.value = c.inqNombre || '';
+        const f2 = document.getElementById('f-inq-cif'); if (f2) f2.value = c.inqDNI || '';
+        const f3 = document.getElementById('f-inq-empresa-dom'); if (f3) f3.value = c.inqDom || '';
+        const f4 = document.getElementById('f-inq-empresa-tel'); if (f4) f4.value = c.inqTel || '';
+        const f5 = document.getElementById('f-inq-empresa-email'); if (f5) f5.value = c.inqEmail || '';
+        const f6 = document.getElementById('f-inq-rep-nombre'); if (f6) f6.value = c.inqRepNombre || '';
+        const f7 = document.getElementById('f-inq-rep-dni'); if (f7) f7.value = c.inqRepDNI || '';
+      } else {
+        const f1 = document.getElementById('f-inq-nombre'); if (f1) f1.value = c.inqNombre || '';
+        const f2 = document.getElementById('f-inq-genero'); if (f2) f2.value = c.inqGenero || 'D.';
+        const f3 = document.getElementById('f-inq-dni'); if (f3) f3.value = c.inqDNI || '';
+        const f4 = document.getElementById('f-inq-dom'); if (f4) f4.value = c.inqDom || '';
+        const f5 = document.getElementById('f-inq-tel'); if (f5) f5.value = c.inqTel || '';
+        const f6 = document.getElementById('f-inq-email'); if (f6) f6.value = c.inqEmail || '';
+      }
 
-    // Condiciones económicas y fechas — las del contrato original, tal cual
-    // (la liquidación de fianza se calcula a partir de esta misma fianza)
-    // PUNTO 138 (07/09/2026): c.renta/c.fianza pueden venir como número
-    // limpio (455.83) o como texto español ("455,83") según cómo se
-    // guardaran — se pasa por parseRentaMixta antes de mostrarlo, para no
-    // reformatear mal un número que ya venía correcto (ej: 455.83 → 45583).
-    const fRenta = document.getElementById('f-con-renta'); if (fRenta) { fRenta.value = c.renta ? fmt(parseRentaMixta(c.renta)) : ''; }
-    const fFianza = document.getElementById('f-fianza'); if (fFianza) { fFianza.value = c.fianza ? fmt(parseRentaMixta(c.fianza)) : ''; }
-    const fFirma = document.getElementById('f-firma'); if (fFirma) fFirma.value = new Date().toISOString().slice(0,10);
-    const fInicio = document.getElementById('f-inicio'); if (fInicio) fInicio.value = c.inicio || '';
-    const fFin = document.getElementById('f-fin'); if (fFin) fFin.value = c.fin || '';
+      // Condiciones económicas y fechas — las del contrato original, tal cual
+      // (la liquidación de fianza se calcula a partir de esta misma fianza)
+      // PUNTO 138 (07/09/2026): c.renta/c.fianza pueden venir como número
+      // limpio (455.83) o como texto español ("455,83") según cómo se
+      // guardaran — se pasa por parseRentaMixta antes de mostrarlo, para no
+      // reformatear mal un número que ya venía correcto (ej: 455.83 → 45583).
+      const fRenta = document.getElementById('f-con-renta'); if (fRenta) { fRenta.value = c.renta ? fmt(parseRentaMixta(c.renta)) : ''; }
+      const fFianza = document.getElementById('f-fianza'); if (fFianza) { fFianza.value = c.fianza ? fmt(parseRentaMixta(c.fianza)) : ''; }
+      const fFirma = document.getElementById('f-firma'); if (fFirma) fFirma.value = new Date().toISOString().slice(0,10);
+      const fInicio = document.getElementById('f-inicio'); if (fInicio) fInicio.value = c.inicio || '';
+      const fFin = document.getElementById('f-fin'); if (fFin) fFin.value = c.fin || '';
 
-    // Tipo de documento: Rescisión — se hace al final para que no lo
-    // pise seleccionarInmueble/filtrarInmueblesPorTipo
-    const tipoEl = document.getElementById('tipo-rescision');
-    if (tipoEl) tipoEl.click();
+      // Tipo de documento: Rescisión — se hace al final para que no lo
+      // pise seleccionarInmueble/filtrarInmueblesPorTipo
+      const tipoEl = document.getElementById('tipo-rescision');
+      if (tipoEl) tipoEl.click();
 
-    wGoStep(2);
-    showToast('❌ Datos del contrato cargados — solo falta la liquidación (luz/agua/deuda)', 'success');
-  }, 350);
+      wGoStep(2);
+      showToast('❌ Datos del contrato cargados — solo falta la liquidación (luz/agua/deuda)', 'success');
+    }, 350);
+  });
 }
 
 // ─── SUBIDAS DE RENTA PACTADAS ──────────────────────────────────────────
@@ -19785,6 +19839,7 @@ function con_regenerarPDF(id) {
   showModule('contratos');
 
   setTimeout(() => {
+   _confirmarReiniciarWizard(() => {
     // 2) Abrir wizard (inicializa el DOM)
     if (typeof showWizard === 'function') showWizard();
 
@@ -19873,6 +19928,7 @@ function con_regenerarPDF(id) {
       if (typeof showRevision === 'function') showRevision();
       showToast('✅ Datos cargados — pulsa Generar PDF', 'success');
     }, 500);
+   });
   }, 300);
 }
 
@@ -20231,6 +20287,7 @@ function cli_nuevoContrato() {
   // Precarga los datos del cliente en el wizard y navega a Contratos
   showModule('contratos');
   setTimeout(() => {
+   _confirmarReiniciarWizard(() => {
     if (typeof showWizard === 'function') showWizard();
     setTimeout(() => {
       const c = cli_clienteActivo;
@@ -20265,6 +20322,7 @@ function cli_nuevoContrato() {
       if (typeof actualizarPreview === 'function') actualizarPreview();
       showToast('✅ Datos del cliente cargados', 'success');
     }, 400);
+   });
   }, 300);
 }
 
@@ -20273,6 +20331,7 @@ function cli_renovacion() {
   if (!cli_clienteActivo) return;
   showModule('contratos');
   setTimeout(() => {
+   _confirmarReiniciarWizard(() => {
     if (typeof showWizard === 'function') showWizard();
     setTimeout(() => {
       // Seleccionar tipo renovación
@@ -20328,6 +20387,7 @@ function cli_renovacion() {
         ? '🔄 Datos cargados para renovación'
         : '⚠️ Revisa la vivienda en "Inmueble" — no se pudo determinar automáticamente', inmOk ? 'success' : 'warning');
     }, 400);
+   });
   }, 300);
 }
 
@@ -20336,6 +20396,7 @@ function cli_rescision() {
   if (!cli_clienteActivo) return;
   showModule('contratos');
   setTimeout(() => {
+   _confirmarReiniciarWizard(() => {
     if (typeof showWizard === 'function') showWizard();
     setTimeout(() => {
       const tipoRescision = document.getElementById('tipo-rescision');
@@ -20375,6 +20436,7 @@ function cli_rescision() {
         ? '❌ Datos cargados para rescisión'
         : '⚠️ Revisa la vivienda en "Inmueble" — no se pudo determinar automáticamente', inmOk ? 'success' : 'warning');
     }, 400);
+   });
   }, 300);
 }
 
