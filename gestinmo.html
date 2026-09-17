@@ -19925,6 +19925,43 @@ function con_regenerarPDF(id) {
         if (document.getElementById('f-inq-email'))  document.getElementById('f-inq-email').value  = c.inqEmail  || '';
       }
 
+      // 6b) PUNTO 187 (17/09/2026): recuperar también los demás firmantes
+      // (cotitulares), no solo el Responsable de cobro — antes, al reabrir
+      // "Ver / Descargar contrato" de un contrato con varios firmantes, el
+      // asistente siempre volvía a mostrar "1" en el selector y el resto de
+      // firmantes desaparecían de la pantalla de edición (aunque el PDF y
+      // la ficha del contrato sí los conservaban bien). El Responsable
+      // ocupa siempre el Firmante 1 (los campos de arriba, ya rellenos);
+      // los cotitulares se colocan en el mismo orden en los Firmantes 2, 3...
+      if (c.cotitulares && c.cotitulares.length && typeof wizardSetNumFirmantes === 'function') {
+        const totalFirmantes = Math.min(5, c.numFirmantes || (c.cotitulares.length + 1));
+        wizardSetNumFirmantes(totalFirmantes);
+        wizardResponsableIdx = 1;
+        if (typeof renderResponsableSelector === 'function') renderResponsableSelector();
+        c.cotitulares.forEach((f, i) => {
+          const idx = i + 2; // los cotitulares ocupan los Firmantes 2, 3, 4, 5
+          if (idx > totalFirmantes) return;
+          if (typeof setInqTipoExtra === 'function') setInqTipoExtra(idx, f.esEmpresa ? 'empresa' : 'persona');
+          if (f.esEmpresa) {
+            const e1 = document.getElementById('f-inq-empresa-nombre-' + idx); if (e1) e1.value = f.nombre || '';
+            const e2 = document.getElementById('f-inq-cif-' + idx); if (e2) e2.value = f.dni || '';
+            const e3 = document.getElementById('f-inq-empresa-dom-' + idx); if (e3) e3.value = f.dom || '';
+            const e4 = document.getElementById('f-inq-empresa-tel-' + idx); if (e4) e4.value = f.tel || '';
+            const e5 = document.getElementById('f-inq-empresa-email-' + idx); if (e5) e5.value = f.email || '';
+            const e6 = document.getElementById('f-inq-rep-nombre-' + idx); if (e6) e6.value = f.repNombre || '';
+            const e7 = document.getElementById('f-inq-rep-dni-' + idx); if (e7) e7.value = f.repDNI || '';
+          } else {
+            const p1 = document.getElementById('f-inq-nombre-' + idx); if (p1) p1.value = f.nombre || '';
+            const p2 = document.getElementById('f-inq-genero-' + idx); if (p2) p2.value = f.genero || 'D.';
+            const p3 = document.getElementById('f-inq-dni-' + idx); if (p3) p3.value = f.dni || '';
+            const p4 = document.getElementById('f-inq-dom-' + idx); if (p4) p4.value = f.dom || '';
+            const p5 = document.getElementById('f-inq-tel-' + idx); if (p5) p5.value = f.tel || '';
+            const p6 = document.getElementById('f-inq-email-' + idx); if (p6) p6.value = f.email || '';
+          }
+        });
+        if (typeof renderResponsableSelector === 'function') renderResponsableSelector();
+      }
+
       // 7) Rellenar condiciones económicas
       if (document.getElementById('f-con-renta'))  document.getElementById('f-con-renta').value  = c.renta  ? fmt(parseRentaMixta(c.renta)) : '';
       if (document.getElementById('f-fianza'))     document.getElementById('f-fianza').value     = c.fianza ? fmt(parseRentaMixta(c.fianza)) : '';
