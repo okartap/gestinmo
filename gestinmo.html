@@ -2228,6 +2228,51 @@ window._registroMerge = _registroMerge; // expuesta para pruebas automáticas
 // esta — hacía falta el mismo tipo de fusión "campo a campo", aquí aplicada
 // inmueble a inmueble (por su referencia, que es el dato que nunca cambia,
 // a diferencia del id interno que se regenera en cada edición).
+// PUNTO 182 (17/09/2026) — BUG REAL CONFIRMADO: Patry escribió la referencia
+// catastral de un inmueble en el iPhone. Poco después guardó esa MISMA ficha
+// en Chrome por otro motivo (cambiar el Estado), antes de que a Chrome le
+// diera tiempo a recibir el dato del iPhone desde la nube. Como la fusión de
+// abajo decidía "todo o nada" (gana la ficha completa con el guardado más
+// reciente, nunca se mezclan campos sueltos de una y otra), el guardado de
+// Chrome —con el catastral todavía en blanco en su formulario— sustituyó a
+// la ficha entera y borró en silencio el dato metido en el iPhone.
+//
+// Arreglo: cuando los dos lados (local y nube) ya tienen fecha de sello —
+// es decir, los dos pasaron por un guardado real, el caso normal del día a
+// día—, la fusión ahora entra CAMPO A CAMPO dentro de esa misma ficha (ver
+// _inmueblesMergeUnRegistro): si el guardado más reciente deja un campo
+// vacío pero el otro lado sí tenía un dato real ahí, se conserva ese dato en
+// vez de perderlo. Solo cuando los DOS lados tienen, para un mismo campo, un
+// valor real que además es distinto, manda el guardado más reciente — igual
+// que antes. Aviso para Patry: si algún día vacías un campo a propósito
+// (borras un texto para dejarlo en blanco) y el otro aparato todavía tiene
+// la versión antigua con ese campo relleno sin haber sincronizado, esta
+// protección puede "revivir" el dato antiguo — mismo compromiso que ya se
+// aceptó en su día para el resto de protecciones de datos de la app (mejor
+// recuperar un dato viejo por error que perder uno nuevo en silencio).
+function _inmueblesMergeUnRegistro(a, b) {
+  // Fusiona dos versiones del MISMO inmueble (mismo ref), campo a campo.
+  // "a" y "b" da igual en qué orden lleguen — el resultado es el mismo.
+  const masReciente = String(b.updatedAt || '') > String(a.updatedAt || '') ? b : a;
+  const otro = masReciente === a ? b : a;
+  const resultado = {};
+  const campos = {};
+  Object.keys(a).forEach(function(k) { campos[k] = true; });
+  Object.keys(b).forEach(function(k) { campos[k] = true; });
+  Object.keys(campos).forEach(function(campo) {
+    const vReciente = masReciente[campo];
+    const vOtro = otro[campo];
+    const recienteVacio = vReciente === '' || vReciente === null || vReciente === undefined;
+    const otroVacio = vOtro === '' || vOtro === null || vOtro === undefined;
+    if (!recienteVacio) resultado[campo] = vReciente; // el más reciente manda si trae un dato real
+    else if (!otroVacio) resultado[campo] = vOtro;     // lo dejó vacío, pero el otro sí lo tenía -> no se pierde
+    else resultado[campo] = vReciente;                 // los dos vacíos, da igual
+  });
+  resultado.updatedAt = masReciente.updatedAt; // queda sellada con la fecha del guardado más reciente
+  return resultado;
+}
+window._inmueblesMergeUnRegistro = _inmueblesMergeUnRegistro; // expuesta para pruebas automáticas
+
 function _inmueblesMerge(localJSON, remoteJSON) {
   try {
     const locales = localJSON ? JSON.parse(localJSON) : [];
@@ -2255,7 +2300,7 @@ function _inmueblesMerge(localJSON, remoteJSON) {
       // por fecha cuando LAS DOS versiones ya tienen sello; si la local no
       // lo tiene, se queda como está hasta que se guarde una vez de verdad
       // (momento en el que ya queda sellada y protegida con normalidad).
-      else if (actual.updatedAt && String(inm.updatedAt || '') > String(actual.updatedAt)) mapa[inm.ref] = inm;
+      else if (actual.updatedAt && inm.updatedAt) mapa[inm.ref] = _inmueblesMergeUnRegistro(actual, inm);
     });
     return JSON.stringify(orden.map(function(r) { return mapa[r]; }));
   } catch (e) {
