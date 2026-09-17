@@ -3394,6 +3394,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div class="info-section">
       <div class="info-section-title">Descripción</div>
       <div class="info-row"><div class="info-label">Dirección</div><div class="info-value" id="info-direccion">—</div></div>
+      <div class="info-row"><div class="info-label">Ref. catastral</div><div class="info-value" id="info-catastral">—</div></div>
       <div class="info-row"><div class="info-label">Edificio</div><div class="info-value" id="info-edificio">—</div></div>
       <div class="info-row"><div class="info-label">Superficie</div><div class="info-value" id="info-m2">—</div></div>
       <div class="info-row"><div class="info-label">Habitaciones</div><div class="info-value" id="info-hab">—</div></div>
@@ -3476,6 +3477,17 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="form-group">
           <div class="form-label">Dirección</div>
           <input class="form-input" id="f-direccion" type="text" placeholder="C/ Ejemplo, 12">
+        </div>
+      </div>
+      <!-- PUNTO 181 (17/09/2026): referencia catastral del inmueble — antes
+      solo existía (y se perdía) dentro del asistente de Contratos, sin
+      quedar guardada en la ficha del propio inmueble. Ahora vive aquí, de
+      forma permanente, y el asistente de Contratos la rellena solo a partir
+      de este dato cuando eliges el inmueble (ver seleccionarInmueble()). -->
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Referencia catastral <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
+          <input class="form-input" id="f-catastral-inm" type="text" placeholder="0000000AB0000A0000AB">
         </div>
       </div>
       <div class="form-row">
@@ -7633,6 +7645,7 @@ function inm_showDetail(idx) {
 
   // Tab info
   document.getElementById('info-direccion').textContent = inm.direccion || '—';
+  document.getElementById('info-catastral').textContent = inm.catastral || '—';
   document.getElementById('info-edificio').textContent = inm.edificio || '—';
   document.getElementById('info-m2').textContent = inm.m2 ? inm.m2+' m²' : '—';
   document.getElementById('info-hab').textContent = inm.hab || '—';
@@ -8166,6 +8179,7 @@ function openModal(editIdx) {
     document.getElementById('f-ref-inm').value = inm.ref || '';
     document.getElementById('f-direccion').value = inm.direccionCalle || inm.direccion || '';
     document.getElementById('f-edificio').value = inm.edificio || '';
+    if (document.getElementById('f-catastral-inm')) document.getElementById('f-catastral-inm').value = inm.catastral || '';
     document.getElementById('f-piso').value = inm.piso || '';
     document.getElementById('f-letra').value = inm.letra || '';
     document.getElementById('f-cp').value = inm.cp || '';
@@ -8275,7 +8289,7 @@ function closeModal() {
 }
 
 function clearForm() {
-  ['f-ref-inm','f-direccion','f-edificio','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-venta-anio','f-venta-gastos','f-venta-plusvalia','f-venta-anio-inicio','f-venta-pct-construccion','f-venta-meses-ultimo-anio','f-notas'].forEach(id => {
+  ['f-ref-inm','f-direccion','f-edificio','f-catastral-inm','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-venta-anio','f-venta-gastos','f-venta-plusvalia','f-venta-anio-inicio','f-venta-pct-construccion','f-venta-meses-ultimo-anio','f-notas'].forEach(id => {
     const el = document.getElementById(id);
     if (el.tagName === 'SELECT') el.selectedIndex = 0;
     else el.value = '';
@@ -8341,6 +8355,9 @@ function saveInmueble() {
     direccion: dirCompleta,
     direccionCalle: direccion,
     edificio: document.getElementById('f-edificio').value.trim(),
+    // PUNTO 181 (17/09/2026): referencia catastral propia del inmueble (ver
+    // comentario en el HTML del formulario, sección Identificación).
+    catastral: document.getElementById('f-catastral-inm') ? document.getElementById('f-catastral-inm').value.trim() : '',
     piso, letra, cp, localidad,
     tipo: document.getElementById('f-tipo').value,
     propietario: document.getElementById('f-propietario').value,
@@ -8487,6 +8504,10 @@ function cargarInmueblesDesdeStorage() {
       .map(inm => ({
         ref: inm.ref || inm.id || '—',
         dir: inm.direccion || inm.dir || '—',
+        // PUNTO 181 (17/09/2026): referencia catastral guardada en la ficha
+        // del inmueble, para que el asistente de Contratos la rellene sola
+        // (ver seleccionarInmueble()) sin tener que volver a escribirla.
+        catastral: inm.catastral || '',
         tipo: tipoMap[inm.tipo] || 'viv',
         tipoLabel: inm.tipo ? (inm.tipo.charAt(0).toUpperCase() + inm.tipo.slice(1)) : 'Inmueble',
         // PUNTO 32: una plaza de garaje incluida en el alquiler de un piso no
@@ -8528,7 +8549,7 @@ function toggleInmuebleMenu() {
 function renderInmuebles(lista) {
   const cont = document.getElementById('inmueble-lista');
   cont.innerHTML = lista.map(inm => `
-    <div onclick="seleccionarInmueble('${inm.ref}','${(inm.dir||'').replace(/'/g,"\\'")}','${inm.tipo}')"
+    <div onclick="seleccionarInmueble('${inm.ref}','${(inm.dir||'').replace(/'/g,"\\'")}','${inm.tipo}','${(inm.catastral||'').replace(/'/g,"\\'")}')"
          style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px;"
          onmouseover="this.style.background='var(--navy-hover)'" onmouseout="this.style.background=''">
       <span style="font-size:11px;font-weight:700;color:var(--gold);min-width:44px;">${inm.ref}</span>
@@ -8548,10 +8569,15 @@ function filtrarInmuebles(q) {
   renderInmuebles(lista);
 }
 
-function seleccionarInmueble(ref, dir, tipo) {
+function seleccionarInmueble(ref, dir, tipo, catastral) {
   document.getElementById('f-ref').value = ref;
   document.getElementById('f-ref-display').textContent = ref;
   document.getElementById('f-dir').value = dir;
+  // PUNTO 181 (17/09/2026): rellena sola la descripción catastral del
+  // contrato a partir de la guardada en la ficha del inmueble (si la hay);
+  // si el inmueble no tiene, deja el campo tal cual esté (no lo vacía, por
+  // si el usuario ya había escrito algo a mano).
+  if (catastral) { const fCatWiz = document.getElementById('f-catastral'); if (fCatWiz) fCatWiz.value = catastral; }
   document.getElementById('inmueble-menu').style.display = 'none';
   // Preseleccionar tipo si coincide
   const tipoCard = document.getElementById('tipo-' + tipo);
