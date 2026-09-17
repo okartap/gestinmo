@@ -3943,6 +3943,19 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div class="fsection">
       <div class="ftitle">Inquilino / Arrendatario</div>
+      <!-- PUNTO 180 (17/09/2026): varios firmantes en un mismo contrato -->
+      <div class="frow-full" style="margin-bottom:14px;">
+        <div class="flabel-full">Nº de personas que firman como arrendatario</div>
+        <div id="firmantes-pills" style="display:flex;gap:8px;margin-top:6px;">
+          <div id="pill-firmantes-1" onclick="wizardSetNumFirmantes(1)" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--accent-gold);background:rgba(201,168,76,.12);font-size:13px;font-weight:700;color:var(--accent-gold);cursor:pointer;">1</div>
+          <div id="pill-firmantes-2" onclick="wizardSetNumFirmantes(2)" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:13px;font-weight:600;color:var(--silver-dim);cursor:pointer;">2</div>
+          <div id="pill-firmantes-3" onclick="wizardSetNumFirmantes(3)" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:13px;font-weight:600;color:var(--silver-dim);cursor:pointer;">3</div>
+          <div id="pill-firmantes-4" onclick="wizardSetNumFirmantes(4)" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:13px;font-weight:600;color:var(--silver-dim);cursor:pointer;">4</div>
+          <div id="pill-firmantes-5" onclick="wizardSetNumFirmantes(5)" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:13px;font-weight:600;color:var(--silver-dim);cursor:pointer;">5</div>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:6px;">Lo habitual es 1 — elige 2 o más cuando el alquiler lo firman varias personas juntas</div>
+      </div>
+      <div id="firmante-1-label" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;display:none;">Firmante 1</div>
       <!-- Toggle persona / empresa -->
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <div id="tab-inq-persona" onclick="setInqTipo('persona')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-hover);font-size:12px;font-weight:700;color:var(--silver-bright);cursor:pointer;transition:all .2s;">👤 Persona física</div>
@@ -3950,7 +3963,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <!-- Campos persona física -->
       <div id="inq-persona-fields">
-        <div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre" placeholder="Nombre y apellidos"></div>
+        <div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre" placeholder="Nombre y apellidos" oninput="renderResponsableSelector()"></div>
         <div class="frow"><div class="flabel">Tratamiento</div><select class="finput" id="f-inq-genero"><option value="D.">D. (Don)</option><option value="Dña.">Dña. (Doña)</option></select></div>
         <div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni" placeholder="00000000X"></div>
         <div class="frow-full"><div class="flabel-full">Domicilio del inquilino</div><input class="finput-full" id="f-inq-dom" placeholder="Domicilio actual..."></div>
@@ -3959,7 +3972,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <!-- Campos empresa -->
       <div id="inq-empresa-fields" style="display:none">
-        <div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre" placeholder="Razón social" oninput="syncInqNombreEmpresa()"></div>
+        <div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre" placeholder="Razón social" oninput="syncInqNombreEmpresa();renderResponsableSelector()"></div>
         <div class="frow"><div class="flabel">CIF</div><input class="finput" id="f-inq-cif" placeholder="B00000000"></div>
         <div class="frow-full"><div class="flabel-full">Domicilio social</div><input class="finput-full" id="f-inq-empresa-dom" placeholder="Domicilio social..."></div>
         <div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-empresa-tel" type="tel" placeholder="600 000 000"></div>
@@ -3967,6 +3980,13 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin:10px 0 6px;padding:0 2px;">Representante legal</div>
         <div class="frow"><div class="flabel">Nombre rep.</div><input class="finput" id="f-inq-rep-nombre" placeholder="Nombre y apellidos"></div>
         <div class="frow"><div class="flabel">DNI rep.</div><input class="finput" id="f-inq-rep-dni" placeholder="00000000X"></div>
+      </div>
+      <!-- Firmantes 2-5, inyectados dinámicamente por wizardSetNumFirmantes() -->
+      <div id="firmantes-extra-container"></div>
+      <div id="seccion-responsable-cobro" style="display:none;margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">
+        <div class="ftitle" style="font-size:11px;">Responsable de cobro</div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:8px;">La persona con la que se habla si hay que reclamar un pago — se puede cambiar más adelante desde la ficha del contrato.</div>
+        <div id="responsable-cobro-chips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       </div>
     </div>
     <div class="fsection">
@@ -4171,6 +4191,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;">
       <div id="det-tipo-label" style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:10px">Contrato</div>
       <div id="det-nombre" style="font-size:20px;font-weight:700;margin-bottom:4px">—</div>
+      <div id="det-cotitulares" style="font-size:12px;color:var(--text2);margin-bottom:6px;display:none"></div>
       <div id="det-refdir" style="font-size:13px;color:var(--text2);margin-bottom:16px">—</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div style="background:var(--navy-mid);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:var(--text2)">Renta</div><div id="det-renta" style="font-size:17px;font-weight:700;color:var(--green)">—</div></div>
@@ -8571,6 +8592,26 @@ function showLista() {
 function showWizard() {
   ['con-view-lista','con-view-wizard','con-view-detalle','con-view-revision'].forEach(v => { const el=document.getElementById(v); if(el) el.classList.remove('active'); });
   document.getElementById('con-view-wizard').classList.add('active');
+  // PUNTO 179 (17/09/2026): al abrir el asistente en blanco, el arrendador
+  // marcado por defecto venía siempre fijo en "Patrimer", sin mirar qué
+  // empresa tienes activa en ese momento en la app (bug real avisado por
+  // Patry) — ahora se marca sola la empresa activa, usando el mismo dato
+  // que ya usa correctamente el buscador de inmuebles del propio asistente.
+  // Los flujos que ya fijan su propio arrendador después de llamar a
+  // showWizard() (ej. det_iniciarRescision, que lee el del contrato
+  // original) lo sobrescriben justo después, sin conflicto.
+  if (typeof selectArrendador === 'function') {
+    selectArrendador(localStorage.getItem('patrimer:empresa') || 'patrimer');
+  }
+  // PUNTO 180 (17/09/2026): varios firmantes por contrato — vuelve siempre
+  // a "1 firmante" al abrir el asistente en blanco, para que un contrato
+  // anterior con cotitulares no deje restos en el siguiente.
+  wizardNumFirmantes = 1;
+  wizardResponsableIdx = 1;
+  _firmanteExtraEsEmpresa = {};
+  const _fecReset = document.getElementById('firmantes-extra-container');
+  if (_fecReset) _fecReset.innerHTML = '';
+  if (typeof wizardSetNumFirmantes === 'function') wizardSetNumFirmantes(1);
   wGoStep(0);
   pdfDoc = null;
   padronBajas = [];
@@ -8629,6 +8670,19 @@ function renderDetalleContrato(c) {
   // ── Cabecera ──
   const elTipo = document.getElementById('det-tipo-label'); if (elTipo) elTipo.textContent = tipoLabelMap[c.tipo] || 'Contrato';
   const elNombre = document.getElementById('det-nombre'); if (elNombre) elNombre.textContent = c.inqNombre || '—';
+  // PUNTO 180 (17/09/2026): si el contrato tiene cotitulares, se muestran
+  // aquí sus nombres — el de "det-nombre" de arriba es siempre el
+  // Responsable de cobro.
+  const elCotit = document.getElementById('det-cotitulares');
+  if (elCotit) {
+    if (c.cotitulares && c.cotitulares.length) {
+      const nombres = c.cotitulares.map(function(f) { return f.nombre || '(sin nombre)'; }).join(', ');
+      elCotit.textContent = '👥 Responsable de cobro · junto con ' + nombres;
+      elCotit.style.display = 'block';
+    } else {
+      elCotit.style.display = 'none';
+    }
+  }
   const elRefDir = document.getElementById('det-refdir'); if (elRefDir) elRefDir.textContent = [c.ref, c.dir].filter(Boolean).join(' · ') || '—';
   const elRenta = document.getElementById('det-renta'); if (elRenta) elRenta.textContent = c.renta ? fmtE(parseRentaMixta(c.renta)) + unidad : '—';
   const elFianza = document.getElementById('det-fianza'); if (elFianza) elFianza.textContent = c.fianza ? fmtE(parseRentaMixta(c.fianza)) : '—';
@@ -8974,6 +9028,154 @@ function syncInqNombreEmpresa() {
   if (!campo) {
     // En modo empresa f-inq-nombre no existe, usamos el de empresa
   }
+}
+
+// ─── PUNTO 180 (17/09/2026): VARIOS FIRMANTES POR CONTRATO ─────────────────
+// Hasta ahora el asistente solo admitía un inquilino por contrato — pedido
+// real de Patry: en pisos compartidos, cada vez es más habitual que firmen
+// 2, 3 o más personas juntas. Diseño acordado con él antes de tocar nada:
+//  - El Firmante 1 sigue siendo los campos de siempre (f-inq-nombre, etc.)
+//    — así, con 1 solo firmante (el caso de toda la vida), el contrato se
+//    genera y se guarda EXACTAMENTE igual que antes de este cambio, sin
+//    ningún riesgo de regresión.
+//  - Los firmantes 2 a 5 son bloques nuevos, inyectados solo cuando hacen
+//    falta, con sus propios campos (mismo formulario persona/empresa, con
+//    sufijo "-2".."-5" en cada id).
+//  - Un "Responsable de cobro" (uno de los firmantes, cambiable en cualquier
+//    momento) es quien queda como inquilino principal de cara al resto de
+//    la app (Cobros/Deudores, Clientes, avisos, tarjeta del contrato) — así
+//    no hace falta tocar esas pantallas para saber con quién
+//    hablar si hay que reclamar un pago.
+// Entregado por fases: esta primera entrega captura y guarda los datos de
+// los 2-5 firmantes y muestra quién es cada uno en la ficha del contrato.
+// Pendiente para una fase posterior (avisado a Patry): que el PDF del
+// contrato nombre a los 2-5 como ARRENDATARIOS (de momento el documento
+// legal solo recoge al responsable de cobro, igual que hacía antes con el
+// único inquilino) y que cada cotitular tenga también su propia ficha en
+// Clientes.
+let wizardNumFirmantes = 1;
+let wizardResponsableIdx = 1;
+let _firmanteExtraEsEmpresa = {};
+
+function renderFirmanteExtraHTML(idx) {
+  return '<div id="firmante-extra-' + idx + '" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">'
+    + '<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Firmante ' + idx + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;">'
+    + '<div id="tab-inq-persona-' + idx + '" onclick="setInqTipoExtra(' + idx + ',\'persona\')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-hover);font-size:12px;font-weight:700;color:var(--silver-bright);cursor:pointer;">👤 Persona física</div>'
+    + '<div id="tab-inq-empresa-' + idx + '" onclick="setInqTipoExtra(' + idx + ',\'empresa\')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:12px;font-weight:600;color:var(--silver-dim);cursor:pointer;">🏢 Empresa</div>'
+    + '</div>'
+    + '<div id="inq-persona-fields-' + idx + '">'
+    + '<div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre-' + idx + '" placeholder="Nombre y apellidos" oninput="renderResponsableSelector()"></div>'
+    + '<div class="frow"><div class="flabel">Tratamiento</div><select class="finput" id="f-inq-genero-' + idx + '"><option value="D.">D. (Don)</option><option value="Dña.">Dña. (Doña)</option></select></div>'
+    + '<div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni-' + idx + '" placeholder="00000000X"></div>'
+    + '<div class="frow-full"><div class="flabel-full">Domicilio</div><input class="finput-full" id="f-inq-dom-' + idx + '" placeholder="Domicilio actual..."></div>'
+    + '<div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-tel-' + idx + '" type="tel" placeholder="600 000 000"></div>'
+    + '<div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-email-' + idx + '" type="email" placeholder="correo@ejemplo.com"></div>'
+    + '</div>'
+    + '<div id="inq-empresa-fields-' + idx + '" style="display:none">'
+    + '<div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre-' + idx + '" placeholder="Razón social" oninput="renderResponsableSelector()"></div>'
+    + '<div class="frow"><div class="flabel">CIF</div><input class="finput" id="f-inq-cif-' + idx + '" placeholder="B00000000"></div>'
+    + '<div class="frow-full"><div class="flabel-full">Domicilio social</div><input class="finput-full" id="f-inq-empresa-dom-' + idx + '" placeholder="Domicilio social..."></div>'
+    + '<div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-empresa-tel-' + idx + '" type="tel" placeholder="600 000 000"></div>'
+    + '<div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-empresa-email-' + idx + '" type="email" placeholder="correo@ejemplo.com"></div>'
+    + '<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin:10px 0 6px;">Representante legal</div>'
+    + '<div class="frow"><div class="flabel">Nombre rep.</div><input class="finput" id="f-inq-rep-nombre-' + idx + '" placeholder="Nombre y apellidos"></div>'
+    + '<div class="frow"><div class="flabel">DNI rep.</div><input class="finput" id="f-inq-rep-dni-' + idx + '" placeholder="00000000X"></div>'
+    + '</div>'
+    + '</div>';
+}
+
+function wizardSetNumFirmantes(n) {
+  wizardNumFirmantes = n;
+  for (let i = 1; i <= 5; i++) {
+    const p = document.getElementById('pill-firmantes-' + i);
+    if (!p) continue;
+    const sel = (i === n);
+    p.style.background = sel ? 'rgba(201,168,76,.12)' : 'var(--navy-card)';
+    p.style.borderColor = sel ? 'var(--accent-gold)' : 'var(--border)';
+    p.style.color = sel ? 'var(--accent-gold)' : 'var(--silver-dim)';
+    p.style.fontWeight = sel ? '700' : '600';
+  }
+  const label1 = document.getElementById('firmante-1-label');
+  if (label1) label1.style.display = n > 1 ? 'block' : 'none';
+  const cont = document.getElementById('firmantes-extra-container');
+  if (cont) {
+    for (let i = 2; i <= 5; i++) {
+      let block = document.getElementById('firmante-extra-' + i);
+      if (i <= n) {
+        if (!block) { cont.insertAdjacentHTML('beforeend', renderFirmanteExtraHTML(i)); }
+        const b2 = document.getElementById('firmante-extra-' + i);
+        if (b2) b2.style.display = 'block';
+      } else if (block) {
+        block.style.display = 'none';
+      }
+    }
+  }
+  if (wizardResponsableIdx > n) wizardResponsableIdx = 1;
+  const secResp = document.getElementById('seccion-responsable-cobro');
+  if (secResp) secResp.style.display = n > 1 ? 'block' : 'none';
+  renderResponsableSelector();
+}
+
+function setInqTipoExtra(idx, tipo) {
+  const esEmp = (tipo === 'empresa');
+  _firmanteExtraEsEmpresa[idx] = esEmp;
+  const tp = document.getElementById('tab-inq-persona-' + idx), te = document.getElementById('tab-inq-empresa-' + idx);
+  if (tp) { tp.style.background = esEmp ? 'var(--navy-card)' : 'var(--navy-hover)'; tp.style.color = esEmp ? 'var(--silver-dim)' : 'var(--silver-bright)'; }
+  if (te) { te.style.background = esEmp ? 'var(--navy-hover)' : 'var(--navy-card)'; te.style.color = esEmp ? 'var(--silver-bright)' : 'var(--silver-dim)'; }
+  const fp = document.getElementById('inq-persona-fields-' + idx), fe = document.getElementById('inq-empresa-fields-' + idx);
+  if (fp) fp.style.display = esEmp ? 'none' : 'block';
+  if (fe) fe.style.display = esEmp ? 'block' : 'none';
+  renderResponsableSelector();
+}
+
+// Datos de un firmante concreto (1 = los campos clásicos de toda la vida;
+// 2-5 = los bloques nuevos), con la misma forma que ya esperaba el resto
+// del código para el inquilino único.
+function wizardObtenerDatosFirmante(i) {
+  if (i === 1 || !i) {
+    return {
+      esEmpresa: inqEsEmpresa,
+      nombre: inqEsEmpresa ? (document.getElementById('f-inq-empresa-nombre')?.value || '') : (document.getElementById('f-inq-nombre')?.value || ''),
+      dni: inqEsEmpresa ? (document.getElementById('f-inq-cif')?.value || '') : (document.getElementById('f-inq-dni')?.value || ''),
+      dom: inqEsEmpresa ? (document.getElementById('f-inq-empresa-dom')?.value || '') : (document.getElementById('f-inq-dom')?.value || ''),
+      tel: inqEsEmpresa ? (document.getElementById('f-inq-empresa-tel')?.value || '') : (document.getElementById('f-inq-tel')?.value || ''),
+      email: inqEsEmpresa ? (document.getElementById('f-inq-empresa-email')?.value || '') : (document.getElementById('f-inq-email')?.value || ''),
+      genero: document.getElementById('f-inq-genero')?.value || 'D.',
+      repNombre: document.getElementById('f-inq-rep-nombre')?.value || '',
+      repDNI: document.getElementById('f-inq-rep-dni')?.value || ''
+    };
+  }
+  const esEmp = !!_firmanteExtraEsEmpresa[i];
+  return {
+    esEmpresa: esEmp,
+    nombre: esEmp ? (document.getElementById('f-inq-empresa-nombre-' + i)?.value || '') : (document.getElementById('f-inq-nombre-' + i)?.value || ''),
+    dni: esEmp ? (document.getElementById('f-inq-cif-' + i)?.value || '') : (document.getElementById('f-inq-dni-' + i)?.value || ''),
+    dom: esEmp ? (document.getElementById('f-inq-empresa-dom-' + i)?.value || '') : (document.getElementById('f-inq-dom-' + i)?.value || ''),
+    tel: esEmp ? (document.getElementById('f-inq-empresa-tel-' + i)?.value || '') : (document.getElementById('f-inq-tel-' + i)?.value || ''),
+    email: esEmp ? (document.getElementById('f-inq-empresa-email-' + i)?.value || '') : (document.getElementById('f-inq-email-' + i)?.value || ''),
+    genero: document.getElementById('f-inq-genero-' + i)?.value || 'D.',
+    repNombre: document.getElementById('f-inq-rep-nombre-' + i)?.value || '',
+    repDNI: document.getElementById('f-inq-rep-dni-' + i)?.value || ''
+  };
+}
+
+function wizardSetResponsable(idx) {
+  wizardResponsableIdx = idx;
+  renderResponsableSelector();
+}
+
+function renderResponsableSelector() {
+  const cont = document.getElementById('responsable-cobro-chips');
+  if (!cont || wizardNumFirmantes <= 1) return;
+  let html = '';
+  for (let i = 1; i <= wizardNumFirmantes; i++) {
+    const d = wizardObtenerDatosFirmante(i);
+    const nombre = (d.nombre && d.nombre.trim()) ? d.nombre.trim() : ('Firmante ' + i);
+    const sel = (i === wizardResponsableIdx);
+    html += '<div onclick="wizardSetResponsable(' + i + ')" style="padding:7px 12px;border-radius:20px;border:1px solid ' + (sel ? 'var(--accent-gold)' : 'var(--border)') + ';background:' + (sel ? 'rgba(201,168,76,.12)' : 'var(--navy-card)') + ';font-size:12px;font-weight:' + (sel ? '700' : '600') + ';color:' + (sel ? 'var(--accent-gold)' : 'var(--silver-dim)') + ';cursor:pointer;">' + (sel ? '★ ' : '') + nombre + '</div>';
+  }
+  cont.innerHTML = html;
 }
 
 function wGoStep(n) {
@@ -9324,9 +9526,15 @@ function actualizarPreview() {
   const arr = ARRENDADORES[arrendadorActivo];
   const ref = document.getElementById('f-ref').value || '';
   const dir = document.getElementById('f-dir').value || '';
-  const inq = inqEsEmpresa
+  // PUNTO 180 (17/09/2026): si hay varios firmantes, el preview muestra el
+  // Responsable de cobro elegido, con un "+N" indicando los cotitulares.
+  const _respPrev = (typeof wizardObtenerDatosFirmante === 'function')
+    ? wizardObtenerDatosFirmante((typeof wizardResponsableIdx === 'number' && wizardResponsableIdx >= 1) ? wizardResponsableIdx : 1)
+    : null;
+  const _numFirmPrev = (typeof wizardNumFirmantes === 'number' && wizardNumFirmantes >= 1) ? wizardNumFirmantes : 1;
+  const inq = (_respPrev ? (_respPrev.nombre || '') : (inqEsEmpresa
     ? (document.getElementById('f-inq-empresa-nombre')?.value || '')
-    : (document.getElementById('f-inq-nombre')?.value || '');
+    : (document.getElementById('f-inq-nombre')?.value || ''))) + (_numFirmPrev > 1 ? ' (+' + (_numFirmPrev - 1) + ')' : '');
   const renta = document.getElementById('f-con-renta').value || '0';
   const fianza = document.getElementById('f-fianza').value || '0';
   const dur = document.getElementById('f-duracion').value || '3';
@@ -10006,29 +10214,35 @@ async function generarPDF() {
   const label = document.getElementById('pdf-progress-label');
   btn.classList.add('generating'); btn.innerHTML = 'Generando...'; progress.classList.add('show');
 
+  // PUNTO 180 (17/09/2026): con varios firmantes, el inquilino "de siempre"
+  // (inqNombre/inqDNI/...) pasa a ser el del Responsable de cobro elegido
+  // — así el resto de la app (PDF, tarjeta del contrato, Clientes, Cobros,
+  // avisos) sigue funcionando exactamente igual que hoy sin tener que
+  // tocarla, solo que ahora ese dato puede venir de cualquiera de los 1-5
+  // firmantes, no siempre del primero. Con 1 solo firmante (el caso de
+  // siempre) esto da exactamente el mismo resultado que antes.
+  const _numFirmantesPDF = (typeof wizardNumFirmantes === 'number' && wizardNumFirmantes >= 1) ? wizardNumFirmantes : 1;
+  const _respIdxPDF = (typeof wizardResponsableIdx === 'number' && wizardResponsableIdx >= 1) ? wizardResponsableIdx : 1;
+  const _todosFirmantesPDF = [];
+  for (let _fi = 1; _fi <= _numFirmantesPDF; _fi++) _todosFirmantesPDF.push(wizardObtenerDatosFirmante(_fi));
+  const _respFirmantePDF = _todosFirmantesPDF[_respIdxPDF - 1] || _todosFirmantesPDF[0] || {};
+  const _cotitularesPDF = _todosFirmantesPDF.filter((f, idx) => (idx + 1) !== _respIdxPDF);
+
   const datos = {
     ref: document.getElementById('f-ref').value || '',
     dir: document.getElementById('f-dir').value || '',
     catastral: document.getElementById('f-catastral').value || '',
-    inqNombre: inqEsEmpresa
-      ? (document.getElementById('f-inq-empresa-nombre')?.value || '')
-      : (document.getElementById('f-inq-nombre')?.value || ''),
-    inqDNI: inqEsEmpresa
-      ? (document.getElementById('f-inq-cif')?.value || '')
-      : (document.getElementById('f-inq-dni')?.value || ''),
-    inqDom: inqEsEmpresa
-      ? (document.getElementById('f-inq-empresa-dom')?.value || '')
-      : (document.getElementById('f-inq-dom')?.value || ''),
-    inqTel: inqEsEmpresa
-      ? (document.getElementById('f-inq-empresa-tel')?.value || '')
-      : (document.getElementById('f-inq-tel')?.value || ''),
-    inqEmail: inqEsEmpresa
-      ? (document.getElementById('f-inq-empresa-email')?.value || '')
-      : (document.getElementById('f-inq-email')?.value || ''),
-    inqEsEmpresa: inqEsEmpresa,
-    inqGenero: document.getElementById('f-inq-genero')?.value || 'D.',
-    inqRepNombre: document.getElementById('f-inq-rep-nombre')?.value || '',
-    inqRepDNI: document.getElementById('f-inq-rep-dni')?.value || '',
+    inqNombre: _respFirmantePDF.nombre || '',
+    inqDNI: _respFirmantePDF.dni || '',
+    inqDom: _respFirmantePDF.dom || '',
+    inqTel: _respFirmantePDF.tel || '',
+    inqEmail: _respFirmantePDF.email || '',
+    inqEsEmpresa: !!_respFirmantePDF.esEmpresa,
+    inqGenero: _respFirmantePDF.genero || 'D.',
+    inqRepNombre: _respFirmantePDF.repNombre || '',
+    inqRepDNI: _respFirmantePDF.repDNI || '',
+    numFirmantes: _numFirmantesPDF,
+    cotitulares: _cotitularesPDF,
     renta: document.getElementById('f-con-renta').value || '0',
     fianza: document.getElementById('f-fianza').value || '0',
     rescisLuz: document.getElementById('f-rescis-luz') ? parseFmtGlobal(document.getElementById('f-rescis-luz').value||'0') : 0,
@@ -10396,6 +10610,12 @@ async function generarPDF() {
         inqGenero: datos.inqGenero,
         inqRepNombre: datos.inqRepNombre,
         inqRepDNI: datos.inqRepDNI,
+        // PUNTO 180 (17/09/2026): varios firmantes — el resto de cotitulares
+        // (todos menos el Responsable de cobro, que es el que ocupa los
+        // campos inq* de siempre). Con 1 solo firmante queda un array vacío,
+        // igual que un contrato de toda la vida.
+        numFirmantes: datos.numFirmantes || 1,
+        cotitulares: datos.cotitulares || [],
         // PUNTO 138 (07/09/2026): antes se guardaba tal cual el texto del
         // formulario (ej: "455,83", con coma española) en vez del número.
         // Cualquier sitio que luego lo leyera con parseFloat() (el estándar
@@ -19285,7 +19505,7 @@ function con_renderLista() {
     return `<div onclick="showDetalle('${idSafe}')" style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
         <div>
-          <div style="font-size:14px;font-weight:700;color:var(--text-primary);">${c.inqNombre || '—'}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text-primary);">${c.inqNombre || '—'}${c.cotitulares && c.cotitulares.length ? ' <span style="font-size:10px;font-weight:700;color:var(--gold);">+' + c.cotitulares.length + '</span>' : ''}</div>
           <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">${[c.ref, c.dir].filter(Boolean).join(' · ') || '—'}</div>
         </div>
         <div style="font-size:11px;font-weight:700;color:${estadoColor};background:${estadoColor}22;padding:3px 8px;border-radius:20px;">${estadoText}</div>
