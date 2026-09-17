@@ -3904,7 +3904,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="arr-details">
           <div class="arr-detail"><div class="arr-detail-l">Representante</div><div class="arr-detail-v">Patricio Gómez García</div></div>
           <div class="arr-detail"><div class="arr-detail-l">DNI representante</div><div class="arr-detail-v">23.257.330-Y</div></div>
-          <div class="arr-detail" style="grid-column:1/-1"><div class="arr-detail-l">Domicilio social</div><div class="arr-detail-v">Avda. Juan Carlos I 55 4º, 30800 Lorca</div></div>
+          <div class="arr-detail" style="grid-column:1/-1"><div class="arr-detail-l">Domicilio social</div><div class="arr-detail-v">Avda. Juan Carlos I 46, 1ºA, 30800 Lorca</div></div>
         </div>
         
       </div>
@@ -6384,7 +6384,7 @@ const LOGO_IMGS = {
 };
 
 const PROFILES = {
-  patrimer:   { name:'Patrimer',   legalName:'Patrimer Levante S.L.',            cif:'B-73110009', address:'Avda. Juan Carlos I 55 4º, Lorca (Murcia)', arrendador:'D. Patricio Gómez García, en nombre de PATRIMER LEVANTE S.L.', dni:'23.257.330-Y', lau:7, type:'juridica', refPrefix:['VIV','BAJ','PG','RUS'], iban:'ES03 2100 4237 4722 0008 0147', banco:'CaixaBank' },
+  patrimer:   { name:'Patrimer',   legalName:'Patrimer Levante S.L.',            cif:'B-73110009', address:'Avda. Juan Carlos I 46, 1ºA, Lorca (Murcia)', arrendador:'D. Patricio Gómez García, en nombre de PATRIMER LEVANTE S.L.', dni:'23.257.330-Y', lau:7, type:'juridica', refPrefix:['VIV','BAJ','PG','RUS'], iban:'ES03 2100 4237 4722 0008 0147', banco:'CaixaBank' },
   patricio:   { name:'Patricio',   legalName:'Patricio Gómez García',             cif:null,          address:'Ctra. de Caravaca s/n, 30800 Lorca (Murcia)',  arrendador:'D. Patricio Gómez García', dni:'23.257.330-Y', lau:5, type:'fisica', refPrefix:['VIV-P'], iban:'ES52 2100 4237 4822 0007 9604', banco:'CaixaBank' },
   industrias: { name:'Industrias', legalName:'Industrias Gómez y Cayuela S.L.',   cif:'B30137418',   address:'Calle Cordobanes Nº15 (Carretera de Caravaca), 30800 Lorca (Murcia)',                       arrendador:'D. Patricio Gómez García y Dña. Mercedes Gómez García (administradores mancomunados)', dni:'pendiente', lau:7, type:'juridica', refPrefix:['IGC'], iban:'ES96 2100 7849 8022 0000 3053', banco:'CaixaBank' }
 };
@@ -8530,7 +8530,7 @@ let arrendadorActivo = 'patrimer';
 const ARRENDADORES = {
   patrimer: {
     label: 'Patrimer Levante S.L.', labelCorto: 'Patrimer', emoji: '🏢',
-    datos: 'D. Patricio Gómez García · DNI 23.257.330-Y\nEn nombre de PATRIMER LEVANTE S.L.\nCIF B-73110009 · Avda. Juan Carlos I 55 4º, Lorca',
+    datos: 'D. Patricio Gómez García · DNI 23.257.330-Y\nEn nombre de PATRIMER LEVANTE S.L.\nCIF B-73110009 · Avda. Juan Carlos I 46, 1ºA, Lorca',
     tipo: 'juridica', duracion_min: 7,
     iban: 'ES03 2100 4237 4722 0008 0147', banco: 'CaixaBank'
   },
@@ -9842,7 +9842,7 @@ function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, 
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y ');
       addParty('', 'Dña. Mercedes Gómez García', ', mayor de edad, con D.N.I. 23.257.329-M y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
     } else {
-      addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 55, 4º de Lorca (Murcia).');
+      addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 46, 1ºA de Lorca (Murcia).');
     }
   } else {
     addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
@@ -9975,7 +9975,7 @@ function generarContratoLocal(doc, datos, arr, margin, pageW, maxW, addText, add
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y ');
       addParty('', 'Dña. Mercedes Gómez García', ', mayor de edad, con D.N.I. 23.257.329-M y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
     } else {
-      addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 55, 4º de Lorca (Murcia).');
+      addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 46, 1ºA de Lorca (Murcia).');
     }
   } else {
     addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
@@ -10097,7 +10097,7 @@ function generarContratoGaraje(doc, datos, arr, margin, pageW, maxW, addText, ad
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia), y ');
       addParty('', 'Dña. Mercedes Gómez García', ', mayor de edad, con D.N.I. 23.257.329-M y domicilio en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
     } else {
-      addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 55, 4º de Lorca (Murcia).');
+      addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Avenida Juan Carlos I, 46, 1ºA de Lorca (Murcia).');
     }
   } else {
     addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. 23.257.330-Y y domicilio a efectos de este contrato en Carretera de Caravaca s/n, 30800 Lorca (Murcia).');
@@ -10216,7 +10216,7 @@ function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, a
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
-    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. B73110009 y domicilio social en Avd. Juan Carlos I, nº55, 4º, 30800 Lorca (Murcia), en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
+    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. B73110009 y domicilio social en Avd. Juan Carlos I, nº46, 1ºA, 30800 Lorca (Murcia), en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
   }
