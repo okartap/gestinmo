@@ -3489,7 +3489,7 @@ async function _tradingConsultarModo(modo) {
   const q = query(collection(db, 'trading_operaciones'), where('modo', '==', modo));
   const snap = await getDocs(q);
   let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, eurAcumulado = 0, tieneEUR = 0, ultimaFecha = '';
-  let ops = [];
+  let opsGrafica = [];
   snap.forEach((docSnap) => {
     const d = docSnap.data();
     if (d._test === true) return;
@@ -3500,23 +3500,14 @@ async function _tradingConsultarModo(modo) {
     if (typeof d.resultadoEUR === 'number') { eurAcumulado += d.resultadoEUR; tieneEUR++; }
     const fh = (d.fecha || '') + ' ' + (d.hora || '');
     if (fh > ultimaFecha) ultimaFecha = fh;
-    ops.push({ fh: fh, eur: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR : null });
+    // 24/09/2026: datos para la nueva gráfica "Evolución de la cuenta"
+    // (bloque OKCHART, el mismo que usa TradingOkar). Usa el resultado NETO
+    // (resultado en € menos la comisión), igual que la app de trading.
+    if (typeof d.resultadoEUR === 'number') {
+      opsGrafica.push({ fecha: d.fecha || '', hora: d.hora || '', neto: d.resultadoEUR - (d.comision || 0), instrumento: d.instrumento || '' });
+    }
   });
-  // PUNTO 165 (10/09/2026): serie cronológica del € acumulado, para la
-  // gráfica de líneas pedida en este punto — se ordena por fecha+hora
-  // (formato 'YYYY-MM-DD HH:MM', ordenable como texto) y se va acumulando
-  // resultadoEUR operación a operación en ese orden. No usa "capital
-  // inicial" (no vive en la nube, solo en el móvil de TradingOkar — punto
-  // 87) — es un acumulado de resultados, no un saldo de cuenta.
-  ops.sort(function(a, b) { return a.fh < b.fh ? -1 : (a.fh > b.fh ? 1 : 0); });
-  let serieEUR = [];
-  let acumSerie = 0;
-  for (let i = 0; i < ops.length; i++) {
-    if (ops[i].eur === null) continue;
-    acumSerie += ops[i].eur;
-    serieEUR.push(acumSerie);
-  }
-  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, serieEUR, ultimaFecha };
+  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, opsGrafica, ultimaFecha };
 }
 window.cargarTradingOkarStats = async function() {
   try {
@@ -3532,19 +3523,303 @@ window.cargarTradingOkarStats = async function() {
       const demoStats = await _tradingConsultarModo('demo');
       if (demoStats.numOperaciones) { stats = demoStats; esDemo = true; }
     }
+    // 24/09/2026: TradingOkar guarda ya sus ajustes en la nube (documento
+    // tipo 'ajustes' de esta misma colección): de ahí sale el capital
+    // inicial para poder dibujar el SALDO de la cuenta, y el margen de BE.
+    // Si todavía no existe (TradingOkar sin actualizar), la gráfica muestra
+    // solo el resultado acumulado, sin capital.
+    let capital = null, beMargen = 1;
+    try {
+      const aj = await getDocs(query(collection(db, 'trading_operaciones'), where('tipo', '==', 'ajustes')));
+      aj.forEach((ds) => {
+        const a = ds.data() || {};
+        const c = a.capital && a.capital[esDemo ? 'demo' : 'real'];
+        if (typeof c === 'number') capital = c;
+        if (typeof a.beMargen === 'number') beMargen = a.beMargen;
+      });
+    } catch (e) { /* sin ajustes: se sigue sin capital */ }
     return {
       ok: true,
       esDemo,
       numOperaciones: stats.numOperaciones,
       winrate: stats.numOperaciones ? (stats.ganadoras / stats.numOperaciones) * 100 : null,
       rAcumulada: stats.rAcumulada, tieneR: stats.tieneR,
-      eurAcumulado: stats.eurAcumulado, tieneEUR: stats.tieneEUR, serieEUR: stats.serieEUR,
+      eurAcumulado: stats.eurAcumulado, tieneEUR: stats.tieneEUR, opsGrafica: stats.opsGrafica, capital, beMargen,
       ultimaFecha: stats.ultimaFecha.trim()
     };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 };
+
+</script>
+
+<script>
+// =====================================================================
+// OKCHART — Gráfica "Evolución de la cuenta" (compartida Okartap / GestInmo)
+// Versión 1 · 24/09/2026. SVG dibujado a mano, sin librerías externas.
+// Mismo bloque en las dos apps: si se cambia aquí, copiarlo igual en la otra.
+//
+// Uso:  okChart(contenedor, {
+//         ops: [{ id, fecha:"AAAA-MM-DD", hora:"HH:MM", neto: €, instrumento }],  // TODAS las del modo
+//         capital: 10000,        // capital inicial del modo
+//         beMargen: 1,           // ± € que cuentan como BE
+//         titulo: "Evolución de la cuenta · Demo",
+//         periodo: 30,           // días iniciales (0 = todo)
+//         selectorPeriodo: true, // botones 1S/1M/3M/Todo dentro de la tarjeta
+//         desde, hasta: "AAAA-MM-DD" (opcional, si la pantalla ya filtra por periodo)
+//         onPeriodo: function(dias) {}  // opcional: recordar el periodo elegido
+//       })
+// =====================================================================
+(function () {
+  var CSS = ".okc{position:relative}" +
+    ".okc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}" +
+    ".okc-title{margin:0;font-size:10.5px;color:#7a8db0;text-transform:uppercase;letter-spacing:2.2px;font-weight:700}" +
+    ".okc-seg{display:flex;background:#161f38;border:1px solid #253050;border-radius:10px;padding:3px;gap:2px}" +
+    ".okc-seg button{background:none;border:0;color:#7a8db0;font:inherit;font-weight:700;font-size:11px;letter-spacing:1px;padding:6px 10px;border-radius:7px;cursor:pointer;text-transform:uppercase}" +
+    ".okc-seg button.on{background:#202d50;color:#c8d4e8}" +
+    ".okc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}" +
+    ".okc-kpi{background:#161f38;border:1px solid #253050;border-radius:10px;padding:9px 4px;text-align:center;min-width:0}" +
+    ".okc-kpi .v{font-size:clamp(12px,3.4vw,15px);font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e8eef8}" +
+    ".okc-kpi .l{font-size:9px;color:#7a8db0;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}" +
+    ".okc .pos{color:#4caf82!important}.okc .neg{color:#e05555!important}" +
+    ".okc-chart{position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none}" +
+    ".okc svg{display:block;width:100%;overflow:visible}" +
+    ".okc text.ax{fill:#7a8db0;font-size:10px;font-weight:600;font-family:inherit}" +
+    ".okc text.sub{fill:#7a8db0;font-size:9.5px;font-weight:700;letter-spacing:1.4px;font-family:inherit}" +
+    ".okc-tip{position:absolute;top:6px;pointer-events:none;background:#161f38;border:1px solid #253050;border-radius:10px;padding:8px 10px;font-size:12px;min-width:160px;max-width:240px;box-shadow:0 6px 20px rgba(0,0,0,.45);opacity:0;transition:opacity .1s;z-index:5;color:#e8eef8}" +
+    ".okc-tip.show{opacity:1}" +
+    ".okc-tip .d{color:#7a8db0;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-weight:700}" +
+    ".okc-tip .row{display:flex;justify-content:space-between;gap:12px;align-items:center;line-height:1.55}" +
+    ".okc-tip .row span{color:#7a8db0;display:flex;align-items:center;gap:6px;white-space:nowrap}" +
+    ".okc-tip .row b{font-weight:700;color:#e8eef8;white-space:nowrap}" +
+    ".okc-key{display:inline-block;width:12px;height:2px;border-radius:1px}" +
+    ".okc-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:11px;color:#7a8db0;font-weight:600}" +
+    ".okc-legend span{display:flex;align-items:center;gap:5px}" +
+    ".okc-btn{background:none;border:1px solid #253050;color:#7a8db0;font:inherit;font-weight:700;font-size:11px;letter-spacing:1px;border-radius:8px;padding:6px 10px;margin-top:12px;cursor:pointer;text-transform:uppercase}" +
+    ".okc-tbl{max-height:260px;overflow:auto;display:none}" +
+    ".okc-tbl table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}" +
+    ".okc-tbl th,.okc-tbl td{text-align:right;padding:6px 4px;border-bottom:1px solid #253050;color:#e8eef8}" +
+    ".okc-tbl th:first-child,.okc-tbl td:first-child{text-align:left}" +
+    ".okc-tbl th{color:#7a8db0;font-size:9.5px;text-transform:uppercase;letter-spacing:1px}" +
+    ".okc-empty{text-align:center;color:#7a8db0;font-size:12px;padding:24px 8px}";
+  function injectCSS() {
+    if (document.getElementById("okc-css")) return;
+    var st = document.createElement("style"); st.id = "okc-css"; st.textContent = CSS; document.head.appendChild(st);
+  }
+  var COL = { win: "#4caf82", loss: "#e05555", be: "#8a97b8" };
+  var NS = "http://www.w3.org/2000/svg";
+  var EUR = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
+  var EUR0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0, useGrouping: "always" });
+  function fE(n, s) { return (s && n > 0 ? "+" : "") + EUR.format(n) + " €"; }
+  function fE0(n, s) { return (s && n > 0 ? "+" : "") + EUR0.format(n) + " €"; }
+  function parseF(f) { var p = (f || "").split("-"); return new Date(+p[0], (+p[1] || 1) - 1, +p[2] || 1); }
+  function ymd(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function fD(f) { return parseF(f).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }).replace(".", ""); }
+  function fDL(f) { return parseF(f).toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }); }
+  function el(tag, attrs, parent) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+  function niceStep(range, n) { var raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw || 1))), m = raw / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
+  function div(cls, txt) { var d = document.createElement("div"); if (cls) d.className = cls; if (txt != null) d.textContent = txt; return d; }
+
+  window.okChart = function (cont, cfg) {
+    if (!cont) return;
+    injectCSS();
+    var be = typeof cfg.beMargen === "number" ? cfg.beMargen : 1;
+    var capital = typeof cfg.capital === "number" ? cfg.capital : 0;
+    var tipo = function (n) { return Math.abs(n) <= be ? "be" : n > 0 ? "win" : "loss"; };
+    // Orden cronológico y saldo acumulado desde el capital inicial (todas las fechas)
+    var todas = (cfg.ops || []).filter(function (o) { return typeof o.neto === "number" && !isNaN(o.neto) && o.fecha; })
+      .map(function (o) { return { id: o.id, fecha: o.fecha, hora: o.hora || "", neto: o.neto, instrumento: o.instrumento || "" }; })
+      .sort(function (a, b) { return (a.fecha + a.hora).localeCompare(b.fecha + b.hora); });
+    var acc = capital, pico = capital;
+    todas.forEach(function (o) { acc += o.neto; o.saldo = acc; pico = Math.max(pico, acc); o.pico = pico; });
+    var periodo = cfg.periodo == null ? 30 : cfg.periodo;
+
+    cont.innerHTML = "";
+    var root = div("okc"); cont.appendChild(root);
+    var head = div("okc-head"); root.appendChild(head);
+    head.appendChild(div("okc-title", cfg.titulo || "Evolución de la cuenta"));
+    var seg = null;
+    if (cfg.selectorPeriodo) {
+      seg = div("okc-seg"); head.appendChild(seg);
+      [[7, "1S"], [30, "1M"], [90, "3M"], [0, "Todo"]].forEach(function (p) {
+        var b = document.createElement("button"); b.type = "button"; b.textContent = p[1];
+        if (p[0] === periodo) b.className = "on";
+        b.onclick = function () { periodo = p[0]; if (cfg.onPeriodo) cfg.onPeriodo(periodo); [].forEach.call(seg.children, function (x) { x.className = x === b ? "on" : ""; }); dibujar(); };
+        seg.appendChild(b);
+      });
+    }
+    var kpis = div("okc-kpis"); root.appendChild(kpis);
+    function kpi() { var k = div("okc-kpi"); var v = div("v", "—"), l = div("l", ""); k.appendChild(v); k.appendChild(l); kpis.appendChild(k); return { v: v, l: l }; }
+    var kSaldo = kpi(), kRes = kpi(), kMax = kpi(), kDD = kpi();
+    kSaldo.l.textContent = "Saldo"; kMax.l.textContent = "Máximo"; kDD.l.textContent = "Desde máximo";
+    var chart = div("okc-chart"); root.appendChild(chart);
+    var svg = el("svg", { role: "img", "aria-label": "Evolución del saldo y resultado neto por día" }, chart);
+    var tip = div("okc-tip"); chart.appendChild(tip);
+    var leg = div("okc-legend"); root.appendChild(leg);
+    leg.innerHTML =
+      '<span><i class="okc-key" style="background:#c8d4e8"></i>Saldo</span>' +
+      '<span><i class="okc-key" style="background:none;border-top:2px dashed #55628a;height:0"></i>Capital inicial</span>' +
+      '<span><svg width="10" height="10"><path d="M5 1 L9 9 L1 9Z" fill="#4caf82"/></svg>Ganada</span>' +
+      '<span><svg width="10" height="10"><path d="M5 9 L9 1 L1 1Z" fill="#e05555"/></svg>Perdida</span>' +
+      '<span><svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="#8a97b8"/></svg>BE</span>' +
+      '<span><i class="okc-key" style="background:rgba(224,85,85,.35);height:9px"></i>Caída desde máximo</span>' +
+      '<span><svg width="12" height="12"><path d="M6 1l1.5 3.2 3.5.4-2.6 2.4.7 3.5L6 8.8 2.9 10.5l.7-3.5L1 4.6l3.5-.4z" fill="#c9a84c"/></svg>Máximo histórico</span>';
+    var btn = document.createElement("button"); btn.type = "button"; btn.className = "okc-btn"; btn.textContent = "Ver tabla por días"; root.appendChild(btn);
+    var tblw = div("okc-tbl"); root.appendChild(tblw);
+    btn.onclick = function () { var v = tblw.style.display === "block"; tblw.style.display = v ? "none" : "block"; btn.textContent = v ? "Ver tabla por días" : "Ocultar tabla"; };
+
+    function dibujar() {
+      var hoy = new Date();
+      var desde = cfg.desde || (periodo ? ymd(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - periodo + 1)) : "0000-00-00");
+      var hasta = cfg.hasta || "9999-99-99";
+      var sel = todas.filter(function (o) { return o.fecha >= desde && o.fecha <= hasta; });
+      var antes = todas.filter(function (o) { return o.fecha < desde; });
+      var saldoIni = antes.length ? antes[antes.length - 1].saldo : capital;
+      var picoIni = antes.length ? antes[antes.length - 1].pico : capital;
+      var saldo = todas.length ? todas[todas.length - 1].saldo : capital;
+      var maxH = todas.length ? todas[todas.length - 1].pico : capital;
+      var saldoFin = sel.length ? sel[sel.length - 1].saldo : saldoIni;
+      var resP = saldoFin - saldoIni, dd = saldo - maxH;
+      kSaldo.v.textContent = fE0(saldo);
+      kRes.v.textContent = fE0(resP, true); kRes.v.className = "v " + (resP >= 0 ? "pos" : "neg");
+      kRes.l.textContent = (resP >= 0 ? "+" : "") + (saldoIni ? (resP / saldoIni * 100).toFixed(1) : "0.0") + "% periodo";
+      kMax.v.textContent = fE0(maxH);
+      kDD.v.textContent = dd < -0.5 ? fE0(dd) : "En máximos"; kDD.v.className = "v " + (dd < -0.5 ? "neg" : "pos");
+
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      tip.className = "okc-tip"; tblw.innerHTML = "";
+      // Agrupar por día (solo días con operaciones: sin huecos de fines de semana)
+      var dias = [];
+      sel.forEach(function (o) { var d = dias[dias.length - 1]; if (!d || d.fecha !== o.fecha) { d = { fecha: o.fecha, ops: [] }; dias.push(d); } d.ops.push(o); });
+      dias.forEach(function (d) { d.neto = d.ops.reduce(function (a, o) { return a + o.neto; }, 0); var u = d.ops[d.ops.length - 1]; d.saldo = u.saldo; d.pico = u.pico; });
+      var n = dias.length;
+      if (!n) {
+        svg.setAttribute("height", 0);
+        var e = chart.querySelector(".okc-empty"); if (!e) { e = div("okc-empty", "Sin operaciones en este periodo."); chart.appendChild(e); }
+        return;
+      }
+      var vacio = chart.querySelector(".okc-empty"); if (vacio) vacio.remove();
+
+      var W = chart.clientWidth || 600;
+      var H1 = 230, GAP = 26, H2 = 70, AX = 20, H = H1 + GAP + H2 + AX;
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("height", H);
+      var PL = 4, PR = 52;
+      var slot = (W - PL - PR) / n;
+      var xDia = function (i) { return PL + slot * (i + 0.5); };
+      var pts = [{ x: PL, y: saldoIni, pico: picoIni }];
+      dias.forEach(function (d, i) { d.ops.forEach(function (o, j) { o.x = PL + slot * i + slot * (j + 1) / (d.ops.length + 1); pts.push({ x: o.x, y: o.saldo, pico: o.pico, o: o }); }); });
+      var vals = pts.map(function (p) { return p.y; }).concat(pts.map(function (p) { return p.pico; }));
+      var yMin = Math.min.apply(null, vals), yMax = Math.max.apply(null, vals);
+      var padV = (yMax - yMin) * 0.08 || 50; yMin -= padV; yMax += padV;
+      var Y = function (v) { return 8 + (1 - (v - yMin) / (yMax - yMin)) * (H1 - 16); };
+
+      var step = niceStep(yMax - yMin, 4);
+      for (var v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {
+        el("line", { x1: PL, x2: W - PR, y1: Y(v), y2: Y(v), stroke: "#222c4a", "stroke-width": 1 }, svg);
+        el("text", { x: W - PR + 6, y: Y(v) + 3.5, "class": "ax" }, svg).textContent = EUR0.format(v);
+      }
+      if (capital >= yMin && capital <= yMax) el("line", { x1: PL, x2: W - PR, y1: Y(capital), y2: Y(capital), stroke: "#55628a", "stroke-width": 1.2, "stroke-dasharray": "4 4" }, svg);
+      // Zona de caída desde el máximo
+      el("path", { d: "M" + pts.map(function (p) { return p.x + "," + Y(p.pico); }).join(" L") + " L" + pts.slice().reverse().map(function (p) { return p.x + "," + Y(p.y); }).join(" L") + "Z", fill: "rgba(224,85,85,.22)" }, svg);
+      var gid = "okcg" + Math.random().toString(36).slice(2, 8);
+      var grad = el("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, el("defs", {}, svg));
+      el("stop", { offset: "0%", "stop-color": "#5b8dee", "stop-opacity": .28 }, grad);
+      el("stop", { offset: "100%", "stop-color": "#5b8dee", "stop-opacity": 0 }, grad);
+      var linea = "M" + pts.map(function (p) { return p.x + "," + Y(p.y); }).join(" L");
+      el("path", { d: linea + " L" + pts[pts.length - 1].x + "," + H1 + " L" + PL + "," + H1 + "Z", fill: "url(#" + gid + ")" }, svg);
+      el("path", { d: linea, fill: "none", stroke: "#c8d4e8", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+      // Marcas por operación: ▲ ganada · ▼ perdida · ● BE (forma + color)
+      var s = pts.length > 60 ? 3.2 : 4.2;
+      pts.slice(1).forEach(function (p) {
+        var t = tipo(p.o.neto), x = p.x, y = Y(p.y);
+        if (t === "win") el("path", { d: "M" + x + " " + (y - s - 1) + " L" + (x + s) + " " + (y + s - 1) + " L" + (x - s) + " " + (y + s - 1) + "Z", fill: COL.win, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
+        else if (t === "loss") el("path", { d: "M" + x + " " + (y + s + 1) + " L" + (x + s) + " " + (y - s + 1) + " L" + (x - s) + " " + (y - s + 1) + "Z", fill: COL.loss, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
+        else el("circle", { cx: x, cy: y, r: s - 0.6, fill: COL.be, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
+      });
+      var top = pts.reduce(function (a, p) { return p.y > a.y ? p : a; }, pts[0]);
+      if (top.o && top.y >= maxH - 0.01) el("path", { d: "M" + top.x + " " + (Y(top.y) - 17) + "l1.8 3.8 4.2.5-3.1 2.9.8 4.1-3.7-2-3.7 2 .8-4.1-3.1-2.9 4.2-.5z", fill: "#c9a84c" }, svg);
+
+      // Barras: resultado neto por día
+      var y0 = H1 + GAP;
+      el("text", { x: PL, y: y0 - 8, "class": "sub" }, svg).textContent = "RESULTADO NETO POR DÍA";
+      var bMax = Math.max.apply(null, dias.map(function (d) { return Math.abs(d.neto); }).concat([1]));
+      var yb0 = y0 + H2 / 2;
+      var YB = function (v) { return yb0 - (v / bMax) * (H2 / 2 - 2); };
+      el("line", { x1: PL, x2: W - PR, y1: yb0, y2: yb0, stroke: "#253050", "stroke-width": 1 }, svg);
+      el("text", { x: W - PR + 6, y: y0 + 8, "class": "ax" }, svg).textContent = "+" + EUR0.format(bMax);
+      el("text", { x: W - PR + 6, y: y0 + H2, "class": "ax" }, svg).textContent = "−" + EUR0.format(bMax);
+      var bw = Math.max(2, Math.min(18, slot - 2));
+      var barras = dias.map(function (d, i) {
+        var t = tipo(d.neto), yT = Math.min(YB(d.neto), yb0), h = Math.max(1.5, Math.abs(YB(d.neto) - yb0));
+        var rr = Math.min(3, bw / 2, h), x = xDia(i) - bw / 2;
+        var path = d.neto >= 0
+          ? "M" + x + "," + yb0 + " V" + (yT + rr) + " Q" + x + "," + yT + " " + (x + rr) + "," + yT + " H" + (x + bw - rr) + " Q" + (x + bw) + "," + yT + " " + (x + bw) + "," + (yT + rr) + " V" + yb0 + "Z"
+          : "M" + x + "," + yb0 + " V" + (yT + h - rr) + " Q" + x + "," + (yT + h) + " " + (x + rr) + "," + (yT + h) + " H" + (x + bw - rr) + " Q" + (x + bw) + "," + (yT + h) + " " + (x + bw) + "," + (yT + h - rr) + " V" + yb0 + "Z";
+        return el("path", { d: path, fill: COL[t] }, svg);
+      });
+      // Eje de fechas
+      var nT = Math.min(n, W < 420 ? 4 : 6);
+      for (var k = 0; k < nT; k++) {
+        var i = Math.round(k * (n - 1) / Math.max(nT - 1, 1));
+        el("text", { x: xDia(i), y: H - 4, "text-anchor": nT === 1 ? "middle" : k === 0 ? "start" : k === nT - 1 ? "end" : "middle", "class": "ax" }, svg).textContent = fD(dias[i].fecha);
+      }
+
+      // Crosshair + recuadro al tocar
+      var cross = el("line", { y1: 0, y2: y0 + H2, stroke: "#7a8db0", "stroke-width": 1, "stroke-dasharray": "2 3", opacity: 0 }, svg);
+      var halo = el("circle", { r: 6, fill: "none", stroke: "#c8d4e8", "stroke-width": 2, opacity: 0 }, svg);
+      var hit = el("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" }, svg);
+      var activo = -1;
+      function fila(lbl, val, cls, color) {
+        var r = div("row"), a = document.createElement("span");
+        if (color) { var kk = document.createElement("i"); kk.className = "okc-key"; kk.style.background = color; a.appendChild(kk); }
+        a.appendChild(document.createTextNode(lbl));
+        var b = document.createElement("b"); b.textContent = val; if (cls) b.className = cls;
+        r.appendChild(a); r.appendChild(b); tip.appendChild(r);
+      }
+      function mostrar(clientX) {
+        var bb = svg.getBoundingClientRect();
+        var x = (clientX - bb.left) * (W / bb.width);
+        var i = Math.max(0, Math.min(n - 1, Math.floor((x - PL) / slot)));
+        if (i === activo) return; activo = i;
+        var d = dias[i], xc = xDia(i);
+        cross.setAttribute("x1", xc); cross.setAttribute("x2", xc); cross.setAttribute("opacity", 1);
+        halo.setAttribute("cx", d.ops[d.ops.length - 1].x); halo.setAttribute("cy", Y(d.saldo)); halo.setAttribute("opacity", 1);
+        barras.forEach(function (b, j) { b.setAttribute("opacity", j === i ? 1 : .45); });
+        while (tip.firstChild) tip.removeChild(tip.firstChild);
+        tip.appendChild(div("d", fDL(d.fecha)));
+        fila("Saldo", fE(d.saldo), "", "#c8d4e8");
+        var td = tipo(d.neto);
+        fila("Neto del día", fE(d.neto, true), td === "win" ? "pos" : td === "loss" ? "neg" : "");
+        d.ops.forEach(function (o, j) { var t = tipo(o.neto); fila((o.hora || "Op " + (j + 1)) + (o.instrumento ? " · " + o.instrumento : ""), fE(o.neto, true), t === "win" ? "pos" : t === "loss" ? "neg" : "", COL[t]); });
+        var ddd = d.saldo - d.pico;
+        fila("Desde máximo", ddd < -0.5 ? fE(ddd) : "En máximos", ddd < -0.5 ? "neg" : "pos");
+        tip.className = "okc-tip show";
+        var px = xc * (bb.width / W), tw = tip.offsetWidth;
+        tip.style.left = Math.max(0, Math.min(bb.width - tw, px < bb.width / 2 ? px + 14 : px - tw - 14)) + "px";
+      }
+      function ocultar() { activo = -1; cross.setAttribute("opacity", 0); halo.setAttribute("opacity", 0); barras.forEach(function (b) { b.setAttribute("opacity", 1); }); tip.className = "okc-tip"; }
+      hit.addEventListener("pointermove", function (e) { mostrar(e.clientX); });
+      hit.addEventListener("pointerdown", function (e) { mostrar(e.clientX); });
+      hit.addEventListener("pointerleave", ocultar);
+
+      // Tabla por días (misma información sin tocar la gráfica)
+      var tbl = document.createElement("table"), trh = tbl.insertRow();
+      ["Día", "Ops", "Neto", "Saldo"].forEach(function (t) { var th = document.createElement("th"); th.textContent = t; trh.appendChild(th); });
+      dias.slice().reverse().forEach(function (d) {
+        var tr = tbl.insertRow(), t = tipo(d.neto);
+        [fD(d.fecha), d.ops.length, fE(d.neto, true), fE(d.saldo)].forEach(function (v, j) { var td = tr.insertCell(); td.textContent = v; if (j === 2) td.className = t === "win" ? "pos" : t === "loss" ? "neg" : ""; });
+      });
+      tblw.appendChild(tbl);
+    }
+    dibujar();
+    // Redibujar si cambia el ancho (girar el móvil, redimensionar ventana)
+    if (window.ResizeObserver) {
+      var ancho = chart.clientWidth, rt;
+      new ResizeObserver(function () { if (chart.clientWidth !== ancho && chart.clientWidth > 0) { ancho = chart.clientWidth; clearTimeout(rt); rt = setTimeout(dibujar, 120); } }).observe(chart);
+    }
+  };
+})();
 
 </script>
 
@@ -17728,45 +18003,21 @@ function _pintarTrading(r) {
   if (r.tieneR < r.numOperaciones) {
     html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:8px;">' + (r.numOperaciones - r.tieneR) + ' operación(es) sin stop puesto — no cuentan en la R acumulada.</div>';
   }
-  // PUNTO 165 (10/09/2026): gráfica de líneas del € acumulado, operación a
-  // operación en orden cronológico ("las entradas" que pediste) — SVG
-  // dibujado a mano, mismo criterio que el resto de la app (nada de
-  // librerías externas de gráficas). Con menos de 2 puntos no se dibuja
-  // (no hay línea que trazar).
-  var chartHtml = _tradingBuildChart(r.serieEUR);
-  if (chartHtml) {
-    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:10px;margin-bottom:2px;">Evolución del resultado acumulado (€) por operación</div>';
-    html += chartHtml;
+  // 24/09/2026: gráfica "Evolución de la cuenta" — la misma de TradingOkar
+  // (bloque OKCHART). Sustituye a la línea pequeña del punto 165.
+  if (r.opsGrafica && r.opsGrafica.length) {
+    html += '<div id="fin-trading-chart" style="margin-top:14px;text-align:left;"></div>';
   }
   cont.innerHTML = html;
+  if (r.opsGrafica && r.opsGrafica.length && window.okChart) {
+    var conCapital = typeof r.capital === 'number';
+    window.okChart(document.getElementById('fin-trading-chart'), {
+      ops: r.opsGrafica, capital: conCapital ? r.capital : 0, beMargen: r.beMargen,
+      titulo: (conCapital ? 'Evolución de la cuenta' : 'Resultado acumulado') + ' · ' + (r.esDemo ? 'Demo' : 'Real'),
+      periodo: 30, selectorPeriodo: true
+    });
+  }
 }
-// PUNTO 165 (10/09/2026): dibuja la línea de € acumulado (serie ya viene
-// ordenada cronológicamente desde _tradingConsultarModo). SVG simple sin
-// librerías — mismo criterio "vanilla" que el resto de la app. El color
-// de la línea depende del signo del último punto (verde si el acumulado
-// termina en positivo, rojo si termina en negativo); la línea discontinua
-// marca el 0 para ver de un vistazo si estás por encima o por debajo.
-function _tradingBuildChart(serie) {
-  if (!serie || serie.length < 2) return '';
-  var w = 280, h = 70, pad = 4;
-  var valores = serie.concat([0]);
-  var mn = Math.min.apply(null, valores), mx = Math.max.apply(null, valores);
-  var rango = (mx - mn) || 1;
-  var stepX = (w - pad * 2) / (serie.length - 1);
-  var pts = serie.map(function(v, i) {
-    var x = pad + i * stepX;
-    var y = h - pad - ((v - mn) / rango) * (h - pad * 2);
-    return x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
-  var zeroY = h - pad - ((0 - mn) / rango) * (h - pad * 2);
-  var ultimo = serie[serie.length - 1];
-  var colorVar = ultimo >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:60px;display:block;">' +
-    '<line x1="' + pad + '" y1="' + zeroY.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + zeroY.toFixed(1) + '" style="stroke:var(--border);stroke-width:1;stroke-dasharray:2,2;"/>' +
-    '<polyline points="' + pts + '" style="fill:none;stroke:' + colorVar + ';stroke-width:2;" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '</svg>';
-}
-
 // --- CUENTAS ---
 function fin_renderCuentas() {
   var data = fin_load('fin:cuentas');
