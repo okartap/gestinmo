@@ -2209,7 +2209,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '260924_03';
+const BUILD_ID = '260924_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -3696,10 +3696,6 @@ window.cargarTradingOkarStats = async function() {
   corregido también los iconos, que estaban cambiados entre sí (📥 de
   "recibir/traer" es el que corresponde a Restaurar, no a Guardar). -->
   <div style="margin-top:16px;display:flex;justify-content:center;gap:20px;">
-    <div onclick="priv_abrir()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;width:168px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;">
-      <span style="font-size:14px;">🔒</span>
-      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase;white-space:nowrap;">Datos privados</span>
-    </div>
     <div onclick="pedirPasswordExportar()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:9px 18px;width:168px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:transform .15s;" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">
       <span style="font-size:14px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">💾</span>
       <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--silver-dim);text-transform:uppercase;white-space:nowrap;">Guardar copia</span>
@@ -4477,6 +4473,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div class="arr-intro">
       <div class="arr-intro-title">¿Quién arrienda?</div>
       <div class="arr-intro-sub">Selecciona el arrendador. Determina los plazos mínimos LAU y los datos del contrato.</div>
+      <!-- PUNTO 217 (24/09/2026): acceso a los datos privados, junto a los datos del arrendador (donde se usan) -->
+      <div onclick="priv_abrir()" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--gold);cursor:pointer;">🔒 <span style="text-decoration:underline;">Editar DNI, domicilios e IBAN</span></div>
     </div>
     <div class="arr-cards">
       <div class="arr-card selected" id="arrcard-patrimer" onclick="selectArrendador('patrimer')">
@@ -9294,7 +9292,7 @@ function toggleInmuebleMenu() {
 // de este archivo, que está publicado en un repositorio PÚBLICO de GitHub.
 // Ahora viven en la ficha 'app:datos_privados' (Firebase, protegida por las
 // reglas: solo Patricio y Mercedes la leen, solo Patricio la modifica) y se
-// rellenan una vez desde "🔒 Datos privados" (pantalla de copias de seguridad).
+// rellenan desde "🔒 Editar DNI, domicilios e IBAN" (Contratos → asistente → paso del arrendador).
 var _PRIV_CAMPOS = [
   ['dniPatricio', 'DNI de Patricio'], ['domicilioPatricio', 'Domicilio de Patricio'],
   ['dniMercedes', 'DNI de Mercedes'], ['domicilioMercedes', 'Domicilio de Mercedes'],
@@ -9318,7 +9316,7 @@ function _privAvisarSiFalta() {
   var d = _privDatos();
   var faltan = _PRIV_CAMPOS.filter(function(c) { return !d[c[0]]; }).map(function(c) { return c[1]; });
   if (faltan.length && typeof showToast === 'function') {
-    showToast('⚠️ Faltan datos privados (' + faltan.join(', ') + '): el PDF saldrá con "pendiente". Rellénalos en 🔒 Datos privados.', 'warning');
+    showToast('⚠️ Faltan datos privados (' + faltan.join(', ') + '): el PDF saldrá con "pendiente". Rellénalos en Contratos → paso Arrendador → 🔒 Editar DNI, domicilios e IBAN.', 'warning');
   }
 }
 function priv_abrir() {
@@ -9326,7 +9324,7 @@ function priv_abrir() {
   var html = '';
   _PRIV_CAMPOS.forEach(function(c) {
     html += '<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--silver-dim);margin-bottom:4px;">' + c[1] + '</div>'
-      + '<input id="priv-in-' + c[0] + '" class="finput" style="width:100%;box-sizing:border-box;" value="' + _escAttrJs(d[c[0]] || '') + '"></div>';
+      + '<input id="priv-in-' + c[0] + '" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:11px 12px;font-size:15px;" value="' + _escAttrJs(d[c[0]] || '') + '"></div>';
   });
   document.getElementById('priv-campos').innerHTML = html;
   document.getElementById('priv-modal').style.display = 'flex';
