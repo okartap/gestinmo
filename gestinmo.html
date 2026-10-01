@@ -2028,6 +2028,8 @@ const DATA_KEYS = [
   // el enlace y los metadatos (tipo, nombre, fecha), nunca el archivo en
   // sí (eso vive en Drive).
   'inmuebles:documentos',
+  // PUNTO 219 (01/10/2026): administradores de fincas (lista compartida por varios inmuebles)
+  'inmuebles:administradores',
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
   // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
   // anuales" de Inicio junto con los alquileres reales.
@@ -2209,7 +2211,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '260924_04';
+const BUILD_ID = '261001_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2750,7 +2752,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -3489,7 +3491,7 @@ async function _tradingConsultarModo(modo) {
   const q = query(collection(db, 'trading_operaciones'), where('modo', '==', modo));
   const snap = await getDocs(q);
   let numOperaciones = 0, ganadoras = 0, rAcumulada = 0, tieneR = 0, eurAcumulado = 0, tieneEUR = 0, ultimaFecha = '';
-  let opsGrafica = [];
+  let ops = [];
   snap.forEach((docSnap) => {
     const d = docSnap.data();
     if (d._test === true) return;
@@ -3500,14 +3502,23 @@ async function _tradingConsultarModo(modo) {
     if (typeof d.resultadoEUR === 'number') { eurAcumulado += d.resultadoEUR; tieneEUR++; }
     const fh = (d.fecha || '') + ' ' + (d.hora || '');
     if (fh > ultimaFecha) ultimaFecha = fh;
-    // 24/09/2026: datos para la nueva gráfica "Evolución de la cuenta"
-    // (bloque OKCHART, el mismo que usa TradingOkar). Usa el resultado NETO
-    // (resultado en € menos la comisión), igual que la app de trading.
-    if (typeof d.resultadoEUR === 'number') {
-      opsGrafica.push({ fecha: d.fecha || '', hora: d.hora || '', neto: d.resultadoEUR - (d.comision || 0), instrumento: d.instrumento || '' });
-    }
+    ops.push({ fh: fh, eur: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR : null });
   });
-  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, opsGrafica, ultimaFecha };
+  // PUNTO 165 (10/09/2026): serie cronológica del € acumulado, para la
+  // gráfica de líneas pedida en este punto — se ordena por fecha+hora
+  // (formato 'YYYY-MM-DD HH:MM', ordenable como texto) y se va acumulando
+  // resultadoEUR operación a operación en ese orden. No usa "capital
+  // inicial" (no vive en la nube, solo en el móvil de TradingOkar — punto
+  // 87) — es un acumulado de resultados, no un saldo de cuenta.
+  ops.sort(function(a, b) { return a.fh < b.fh ? -1 : (a.fh > b.fh ? 1 : 0); });
+  let serieEUR = [];
+  let acumSerie = 0;
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i].eur === null) continue;
+    acumSerie += ops[i].eur;
+    serieEUR.push(acumSerie);
+  }
+  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, serieEUR, ultimaFecha };
 }
 window.cargarTradingOkarStats = async function() {
   try {
@@ -3523,303 +3534,19 @@ window.cargarTradingOkarStats = async function() {
       const demoStats = await _tradingConsultarModo('demo');
       if (demoStats.numOperaciones) { stats = demoStats; esDemo = true; }
     }
-    // 24/09/2026: TradingOkar guarda ya sus ajustes en la nube (documento
-    // tipo 'ajustes' de esta misma colección): de ahí sale el capital
-    // inicial para poder dibujar el SALDO de la cuenta, y el margen de BE.
-    // Si todavía no existe (TradingOkar sin actualizar), la gráfica muestra
-    // solo el resultado acumulado, sin capital.
-    let capital = null, beMargen = 1;
-    try {
-      const aj = await getDocs(query(collection(db, 'trading_operaciones'), where('tipo', '==', 'ajustes')));
-      aj.forEach((ds) => {
-        const a = ds.data() || {};
-        const c = a.capital && a.capital[esDemo ? 'demo' : 'real'];
-        if (typeof c === 'number') capital = c;
-        if (typeof a.beMargen === 'number') beMargen = a.beMargen;
-      });
-    } catch (e) { /* sin ajustes: se sigue sin capital */ }
     return {
       ok: true,
       esDemo,
       numOperaciones: stats.numOperaciones,
       winrate: stats.numOperaciones ? (stats.ganadoras / stats.numOperaciones) * 100 : null,
       rAcumulada: stats.rAcumulada, tieneR: stats.tieneR,
-      eurAcumulado: stats.eurAcumulado, tieneEUR: stats.tieneEUR, opsGrafica: stats.opsGrafica, capital, beMargen,
+      eurAcumulado: stats.eurAcumulado, tieneEUR: stats.tieneEUR, serieEUR: stats.serieEUR,
       ultimaFecha: stats.ultimaFecha.trim()
     };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 };
-
-</script>
-
-<script>
-// =====================================================================
-// OKCHART — Gráfica "Evolución de la cuenta" (compartida Okartap / GestInmo)
-// Versión 1 · 24/09/2026. SVG dibujado a mano, sin librerías externas.
-// Mismo bloque en las dos apps: si se cambia aquí, copiarlo igual en la otra.
-//
-// Uso:  okChart(contenedor, {
-//         ops: [{ id, fecha:"AAAA-MM-DD", hora:"HH:MM", neto: €, instrumento }],  // TODAS las del modo
-//         capital: 10000,        // capital inicial del modo
-//         beMargen: 1,           // ± € que cuentan como BE
-//         titulo: "Evolución de la cuenta · Demo",
-//         periodo: 30,           // días iniciales (0 = todo)
-//         selectorPeriodo: true, // botones 1S/1M/3M/Todo dentro de la tarjeta
-//         desde, hasta: "AAAA-MM-DD" (opcional, si la pantalla ya filtra por periodo)
-//         onPeriodo: function(dias) {}  // opcional: recordar el periodo elegido
-//       })
-// =====================================================================
-(function () {
-  var CSS = ".okc{position:relative}" +
-    ".okc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}" +
-    ".okc-title{margin:0;font-size:10.5px;color:#7a8db0;text-transform:uppercase;letter-spacing:2.2px;font-weight:700}" +
-    ".okc-seg{display:flex;background:#161f38;border:1px solid #253050;border-radius:10px;padding:3px;gap:2px}" +
-    ".okc-seg button{background:none;border:0;color:#7a8db0;font:inherit;font-weight:700;font-size:11px;letter-spacing:1px;padding:6px 10px;border-radius:7px;cursor:pointer;text-transform:uppercase}" +
-    ".okc-seg button.on{background:#202d50;color:#c8d4e8}" +
-    ".okc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}" +
-    ".okc-kpi{background:#161f38;border:1px solid #253050;border-radius:10px;padding:9px 4px;text-align:center;min-width:0}" +
-    ".okc-kpi .v{font-size:clamp(12px,3.4vw,15px);font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e8eef8}" +
-    ".okc-kpi .l{font-size:9px;color:#7a8db0;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}" +
-    ".okc .pos{color:#4caf82!important}.okc .neg{color:#e05555!important}" +
-    ".okc-chart{position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none}" +
-    ".okc svg{display:block;width:100%;overflow:visible}" +
-    ".okc text.ax{fill:#7a8db0;font-size:10px;font-weight:600;font-family:inherit}" +
-    ".okc text.sub{fill:#7a8db0;font-size:9.5px;font-weight:700;letter-spacing:1.4px;font-family:inherit}" +
-    ".okc-tip{position:absolute;top:6px;pointer-events:none;background:#161f38;border:1px solid #253050;border-radius:10px;padding:8px 10px;font-size:12px;min-width:160px;max-width:240px;box-shadow:0 6px 20px rgba(0,0,0,.45);opacity:0;transition:opacity .1s;z-index:5;color:#e8eef8}" +
-    ".okc-tip.show{opacity:1}" +
-    ".okc-tip .d{color:#7a8db0;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-weight:700}" +
-    ".okc-tip .row{display:flex;justify-content:space-between;gap:12px;align-items:center;line-height:1.55}" +
-    ".okc-tip .row span{color:#7a8db0;display:flex;align-items:center;gap:6px;white-space:nowrap}" +
-    ".okc-tip .row b{font-weight:700;color:#e8eef8;white-space:nowrap}" +
-    ".okc-key{display:inline-block;width:12px;height:2px;border-radius:1px}" +
-    ".okc-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:11px;color:#7a8db0;font-weight:600}" +
-    ".okc-legend span{display:flex;align-items:center;gap:5px}" +
-    ".okc-btn{background:none;border:1px solid #253050;color:#7a8db0;font:inherit;font-weight:700;font-size:11px;letter-spacing:1px;border-radius:8px;padding:6px 10px;margin-top:12px;cursor:pointer;text-transform:uppercase}" +
-    ".okc-tbl{max-height:260px;overflow:auto;display:none}" +
-    ".okc-tbl table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}" +
-    ".okc-tbl th,.okc-tbl td{text-align:right;padding:6px 4px;border-bottom:1px solid #253050;color:#e8eef8}" +
-    ".okc-tbl th:first-child,.okc-tbl td:first-child{text-align:left}" +
-    ".okc-tbl th{color:#7a8db0;font-size:9.5px;text-transform:uppercase;letter-spacing:1px}" +
-    ".okc-empty{text-align:center;color:#7a8db0;font-size:12px;padding:24px 8px}";
-  function injectCSS() {
-    if (document.getElementById("okc-css")) return;
-    var st = document.createElement("style"); st.id = "okc-css"; st.textContent = CSS; document.head.appendChild(st);
-  }
-  var COL = { win: "#4caf82", loss: "#e05555", be: "#8a97b8" };
-  var NS = "http://www.w3.org/2000/svg";
-  var EUR = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
-  var EUR0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0, useGrouping: "always" });
-  function fE(n, s) { return (s && n > 0 ? "+" : "") + EUR.format(n) + " €"; }
-  function fE0(n, s) { return (s && n > 0 ? "+" : "") + EUR0.format(n) + " €"; }
-  function parseF(f) { var p = (f || "").split("-"); return new Date(+p[0], (+p[1] || 1) - 1, +p[2] || 1); }
-  function ymd(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
-  function fD(f) { return parseF(f).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }).replace(".", ""); }
-  function fDL(f) { return parseF(f).toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }); }
-  function el(tag, attrs, parent) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
-  function niceStep(range, n) { var raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw || 1))), m = raw / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
-  function div(cls, txt) { var d = document.createElement("div"); if (cls) d.className = cls; if (txt != null) d.textContent = txt; return d; }
-
-  window.okChart = function (cont, cfg) {
-    if (!cont) return;
-    injectCSS();
-    var be = typeof cfg.beMargen === "number" ? cfg.beMargen : 1;
-    var capital = typeof cfg.capital === "number" ? cfg.capital : 0;
-    var tipo = function (n) { return Math.abs(n) <= be ? "be" : n > 0 ? "win" : "loss"; };
-    // Orden cronológico y saldo acumulado desde el capital inicial (todas las fechas)
-    var todas = (cfg.ops || []).filter(function (o) { return typeof o.neto === "number" && !isNaN(o.neto) && o.fecha; })
-      .map(function (o) { return { id: o.id, fecha: o.fecha, hora: o.hora || "", neto: o.neto, instrumento: o.instrumento || "" }; })
-      .sort(function (a, b) { return (a.fecha + a.hora).localeCompare(b.fecha + b.hora); });
-    var acc = capital, pico = capital;
-    todas.forEach(function (o) { acc += o.neto; o.saldo = acc; pico = Math.max(pico, acc); o.pico = pico; });
-    var periodo = cfg.periodo == null ? 30 : cfg.periodo;
-
-    cont.innerHTML = "";
-    var root = div("okc"); cont.appendChild(root);
-    var head = div("okc-head"); root.appendChild(head);
-    head.appendChild(div("okc-title", cfg.titulo || "Evolución de la cuenta"));
-    var seg = null;
-    if (cfg.selectorPeriodo) {
-      seg = div("okc-seg"); head.appendChild(seg);
-      [[7, "1S"], [30, "1M"], [90, "3M"], [0, "Todo"]].forEach(function (p) {
-        var b = document.createElement("button"); b.type = "button"; b.textContent = p[1];
-        if (p[0] === periodo) b.className = "on";
-        b.onclick = function () { periodo = p[0]; if (cfg.onPeriodo) cfg.onPeriodo(periodo); [].forEach.call(seg.children, function (x) { x.className = x === b ? "on" : ""; }); dibujar(); };
-        seg.appendChild(b);
-      });
-    }
-    var kpis = div("okc-kpis"); root.appendChild(kpis);
-    function kpi() { var k = div("okc-kpi"); var v = div("v", "—"), l = div("l", ""); k.appendChild(v); k.appendChild(l); kpis.appendChild(k); return { v: v, l: l }; }
-    var kSaldo = kpi(), kRes = kpi(), kMax = kpi(), kDD = kpi();
-    kSaldo.l.textContent = "Saldo"; kMax.l.textContent = "Máximo"; kDD.l.textContent = "Desde máximo";
-    var chart = div("okc-chart"); root.appendChild(chart);
-    var svg = el("svg", { role: "img", "aria-label": "Evolución del saldo y resultado neto por día" }, chart);
-    var tip = div("okc-tip"); chart.appendChild(tip);
-    var leg = div("okc-legend"); root.appendChild(leg);
-    leg.innerHTML =
-      '<span><i class="okc-key" style="background:#c8d4e8"></i>Saldo</span>' +
-      '<span><i class="okc-key" style="background:none;border-top:2px dashed #55628a;height:0"></i>Capital inicial</span>' +
-      '<span><svg width="10" height="10"><path d="M5 1 L9 9 L1 9Z" fill="#4caf82"/></svg>Ganada</span>' +
-      '<span><svg width="10" height="10"><path d="M5 9 L9 1 L1 1Z" fill="#e05555"/></svg>Perdida</span>' +
-      '<span><svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="#8a97b8"/></svg>BE</span>' +
-      '<span><i class="okc-key" style="background:rgba(224,85,85,.35);height:9px"></i>Caída desde máximo</span>' +
-      '<span><svg width="12" height="12"><path d="M6 1l1.5 3.2 3.5.4-2.6 2.4.7 3.5L6 8.8 2.9 10.5l.7-3.5L1 4.6l3.5-.4z" fill="#c9a84c"/></svg>Máximo histórico</span>';
-    var btn = document.createElement("button"); btn.type = "button"; btn.className = "okc-btn"; btn.textContent = "Ver tabla por días"; root.appendChild(btn);
-    var tblw = div("okc-tbl"); root.appendChild(tblw);
-    btn.onclick = function () { var v = tblw.style.display === "block"; tblw.style.display = v ? "none" : "block"; btn.textContent = v ? "Ver tabla por días" : "Ocultar tabla"; };
-
-    function dibujar() {
-      var hoy = new Date();
-      var desde = cfg.desde || (periodo ? ymd(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - periodo + 1)) : "0000-00-00");
-      var hasta = cfg.hasta || "9999-99-99";
-      var sel = todas.filter(function (o) { return o.fecha >= desde && o.fecha <= hasta; });
-      var antes = todas.filter(function (o) { return o.fecha < desde; });
-      var saldoIni = antes.length ? antes[antes.length - 1].saldo : capital;
-      var picoIni = antes.length ? antes[antes.length - 1].pico : capital;
-      var saldo = todas.length ? todas[todas.length - 1].saldo : capital;
-      var maxH = todas.length ? todas[todas.length - 1].pico : capital;
-      var saldoFin = sel.length ? sel[sel.length - 1].saldo : saldoIni;
-      var resP = saldoFin - saldoIni, dd = saldo - maxH;
-      kSaldo.v.textContent = fE0(saldo);
-      kRes.v.textContent = fE0(resP, true); kRes.v.className = "v " + (resP >= 0 ? "pos" : "neg");
-      kRes.l.textContent = (resP >= 0 ? "+" : "") + (saldoIni ? (resP / saldoIni * 100).toFixed(1) : "0.0") + "% periodo";
-      kMax.v.textContent = fE0(maxH);
-      kDD.v.textContent = dd < -0.5 ? fE0(dd) : "En máximos"; kDD.v.className = "v " + (dd < -0.5 ? "neg" : "pos");
-
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
-      tip.className = "okc-tip"; tblw.innerHTML = "";
-      // Agrupar por día (solo días con operaciones: sin huecos de fines de semana)
-      var dias = [];
-      sel.forEach(function (o) { var d = dias[dias.length - 1]; if (!d || d.fecha !== o.fecha) { d = { fecha: o.fecha, ops: [] }; dias.push(d); } d.ops.push(o); });
-      dias.forEach(function (d) { d.neto = d.ops.reduce(function (a, o) { return a + o.neto; }, 0); var u = d.ops[d.ops.length - 1]; d.saldo = u.saldo; d.pico = u.pico; });
-      var n = dias.length;
-      if (!n) {
-        svg.setAttribute("height", 0);
-        var e = chart.querySelector(".okc-empty"); if (!e) { e = div("okc-empty", "Sin operaciones en este periodo."); chart.appendChild(e); }
-        return;
-      }
-      var vacio = chart.querySelector(".okc-empty"); if (vacio) vacio.remove();
-
-      var W = chart.clientWidth || 600;
-      var H1 = 230, GAP = 26, H2 = 70, AX = 20, H = H1 + GAP + H2 + AX;
-      svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("height", H);
-      var PL = 4, PR = 52;
-      var slot = (W - PL - PR) / n;
-      var xDia = function (i) { return PL + slot * (i + 0.5); };
-      var pts = [{ x: PL, y: saldoIni, pico: picoIni }];
-      dias.forEach(function (d, i) { d.ops.forEach(function (o, j) { o.x = PL + slot * i + slot * (j + 1) / (d.ops.length + 1); pts.push({ x: o.x, y: o.saldo, pico: o.pico, o: o }); }); });
-      var vals = pts.map(function (p) { return p.y; }).concat(pts.map(function (p) { return p.pico; }));
-      var yMin = Math.min.apply(null, vals), yMax = Math.max.apply(null, vals);
-      var padV = (yMax - yMin) * 0.08 || 50; yMin -= padV; yMax += padV;
-      var Y = function (v) { return 8 + (1 - (v - yMin) / (yMax - yMin)) * (H1 - 16); };
-
-      var step = niceStep(yMax - yMin, 4);
-      for (var v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {
-        el("line", { x1: PL, x2: W - PR, y1: Y(v), y2: Y(v), stroke: "#222c4a", "stroke-width": 1 }, svg);
-        el("text", { x: W - PR + 6, y: Y(v) + 3.5, "class": "ax" }, svg).textContent = EUR0.format(v);
-      }
-      if (capital >= yMin && capital <= yMax) el("line", { x1: PL, x2: W - PR, y1: Y(capital), y2: Y(capital), stroke: "#55628a", "stroke-width": 1.2, "stroke-dasharray": "4 4" }, svg);
-      // Zona de caída desde el máximo
-      el("path", { d: "M" + pts.map(function (p) { return p.x + "," + Y(p.pico); }).join(" L") + " L" + pts.slice().reverse().map(function (p) { return p.x + "," + Y(p.y); }).join(" L") + "Z", fill: "rgba(224,85,85,.22)" }, svg);
-      var gid = "okcg" + Math.random().toString(36).slice(2, 8);
-      var grad = el("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, el("defs", {}, svg));
-      el("stop", { offset: "0%", "stop-color": "#5b8dee", "stop-opacity": .28 }, grad);
-      el("stop", { offset: "100%", "stop-color": "#5b8dee", "stop-opacity": 0 }, grad);
-      var linea = "M" + pts.map(function (p) { return p.x + "," + Y(p.y); }).join(" L");
-      el("path", { d: linea + " L" + pts[pts.length - 1].x + "," + H1 + " L" + PL + "," + H1 + "Z", fill: "url(#" + gid + ")" }, svg);
-      el("path", { d: linea, fill: "none", stroke: "#c8d4e8", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
-      // Marcas por operación: ▲ ganada · ▼ perdida · ● BE (forma + color)
-      var s = pts.length > 60 ? 3.2 : 4.2;
-      pts.slice(1).forEach(function (p) {
-        var t = tipo(p.o.neto), x = p.x, y = Y(p.y);
-        if (t === "win") el("path", { d: "M" + x + " " + (y - s - 1) + " L" + (x + s) + " " + (y + s - 1) + " L" + (x - s) + " " + (y + s - 1) + "Z", fill: COL.win, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
-        else if (t === "loss") el("path", { d: "M" + x + " " + (y + s + 1) + " L" + (x + s) + " " + (y - s + 1) + " L" + (x - s) + " " + (y - s + 1) + "Z", fill: COL.loss, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
-        else el("circle", { cx: x, cy: y, r: s - 0.6, fill: COL.be, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
-      });
-      var top = pts.reduce(function (a, p) { return p.y > a.y ? p : a; }, pts[0]);
-      if (top.o && top.y >= maxH - 0.01) el("path", { d: "M" + top.x + " " + (Y(top.y) - 17) + "l1.8 3.8 4.2.5-3.1 2.9.8 4.1-3.7-2-3.7 2 .8-4.1-3.1-2.9 4.2-.5z", fill: "#c9a84c" }, svg);
-
-      // Barras: resultado neto por día
-      var y0 = H1 + GAP;
-      el("text", { x: PL, y: y0 - 8, "class": "sub" }, svg).textContent = "RESULTADO NETO POR DÍA";
-      var bMax = Math.max.apply(null, dias.map(function (d) { return Math.abs(d.neto); }).concat([1]));
-      var yb0 = y0 + H2 / 2;
-      var YB = function (v) { return yb0 - (v / bMax) * (H2 / 2 - 2); };
-      el("line", { x1: PL, x2: W - PR, y1: yb0, y2: yb0, stroke: "#253050", "stroke-width": 1 }, svg);
-      el("text", { x: W - PR + 6, y: y0 + 8, "class": "ax" }, svg).textContent = "+" + EUR0.format(bMax);
-      el("text", { x: W - PR + 6, y: y0 + H2, "class": "ax" }, svg).textContent = "−" + EUR0.format(bMax);
-      var bw = Math.max(2, Math.min(18, slot - 2));
-      var barras = dias.map(function (d, i) {
-        var t = tipo(d.neto), yT = Math.min(YB(d.neto), yb0), h = Math.max(1.5, Math.abs(YB(d.neto) - yb0));
-        var rr = Math.min(3, bw / 2, h), x = xDia(i) - bw / 2;
-        var path = d.neto >= 0
-          ? "M" + x + "," + yb0 + " V" + (yT + rr) + " Q" + x + "," + yT + " " + (x + rr) + "," + yT + " H" + (x + bw - rr) + " Q" + (x + bw) + "," + yT + " " + (x + bw) + "," + (yT + rr) + " V" + yb0 + "Z"
-          : "M" + x + "," + yb0 + " V" + (yT + h - rr) + " Q" + x + "," + (yT + h) + " " + (x + rr) + "," + (yT + h) + " H" + (x + bw - rr) + " Q" + (x + bw) + "," + (yT + h) + " " + (x + bw) + "," + (yT + h - rr) + " V" + yb0 + "Z";
-        return el("path", { d: path, fill: COL[t] }, svg);
-      });
-      // Eje de fechas
-      var nT = Math.min(n, W < 420 ? 4 : 6);
-      for (var k = 0; k < nT; k++) {
-        var i = Math.round(k * (n - 1) / Math.max(nT - 1, 1));
-        el("text", { x: xDia(i), y: H - 4, "text-anchor": nT === 1 ? "middle" : k === 0 ? "start" : k === nT - 1 ? "end" : "middle", "class": "ax" }, svg).textContent = fD(dias[i].fecha);
-      }
-
-      // Crosshair + recuadro al tocar
-      var cross = el("line", { y1: 0, y2: y0 + H2, stroke: "#7a8db0", "stroke-width": 1, "stroke-dasharray": "2 3", opacity: 0 }, svg);
-      var halo = el("circle", { r: 6, fill: "none", stroke: "#c8d4e8", "stroke-width": 2, opacity: 0 }, svg);
-      var hit = el("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" }, svg);
-      var activo = -1;
-      function fila(lbl, val, cls, color) {
-        var r = div("row"), a = document.createElement("span");
-        if (color) { var kk = document.createElement("i"); kk.className = "okc-key"; kk.style.background = color; a.appendChild(kk); }
-        a.appendChild(document.createTextNode(lbl));
-        var b = document.createElement("b"); b.textContent = val; if (cls) b.className = cls;
-        r.appendChild(a); r.appendChild(b); tip.appendChild(r);
-      }
-      function mostrar(clientX) {
-        var bb = svg.getBoundingClientRect();
-        var x = (clientX - bb.left) * (W / bb.width);
-        var i = Math.max(0, Math.min(n - 1, Math.floor((x - PL) / slot)));
-        if (i === activo) return; activo = i;
-        var d = dias[i], xc = xDia(i);
-        cross.setAttribute("x1", xc); cross.setAttribute("x2", xc); cross.setAttribute("opacity", 1);
-        halo.setAttribute("cx", d.ops[d.ops.length - 1].x); halo.setAttribute("cy", Y(d.saldo)); halo.setAttribute("opacity", 1);
-        barras.forEach(function (b, j) { b.setAttribute("opacity", j === i ? 1 : .45); });
-        while (tip.firstChild) tip.removeChild(tip.firstChild);
-        tip.appendChild(div("d", fDL(d.fecha)));
-        fila("Saldo", fE(d.saldo), "", "#c8d4e8");
-        var td = tipo(d.neto);
-        fila("Neto del día", fE(d.neto, true), td === "win" ? "pos" : td === "loss" ? "neg" : "");
-        d.ops.forEach(function (o, j) { var t = tipo(o.neto); fila((o.hora || "Op " + (j + 1)) + (o.instrumento ? " · " + o.instrumento : ""), fE(o.neto, true), t === "win" ? "pos" : t === "loss" ? "neg" : "", COL[t]); });
-        var ddd = d.saldo - d.pico;
-        fila("Desde máximo", ddd < -0.5 ? fE(ddd) : "En máximos", ddd < -0.5 ? "neg" : "pos");
-        tip.className = "okc-tip show";
-        var px = xc * (bb.width / W), tw = tip.offsetWidth;
-        tip.style.left = Math.max(0, Math.min(bb.width - tw, px < bb.width / 2 ? px + 14 : px - tw - 14)) + "px";
-      }
-      function ocultar() { activo = -1; cross.setAttribute("opacity", 0); halo.setAttribute("opacity", 0); barras.forEach(function (b) { b.setAttribute("opacity", 1); }); tip.className = "okc-tip"; }
-      hit.addEventListener("pointermove", function (e) { mostrar(e.clientX); });
-      hit.addEventListener("pointerdown", function (e) { mostrar(e.clientX); });
-      hit.addEventListener("pointerleave", ocultar);
-
-      // Tabla por días (misma información sin tocar la gráfica)
-      var tbl = document.createElement("table"), trh = tbl.insertRow();
-      ["Día", "Ops", "Neto", "Saldo"].forEach(function (t) { var th = document.createElement("th"); th.textContent = t; trh.appendChild(th); });
-      dias.slice().reverse().forEach(function (d) {
-        var tr = tbl.insertRow(), t = tipo(d.neto);
-        [fD(d.fecha), d.ops.length, fE(d.neto, true), fE(d.saldo)].forEach(function (v, j) { var td = tr.insertCell(); td.textContent = v; if (j === 2) td.className = t === "win" ? "pos" : t === "loss" ? "neg" : ""; });
-      });
-      tblw.appendChild(tbl);
-    }
-    dibujar();
-    // Redibujar si cambia el ancho (girar el móvil, redimensionar ventana)
-    if (window.ResizeObserver) {
-      var ancho = chart.clientWidth, rt;
-      new ResizeObserver(function () { if (chart.clientWidth !== ancho && chart.clientWidth > 0) { ancho = chart.clientWidth; clearTimeout(rt); rt = setTimeout(dibujar, 120); } }).observe(chart);
-    }
-  };
-})();
 
 </script>
 
@@ -3831,6 +3558,23 @@ window.cargarTradingOkarStats = async function() {
 
 <div class="accent-line"></div>
 
+<div id="adm-modal" style="display:none;position:fixed;inset:0;z-index:960;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;max-width:380px;">
+    <div id="adm-modal-titulo" style="font-size:14px;font-weight:700;color:var(--silver-bright);margin-bottom:12px;">🏢 Nuevo administrador de fincas</div>
+    <input type="hidden" id="adm-id">
+    <div style="font-size:11px;color:var(--silver-dim);margin-bottom:4px;">Nombre</div>
+    <input id="adm-nombre" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:11px 12px;font-size:15px;margin-bottom:10px;">
+    <div style="font-size:11px;color:var(--silver-dim);margin-bottom:4px;">Teléfono</div>
+    <input id="adm-telefono" type="tel" inputmode="tel" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:11px 12px;font-size:15px;margin-bottom:10px;">
+    <div style="font-size:11px;color:var(--silver-dim);margin-bottom:4px;">Email</div>
+    <input id="adm-email" type="email" inputmode="email" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:11px 12px;font-size:15px;">
+    <div id="adm-error" style="color:var(--accent-red);font-size:12px;min-height:16px;margin-top:6px;"></div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button onclick="adm_cerrar()" style="flex:1;background:var(--navy-card);color:var(--silver-bright);border:1px solid var(--border);border-radius:10px;padding:11px;cursor:pointer;">Cancelar</button>
+      <button onclick="adm_guardar()" style="flex:1;background:var(--gold);color:#111;border:none;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;">Guardar</button>
+    </div>
+  </div>
+</div>
 <div id="priv-modal" style="display:none;position:fixed;inset:0;z-index:950;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:16px;">
   <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;max-width:380px;max-height:90vh;overflow:auto;">
     <div style="font-size:14px;font-weight:700;color:var(--silver-bright);margin-bottom:4px;">🔒 Datos privados</div>
@@ -4305,6 +4049,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="info-row"><div class="info-label">Estado</div><div class="info-value" id="info-estado">—</div></div>
       <div class="info-row" id="info-garaje-row" style="display:none;"><div class="info-label">Plaza de garaje</div><div class="info-value" id="info-garaje">—</div></div>
       <div class="info-row"><div class="info-label">Propietario</div><div class="info-value" id="info-propietario">—</div></div>
+      <div class="info-row" id="info-admin-row" style="flex-wrap:wrap;"><div class="info-label">Administrador de fincas</div><div class="info-value" id="info-admin">—</div><div id="info-admin-botones" style="display:none;width:100%;gap:8px;margin-top:8px;"></div></div>
       <div class="info-row"><div class="info-label">Notas</div><div class="info-value" id="info-notas">—</div></div>
     </div>
     <div class="info-section">
@@ -4391,6 +4136,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="form-group">
           <div class="form-label">Referencia catastral <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
           <input class="form-input" id="f-catastral-inm" type="text" placeholder="0000000AB0000A0000AB">
+        </div>
+      </div>
+      <!-- PUNTO 219 (01/10/2026): administrador de fincas, elegido de una lista común -->
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Administrador de fincas <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
+          <select class="form-input" id="f-admin-inm" onchange="adm_onSelectChange(this)"></select>
+          <div id="f-admin-editar" onclick="adm_editarSeleccionado()" style="display:none;margin-top:6px;font-size:11px;color:var(--gold);text-decoration:underline;cursor:pointer;">✏️ Editar datos de este administrador</div>
         </div>
       </div>
       <div class="form-row">
@@ -6216,7 +5969,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     <div class="fin-section-header">
       <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-pathist-chev" onclick="fin_toggleSeccion('pathist')">&#9660;</button>
       <div class="fin-section-title">&#128202; Histórico de patrimonio</div>
-      <button class="fin-add-btn" onclick="fin_patHist_guardarSnapshot()">&#xFF0B;</button>
+      <button class="fin-add-btn" onclick="fin_patHist_abrirFoto()">&#xFF0B;</button>
     </div>
     <div id="fin-pathist-body">
     <div id="fin-pathist-aviso" style="display:none;"></div>
@@ -6382,6 +6135,24 @@ Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
       </div>
       <button onclick="finper_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
       <button onclick="finper_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUNTO 220 (01/10/2026): foto mensual del patrimonio (aviso → desglose por banco editable) -->
+<div class="moverlay" id="pathist-foto-modal" style="display:none;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:400px;width:92%;max-height:88vh;overflow-y:auto;">
+    <div class="mtitle"><span id="pathist-foto-titulo">Patrimonio</span><span class="mclose" onclick="fin_patHist_cerrarFoto()">&#10005;</span></div>
+    <div id="pathist-foto-paso1">
+      <div style="background:rgba(230,168,63,0.14);border:1px solid var(--accent-gold);border-radius:10px;padding:12px;margin:6px 0 14px;font-size:13px;color:var(--accent-gold);font-weight:600;line-height:1.4;">&#9888;&#65039; Antes de guardar, actualiza tus saldos y valores (cuentas, fondos y acciones) para que la foto del mes sea correcta.</div>
+      <button onclick="fin_patHist_irActualizar()" style="width:100%;background:var(--accent-blue);border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">&#128260; ACTUALIZAR VALORES</button>
+      <button onclick="fin_patHist_seguirFoto()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;padding:12px;cursor:pointer;">Ya están al día &#8594; Seguir</button>
+    </div>
+    <div id="pathist-foto-paso2" style="display:none;">
+      <div id="pathist-foto-lineas" style="margin-top:6px;"></div>
+      <div id="pathist-foto-total" style="text-align:center;font-size:11px;color:var(--silver-dim);border-top:1px solid var(--border);padding-top:10px;margin:6px 0 12px;"></div>
+      <button onclick="fin_patHist_guardarFoto()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
+      <button onclick="fin_patHist_cerrarFoto()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
     </div>
   </div>
 </div>
@@ -7503,6 +7274,7 @@ const BACKUP_KEYS = [
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 166 (14/09/2026): documentos por inmueble (enlaces a Drive).
   'inmuebles:documentos',
+  'inmuebles:administradores', // PUNTO 219
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
   'ingresos:otros:patricio',
   'fin:cotizaciones',
@@ -8711,6 +8483,7 @@ function inm_showDetail(idx) {
     infoGarajeRow.style.display = 'none';
   }
   document.getElementById('info-propietario').textContent = propLabels[inm.propietario] || '—';
+  adm_pintarFicha(inm); // PUNTO 219
   document.getElementById('info-precio').textContent = inm.precio ? fmt(inm.precio)+' €' : '—';
   document.getElementById('info-gastos-compra').textContent = inm.gastosCompra ? fmt(inm.gastosCompra)+' €' : '—';
   document.getElementById('info-reforma').textContent = inm.reforma ? fmt(inm.reforma)+' €' : '—';
@@ -9220,6 +8993,7 @@ function inm_onEstadoChange() {
 function openModal(editIdx) {
   const modal = document.getElementById('inm-modal-inmueble');
   clearForm();
+  adm_rellenarSelect(''); // PUNTO 219: lista de administradores, vacía para un inmueble nuevo
   if (editIdx !== undefined) {
     const inm = loadInmuebles()[editIdx];
     document.getElementById('modal-title-text').textContent = 'Editar inmueble';
@@ -9238,6 +9012,7 @@ function openModal(editIdx) {
     document.getElementById('f-direccion').value = inm.direccionCalle || inm.direccion || '';
     document.getElementById('f-edificio').value = inm.edificio || '';
     if (document.getElementById('f-catastral-inm')) document.getElementById('f-catastral-inm').value = inm.catastral || '';
+    adm_rellenarSelect(inm.adminId || ''); // PUNTO 219
     document.getElementById('f-piso').value = inm.piso || '';
     document.getElementById('f-letra').value = inm.letra || '';
     document.getElementById('f-cp').value = inm.cp || '';
@@ -9416,6 +9191,7 @@ function saveInmueble() {
     // PUNTO 181 (17/09/2026): referencia catastral propia del inmueble (ver
     // comentario en el HTML del formulario, sección Identificación).
     catastral: document.getElementById('f-catastral-inm') ? document.getElementById('f-catastral-inm').value.trim() : '',
+    adminId: document.getElementById('f-admin-inm') ? document.getElementById('f-admin-inm').value : '', // PUNTO 219
     piso, letra, cp, localidad,
     tipo: document.getElementById('f-tipo').value,
     propietario: document.getElementById('f-propietario').value,
@@ -9560,6 +9336,88 @@ function toggleInmuebleMenu() {
     }
     setTimeout(() => document.getElementById('inmueble-search').focus(), 100);
   }
+}
+
+// ═══ PUNTO 219 (01/10/2026) — ADMINISTRADOR DE FINCAS ═══════════════════
+// Decidido con Patry: lista común de administradores (nombre, teléfono,
+// email) en 'inmuebles:administradores' (Firebase, protegida); cada inmueble
+// guarda solo adminId. En el formulario se elige de la lista o "＋ Añadir
+// nuevo"; si cambia un teléfono/email se corrige una vez y vale para todos
+// sus pisos. En la ficha: botones Llamar y Enviar email. Mercedes lo ve y
+// puede llamar/escribir, pero no crear ni editar (bloqueaSiViewer).
+function adm_load() {
+  try { return (JSON.parse(localStorage.getItem('inmuebles:administradores') || '[]') || []).filter(function(a) { return a && !a.deleted; }); }
+  catch (e) { return []; }
+}
+function adm_buscar(id) { return id ? adm_load().filter(function(a) { return a.id === id; })[0] || null : null; }
+function adm_rellenarSelect(seleccionado) {
+  var sel = document.getElementById('f-admin-inm');
+  if (!sel) return;
+  var lista = adm_load().sort(function(a, b) { return String(a.nombre).localeCompare(String(b.nombre)); });
+  var html = '<option value="">— Sin administrador —</option>';
+  lista.forEach(function(a) { html += '<option value="' + _escAttrJs(a.id) + '">' + notas_esc(a.nombre) + '</option>'; });
+  html += '<option value="__nuevo__">＋ Añadir nuevo…</option>';
+  sel.innerHTML = html;
+  sel.value = (seleccionado && adm_buscar(seleccionado)) ? seleccionado : '';
+  sel.dataset.anterior = sel.value;
+  var ed = document.getElementById('f-admin-editar'); if (ed) ed.style.display = sel.value ? '' : 'none';
+}
+function adm_onSelectChange(sel) {
+  if (sel.value === '__nuevo__') { sel.value = sel.dataset.anterior || ''; adm_abrir(null); return; }
+  sel.dataset.anterior = sel.value;
+  var ed = document.getElementById('f-admin-editar'); if (ed) ed.style.display = sel.value ? '' : 'none';
+}
+function adm_editarSeleccionado() {
+  var sel = document.getElementById('f-admin-inm');
+  if (sel && sel.value) adm_abrir(sel.value);
+}
+function adm_abrir(id) {
+  if (bloqueaSiViewer('Crear o editar un administrador de fincas')) return;
+  var a = adm_buscar(id);
+  document.getElementById('adm-id').value = a ? a.id : '';
+  document.getElementById('adm-nombre').value = a ? (a.nombre || '') : '';
+  document.getElementById('adm-telefono').value = a ? (a.telefono || '') : '';
+  document.getElementById('adm-email').value = a ? (a.email || '') : '';
+  document.getElementById('adm-error').textContent = '';
+  document.getElementById('adm-modal-titulo').textContent = a ? '🏢 Editar administrador de fincas' : '🏢 Nuevo administrador de fincas';
+  document.getElementById('adm-modal').style.display = 'flex';
+}
+function adm_cerrar() { document.getElementById('adm-modal').style.display = 'none'; }
+function adm_guardar() {
+  if (bloqueaSiViewer('Guardar un administrador de fincas')) return;
+  var nombre = document.getElementById('adm-nombre').value.trim();
+  if (!nombre) { document.getElementById('adm-error').textContent = 'Escribe al menos el nombre.'; return; }
+  var id = document.getElementById('adm-id').value;
+  var todos = [];
+  try { todos = JSON.parse(localStorage.getItem('inmuebles:administradores') || '[]') || []; } catch (e) { todos = []; }
+  var ahora = new Date().toISOString();
+  var datos = { nombre: nombre, telefono: document.getElementById('adm-telefono').value.trim(), email: document.getElementById('adm-email').value.trim(), updatedAt: ahora };
+  if (id) {
+    todos = todos.map(function(a) { return a.id === id ? Object.assign({}, a, datos) : a; });
+  } else {
+    id = 'adm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    todos.push(Object.assign({ id: id }, datos));
+  }
+  localStorage.setItem('inmuebles:administradores', JSON.stringify(todos));
+  adm_cerrar();
+  adm_rellenarSelect(id);
+  if (typeof currentDetailIdx === 'number' && currentDetailIdx !== null) {
+    try { adm_pintarFicha(loadInmuebles()[currentDetailIdx]); } catch (e) {}
+  }
+}
+function adm_pintarFicha(inm) {
+  var el = document.getElementById('info-admin');
+  var bot = document.getElementById('info-admin-botones');
+  if (!el || !bot) return;
+  var a = adm_buscar(inm && inm.adminId);
+  if (!a) { el.textContent = '—'; bot.style.display = 'none'; bot.innerHTML = ''; return; }
+  el.textContent = a.nombre + (a.telefono ? ' · ' + a.telefono : '');
+  var estilo = 'flex:1;text-align:center;text-decoration:none;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:9px;font-size:13px;color:var(--silver-bright);';
+  var html = '';
+  if (a.telefono) html += '<a href="tel:' + encodeURIComponent(a.telefono.replace(/\s+/g, '')) + '" style="' + estilo + '">📞 Llamar</a>';
+  if (a.email) html += '<a href="mailto:' + encodeURIComponent(a.email.trim()).replace(/%40/g, '@') + '" style="' + estilo + '">✉️ Enviar email</a>';
+  bot.innerHTML = html;
+  bot.style.display = html ? 'flex' : 'none';
 }
 
 // ═══ PUNTO 216 (24/09/2026) — DATOS PRIVADOS FUERA DEL ARCHIVO PÚBLICO ═══
@@ -12460,7 +12318,12 @@ async function generarPDF() {
         updatedAt: ahora
       };
       if (esEdicion) {
-        contratos[idxEnEdicion] = nuevoContrato;
+        // PUNTO 218 (01/10/2026) — BUG: al modificar un contrato se sustituía
+        // la ficha entera y se perdía todo lo que no viene del asistente:
+        // historial de IPC aplicados (ipcAplicado, rentaAnterior), subidas de
+        // renta pactadas y el historial de empadronados. Ahora se conserva
+        // todo lo anterior y solo se pisan los datos que salen del asistente.
+        contratos[idxEnEdicion] = Object.assign({}, contratoPrevio, nuevoContrato);
       } else {
         contratos.unshift(nuevoContrato);
       }
@@ -18003,21 +17866,45 @@ function _pintarTrading(r) {
   if (r.tieneR < r.numOperaciones) {
     html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:8px;">' + (r.numOperaciones - r.tieneR) + ' operación(es) sin stop puesto — no cuentan en la R acumulada.</div>';
   }
-  // 24/09/2026: gráfica "Evolución de la cuenta" — la misma de TradingOkar
-  // (bloque OKCHART). Sustituye a la línea pequeña del punto 165.
-  if (r.opsGrafica && r.opsGrafica.length) {
-    html += '<div id="fin-trading-chart" style="margin-top:14px;text-align:left;"></div>';
+  // PUNTO 165 (10/09/2026): gráfica de líneas del € acumulado, operación a
+  // operación en orden cronológico ("las entradas" que pediste) — SVG
+  // dibujado a mano, mismo criterio que el resto de la app (nada de
+  // librerías externas de gráficas). Con menos de 2 puntos no se dibuja
+  // (no hay línea que trazar).
+  var chartHtml = _tradingBuildChart(r.serieEUR);
+  if (chartHtml) {
+    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:10px;margin-bottom:2px;">Evolución del resultado acumulado (€) por operación</div>';
+    html += chartHtml;
   }
   cont.innerHTML = html;
-  if (r.opsGrafica && r.opsGrafica.length && window.okChart) {
-    var conCapital = typeof r.capital === 'number';
-    window.okChart(document.getElementById('fin-trading-chart'), {
-      ops: r.opsGrafica, capital: conCapital ? r.capital : 0, beMargen: r.beMargen,
-      titulo: (conCapital ? 'Evolución de la cuenta' : 'Resultado acumulado') + ' · ' + (r.esDemo ? 'Demo' : 'Real'),
-      periodo: 30, selectorPeriodo: true
-    });
-  }
 }
+// PUNTO 165 (10/09/2026): dibuja la línea de € acumulado (serie ya viene
+// ordenada cronológicamente desde _tradingConsultarModo). SVG simple sin
+// librerías — mismo criterio "vanilla" que el resto de la app. El color
+// de la línea depende del signo del último punto (verde si el acumulado
+// termina en positivo, rojo si termina en negativo); la línea discontinua
+// marca el 0 para ver de un vistazo si estás por encima o por debajo.
+function _tradingBuildChart(serie) {
+  if (!serie || serie.length < 2) return '';
+  var w = 280, h = 70, pad = 4;
+  var valores = serie.concat([0]);
+  var mn = Math.min.apply(null, valores), mx = Math.max.apply(null, valores);
+  var rango = (mx - mn) || 1;
+  var stepX = (w - pad * 2) / (serie.length - 1);
+  var pts = serie.map(function(v, i) {
+    var x = pad + i * stepX;
+    var y = h - pad - ((v - mn) / rango) * (h - pad * 2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  var zeroY = h - pad - ((0 - mn) / rango) * (h - pad * 2);
+  var ultimo = serie[serie.length - 1];
+  var colorVar = ultimo >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:60px;display:block;">' +
+    '<line x1="' + pad + '" y1="' + zeroY.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + zeroY.toFixed(1) + '" style="stroke:var(--border);stroke-width:1;stroke-dasharray:2,2;"/>' +
+    '<polyline points="' + pts + '" style="fill:none;stroke:' + colorVar + ';stroke-width:2;" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '</svg>';
+}
+
 // --- CUENTAS ---
 function fin_renderCuentas() {
   var data = fin_load('fin:cuentas');
@@ -19389,31 +19276,11 @@ function fin_patHist_calcularActual() {
     inmobRefsSinValor: inmob.refsSinValor
   };
 }
+// PUNTO 220 (01/10/2026): el "＋" ahora abre el flujo nuevo (aviso de
+// actualizar saldos → foto por banco editable). Se mantiene el nombre por
+// si algún botón antiguo lo llama.
 function fin_patHist_guardarSnapshot() {
-  if (bloqueaSiViewer('Guardar un snapshot del histórico de patrimonio')) return;
-  var emp = fin_emp();
-  if (emp !== 'patrimer' && emp !== 'patricio') return;
-  var mesId = fin_patHist_mesActual();
-  var lista = fin_patHist_load();
-  var existente = lista.find(function(r) { return r.id === mesId; });
-  if (existente) {
-    if (!confirm('Ya hay un snapshot guardado para ' + fin_patHist_nombreMes(mesId) + ' (' + fin_fmt(existente.total) + '). ¿Lo actualizo con los saldos de ahora mismo?')) return;
-  }
-  var datos = fin_patHist_calcularActual();
-  var row = existente || { id: mesId, nota: '' };
-  row.fecha = _fechaHoyLocal();
-  row.liquidez = datos.liquidez;
-  row.invertido = datos.invertido;
-  row.inmobiliario = datos.inmobiliario;
-  row.total = datos.liquidez + datos.invertido + datos.inmobiliario;
-  row.updatedAt = new Date().toISOString();
-  if (existente) {
-    lista = lista.map(function(r) { return r.id === mesId ? row : r; });
-  } else {
-    lista.push(row);
-  }
-  fin_patHist_save(lista);
-  fin_patHist_render();
+  fin_patHist_abrirFoto();
 }
 function fin_patHist_editarNota(id) {
   if (bloqueaSiViewer('Editar una nota del histórico de patrimonio')) return;
@@ -19443,6 +19310,7 @@ function fin_patHist_render() {
     return;
   }
   if (sec) sec.style.display = '';
+  if (emp === 'patricio') fin_patHist_migrarFinper(); // PUNTO 220
   var lista = fin_patHist_load();
   var mesActual = fin_patHist_mesActual();
   var tieneEsteMes = lista.some(function(r) { return r.id === mesActual; });
@@ -19450,7 +19318,7 @@ function fin_patHist_render() {
   if (avisoEl) {
     if (!tieneEsteMes) {
       avisoEl.style.display = 'block';
-      avisoEl.innerHTML = '<div style="background:rgba(230,168,63,0.14);border:1px solid var(--accent-gold);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--accent-gold);font-weight:600;">📅 Actualiza los saldos y pulsa "＋" para guardar el snapshot de ' + fin_patHist_nombreMes(mesActual) + '.</div>';
+      avisoEl.innerHTML = '<div style="background:rgba(230,168,63,0.14);border:1px solid var(--accent-gold);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--accent-gold);font-weight:600;">📅 Pulsa "＋" para guardar el patrimonio de ' + fin_patHist_nombreMes(mesActual) + ' (antes te recordará actualizar saldos y valores).</div>';
     } else {
       avisoEl.style.display = 'none';
       avisoEl.innerHTML = '';
@@ -19497,6 +19365,15 @@ function fin_patHist_render() {
     html += '<div><div class="fin-card-nombre">' + fin_patHist_nombreMes(r.id) + '</div>';
     html += '<div class="fin-card-sub">Liquidez ' + fin_fmt(r.liquidez) + ' · Invertido ' + fin_fmt(r.invertido) + ' · Inmobiliario ' + fin_fmt(r.inmobiliario) + '</div></div>';
     html += '<div class="fin-card-saldo">' + fin_fmt(r.total) + '</div></div>';
+    // PUNTO 220: desglose por banco (si la foto lo tiene).
+    if (r.bancos && r.bancos.length) {
+      var partesB = r.bancos.filter(function(b) { return (b.liquidez || 0) + (b.invertido || 0) !== 0; }).map(function(b) {
+        return notas_esc(b.nombre) + ' ' + fin_fmt((b.liquidez || 0) + (b.invertido || 0));
+      });
+      if (r.urbanitae) partesB.push('Urbanitae ' + fin_fmt(r.urbanitae));
+      if (partesB.length) html += '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">🏦 ' + partesB.join(' · ') + '</div>';
+    }
+    if (r.origen === 'importado') html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:2px;">Traspasado de "Patrimonio financiero" (inmobiliario con el valor actual)</div>';
     html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">Diferencia vs. mes anterior: ' + difHtml + '</div>';
     if (r.nota) html += '<div style="font-size:11px;color:var(--silver-bright);font-style:italic;margin-top:4px;">📝 ' + notas_esc(r.nota) + '</div>';
     html += '<div class="fin-card-actions">';
@@ -19506,6 +19383,240 @@ function fin_patHist_render() {
   });
   listaEl.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 220 (01/10/2026): HISTÓRICO DE PATRIMONIO UNIFICADO — se fusionan
+// el "Histórico de patrimonio" (A) y el antiguo "Patrimonio financiero
+// (personal)" (B, finper_*) en una sola tabla mensual por empresa
+// (misma clave de siempre: fin:patrimonio_historico:<empresa>, así que el
+// aviso "Snapshot de patrimonio sin guardar este mes" de Inicio sigue
+// funcionando igual). Valor del patrimonio COMPLETO: liquidez + inversiones
+// (fondos, acciones, Urbanitae) + inmobiliario. Al pulsar "＋": 1) aviso de
+// actualizar saldos; 2) foto automática desglosada por banco, editable
+// antes de guardar. El Panel "Patrimonio financiero" (C) NO se toca.
+// ═══════════════════════════════════════════════════════════════════════
+var _patFoto = null; // líneas de la foto en curso
+
+// Desglose por banco de lo que hay AHORA en Finanzas (empresa activa).
+function fin_patHist_desglose() {
+  var emp = fin_emp();
+  var bancos = {}, orden = [];
+  function _linea(clave, nombre) {
+    if (!bancos[clave]) { bancos[clave] = { clave: clave, nombre: nombre, liquidez: 0, invertido: 0 }; orden.push(clave); }
+    return bancos[clave];
+  }
+  function _nombreClave(c) { return FIN_CUENTA_LABEL[c] || c; }
+  // Liquidez: cada cuenta va a su banco (Caixa/MyInvestor/Trade Republic
+  // por nombre — mismo criterio que el asistente de actualizar valores);
+  // cualquier otra cuenta sale con su propio nombre.
+  fin_visibles('fin:cuentas').forEach(function(c) {
+    var clave = fin_asiClaveBrokerCuenta(c.nombre);
+    var nombre = FIN_CUENTA_LABEL[clave] || (c.nombre || 'Cuenta');
+    _linea(clave, nombre).liquidez += parseFloat(c.saldo) || 0;
+  });
+  // Invertido: fondos por su "Cuenta/Broker".
+  var SIN = 'sin_asignar';
+  fin_visibles('fin:fondos').forEach(function(f) {
+    var v = parseFloat(f.valor) || 0;
+    if (f.cuenta) _linea(f.cuenta, _nombreClave(f.cuenta)).invertido += v;
+    else _linea(SIN, 'Sin banco asignado').invertido += v;
+  });
+  // Acciones: la asignación de broker por valor solo existe para Patricio.
+  var cuentaAcc = emp === 'patricio' ? _finAccionesCuentaLoad() : {};
+  var simples = fin_accSimpleLoad();
+  var origenSimple = {};
+  simples.forEach(function(s) {
+    if (!s || s.deleted) return;
+    var v = parseFloat(s.valorActual) || 0;
+    if (s.origenTicker) origenSimple[s.origenTicker] = true;
+    var c = s.origenTicker ? cuentaAcc[s.origenTicker] : '';
+    if (c) _linea(c, _nombreClave(c)).invertido += v;
+    else _linea(SIN, 'Sin banco asignado').invertido += v;
+  });
+  var pos = {};
+  fin_visibles('fin:acciones').forEach(function(op) {
+    var t = op.ticker;
+    if (!t || origenSimple[t]) return;
+    if (!pos[t]) pos[t] = 0;
+    if (op.tipo === 'compra') pos[t] += parseFloat(op.cantidad) || 0;
+    else if (op.tipo === 'venta') pos[t] -= parseFloat(op.cantidad) || 0;
+    else if (op.tipo === 'scrip') pos[t] += parseFloat(op.scripAcciones) || 0;
+  });
+  Object.keys(pos).forEach(function(t) {
+    if (pos[t] <= 0) return;
+    var cot = _finCotizaciones[t] || null;
+    if (!cot) return;
+    var v = cot * pos[t];
+    var c = cuentaAcc[t];
+    if (c) _linea(c, _nombreClave(c)).invertido += v;
+    else _linea(SIN, 'Sin banco asignado').invertido += v;
+  });
+  // Orden: Caixa, MyInvestor, Trade Republic, resto, "sin asignar" al final.
+  var pref = ['caixa', 'myinvestor', 'traderepublic'];
+  orden.sort(function(a, b) {
+    var ia = a === SIN ? 99 : (pref.indexOf(a) === -1 ? 50 : pref.indexOf(a));
+    var ib = b === SIN ? 99 : (pref.indexOf(b) === -1 ? 50 : pref.indexOf(b));
+    return ia - ib;
+  });
+  var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) {
+    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
+  }, 0);
+  return {
+    bancos: orden.map(function(k) { return bancos[k]; }),
+    urbanitae: urbanitae,
+    inmobiliario: inm_patrimonioInmobiliario(emp).total
+  };
+}
+
+// Paso 1: aviso de actualizar saldos antes de la foto.
+function fin_patHist_abrirFoto() {
+  if (bloqueaSiViewer('Guardar un snapshot del histórico de patrimonio')) return;
+  var emp = fin_emp();
+  if (emp !== 'patrimer' && emp !== 'patricio') return;
+  var mesId = fin_patHist_mesActual();
+  document.getElementById('pathist-foto-titulo').textContent = 'Patrimonio · ' + fin_patHist_nombreMes(mesId);
+  document.getElementById('pathist-foto-paso1').style.display = 'block';
+  document.getElementById('pathist-foto-paso2').style.display = 'none';
+  document.getElementById('pathist-foto-modal').style.display = 'flex';
+}
+function fin_patHist_cerrarFoto() {
+  document.getElementById('pathist-foto-modal').style.display = 'none';
+  _patFoto = null;
+}
+function fin_patHist_irActualizar() {
+  fin_patHist_cerrarFoto();
+  fin_abrirAsistente();
+}
+// Paso 2: foto automática por banco, con importes editables.
+function fin_patHist_seguirFoto() {
+  var d = fin_patHist_desglose();
+  _patFoto = d;
+  var est = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:7px 8px;box-sizing:border-box;text-align:right;';
+  var lbl = 'font-size:10px;color:var(--text-secondary);letter-spacing:.4px;';
+  function _inp(id, v) {
+    return '<input id="' + id + '" type="text" inputmode="decimal" value="' + fmtGlobal(v) + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);fin_patHist_recalcFoto()" oninput="fin_patHist_recalcFoto()" style="' + est + '">';
+  }
+  var html = '';
+  if (d.bancos.length === 0) {
+    html += '<div style="font-size:12px;color:var(--silver-dim);margin-bottom:8px;">No hay cuentas, fondos ni acciones cargados en esta empresa.</div>';
+  }
+  d.bancos.forEach(function(b, i) {
+    html += '<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px;">';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--silver-bright);margin-bottom:6px;">🏦 ' + notas_esc(b.nombre) + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+    html += '<div><div style="' + lbl + '">LIQUIDEZ</div>' + _inp('pathist-b' + i + '-liq', b.liquidez) + '</div>';
+    html += '<div><div style="' + lbl + '">INVERTIDO</div>' + _inp('pathist-b' + i + '-inv', b.invertido) + '</div>';
+    html += '</div></div>';
+  });
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+  html += '<div><div style="' + lbl + '">🏗️ URBANITAE</div>' + _inp('pathist-urb', d.urbanitae) + '</div>';
+  html += '<div><div style="' + lbl + '">🏠 INMOBILIARIO</div>' + _inp('pathist-inm', d.inmobiliario) + '</div>';
+  html += '</div>';
+  document.getElementById('pathist-foto-lineas').innerHTML = html;
+  document.getElementById('pathist-foto-paso1').style.display = 'none';
+  document.getElementById('pathist-foto-paso2').style.display = 'block';
+  fin_patHist_recalcFoto();
+}
+function _patFotoLeer() {
+  if (!_patFoto) return null;
+  function _v(id) { var el = document.getElementById(id); return el ? (parseFmtGlobal(el.value) || 0) : 0; }
+  var bancos = _patFoto.bancos.map(function(b, i) {
+    return { nombre: b.nombre, liquidez: _v('pathist-b' + i + '-liq'), invertido: _v('pathist-b' + i + '-inv') };
+  });
+  var urb = _v('pathist-urb'), inm = _v('pathist-inm');
+  var liq = bancos.reduce(function(s, b) { return s + b.liquidez; }, 0);
+  var inv = bancos.reduce(function(s, b) { return s + b.invertido; }, 0) + urb;
+  return { bancos: bancos, urbanitae: urb, inmobiliario: inm, liquidez: liq, invertido: inv, total: liq + inv + inm };
+}
+function fin_patHist_recalcFoto() {
+  var r = _patFotoLeer();
+  if (!r) return;
+  document.getElementById('pathist-foto-total').innerHTML =
+    'Liquidez ' + fin_fmt(r.liquidez) + ' · Invertido ' + fin_fmt(r.invertido) + ' · Inmobiliario ' + fin_fmt(r.inmobiliario) +
+    '<div style="font-size:18px;font-weight:700;color:var(--silver-bright);margin-top:4px;">TOTAL ' + fin_fmt(r.total) + '</div>';
+}
+function fin_patHist_guardarFoto() {
+  if (bloqueaSiViewer('Guardar un snapshot del histórico de patrimonio')) return;
+  var r = _patFotoLeer();
+  if (!r) return;
+  var mesId = fin_patHist_mesActual();
+  var lista = fin_patHist_load();
+  var existente = lista.find(function(x) { return x.id === mesId; });
+  if (existente && !confirm('Ya hay un snapshot guardado para ' + fin_patHist_nombreMes(mesId) + ' (' + fin_fmt(existente.total) + '). ¿Lo sustituyo por este?')) return;
+  var row = { id: mesId, nota: existente ? (existente.nota || '') : '' };
+  row.fecha = _fechaHoyLocal();
+  row.liquidez = r.liquidez;
+  row.invertido = r.invertido;
+  row.inmobiliario = r.inmobiliario;
+  row.total = r.total;
+  row.bancos = r.bancos;
+  row.urbanitae = r.urbanitae;
+  row.updatedAt = new Date().toISOString();
+  if (existente) lista = lista.map(function(x) { return x.id === mesId ? row : x; });
+  else lista.push(row);
+  fin_patHist_save(lista);
+  fin_patHist_cerrarFoto();
+  fin_patHist_render();
+  info('✓ Patrimonio de ' + fin_patHist_nombreMes(mesId) + ' guardado: ' + fin_fmt(row.total));
+}
+
+// Traspaso (una vez por mes y aparato) de los meses del antiguo
+// "Patrimonio financiero (personal)" al histórico unificado de Patricio.
+// - Solo meses que el histórico todavía no tenga (los que ya había, se respetan).
+// - Inmobiliario = valor ACTUAL de los inmuebles (decisión de Patry).
+// - Urbanitae NO se añade a los meses antiguos.
+// - updatedAt fijo y antiguo: si borras un mes traspasado, el borrado gana
+//   siempre en la sincronización (no puede "resucitar" desde otro aparato).
+// - Lo que ya se traspasó en este aparato se apunta, para no volver a
+//   meter un mes que hayas borrado tú a propósito.
+function fin_patHist_migrarFinper() {
+  try {
+    if (typeof getRol === 'function' && getRol() === 'viewer') return false;
+    if (!window._appEstable) return false; // esperar a que llegue la nube
+    var finper = [];
+    try { finper = JSON.parse(localStorage.getItem('fin:patrimonio_financiero:patricio') || '[]'); } catch (e) {}
+    if (!finper.length) return false;
+    var inmLista = [];
+    try { inmLista = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'); } catch (e) {}
+    if (!inmLista.length) return false;
+    var hechos = [];
+    try { hechos = JSON.parse(localStorage.getItem('gi:finper_migrados') || '[]'); } catch (e) {}
+    var lista = fin_patHist_load('patricio');
+    var tiene = {};
+    lista.forEach(function(r) { if (r && r.id) tiene[r.id] = true; });
+    var inmActual = inm_patrimonioInmobiliario('patricio').total;
+    var anadidos = 0;
+    finper.forEach(function(r) {
+      if (!r || !r.id || r.deleted || hechos.indexOf(r.id) !== -1) return;
+      hechos.push(r.id);
+      if (tiene[r.id]) return;
+      var liq = finper_liquidez(r), inv = finper_invertido(r);
+      var row = { id: r.id, fecha: r.id + '-01', liquidez: liq, invertido: inv, inmobiliario: inmActual,
+        total: liq + inv + inmActual, urbanitae: 0, nota: '', origen: 'importado', updatedAt: '2026-10-01T00:00:00.000Z' };
+      if (r.caixa !== undefined && r.caixa !== null) {
+        row.bancos = [
+          { nombre: 'Caixa', liquidez: parseFloat(r.caixa) || 0, invertido: 0 },
+          { nombre: 'MyInvestor', liquidez: 0, invertido: parseFloat(r.myinvestor) || 0 },
+          { nombre: 'Trade Republic', liquidez: 0, invertido: parseFloat(r.traderepublic) || 0 }
+        ];
+      }
+      lista.push(row);
+      anadidos++;
+    });
+    localStorage.setItem('gi:finper_migrados', JSON.stringify(hechos));
+    if (anadidos) fin_patHist_save(lista, 'patricio');
+    return anadidos > 0;
+  } catch (e) {
+    console.warn('Traspaso de Patrimonio financiero fallido:', e.message);
+    return false;
+  }
+}
+setTimeout(function() {
+  if (fin_patHist_migrarFinper()) {
+    var m = document.getElementById('mod-finanzas');
+    if (m && m.classList.contains('active') && typeof fin_render === 'function') fin_render();
+  }
+}, 11000);
 
 // ═══════════════════════════════════════════════════════════════════════
 // PUNTO 109 (06/09/2026): PATRIMONIO FINANCIERO (PERSONAL) — tabla manual,
@@ -19610,8 +19721,10 @@ function finper_borrar(id) {
 function finper_render() {
   var sec = document.getElementById('fin-finper-section');
   if (!sec) return;
-  if (fin_emp() !== 'patricio') { sec.style.display = 'none'; return; }
-  sec.style.display = '';
+  // PUNTO 220 (01/10/2026): sección retirada — sus meses se traspasan al
+  // Histórico de patrimonio unificado (fin_patHist_migrarFinper). Los datos
+  // originales se conservan en la nube, sin borrar.
+  sec.style.display = 'none'; return;
   var lista = finper_load().slice().sort(function (a, b) { return a.id.localeCompare(b.id); });
   var kpisEl = document.getElementById('fin-finper-kpis');
   var listaEl = document.getElementById('fin-finper-lista');
@@ -21071,7 +21184,7 @@ function pend_calcular() {
         try { listaChk = JSON.parse(localStorage.getItem('fin:patrimonio_historico:' + e.k) || '[]'); } catch (err) {}
         var yaEsteMes = listaChk.some(function(r) { return r.id === mesIdPat; });
         if (!yaEsteMes) {
-          items.push({ icon: '📅', t: 'Snapshot de patrimonio de ' + e.n + ' sin guardar este mes', s: 'Actualiza los saldos en Finanzas y pulsa "＋" en Histórico de patrimonio', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
+          items.push({ icon: '📅', t: 'Snapshot de patrimonio de ' + e.n + ' sin guardar este mes', s: 'Finanzas → Histórico de patrimonio → "＋" (actualiza antes saldos y valores)', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
         }
       });
     }
@@ -21174,6 +21287,12 @@ function pend_gestionar(i) {
     if (typeof saveProfile === 'function') saveProfile(it.empresa);
     if (typeof applyProfile === 'function') applyProfile(it.empresa);
     showModule('finanzas');
+    // PUNTO 220 (01/10/2026): lleva directo al Histórico y abre el "＋".
+    setTimeout(function() {
+      var secH = document.getElementById('fin-pathist-section');
+      if (secH && secH.scrollIntoView) secH.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof fin_patHist_abrirFoto === 'function') fin_patHist_abrirFoto();
+    }, 300);
   }
 }
 
@@ -21323,7 +21442,7 @@ document.addEventListener("DOMContentLoaded", loginInit);
         window.syncToFirestore('fin:ultima_actualizacion', localStorage.getItem('fin:ultima_actualizacion'));
       }
     }
-    if (!_desdeNube && window._appEstable && key !== 'app:registro_actividad' && DATA_KEYS.includes(key)) {
+    if (!_desdeNube && window._appEstable && key !== 'app:registro_actividad' && (window.DATA_KEYS || []).includes(key)) {
       try {
         if (typeof getRol === 'function' && getRol() === 'viewer') {
           _registrarActividad('posible_fuga', 'Se guardó un cambio real en "' + key + '" estando en modo Visualización — revisar qué botón no tiene el candado puesto');
@@ -21673,7 +21792,7 @@ function con_renderLista() {
         <span style="font-weight:700;color:var(--silver-bright);">${renta}/mes</span>
       </div>
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-        <button onclick="event.stopPropagation();con_regenerarPDF('${idSafe}')" style="width:100%;background:none;border:1px solid var(--border);border-radius:10px;color:var(--silver-mid);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:8px;cursor:pointer;letter-spacing:.5px;">📄 Ver / Descargar contrato</button>
+        <button onclick="event.stopPropagation();con_regenerarPDF('${idSafe}')" style="width:100%;background:none;border:1px solid var(--border);border-radius:10px;color:var(--silver-mid);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:8px;cursor:pointer;letter-spacing:.5px;">📄 Ver · ✏️ Editar · ⬇️ Descargar</button>
       </div>
     </div>`;
   }).join('');
