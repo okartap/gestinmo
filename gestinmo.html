@@ -2211,7 +2211,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261001_03';
+const BUILD_ID = '261001_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -21020,37 +21020,45 @@ function notas_render() {
 // no se guarda nada nuevo, solo se repite el cálculo aquí para poder
 // mostrarlo junto. Si no hay nada pendiente, pend_render() oculta la
 // tarjeta entera (igual que el aviso de rústico en Cobros).
+// PUNTO 221 (01/10/2026): los avisos de "Pendiente de gestionar" salen en
+// TODAS las empresas (a petición de Patry), cada uno con la etiqueta y el
+// color de la empresa a la que pertenece. Empresa de un contrato: la del
+// propietario de su inmueble (por ref); si no, por el texto del arrendador.
+function pend_empresaContrato(c, inmPorRef) {
+  if (c && c.ref && inmPorRef[c.ref] && inmPorRef[c.ref].propietario) {
+    return normEmpresa(String(inmPorRef[c.ref].propietario).toLowerCase());
+  }
+  var arr = String((c && c.arrendador) || '').toLowerCase();
+  if (arr.indexOf('patrimer') !== -1 || arr.indexOf('b-73110009') !== -1) return 'patrimer';
+  if (arr.indexOf('industrias') !== -1 || arr.indexOf('igc') !== -1) return 'industrias';
+  if (arr.indexOf('patricio') !== -1) return 'patricio';
+  return '';
+}
+function pend_inmPorRef() {
+  var mapa = {};
+  try {
+    (getInmuebles() || []).forEach(function(inm) { if (inm && inm.ref) mapa[inm.ref] = inm; });
+  } catch (e) {}
+  return mapa;
+}
+var PEND_EMPRESAS = {
+  patrimer:   { n: 'PATRIMER',   color: 'var(--patrimer-color)' },
+  patricio:   { n: 'PATRICIO',   color: 'var(--patricio-color)' },
+  industrias: { n: 'INDUSTRIAS', color: 'var(--industrias-color)' }
+};
+
 function pend_contratosPorVencer() {
   try {
     var todos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
-    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
-    var arrMap = {
-      'patrimer':   ['patrimer levante','patrimer','b-73110009'],
-      'patricio':   ['patricio gómez garcía a título personal','patricio gomez garcia a titulo personal','como titular personal'],
-      'industrias': ['industrias gómez','industrias gomez','igc','b-pendiente']
-    };
-    var claves = arrMap[emp] || arrMap['patrimer'];
-    var todosInm = JSON.parse(localStorage.getItem('patrimer:inmuebles') || localStorage.getItem('inmuebles:lista') || '[]');
-    var refsEmp = {};
-    todosInm.forEach(function(inm) {
-      var p = normEmpresa((inm.propietario || 'patrimer').toLowerCase());
-      if (p === emp) { if (inm.ref) refsEmp[inm.ref] = true; }
-    });
-    var contratos = todos.filter(function(c) {
-      if (c.ref && Object.keys(refsEmp).length > 0) return !!refsEmp[c.ref];
-      if (!c.arrendador) return false;
-      var arr = c.arrendador.toLowerCase();
-      if (emp === 'patricio' && (arr.includes('patrimer') || arr.includes('b-73110009'))) return false;
-      return claves.some(function(k) { return arr.includes(k); });
-    });
+    var inmPorRef = pend_inmPorRef();
     var hoy = new Date();
     var res = [];
-    contratos.forEach(function(c) {
+    todos.forEach(function(c) {
       if (c.estado === 'renovado' || c.estado === 'rescindido') return;
       if (!c.fin) return;
       var fin = new Date(c.fin);
       var dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
-      if (dias >= 0 && dias <= 60) res.push({ nombre: c.inqNombre || c.dir || 'Contrato', dias: dias, id: c.id });
+      if (dias >= 0 && dias <= 60) res.push({ nombre: c.inqNombre || c.dir || 'Contrato', dias: dias, id: c.id, empresa: pend_empresaContrato(c, inmPorRef) });
     });
     return res;
   } catch (e) { return []; }
@@ -21063,19 +21071,12 @@ function pend_ipcPendientes() {
     var anio = parseInt(partes[0]);
     var mesN = parseInt(partes[1]);
     var contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
-    var inmuebles = getInmuebles();
-    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
-    var refsEmpresa = {};
-    inmuebles.forEach(function(inm) {
-      if (!inm.propietario || normEmpresa(inm.propietario) === normEmpresa(emp)) {
-        if (inm.ref) refsEmpresa[inm.ref] = true;
-      }
-    });
+    var inmPorRef = pend_inmPorRef(); // PUNTO 221: todas las empresas
     var res = [];
     // BLINDAJE: los contratos rústicos no entran aquí — su importe anual se
     // registra a mano en el Histórico de cada finca, no sube por IPC (ver
     // el mismo blindaje en ipc_renderBanners).
-    contratos.filter(function(c) { return c.estado === 'activo' && c.inicio && c.tipo !== 'rustica' && c.tipo !== 'rusticatemp' && (!c.ref || refsEmpresa[c.ref]); }).forEach(function(c) {
+    contratos.filter(function(c) { return c.estado === 'activo' && c.inicio && c.tipo !== 'rustica' && c.tipo !== 'rusticatemp'; }).forEach(function(c) {
       var ini = new Date(c.inicio);
       if (ini.getMonth() + 1 === mesN) {
         var aniosTranscurridos = anio - ini.getFullYear();
@@ -21084,7 +21085,7 @@ function pend_ipcPendientes() {
         // si ya se aplicó el IPC este año, se da por gestionada la anualidad.
         var yaAplicadoEsteAnio = (c.ipcAplicado || []).some(function(a) { return a && a.mes && a.mes.slice(0,4) === String(anio); });
         if (yaAplicadoEsteAnio) return;
-        res.push({ nombre: c.inqNombre || c.dir || 'Contrato', ref: c.ref || '', id: c.id });
+        res.push({ nombre: c.inqNombre || c.dir || 'Contrato', ref: c.ref || '', id: c.id, empresa: pend_empresaContrato(c, inmPorRef) });
       }
     });
     return res;
@@ -21094,24 +21095,17 @@ function pend_ipcPendientes() {
 function pend_subidasPactadas() {
   try {
     var todos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
-    var inmuebles = getInmuebles();
-    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
-    var refsEmpresa = {};
-    inmuebles.forEach(function(inm) {
-      if (!inm.propietario || normEmpresa(inm.propietario) === normEmpresa(emp)) {
-        if (inm.ref) refsEmpresa[inm.ref] = true;
-      }
-    });
+    var inmPorRef = pend_inmPorRef(); // PUNTO 221: todas las empresas
     var hoy = new Date();
     var res = [];
-    todos.filter(function(c) { return c.estado === 'activo' && (!c.ref || refsEmpresa[c.ref]); }).forEach(function(c) {
+    todos.filter(function(c) { return c.estado === 'activo'; }).forEach(function(c) {
       (c.subidasPactadas || []).forEach(function(s) {
         if (s.aplicada) return;
         if (!s.fecha) return;
         var fecha = new Date(s.fecha);
         var dias = Math.ceil((fecha - hoy) / (1000 * 60 * 60 * 24));
         if (dias <= 30) {
-          res.push({ nombre: c.inqNombre || c.dir || 'Contrato', ref: c.ref || '', importe: s.importe, fecha: s.fecha, dias: dias, contratoId: c.id });
+          res.push({ nombre: c.inqNombre || c.dir || 'Contrato', ref: c.ref || '', importe: s.importe, fecha: s.fecha, dias: dias, contratoId: c.id, empresa: pend_empresaContrato(c, inmPorRef) });
         }
       });
     });
@@ -21128,28 +21122,28 @@ function pend_calcular() {
     }
   } catch (e) {}
   try {
-    var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
-    if (emp === 'patrimer' && typeof rus_pendientes === 'function') {
+    // PUNTO 221: el rústico (de Patrimer) sale ya en todas las empresas, con su etiqueta.
+    if (typeof rus_pendientes === 'function') {
       var anio = new Date().getFullYear();
       rus_pendientes(anio).forEach(function(p) {
-        items.push({ icon: '🌾', t: 'Finca "' + p.nombre + '" sin importe de rústico de ' + anio, s: 'Estimado según ' + (anio - 1) + ': ~' + fmtE(p.estimado), accion: 'rustico', ref: p.ref, nombre: p.nombre });
+        items.push({ icon: '🌾', t: 'Finca "' + p.nombre + '" sin importe de rústico de ' + anio, s: 'Estimado según ' + (anio - 1) + ': ~' + fmtE(p.estimado), accion: 'rustico', ref: p.ref, nombre: p.nombre, empresa: 'patrimer' });
       });
     }
   } catch (e) {}
   try {
     pend_contratosPorVencer().forEach(function(c) {
-      items.push({ icon: '📄', t: 'Contrato de "' + c.nombre + '" vence en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's'), s: 'Revisa si renueva o finaliza', accion: 'contrato', id: c.id });
+      items.push({ icon: '📄', t: 'Contrato de "' + c.nombre + '" vence en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's'), s: 'Revisa si renueva o finaliza', accion: 'contrato', id: c.id, empresa: c.empresa });
     });
   } catch (e) {}
   try {
     pend_ipcPendientes().forEach(function(c) {
-      items.push({ icon: '📈', t: 'IPC pendiente de actualizar: ' + c.nombre, s: (c.ref ? c.ref + ' · ' : '') + 'Le toca anualidad este mes', accion: 'ipc', id: c.id });
+      items.push({ icon: '📈', t: 'IPC pendiente de actualizar: ' + c.nombre, s: (c.ref ? c.ref + ' · ' : '') + 'Le toca anualidad este mes', accion: 'ipc', id: c.id, empresa: c.empresa });
     });
   } catch (e) {}
   try {
     pend_subidasPactadas().forEach(function(s) {
       var cuando = s.dias < 0 ? ('debía empezar hace ' + Math.abs(s.dias) + ' día' + (Math.abs(s.dias) === 1 ? '' : 's')) : (s.dias === 0 ? 'empieza hoy' : ('en ' + s.dias + ' día' + (s.dias === 1 ? '' : 's')));
-      items.push({ icon: '📈', t: 'Subida de renta pactada: ' + s.nombre + ' sube a ' + fmtE(parseFloat(s.importe) || 0), s: (s.ref ? s.ref + ' · ' : '') + 'Pactada para el ' + fmtDate(s.fecha) + ' (' + cuando + ')', accion: 'subida', id: s.contratoId });
+      items.push({ icon: '📈', t: 'Subida de renta pactada: ' + s.nombre + ' sube a ' + fmtE(parseFloat(s.importe) || 0), s: (s.ref ? s.ref + ' · ' : '') + 'Pactada para el ' + fmtDate(s.fecha) + ' (' + cuando + ')', accion: 'subida', id: s.contratoId, empresa: s.empresa });
     });
   } catch (e) {}
   // PUNTO 90b (03/09/2026): aviso del registro de actividad — solo para el
@@ -21184,11 +21178,14 @@ function pend_calcular() {
         try { listaChk = JSON.parse(localStorage.getItem('fin:patrimonio_historico:' + e.k) || '[]'); } catch (err) {}
         var yaEsteMes = listaChk.some(function(r) { return r.id === mesIdPat; });
         if (!yaEsteMes) {
-          items.push({ icon: '📅', t: 'Snapshot de patrimonio de ' + e.n + ' sin guardar este mes', s: 'Finanzas → Histórico de patrimonio → "＋" (actualiza antes saldos y valores)', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
+          items.push({ icon: '📅', t: 'Snapshot de patrimonio sin guardar este mes', s: 'Finanzas → Histórico de patrimonio → "＋" (actualiza antes saldos y valores)', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
         }
       });
     }
   } catch (e) {}
+  // PUNTO 221: ahora salen avisos de todas las empresas — Mercedes solo ve
+  // los de las empresas a las que tiene acceso (nunca los de Patricio).
+  items = items.filter(function(it) { return !it.empresa || usuarioPuedeEmpresa(it.empresa); });
   return items;
 }
 
@@ -21227,12 +21224,16 @@ function pend_render() {
     // PUNTO 92 (05/09/2026): un aviso "urgente" (hoy solo el snapshot mensual
     // de patrimonio sin guardar) se pinta más destacado que el resto — borde
     // de color y fondo tintado — en vez de ser un texto más entre los demás.
+    // PUNTO 221 (01/10/2026): franja lateral + etiqueta con el nombre y el
+    // color de la empresa del aviso (GENERAL en gris si no es de ninguna).
+    var empInfo = PEND_EMPRESAS[it.empresa] || { n: 'GENERAL', color: 'var(--silver-dim)' };
     var estiloFila = it.urgente
-      ? 'display:flex;align-items:flex-start;gap:10px;padding:9px 10px;margin:4px 0;border-radius:8px;background:rgba(230,168,63,0.10);border:1px solid var(--accent-gold);'
-      : 'display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);';
+      ? 'display:flex;align-items:flex-start;gap:10px;padding:9px 10px;margin:5px 0;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid ' + empInfo.color + ';border-left:4px solid ' + empInfo.color + ';'
+      : 'display:flex;align-items:flex-start;gap:10px;padding:9px 10px;margin:5px 0;border-radius:8px;border-left:4px solid ' + empInfo.color + ';background:rgba(255,255,255,0.02);';
+    var chip = '<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.8px;color:' + empInfo.color + ';border:1px solid ' + empInfo.color + ';border-radius:6px;padding:1px 6px;margin-bottom:3px;">' + empInfo.n + '</span>';
     return '<div style="' + estiloFila + '">' +
       '<div style="font-size:15px;flex-shrink:0;margin-top:1px;">' + it.icon + '</div>' +
-      '<div style="flex:1;min-width:0;">' +
+      '<div style="flex:1;min-width:0;">' + chip +
         '<div style="font-size:12.5px;color:var(--silver-bright);line-height:1.35;">' + it.t + '</div>' +
         '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:1px;">' + it.s + '</div>' +
         btn +
@@ -21247,6 +21248,12 @@ function pend_render() {
 function pend_gestionar(i) {
   var it = _pendItems[i];
   if (!it || !it.accion) return;
+  // PUNTO 221 (01/10/2026): si el aviso es de otra empresa, se cambia a ella
+  // antes de abrir la pantalla (igual que ya hacía el aviso del snapshot).
+  if (it.empresa && it.empresa !== (localStorage.getItem('patrimer:empresa') || 'patrimer')) {
+    if (typeof saveProfile === 'function') saveProfile(it.empresa);
+    if (typeof applyProfile === 'function') applyProfile(it.empresa);
+  }
   if (it.accion === 'contrato') {
     // Vence pronto → ficha del contrato + elegir Renovación/Rescisión
     showModule('contratos');
