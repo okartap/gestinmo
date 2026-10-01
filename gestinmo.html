@@ -2211,7 +2211,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261001_05';
+const BUILD_ID = '261001_06';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4117,14 +4117,14 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Referencia</div>
-          <input class="form-input" id="f-ref-inm" type="text" placeholder="VIV02" oninput="this.value=this.value.toUpperCase();this.dataset.auto=''">
+          <input class="form-input" id="f-ref-inm" type="text" oninput="this.value=this.value.toUpperCase();this.dataset.auto=''">
           <div class="form-hint">Ej: VIV02, RUS01, PG03</div>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Dirección</div>
-          <input class="form-input" id="f-direccion" type="text" placeholder="C/ Ejemplo, 12">
+          <input class="form-input" id="f-direccion" type="text">
         </div>
       </div>
       <!-- PUNTO 181 (17/09/2026): referencia catastral del inmueble — antes
@@ -4135,7 +4135,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Referencia catastral <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
-          <input class="form-input" id="f-catastral-inm" type="text" placeholder="0000000AB0000A0000AB">
+          <input class="form-input" id="f-catastral-inm" type="text">
         </div>
       </div>
       <!-- PUNTO 219 (01/10/2026): administrador de fincas, elegido de una lista común -->
@@ -4149,27 +4149,27 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label" id="f-edificio-label">Nombre del edificio (opcional)</div>
-          <input class="form-input" id="f-edificio" type="text" placeholder="Ej: Edificio Paris">
+          <input class="form-input" id="f-edificio" type="text">
         </div>
       </div>
       <div class="form-row two" id="f-piso-letra-row">
         <div class="form-group" id="f-piso-group">
           <div class="form-label">Piso</div>
-          <input class="form-input" id="f-piso" type="text" placeholder="3º">
+          <input class="form-input" id="f-piso" type="text">
         </div>
         <div class="form-group">
           <div class="form-label" id="f-letra-label">Letra / puerta</div>
-          <input class="form-input" id="f-letra" type="text" placeholder="B">
+          <input class="form-input" id="f-letra" type="text">
         </div>
       </div>
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">C.P.</div>
-          <input class="form-input" id="f-cp" type="text" placeholder="30800" maxlength="5">
+          <input class="form-input" id="f-cp" type="text" maxlength="5">
         </div>
         <div class="form-group">
           <div class="form-label">Localidad</div>
-          <input class="form-input" id="f-localidad" type="text" placeholder="Lorca">
+          <input class="form-input" id="f-localidad" type="text">
         </div>
       </div>
       <div class="form-row two">
@@ -4202,7 +4202,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label" id="f-m2-label">Superficie (m²)</div>
-          <input class="form-input" id="f-m2" type="number" inputmode="decimal" placeholder="85">
+          <input class="form-input" id="f-m2" type="number" inputmode="decimal">
         </div>
         <div class="form-group">
           <div class="form-label">Estado</div>
@@ -4217,11 +4217,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two" id="f-hab-banos-row">
         <div class="form-group">
           <div class="form-label">Habitaciones</div>
-          <input class="form-input" id="f-hab" type="number" inputmode="decimal" placeholder="3" min="0">
+          <input class="form-input" id="f-hab" type="number" inputmode="decimal" min="0">
         </div>
         <div class="form-group">
           <div class="form-label">Baños</div>
-          <input class="form-input" id="f-banos" type="number" inputmode="decimal" placeholder="1" min="0">
+          <input class="form-input" id="f-banos" type="number" inputmode="decimal" min="0">
         </div>
       </div>
 
@@ -4251,12 +4251,12 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">Renta mensual (€)</div>
-          <input class="form-input" id="f-renta" type="text" inputmode="decimal" placeholder="750" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-renta" type="text" inputmode="decimal" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint" id="f-renta-hint" style="display:none;">Se lee del contrato activo — para cambiarla, usa Renovación en la ficha del contrato</div>
         </div>
         <div class="form-group">
           <div class="form-label">Renta estimada (€)</div>
-          <input class="form-input" id="f-renta-est" type="text" inputmode="decimal" placeholder="Si vacío/reforma" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-renta-est" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint">Solo si sin contrato activo</div>
         </div>
       </div>
@@ -4265,36 +4265,36 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">Precio compra (€)</div>
-          <input class="form-input" id="f-precio" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-precio" type="text" inputmode="decimal" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         </div>
         <div class="form-group">
           <div class="form-label">Gastos compra (€)</div>
-          <input class="form-input" id="f-gastos-compra" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
+          <input class="form-input" id="f-gastos-compra" type="text" inputmode="decimal" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
           <div class="form-hint">Notaría, ITP, registro…</div>
         </div>
       </div>
       <div class="form-row two" id="f-reforma-gastosanu-row">
         <div class="form-group" id="f-reforma-group">
           <div class="form-label">Reforma / inversión (€)</div>
-          <input class="form-input" id="f-reforma" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
+          <input class="form-input" id="f-reforma" type="text" inputmode="decimal" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
         </div>
         <div class="form-group">
           <div class="form-label">Gastos anuales (€)</div>
-          <input class="form-input" id="f-gastos-anuales" type="text" inputmode="decimal" placeholder="0" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
+          <input class="form-input" id="f-gastos-anuales" type="text" inputmode="decimal" oninput="recalcPreview()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);recalcPreview()">
           <div class="form-hint">IBI + comunidad + seguro…</div>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Valor de mercado actual (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
-          <input class="form-input" id="f-precio-actual" type="text" inputmode="decimal" placeholder="Si no se indica, no cuenta en el patrimonio total" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-precio-actual" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint">Lo que valdría hoy, para ver el valor real de tu patrimonio — no afecta al cálculo de rentabilidad</div>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Alquiler cobrado hasta hoy, antes de usar la app (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
-          <input class="form-input" id="f-ingresos-acum" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="form-input" id="f-ingresos-acum" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="form-hint">Punto de partida para calcular la amortización real (punto 35): se rellena una sola vez con una estimación de todo lo cobrado desde que compraste el inmueble. A partir de ahí, la app suma sola los cobros que vayas registrando</div>
         </div>
       </div>
@@ -4308,11 +4308,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="form-row two">
           <div class="form-group">
             <div class="form-label">Precio de venta (€)</div>
-            <input class="form-input" id="f-venta-declarado" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+            <input class="form-input" id="f-venta-declarado" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           </div>
           <div class="form-group">
             <div class="form-label">Efectivo aparte (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(opcional)</span></div>
-            <input class="form-input" id="f-venta-efectivo" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+            <input class="form-input" id="f-venta-efectivo" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           </div>
         </div>
         <div class="form-hint">Se suma a lo cobrado en alquiler para calcular el resultado final de la inversión (punto 35)</div>
@@ -4325,31 +4325,31 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="form-row two" style="margin-top:14px;">
           <div class="form-group">
             <div class="form-label">Año de la venta (para el IRPF)</div>
-            <input class="form-input" id="f-venta-anio" type="text" inputmode="numeric" placeholder="2026">
+            <input class="form-input" id="f-venta-anio" type="text" inputmode="numeric">
           </div>
           <div class="form-group">
             <div class="form-label">Gastos de venta (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(agencia, etc.)</span></div>
-            <input class="form-input" id="f-venta-gastos" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+            <input class="form-input" id="f-venta-gastos" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           </div>
         </div>
         <div class="form-row two">
           <div class="form-group">
             <div class="form-label">Plusvalía municipal (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(en cuanto la sepas)</span></div>
-            <input class="form-input" id="f-venta-plusvalia" type="text" inputmode="decimal" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+            <input class="form-input" id="f-venta-plusvalia" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           </div>
           <div class="form-group">
             <div class="form-label">Año desde el que estuvo alquilado</div>
-            <input class="form-input" id="f-venta-anio-inicio" type="text" inputmode="numeric" placeholder="2017">
+            <input class="form-input" id="f-venta-anio-inicio" type="text" inputmode="numeric">
           </div>
         </div>
         <div class="form-row two">
           <div class="form-group">
             <div class="form-label">% del valor que es construcción <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(el resto es suelo)</span></div>
-            <input class="form-input" id="f-venta-pct-construccion" type="text" inputmode="decimal" placeholder="70">
+            <input class="form-input" id="f-venta-pct-construccion" type="text" inputmode="decimal">
           </div>
           <div class="form-group">
             <div class="form-label">Meses alquilado en el año de venta <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(0 si ya estaba vacío)</span></div>
-            <input class="form-input" id="f-venta-meses-ultimo-anio" type="text" inputmode="numeric" placeholder="0">
+            <input class="form-input" id="f-venta-meses-ultimo-anio" type="text" inputmode="numeric">
           </div>
         </div>
         <div class="form-hint">Con esto, Renta Patricio puede calcular aparte la ganancia patrimonial de la venta y mostrarte el resultado del IRPF de ese año contando también la venta. La plusvalía municipal se puede dejar en 0 y rellenar más adelante en cuanto llegue — el cálculo se actualiza solo.</div>
@@ -4373,7 +4373,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-section-title">Notas</div>
       <div class="form-row">
         <div class="form-group">
-          <input class="form-input" id="f-notas" type="text" placeholder="Observaciones opcionales">
+          <input class="form-input" id="f-notas" type="text">
         </div>
       </div>
 
@@ -4608,8 +4608,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         </div>
       </div>
       <input type="hidden" id="f-ref" value="VIV01">
-      <div class="frow-full"><div class="flabel-full">Dirección completa</div><input class="finput-full" id="f-dir" placeholder="C/ Mayor 14, 3º B, Lorca..." value="C/ Mayor 14, 3º B, 30800 Lorca (Murcia)"></div>
-      <div class="frow-full"><div class="flabel-full">Descripción catastral</div><input class="finput-full" id="f-catastral" placeholder="Ref. catastral..."></div>
+      <div class="frow-full"><div class="flabel-full">Dirección completa</div><input class="finput-full" id="f-dir" value="C/ Mayor 14, 3º B, 30800 Lorca (Murcia)"></div>
+      <div class="frow-full"><div class="flabel-full">Descripción catastral</div><input class="finput-full" id="f-catastral"></div>
     </div>
     <div class="fsection">
       <div class="ftitle">Inquilino / Arrendatario</div>
@@ -4633,23 +4633,23 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <!-- Campos persona física -->
       <div id="inq-persona-fields">
-        <div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre" placeholder="Nombre y apellidos" oninput="renderResponsableSelector()"></div>
+        <div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre" oninput="renderResponsableSelector()"></div>
         <div class="frow"><div class="flabel">Tratamiento</div><select class="finput" id="f-inq-genero"><option value="D.">D. (Don)</option><option value="Dña.">Dña. (Doña)</option></select></div>
-        <div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni" placeholder="00000000X"></div>
-        <div class="frow-full"><div class="flabel-full">Domicilio del inquilino</div><input class="finput-full" id="f-inq-dom" placeholder="Domicilio actual..."></div>
-        <div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-tel" type="tel" placeholder="600 000 000"></div>
-        <div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-email" type="email" placeholder="correo@ejemplo.com"></div>
+        <div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni"></div>
+        <div class="frow-full"><div class="flabel-full">Domicilio del inquilino</div><input class="finput-full" id="f-inq-dom"></div>
+        <div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-tel" type="tel"></div>
+        <div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-email" type="email"></div>
       </div>
       <!-- Campos empresa -->
       <div id="inq-empresa-fields" style="display:none">
-        <div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre" placeholder="Razón social" oninput="syncInqNombreEmpresa();renderResponsableSelector()"></div>
-        <div class="frow"><div class="flabel">CIF</div><input class="finput" id="f-inq-cif" placeholder="B00000000"></div>
-        <div class="frow-full"><div class="flabel-full">Domicilio social</div><input class="finput-full" id="f-inq-empresa-dom" placeholder="Domicilio social..."></div>
-        <div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-empresa-tel" type="tel" placeholder="600 000 000"></div>
-        <div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-empresa-email" type="email" placeholder="correo@ejemplo.com"></div>
+        <div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre" oninput="syncInqNombreEmpresa();renderResponsableSelector()"></div>
+        <div class="frow"><div class="flabel">CIF</div><input class="finput" id="f-inq-cif"></div>
+        <div class="frow-full"><div class="flabel-full">Domicilio social</div><input class="finput-full" id="f-inq-empresa-dom"></div>
+        <div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-empresa-tel" type="tel"></div>
+        <div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-empresa-email" type="email"></div>
         <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin:10px 0 6px;padding:0 2px;">Representante legal</div>
-        <div class="frow"><div class="flabel">Nombre rep.</div><input class="finput" id="f-inq-rep-nombre" placeholder="Nombre y apellidos"></div>
-        <div class="frow"><div class="flabel">DNI rep.</div><input class="finput" id="f-inq-rep-dni" placeholder="00000000X"></div>
+        <div class="frow"><div class="flabel">Nombre rep.</div><input class="finput" id="f-inq-rep-nombre"></div>
+        <div class="frow"><div class="flabel">DNI rep.</div><input class="finput" id="f-inq-rep-dni"></div>
       </div>
       <!-- Firmantes 2-5, inyectados dinámicamente por wizardSetNumFirmantes() -->
       <div id="firmantes-extra-container"></div>
@@ -4661,16 +4661,16 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div class="fsection">
       <div class="ftitle">Condiciones económicas</div>
-      <div class="frow"><div class="flabel">Renta mensual</div><input class="finput" id="f-con-renta" placeholder="0" value="750" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);_fianzaRevisar()"><span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">€/mes</span></div>
+      <div class="frow"><div class="flabel">Renta mensual</div><input class="finput" id="f-con-renta" value="750" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);_fianzaRevisar()"><span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">€/mes</span></div>
       <div class="frow">
         <div class="flabel">Fianza</div>
-        <input class="finput" id="f-fianza" placeholder="0" value="750" oninput="fianzaEditadaManualmente=true" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);if(_fianzaOrigen!==null)_fianzaPintarNota()">
+        <input class="finput" id="f-fianza" value="750" oninput="fianzaEditadaManualmente=true" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);if(_fianzaOrigen!==null)_fianzaPintarNota()">
         <span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">€</span>
       </div>
       <div id="fianza-nota" style="font-size:10px;color:var(--text2);padding:4px 14px 6px;margin-top:-4px;">
         1 mes (arrendatario persona física) · editable por acuerdo
       </div>
-      <div class="frow"><div class="flabel">Duración</div><input class="finput" id="f-duracion" placeholder="0" value="1" oninput="calcFechaFin();_fianzaRevisar()" inputmode="decimal"><span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">años</span></div>
+      <div class="frow"><div class="flabel">Duración</div><input class="finput" id="f-duracion" value="1" oninput="calcFechaFin();_fianzaRevisar()" inputmode="decimal"><span style="font-size:12px;color:var(--silver-dim);flex-shrink:0">años</span></div>
     </div>
     <div class="fsection">
       <div class="ftitle">Fechas</div>
@@ -4680,7 +4680,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <div class="fsection">
       <div class="ftitle">Cláusula especial de renta <span style="font-size:10px;color:var(--silver-dim);font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></div>
-      <textarea class="finput-full" id="f-renta-especial" rows="3" placeholder="Ej: El segundo año la renta será de 475€/mes. A partir del tercer año se actualizará según el IPC." style="width:100%;resize:vertical;min-height:72px;font-family:'Rajdhani',sans-serif;font-size:13px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:10px 12px;box-sizing:border-box;"></textarea>
+      <textarea class="finput-full" id="f-renta-especial" rows="3" style="width:100%;resize:vertical;min-height:72px;font-family:'Rajdhani',sans-serif;font-size:13px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:10px 12px;box-sizing:border-box;"></textarea>
       <div style="font-size:10px;color:var(--text2);padding:4px 2px;">Si se rellena, sustituye la cláusula estándar de actualización del IPC.</div>
     </div>
     <div class="fsection">
@@ -4698,11 +4698,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="fsection" style="background:rgba(229,115,115,.06);border:1px solid rgba(229,115,115,.2);border-radius:12px;padding:14px;margin-bottom:16px;">
         <div class="ftitle" style="color:#e57373;margin-bottom:12px;">❌ Liquidación de fianza</div>
         <div class="frow two">
-          <div><div class="flabel">Retención luz (€)</div><input class="finput" id="f-rescis-luz" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);rescis_calcNeto()"></div>
-          <div><div class="flabel">Retención agua (€)</div><input class="finput" id="f-rescis-agua" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);rescis_calcNeto()"></div>
+          <div><div class="flabel">Retención luz (€)</div><input class="finput" id="f-rescis-luz" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);rescis_calcNeto()"></div>
+          <div><div class="flabel">Retención agua (€)</div><input class="finput" id="f-rescis-agua" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);rescis_calcNeto()"></div>
         </div>
         <div class="frow">
-          <div><div class="flabel">Deuda pendiente de renta (€)</div><input class="finput" id="f-rescis-deuda" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);rescis_calcNeto()"></div>
+          <div><div class="flabel">Deuda pendiente de renta (€)</div><input class="finput" id="f-rescis-deuda" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);rescis_calcNeto()"></div>
         </div>
         <div style="margin-top:10px;padding:10px 12px;background:rgba(76,175,130,.08);border:1px solid rgba(76,175,130,.2);border-radius:8px;">
           <div style="font-size:11px;color:var(--silver-dim);">Neto a devolver al arrendatario</div>
@@ -4714,7 +4714,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="seccion-anexo" style="display:none;">
       <div class="fsection" style="background:rgba(94,140,224,.06);border:1px solid rgba(94,140,224,.2);border-radius:12px;padding:14px;margin-bottom:16px;">
         <div class="ftitle" style="color:var(--blue);margin-bottom:12px;">📎 Qué se modifica</div>
-        <textarea class="finput-full" id="f-anexo-motivo" rows="4" placeholder="Ej: Se autoriza al arrendatario a tener una mascota en la vivienda. / Se modifica la cuenta bancaria de pago de la renta, que pasa a ser ES00 0000 0000 0000 0000." style="width:100%;resize:vertical;min-height:88px;font-family:'Rajdhani',sans-serif;font-size:13px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:10px 12px;box-sizing:border-box;"></textarea>
+        <textarea class="finput-full" id="f-anexo-motivo" rows="4" style="width:100%;resize:vertical;min-height:88px;font-family:'Rajdhani',sans-serif;font-size:13px;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:10px 12px;box-sizing:border-box;"></textarea>
         <div style="font-size:11px;color:var(--silver-dim);margin-top:6px;">Escribe en una o dos frases qué se cambia — se incorporará tal cual al documento, dentro de la cláusula "Único. Modificación acordada".</div>
       </div>
     </div>
@@ -4722,7 +4722,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="seccion-rustico" style="display:none;">
       <div class="fsection" style="background:rgba(76,175,130,.06);border:1px solid rgba(76,175,130,.2);border-radius:12px;padding:14px;margin-bottom:16px;">
         <div class="ftitle" style="color:#4caf82;margin-bottom:12px;">🌾 Aprovechamiento de la finca</div>
-        <input class="finput-full" id="f-aprovechamiento" placeholder="Ej: cultivo de cítricos / secano / cereal / pastos...">
+        <input class="finput-full" id="f-aprovechamiento">
         <div style="font-size:11px;color:var(--silver-dim);margin-top:6px;">Qué uso agrícola concreto se autoriza — se incorpora tal cual en la cláusula de Objeto. Si se deja en blanco, el documento dirá "uso agrícola pactado".</div>
       </div>
     </div>
@@ -5182,7 +5182,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
   <div class="modal">
     <div class="mtitle">Registro histórico<span class="mclose" onclick="closeModalById('fac-modal-historico')">&#10005;</span></div>
     <div class="mfield"><div class="mflabel">Mes</div><input class="minput" id="fac-hist-mes" type="month"></div>
-    <div class="mfield"><div class="mflabel">Importe total (euros)</div><input class="minput" id="fac-hist-importe" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>
+    <div class="mfield"><div class="mflabel">Importe total (euros)</div><input class="minput" id="fac-hist-importe" type="number" inputmode="decimal" step="0.01"></div>
     <button class="btn1" onclick="fac_guardarHistorico()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fac-modal-historico')" style="margin-top:8px;">Cancelar</button>
   </div>
@@ -5204,7 +5204,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     <div id="fac-cobro-info" style="font-size:12px;color:var(--silver-mid);margin-bottom:14px;line-height:1.5;padding:10px 12px;background:rgba(76,175,130,.08);border-radius:10px;border:1px solid rgba(76,175,130,.2);"></div>
     <div class="mfield">
       <div class="mflabel">Importe cobrado (€)</div>
-      <input class="minput" type="number" inputmode="decimal" step="0.01" placeholder="0,00" id="fac-cobro-importe" oninput="facCobro_calcSaldo()">
+      <input class="minput" type="number" inputmode="decimal" step="0.01" id="fac-cobro-importe" oninput="facCobro_calcSaldo()">
     </div>
     <div id="fac-cobro-saldo-preview" style="display:none;margin:10px 0;padding:10px 12px;border-radius:10px;font-size:13px;"></div>
     <button class="btn1" onclick="facCobro_guardar()">Guardar</button>
@@ -5259,8 +5259,8 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       </div>
     </div>
     <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" type="date" id="cobro-fecha"></div>
-    <div class="mfield"><div class="mflabel">Importe</div><input class="minput" type="number" inputmode="decimal" placeholder="0,00" id="cobro-importe" step="0.01"></div>
-    <div class="mfield"><div class="mflabel">Concepto (opcional)</div><input class="minput" placeholder="Mes de junio, transferencia..." id="cobro-concepto"></div>
+    <div class="mfield"><div class="mflabel">Importe</div><input class="minput" type="number" inputmode="decimal" id="cobro-importe" step="0.01"></div>
+    <div class="mfield"><div class="mflabel">Concepto (opcional)</div><input class="minput" id="cobro-concepto"></div>
     <button class="btn1" onclick="guardarCobro()">Guardar apunte</button>
   </div>
 </div>
@@ -5327,7 +5327,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     </div>
     <div class="mfield" id="kurra-otro-wrap" style="display:none;">
       <div class="mflabel">Describe el concepto</div>
-      <input class="minput" id="kurra-otro-texto" placeholder="Ej: Derrama comunidad">
+      <input class="minput" id="kurra-otro-texto">
     </div>
     <div class="mfield" id="kurra-otro-tipo-wrap" style="display:none;">
       <div class="mflabel">Tipo</div>
@@ -5338,7 +5338,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     </div>
     <div class="mfield"><div class="mflabel">Mes</div><select class="minput" id="kurra-mes"></select></div>
     <div class="mfield"><div class="mflabel">Día</div><select class="minput" id="kurra-dia"></select></div>
-    <div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" type="number" inputmode="decimal" step="0.01" placeholder="0,00" id="kurra-importe"></div>
+    <div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" type="number" inputmode="decimal" step="0.01" id="kurra-importe"></div>
     <button class="btn1" onclick="kurra_guardarApunte()">Guardar apunte</button>
     <button class="btn2" id="kurra-btn-borrar" style="display:none;color:var(--red);" onclick="kurra_borrarApunte()">Eliminar apunte</button>
   </div>
@@ -5461,12 +5461,12 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div class="ftitle">Identificación</div>
       <div class="frow">
         <div class="flabel">Nombre / dirección</div>
-        <input class="finput" id="e_nombre" placeholder="C/ Mayor 14..." oninput="updateHeaderNombre()">
+        <input class="finput" id="e_nombre" oninput="updateHeaderNombre()">
       </div>
       <div class="frow frow-contact">
         <div class="flabel" style="color:var(--blue)">👤 Contacto / vendedor</div>
-        <input class="finput" id="e_contacto_nombre" placeholder="Nombre..." style="width:80px;font-size:13px;">
-        <input class="finput" id="e_contacto_tel" placeholder="Teléfono..." type="tel" style="width:80px;font-size:13px;">
+        <input class="finput" id="e_contacto_nombre" style="width:80px;font-size:13px;">
+        <input class="finput" id="e_contacto_tel" type="tel" style="width:80px;font-size:13px;">
       </div>
 
     </div>
@@ -5475,24 +5475,24 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div class="ftitle">Coste de adquisición</div>
       <div class="frow">
         <div class="flabel">Precio inmueble</div>
-        <input class="finput" id="e_precio" placeholder="0" oninput="onPrecioChange()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_precio" oninput="onPrecioChange()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow">
         <div class="flabel">Efectivo / entrada</div>
-        <input class="finput" id="e_efectivo" placeholder="0" oninput="if(_comisionModoPct){onComisionPctChange();}else{calcEstudio();}" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_efectivo" oninput="if(_comisionModoPct){onComisionPctChange();}else{calcEstudio();}" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow" id="frow-comision">
         <div class="flabel">Comisión agencia</div>
         <!-- Modo €: input libre -->
         <div id="com-modo-eur" style="display:flex;align-items:center;gap:4px;">
-          <input class="finput" id="e_comision" placeholder="0" style="width:90px;" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="finput" id="e_comision" style="width:90px;" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="funit">€</div>
         </div>
         <!-- Modo %: pct → calcula € -->
         <div id="com-modo-pct" style="display:none;align-items:center;gap:4px;">
-          <input class="finput finput-pct" id="e_comision_pct" placeholder="3" style="width:48px;" oninput="onComisionPctChange()">
+          <input class="finput finput-pct" id="e_comision_pct" style="width:48px;" oninput="onComisionPctChange()">
           <div class="funit">%</div>
           <div class="imp-arrow">→</div>
           <div class="funit" id="e_comision_calculada" style="color:var(--silver-bright);font-weight:700;font-size:14px;min-width:60px;text-align:right;">0€</div>
@@ -5504,31 +5504,31 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div class="frow frow-imp">
         <div class="flabel">Impuestos</div>
         <div class="imp-pct-wrap">
-          <input class="finput finput-pct" id="e_imp_pct" placeholder="7,75" value="7,75" oninput="onImpPctChange()">
+          <input class="finput finput-pct" id="e_imp_pct" value="7,75" oninput="onImpPctChange()">
           <div class="funit">%</div>
           <div class="imp-arrow">→</div>
-          <input class="finput finput-imp" id="e_impuestos" placeholder="0" oninput="onImpImporteChange()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="finput finput-imp" id="e_impuestos" oninput="onImpImporteChange()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="funit">€</div>
         </div>
       </div>
       <div class="frow" style="background:rgba(91,141,238,.06);border-color:rgba(91,141,238,.3)">
         <div class="flabel" style="color:var(--blue)">📋 Notaría <span style="font-size:10px;opacity:.6">(auto)</span></div>
-        <input class="finput" id="e_notaria" placeholder="—" oninput="_notariaManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_notaria" oninput="_notariaManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow" style="background:rgba(91,141,238,.06);border-color:rgba(91,141,238,.3)">
         <div class="flabel" style="color:var(--blue)">🏛️ Registro <span style="font-size:10px;opacity:.6">(auto)</span></div>
-        <input class="finput" id="e_registro" placeholder="—" oninput="_registroManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_registro" oninput="_registroManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow">
         <div class="flabel">Obras + gastos reforma</div>
-        <input class="finput" id="e_obras" placeholder="0" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_obras" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow">
         <div class="flabel">Mobiliario</div>
-        <input class="finput" id="e_mobiliario" placeholder="0" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_mobiliario" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow" style="background:rgba(201,168,76,.07);border-color:rgba(201,168,76,.3)">
@@ -5542,17 +5542,17 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div class="ftitle">Gastos anuales estimados</div>
       <div class="frow">
         <div class="flabel">Seguro hogar</div>
-        <input class="finput" id="e_seguro" placeholder="0" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_seguro" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€/año</div>
       </div>
       <div class="frow">
         <div class="flabel">IBI</div>
-        <input class="finput" id="e_ibi" placeholder="0" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_ibi" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€/año</div>
       </div>
       <div class="frow">
         <div class="flabel">Comunidad</div>
-        <input class="finput" id="e_comunidad_mes" placeholder="0" oninput="calcComunidad()" style="width:70px;" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_comunidad_mes" oninput="calcComunidad()" style="width:70px;" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€/mes</div>
         <div class="funit" style="margin-left:6px;color:var(--silver-dim);font-size:11px;" id="e_comunidad_anual_label">= 0€/año</div>
       </div>
@@ -5572,7 +5572,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div class="ftitle">Ingresos estimados</div>
       <div class="frow">
         <div class="flabel">Alquiler mensual</div>
-        <input class="finput" id="e_alquiler" placeholder="0" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_alquiler" oninput="calcEstudio()" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€/mes</div>
       </div>
     </div>
@@ -6123,15 +6123,15 @@ Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
       </div>
       <div style="margin-bottom:12px;">
         <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">CAIXA (€)</div>
-        <input id="finper-caixa" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        <input id="finper-caixa" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
       </div>
       <div style="margin-bottom:12px;">
         <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">MYINVESTOR (€)</div>
-        <input id="finper-myinvestor" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        <input id="finper-myinvestor" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
       </div>
       <div style="margin-bottom:16px;">
         <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">TRADE REPUBLIC (€)</div>
-        <input id="finper-traderepublic" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
+        <input id="finper-traderepublic" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;">
       </div>
       <button onclick="finper_guardar()" style="width:100%;background:#4caf82;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
       <button onclick="finper_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
@@ -6164,7 +6164,7 @@ Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
     <div style="font-size:12px;color:var(--silver-dim);margin-bottom:4px;" id="fin-asi-progreso"></div>
     <div style="font-size:16px;font-weight:600;color:var(--silver-bright);margin-bottom:14px;" id="fin-asi-pregunta"></div>
     <div style="font-size:12px;color:var(--silver-dim);margin-bottom:8px;" id="fin-asi-actual"></div>
-    <input class="minput" id="fin-asi-input" type="text" inputmode="decimal" placeholder="0,00" style="font-size:20px;text-align:right;padding:14px;" oninput="fin_asiFormatInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();fin_asiSiguiente();}">
+    <input class="minput" id="fin-asi-input" type="text" inputmode="decimal" style="font-size:20px;text-align:right;padding:14px;" oninput="fin_asiFormatInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();fin_asiSiguiente();}">
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn2" onclick="fin_asiSaltar()" style="flex:1;">Saltar</button>
       <button class="btn1" onclick="fin_asiSiguiente()" style="flex:2;">Siguiente &#8250;</button>
@@ -6175,9 +6175,9 @@ Bitcoin), más el valor inmobiliario en vivo (mismo dato que la tarjeta
 <div class="moverlay" id="fin-modal-cuenta">
   <div class="modal">
     <div class="mtitle">Cuenta bancaria<span class="mclose" onclick="closeModalById('fin-modal-cuenta')">&#10005;</span></div>
-    <div class="mfield"><div class="mflabel">Nombre / Banco</div><input class="minput" id="fin-cuenta-nombre" placeholder="Ej: CaixaBank corriente"></div>
-    <div class="mfield"><div class="mflabel">IBAN (ultimos 4 digitos)</div><input class="minput" id="fin-cuenta-iban" placeholder="0147" maxlength="4" inputmode="numeric"></div>
-    <div class="mfield"><div class="mflabel">Saldo actual (euros)</div><input class="minput" id="fin-cuenta-saldo" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Nombre / Banco</div><input class="minput" id="fin-cuenta-nombre"></div>
+    <div class="mfield"><div class="mflabel">IBAN (ultimos 4 digitos)</div><input class="minput" id="fin-cuenta-iban" maxlength="4" inputmode="numeric"></div>
+    <div class="mfield"><div class="mflabel">Saldo actual (euros)</div><input class="minput" id="fin-cuenta-saldo" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
     <input type="hidden" id="fin-cuenta-idx" value="">
     <button class="btn1" onclick="fin_guardarCuenta()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-cuenta')" style="margin-top:8px;">Cancelar</button>
@@ -6208,7 +6208,7 @@ abierto. -->
         <option value="OTRO">Otro</option>
       </select>
     </div>
-    <div class="mfield" id="fin-ticker-manual-row" style="display:none"><div class="mflabel">Ticker Yahoo Finance</div><input class="minput" id="fin-accion-ticker-manual" placeholder="Ej: IBE.MC"></div>
+    <div class="mfield" id="fin-ticker-manual-row" style="display:none"><div class="mflabel">Ticker Yahoo Finance</div><input class="minput" id="fin-accion-ticker-manual"></div>
     <div class="mfield"><div class="mflabel">Tipo</div>
       <select class="minput" id="fin-accion-tipo" onchange="fin_tipoChange()">
         <option value="compra">Compra</option>
@@ -6220,26 +6220,26 @@ abierto. -->
     <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" id="fin-accion-fecha" type="date"></div>
     <!-- Campos compra/venta -->
     <div id="fin-campos-compraventa">
-      <div class="mfield"><div class="mflabel">Cantidad (acciones)</div><input class="minput" id="fin-accion-cantidad" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
-      <div class="mfield"><div class="mflabel">Precio unitario (euros)</div><input class="minput" id="fin-accion-precio" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Cantidad (acciones)</div><input class="minput" id="fin-accion-cantidad" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
+      <div class="mfield"><div class="mflabel">Precio unitario (euros)</div><input class="minput" id="fin-accion-precio" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
     </div>
     <!-- Campos dividendo efectivo -->
     <div id="fin-campos-dividendo" style="display:none">
-      <div class="mfield"><div class="mflabel">Num. acciones en ese momento</div><input class="minput" id="fin-div-acciones" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
-      <div class="mfield"><div class="mflabel">Importe bruto total (euros)</div><input class="minput" id="fin-div-importe" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-      <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-div-obs" placeholder="Ej: A cuenta, Complementario..."></div>
+      <div class="mfield"><div class="mflabel">Num. acciones en ese momento</div><input class="minput" id="fin-div-acciones" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
+      <div class="mfield"><div class="mflabel">Importe bruto total (euros)</div><input class="minput" id="fin-div-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-div-obs"></div>
     </div>
     <!-- Campos scrip dividend -->
     <div id="fin-campos-scrip" style="display:none">
-      <div class="mfield"><div class="mflabel">Acciones recibidas</div><input class="minput" id="fin-scrip-acciones" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
+      <div class="mfield"><div class="mflabel">Acciones recibidas</div><input class="minput" id="fin-scrip-acciones" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
       <!-- PUNTO 70 (30/08/2026): valor real en euros de las acciones recibidas
            (acciones × cotización de apertura ese día) — antes solo quedaba
            anotado como texto en la Observación, y no contaba ni en "Dividendos
            cobrados" ni en el Resumen anual ni en Análisis de Dividendos. -->
-      <div class="mfield"><div class="mflabel">Valor real de esas acciones (euros)</div><input class="minput" id="fin-scrip-valor-real" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Valor real de esas acciones (euros)</div><input class="minput" id="fin-scrip-valor-real" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
       <div class="form-hint" style="margin:-4px 2px 10px;">Acciones recibidas × cotización de apertura ese día. Si lo dejas en blanco, se aproxima con la cotización actual (menos exacto).</div>
-      <div class="mfield"><div class="mflabel">Efectivo por derechos sobrantes (euros)</div><input class="minput" id="fin-scrip-sobrantes" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-      <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-scrip-obs" placeholder="Opcional"></div>
+      <div class="mfield"><div class="mflabel">Efectivo por derechos sobrantes (euros)</div><input class="minput" id="fin-scrip-sobrantes" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Observacion (opcional)</div><input class="minput" id="fin-scrip-obs"></div>
     </div>
     <button class="btn1" onclick="fin_guardarAccion()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-accion')" style="margin-top:8px;">Cancelar</button>
@@ -6250,8 +6250,8 @@ abierto. -->
 <div class="moverlay" id="fin-modal-fondo">
   <div class="modal">
     <div class="mtitle">Fondo de inversion<span class="mclose" onclick="closeModalById('fin-modal-fondo')">&#10005;</span></div>
-    <div class="mfield"><div class="mflabel">Nombre del fondo</div><input class="minput" id="fin-fondo-nombre" placeholder="Ej: Indexa Capital Cartera 10"></div>
-    <div class="mfield"><div class="mflabel">Gestora / Plataforma</div><input class="minput" id="fin-fondo-gestora" placeholder="Ej: Indexa Capital"></div>
+    <div class="mfield"><div class="mflabel">Nombre del fondo</div><input class="minput" id="fin-fondo-nombre"></div>
+    <div class="mfield"><div class="mflabel">Gestora / Plataforma</div><input class="minput" id="fin-fondo-gestora"></div>
     <!-- PUNTO 114 (06/09/2026): en qué cuenta/broker está metido este fondo —
     lo usa el Panel Patrimonio Financiero para saber cuánto de cada broker es
     "Invertido", sin que tengas que volver a escribir el importe a mano. -->
@@ -6264,8 +6264,8 @@ abierto. -->
         <option value="otra">Otra</option>
       </select>
     </div>
-    <div class="mfield"><div class="mflabel">Total aportado (euros)</div><input class="minput" id="fin-fondo-aportado" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-    <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-fondo-valor" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Total aportado (euros)</div><input class="minput" id="fin-fondo-aportado" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-fondo-valor" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
     <input type="hidden" id="fin-fondo-idx" value="">
     <!-- PUNTO 86 (30/08/2026): aportación periódica automática (DCA). -->
     <div class="mfield" style="display:flex;align-items:center;gap:10px;">
@@ -6273,8 +6273,8 @@ abierto. -->
       <label for="fin-fondo-dca-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Aportación periódica automática (DCA)</label>
     </div>
     <div id="fin-fondo-dca-campos" style="display:none;">
-      <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-fondo-dca-importe" type="text" inputmode="decimal" placeholder="Ej: 100" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-      <div class="mfield"><div class="mflabel">Cada cuántos días</div><input class="minput" id="fin-fondo-dca-periodicidad" type="number" inputmode="numeric" placeholder="Ej: 15"></div>
+      <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-fondo-dca-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Cada cuántos días</div><input class="minput" id="fin-fondo-dca-periodicidad" type="number" inputmode="numeric"></div>
       <div class="mfield"><div class="mflabel">Fecha de inicio del DCA</div><input class="minput" id="fin-fondo-dca-fecha-inicio" type="date"></div>
       <div class="form-hint" style="margin:-4px 2px 10px;">Al entrar en Finanzas, si toca aportar, se te avisará para confirmarlo — el "Valor actual" se sigue actualizando siempre a mano.</div>
     </div>
@@ -6293,10 +6293,10 @@ cálculo a mano. -->
 <div class="moverlay" id="fin-modal-accion-simple">
   <div class="modal">
     <div class="mtitle" id="fin-accsimple-titulo">Acción (modo simple)<span class="mclose" onclick="closeModalById('fin-modal-accion-simple')">&#10005;</span></div>
-    <div class="mfield"><div class="mflabel">Nombre de la acción</div><input class="minput" id="fin-accsimple-nombre" placeholder="Ej: Hermès"></div>
-    <div class="mfield"><div class="mflabel">Nº de acciones</div><input class="minput" id="fin-accsimple-num" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
-    <div class="mfield"><div class="mflabel">Precio medio de compra (€/acción)</div><input class="minput" id="fin-accsimple-pmedio" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-    <div class="mfield"><div class="mflabel">Precio de mercado actual (€/acción)</div><input class="minput" id="fin-accsimple-pmercado" type="text" inputmode="decimal" placeholder="0" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Nombre de la acción</div><input class="minput" id="fin-accsimple-nombre"></div>
+    <div class="mfield"><div class="mflabel">Nº de acciones</div><input class="minput" id="fin-accsimple-num" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
+    <div class="mfield"><div class="mflabel">Precio medio de compra (€/acción)</div><input class="minput" id="fin-accsimple-pmedio" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Precio de mercado actual (€/acción)</div><input class="minput" id="fin-accsimple-pmercado" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
     <input type="hidden" id="fin-accsimple-idx" value="">
     <button class="btn1" onclick="fin_guardarAccionSimple()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-accion-simple')" style="margin-top:8px;">Cancelar</button>
@@ -6307,11 +6307,11 @@ cálculo a mano. -->
 <div class="moverlay" id="fin-modal-urbanitae">
   <div class="modal">
     <div class="mtitle">Proyecto Urbanitae<span class="mclose" onclick="closeModalById('fin-modal-urbanitae')">&#10005;</span></div>
-    <div class="mfield"><div class="mflabel">Nombre del proyecto</div><input class="minput" id="fin-urb-nombre" placeholder="Ej: Vivaldi Project"></div>
+    <div class="mfield"><div class="mflabel">Nombre del proyecto</div><input class="minput" id="fin-urb-nombre"></div>
     <div class="mfield"><div class="mflabel">Fecha de inversión</div><input class="minput" id="fin-urb-fecha" type="date" oninput="fin_urbanitaeActualizarPreview()"></div>
-    <div class="mfield"><div class="mflabel">Capital invertido (euros)</div><input class="minput" id="fin-urb-capital" type="text" inputmode="decimal" placeholder="0" oninput="fin_urbanitaeActualizarPreview()"></div>
-    <div class="mfield"><div class="mflabel">Interés pactado (% anual)</div><input class="minput" id="fin-urb-interes" type="text" inputmode="decimal" placeholder="Ej: 10,5" oninput="fin_urbanitaeActualizarPreview()"></div>
-    <div class="mfield"><div class="mflabel">Plazo (meses)</div><input class="minput" id="fin-urb-meses" type="number" inputmode="numeric" placeholder="Ej: 18" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="mfield"><div class="mflabel">Capital invertido (euros)</div><input class="minput" id="fin-urb-capital" type="text" inputmode="decimal" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="mfield"><div class="mflabel">Interés pactado (% anual)</div><input class="minput" id="fin-urb-interes" type="text" inputmode="decimal" oninput="fin_urbanitaeActualizarPreview()"></div>
+    <div class="mfield"><div class="mflabel">Plazo (meses)</div><input class="minput" id="fin-urb-meses" type="number" inputmode="numeric" oninput="fin_urbanitaeActualizarPreview()"></div>
     <div class="form-hint" id="fin-urb-preview" style="margin:-4px 2px 10px;"></div>
     <div class="mfield">
       <div class="mflabel">Estado</div>
@@ -6320,7 +6320,7 @@ cálculo a mano. -->
         <option value="cobrado">Cobrado</option>
       </select>
     </div>
-    <div class="mfield"><div class="mflabel">Detalle (opcional)</div><textarea class="mtextarea minput" id="fin-urb-detalle" rows="3" placeholder="Ubicación, garantía, condiciones de prórroga..."></textarea></div>
+    <div class="mfield"><div class="mflabel">Detalle (opcional)</div><textarea class="mtextarea minput" id="fin-urb-detalle" rows="3"></textarea></div>
     <input type="hidden" id="fin-urb-idx" value="">
     <button class="btn1" onclick="fin_guardarUrbanitae()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-urbanitae')" style="margin-top:8px;">Cancelar</button>
@@ -6406,27 +6406,27 @@ con editar/borrar en cada línea. -->
     <div style="display:grid;gap:10px;">
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Nombre completo</div>
-        <input id="cli-edit-nombre" class="finput" style="width:100%;box-sizing:border-box;" placeholder="Nombre y apellidos">
+        <input id="cli-edit-nombre" class="finput" style="width:100%;box-sizing:border-box;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">DNI / CIF</div>
-        <input id="cli-edit-dni" class="finput" style="width:100%;box-sizing:border-box;" placeholder="00000000X">
+        <input id="cli-edit-dni" class="finput" style="width:100%;box-sizing:border-box;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Teléfono</div>
-        <input id="cli-edit-tel" class="finput" type="tel" style="width:100%;box-sizing:border-box;" placeholder="600 000 000">
+        <input id="cli-edit-tel" class="finput" type="tel" style="width:100%;box-sizing:border-box;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Email</div>
-        <input id="cli-edit-email" class="finput" type="email" style="width:100%;box-sizing:border-box;" placeholder="correo@ejemplo.com">
+        <input id="cli-edit-email" class="finput" type="email" style="width:100%;box-sizing:border-box;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Domicilio</div>
-        <input id="cli-edit-dom" class="finput" style="width:100%;box-sizing:border-box;" placeholder="Dirección completa">
+        <input id="cli-edit-dom" class="finput" style="width:100%;box-sizing:border-box;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Notas</div>
-        <textarea id="cli-edit-notas" class="finput" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical;font-family:'Rajdhani',sans-serif;" placeholder="Observaciones opcionales"></textarea>
+        <textarea id="cli-edit-notas" class="finput" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical;font-family:'Rajdhani',sans-serif;"></textarea>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:14px;">
@@ -6506,35 +6506,35 @@ con editar/borrar en cada línea. -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Nombre completo</div>
-          <input class="form-input" id="cli-nuevo-nombre" type="text" placeholder="Nombre y apellidos, o razón social">
+          <input class="form-input" id="cli-nuevo-nombre" type="text">
         </div>
       </div>
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">DNI / NIE / CIF</div>
-          <input class="form-input" id="cli-nuevo-dni" type="text" placeholder="00000000X" oninput="this.value=this.value.toUpperCase()">
+          <input class="form-input" id="cli-nuevo-dni" type="text" oninput="this.value=this.value.toUpperCase()">
         </div>
         <div class="form-group">
           <div class="form-label">Teléfono</div>
-          <input class="form-input" id="cli-nuevo-tel" type="tel" placeholder="600 000 000">
+          <input class="form-input" id="cli-nuevo-tel" type="tel">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Email</div>
-          <input class="form-input" id="cli-nuevo-email" type="email" placeholder="correo@ejemplo.com">
+          <input class="form-input" id="cli-nuevo-email" type="email">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-label">Domicilio</div>
-          <input class="form-input" id="cli-nuevo-dom" type="text" placeholder="Dirección completa">
+          <input class="form-input" id="cli-nuevo-dom" type="text">
         </div>
       </div>
       <div class="form-section-title">Notas</div>
       <div class="form-row">
         <div class="form-group">
-          <textarea class="form-input" id="cli-nuevo-notas" style="min-height:60px;resize:vertical;" placeholder="Observaciones opcionales"></textarea>
+          <textarea class="form-input" id="cli-nuevo-notas" style="min-height:60px;resize:vertical;"></textarea>
         </div>
       </div>
       <button class="btn-save" onclick="cli_guardarNuevo()">GUARDAR CLIENTE</button>
@@ -6753,11 +6753,11 @@ con editar/borrar en cada línea. -->
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">SALARIO BRUTO (€)</div>
-      <input id="renta-nom-bruto" type="text" inputmode="decimal" placeholder="3.500" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="renta-nom-bruto" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">RETENCIÓN IRPF (€)</div>
-      <input id="renta-nom-retencion" type="text" inputmode="decimal" placeholder="420" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="renta-nom-retencion" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:20px;">
       <!-- PUNTO 126 (06/09/2026): este campo se llamaba "Seguridad Social" —
@@ -6767,7 +6767,7 @@ con editar/borrar en cada línea. -->
            El id y el nombre interno del dato (ss) se mantienen igual para no
            romper nada de lo que ya tengas guardado. -->
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CUOTA DE AUTÓNOMO (€)</div>
-      <input id="renta-nom-ss" type="text" inputmode="decimal" placeholder="290" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="renta-nom-ss" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <button onclick="renta_guardarNomina()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:14px;cursor:pointer;margin-bottom:10px;">GUARDAR</button>
     <button onclick="renta_cerrarModalNomina()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
@@ -6788,11 +6788,11 @@ con editar/borrar en cada línea. -->
          centrarlos también y así se ha dejado). -->
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CONCEPTO</div>
-      <input id="renta-gasto-concepto" type="text" placeholder="Ej: IBI, reparación caldera..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="renta-gasto-concepto" type="text" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">IMPORTE (€)</div>
-      <input id="renta-gasto-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="renta-gasto-importe" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA</div>
@@ -6870,11 +6870,11 @@ con editar/borrar en cada línea. -->
     </div>
     <div id="ingotros-otros-detalle-wrap" style="display:none;margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">ESPECIFICA</div>
-      <input id="ingotros-otros-detalle" type="text" placeholder="Ej: Sueldo, Dividendo Patrimer..." style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="ingotros-otros-detalle" type="text" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">IMPORTE (€)</div>
-      <input id="ingotros-importe" type="text" inputmode="decimal" placeholder="0,00" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+      <input id="ingotros-importe" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
     </div>
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA</div>
@@ -7010,7 +7010,7 @@ con editar/borrar en cada línea. -->
     <div class="mfield">
       <div class="mflabel">% IPC (variación anual)</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <input class="minput" type="number" inputmode="decimal" step="0.01" placeholder="Ej: 3.5" id="ipc-pct" oninput="ipc_calcular()" style="flex:1;">
+        <input class="minput" type="number" inputmode="decimal" step="0.01" id="ipc-pct" oninput="ipc_calcular()" style="flex:1;">
         <span style="color:var(--silver-dim);font-size:13px;flex-shrink:0;">%</span>
       </div>
     </div>
@@ -7036,7 +7036,7 @@ con editar/borrar en cada línea. -->
     </div>
     <div class="mfield">
       <div class="mflabel">Nueva renta pactada (€)</div>
-      <input class="minput" type="text" inputmode="decimal" placeholder="Ej: 750" id="sp-importe" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+      <input class="minput" type="text" inputmode="decimal" id="sp-importe" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
     </div>
     <button class="btn1" onclick="sp_guardar()">✓ Guardar</button>
     <button class="btn2" onclick="closeModalById('sp-modal')" style="margin-top:8px;">Cancelar</button>
@@ -8923,7 +8923,7 @@ function inm_actualizarCamposPorTipo(tipo) {
   const edificioLabel = document.getElementById('f-edificio-label');
   const edificioInput = document.getElementById('f-edificio');
   if (edificioLabel) edificioLabel.textContent = esRustico ? 'Nombre de la finca (opcional)' : 'Nombre del edificio (opcional)';
-  if (edificioInput) edificioInput.placeholder = esRustico ? 'Ej: Finca La Hoya' : 'Ej: Edificio Paris';
+  if (edificioInput) edificioInput.placeholder = ''; // PUNTO 223: sin textos de ejemplo
 
   const pisoGroup = document.getElementById('f-piso-group');
   const pisoLetraRow = document.getElementById('f-piso-letra-row');
@@ -8934,7 +8934,7 @@ function inm_actualizarCamposPorTipo(tipo) {
   const letraLabel = document.getElementById('f-letra-label');
   const letraInput = document.getElementById('f-letra');
   if (letraLabel) letraLabel.textContent = esRustico ? 'Número de finca' : 'Letra / puerta';
-  if (letraInput) letraInput.placeholder = esRustico ? 'Ej: 3' : 'B';
+  if (letraInput) letraInput.placeholder = ''; // PUNTO 223
 
   const m2Label = document.getElementById('f-m2-label');
   if (m2Label) m2Label.textContent = esRustico ? 'Superficie (m² o ha)' : 'Superficie (m²)';
@@ -10229,22 +10229,22 @@ function renderFirmanteExtraHTML(idx) {
     + '<div id="tab-inq-empresa-' + idx + '" onclick="setInqTipoExtra(' + idx + ',\'empresa\')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:12px;font-weight:600;color:var(--silver-dim);cursor:pointer;">🏢 Empresa</div>'
     + '</div>'
     + '<div id="inq-persona-fields-' + idx + '">'
-    + '<div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre-' + idx + '" placeholder="Nombre y apellidos" oninput="renderResponsableSelector()"></div>'
+    + '<div class="frow"><div class="flabel">Nombre completo</div><input class="finput" id="f-inq-nombre-' + idx + '" oninput="renderResponsableSelector()"></div>'
     + '<div class="frow"><div class="flabel">Tratamiento</div><select class="finput" id="f-inq-genero-' + idx + '"><option value="D.">D. (Don)</option><option value="Dña.">Dña. (Doña)</option></select></div>'
-    + '<div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni-' + idx + '" placeholder="00000000X"></div>'
-    + '<div class="frow-full"><div class="flabel-full">Domicilio</div><input class="finput-full" id="f-inq-dom-' + idx + '" placeholder="Domicilio actual..."></div>'
-    + '<div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-tel-' + idx + '" type="tel" placeholder="600 000 000"></div>'
-    + '<div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-email-' + idx + '" type="email" placeholder="correo@ejemplo.com"></div>'
+    + '<div class="frow"><div class="flabel">DNI / NIE</div><input class="finput" id="f-inq-dni-' + idx + '"></div>'
+    + '<div class="frow-full"><div class="flabel-full">Domicilio</div><input class="finput-full" id="f-inq-dom-' + idx + '"></div>'
+    + '<div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-tel-' + idx + '" type="tel"></div>'
+    + '<div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-email-' + idx + '" type="email"></div>'
     + '</div>'
     + '<div id="inq-empresa-fields-' + idx + '" style="display:none">'
-    + '<div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre-' + idx + '" placeholder="Razón social" oninput="renderResponsableSelector()"></div>'
-    + '<div class="frow"><div class="flabel">CIF</div><input class="finput" id="f-inq-cif-' + idx + '" placeholder="B00000000"></div>'
-    + '<div class="frow-full"><div class="flabel-full">Domicilio social</div><input class="finput-full" id="f-inq-empresa-dom-' + idx + '" placeholder="Domicilio social..."></div>'
-    + '<div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-empresa-tel-' + idx + '" type="tel" placeholder="600 000 000"></div>'
-    + '<div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-empresa-email-' + idx + '" type="email" placeholder="correo@ejemplo.com"></div>'
+    + '<div class="frow"><div class="flabel">Nombre empresa</div><input class="finput" id="f-inq-empresa-nombre-' + idx + '" oninput="renderResponsableSelector()"></div>'
+    + '<div class="frow"><div class="flabel">CIF</div><input class="finput" id="f-inq-cif-' + idx + '"></div>'
+    + '<div class="frow-full"><div class="flabel-full">Domicilio social</div><input class="finput-full" id="f-inq-empresa-dom-' + idx + '"></div>'
+    + '<div class="frow"><div class="flabel">Teléfono</div><input class="finput" id="f-inq-empresa-tel-' + idx + '" type="tel"></div>'
+    + '<div class="frow"><div class="flabel">Email</div><input class="finput" id="f-inq-empresa-email-' + idx + '" type="email"></div>'
     + '<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin:10px 0 6px;">Representante legal</div>'
-    + '<div class="frow"><div class="flabel">Nombre rep.</div><input class="finput" id="f-inq-rep-nombre-' + idx + '" placeholder="Nombre y apellidos"></div>'
-    + '<div class="frow"><div class="flabel">DNI rep.</div><input class="finput" id="f-inq-rep-dni-' + idx + '" placeholder="00000000X"></div>'
+    + '<div class="frow"><div class="flabel">Nombre rep.</div><input class="finput" id="f-inq-rep-nombre-' + idx + '"></div>'
+    + '<div class="frow"><div class="flabel">DNI rep.</div><input class="finput" id="f-inq-rep-dni-' + idx + '"></div>'
     + '</div>'
     + '</div>';
 }
@@ -10531,9 +10531,9 @@ function addPadronPerson() {
   div.className = 'padron-person-card'; div.id = 'pp-' + idx;
   div.innerHTML = `<div class="padron-person-header"><div class="padron-person-num">Persona ${idx}</div><div class="padron-person-remove" onclick="removePadronPerson(${idx})">✕</div></div>
     <div class="padron-person-fields">
-      <input class="padron-input padron-input-full" placeholder="Nombre completo" id="pp-nombre-${idx}">
-      <input class="padron-input" placeholder="DNI / NIE" id="pp-dni-${idx}">
-      <input class="padron-input" placeholder="Parentesco" id="pp-rel-${idx}">
+      <input class="padron-input padron-input-full" id="pp-nombre-${idx}">
+      <input class="padron-input" id="pp-dni-${idx}">
+      <input class="padron-input" id="pp-rel-${idx}">
     </div>
     <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px;">DNI (frente / reverso)</div>
     <div class="dni-upload-row">
@@ -13040,12 +13040,12 @@ function rus_renderModalContent() {
   html += '</table>';
   html += '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">';
   html += '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-bottom:8px;">Añadir / corregir un año</div>';
-  html += '<div class="mfield"><div class="mflabel">Año</div><input class="minput" id="rus-form-anio" type="number" placeholder="' + new Date().getFullYear() + '"></div>';
+  html += '<div class="mfield"><div class="mflabel">Año</div><input class="minput" id="rus-form-anio" type="number"></div>';
   html += '<div class="mfield"><div class="mflabel">Mes de cobro</div><select class="minput" id="rus-form-mes">';
   html += '<option value="">-- Selecciona --</option>';
   for (var mm = 1; mm <= 12; mm++) { html += '<option value="' + mm + '">' + RUS_MESES_NOMBRE[mm] + '</option>'; }
   html += '</select></div>';
-  html += '<div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" id="rus-form-importe" type="number" inputmode="decimal" step="0.01" placeholder="0"></div>';
+  html += '<div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" id="rus-form-importe" type="number" inputmode="decimal" step="0.01"></div>';
   html += '<button class="btn1" onclick="rus_guardarAnio()">Guardar</button>';
   html += '</div>';
   document.getElementById('rus-hist-content').innerHTML = html;
@@ -14306,7 +14306,7 @@ function mostrarVacantes(){
           <div class="ifname">${inm.direccion||'Sin dirección'}</div>
           <div class="iftenant" style="color:var(--amber)">Sin inquilino${rentaEst?' · Est. '+fmtE(rentaEst):''}</div>
         </div>
-        <div class="ifprice"><input class="ifprice-input" value="${rentaEst?fmt(rentaEst):''}" data-orig="${rentaEst}" onchange="calcTotal()" oninput="calcTotal()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);calcTotal()" placeholder="0" inputmode="decimal"><div class="ifunit">€</div></div>
+        <div class="ifprice"><input class="ifprice-input" value="${rentaEst?fmt(rentaEst):''}" data-orig="${rentaEst}" onchange="calcTotal()" oninput="calcTotal()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);calcTotal()" inputmode="decimal"><div class="ifunit">€</div></div>
       </div>`;
     });
   });
@@ -15430,8 +15430,8 @@ function addOtroConcepto(desc='', importe=''){
   div.className = 'otros-sub-row';
   div.id = id;
   div.innerHTML = `
-    <input class="otros-sub-desc" placeholder="Concepto..." value="${desc}">
-    <input class="otros-sub-amount" placeholder="0€" value="${importe}" oninput="calcOtrosTotal()">
+    <input class="otros-sub-desc" value="${desc}">
+    <input class="otros-sub-amount" value="${importe}" oninput="calcOtrosTotal()">
     <span class="otros-sub-del" onclick="document.getElementById('${id}').remove();calcOtrosTotal()">✕</span>
   `;
   container.appendChild(div);
@@ -15502,8 +15502,8 @@ function addGasto(cat, color, desc='', amount=''){
   div.id = id;
   div.innerHTML = `
     <div class="gasto-cat-dot" style="background:${color}"></div>
-    <input class="gasto-desc" placeholder="Descripción..." value="${desc}">
-    <input class="gasto-amount" placeholder="0€" value="${amount}" oninput="calcTotalGastos()">
+    <input class="gasto-desc" value="${desc}">
+    <input class="gasto-amount" value="${amount}" oninput="calcTotalGastos()">
     <div class="gasto-del" onclick="document.getElementById('${id}').remove();calcTotalGastos()">✕</div>
   `;
   container.appendChild(div);
@@ -16566,7 +16566,7 @@ function setNombreMode(mode) {
     inp.readOnly = true;
     inp.style.opacity = '0.5';
   } else {
-    inp.placeholder = 'Ej: VIV01_Contrato_Ana_2026';
+    inp.placeholder = ''; // PUNTO 223
     inp.readOnly = false;
     inp.style.opacity = '1';
     inp.focus();
@@ -23112,9 +23112,29 @@ function renta_abrirModalNomina(idx) {
     renta_nomEditIdx = -1;
     document.getElementById('renta-nom-bruto').value = '';
     document.getElementById('renta-nom-retencion').value = '';
-    document.getElementById('renta-nom-ss').value = '';
+    // PUNTO 223 (01/10/2026): la cuota de autónomo sale ya rellena con la
+    // de la última nómina guardada (es siempre la misma) — se puede cambiar.
+    var ssUlt = renta_ultimaCuotaAutonomo();
+    document.getElementById('renta-nom-ss').value = ssUlt ? fmtGlobal(ssUlt) : '';
     if (titEl) titEl.textContent = '💼 AÑADIR NÓMINA';
   }
+}
+// Cuota de autónomo de la última nómina guardada (este año; si aún no hay
+// ninguna, la del año anterior).
+function renta_ultimaCuotaAutonomo() {
+  var anios = [renta_anio, renta_anio - 1];
+  for (var a = 0; a < anios.length; a++) {
+    var arr = [];
+    try { arr = JSON.parse(localStorage.getItem('renta:nominas:' + anios[a]) || '[]'); } catch (e) { arr = []; }
+    var mejor = null, mejorIdx = -1;
+    arr.forEach(function(n, i) {
+      if (!n || n.deleted || !(parseFloat(n.ss) > 0)) return;
+      var u = String(n.updatedAt || '');
+      if (!mejor || u > String(mejor.updatedAt || '') || (u === String(mejor.updatedAt || '') && i > mejorIdx)) { mejor = n; mejorIdx = i; }
+    });
+    if (mejor) return parseFloat(mejor.ss) || 0;
+  }
+  return 0;
 }
 function renta_cerrarModalNomina() {
   var modal = document.getElementById('renta-modal-nomina');
@@ -23240,7 +23260,7 @@ function renta_renderAlquileres() {
       + '<input type="text" inputmode="decimal" value="' + (amorBase ? fmtGlobal(parseFloat(amorBase)) : '') + '"'
       + ' onfocus="this.value=this.value.replace(/[.]/g,\'\').replace(/,/g,\'.\').replace(/[^0-9.]/g,\'\')"'
       + ' onblur="var v=parseFmtGlobal(this.value);this.value=v?fmtGlobal(v):\'\';renta_setInmCampo(\'' + inmId + '\',\'amorBase\',v||\'\')"'
-      + ' placeholder="0" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:\'Rajdhani\',sans-serif;">'
+      + ' style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:\'Rajdhani\',sans-serif;">'
       + '</div>';
 
     // Nota informativa
@@ -23326,9 +23346,9 @@ function alqmen_render() {
       + '<div style="font-size:12.5px;font-weight:700;color:var(--silver-bright);margin-bottom:8px;">' + label + (esCopia ? ' <span style="font-weight:400;color:var(--text-secondary);font-size:10.5px;">(copiado de ' + mesNombre(mesAnteriorYm) + ')</span>' : '') + '</div>'
       + '<div style="display:flex;gap:8px;">'
       + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">ALQUILER (€)</div>'
-      + '<input type="text" inputmode="decimal" class="alqmen-input-alquiler" value="' + alquilerVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '<input type="text" inputmode="decimal" class="alqmen-input-alquiler" value="' + alquilerVal + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
       + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">COMUNIDAD (€)</div>'
-      + '<input type="text" inputmode="decimal" class="alqmen-input-comunidad" value="' + comunidadVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '<input type="text" inputmode="decimal" class="alqmen-input-comunidad" value="' + comunidadVal + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
       + '</div></div>';
   });
   cont.innerHTML = html;
@@ -23411,9 +23431,9 @@ function segibi_render() {
       + '</div>'
       + '<div style="display:flex;gap:8px;">'
       + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">SEGURO (€/año)</div>'
-      + '<input type="text" inputmode="decimal" class="segibi-input-seguro" value="' + seguroVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '<input type="text" inputmode="decimal" class="segibi-input-seguro" value="' + seguroVal + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
       + '<div style="flex:1;"><div style="font-size:10px;color:var(--text-secondary);margin-bottom:3px;letter-spacing:0.5px;">IBI (€/año)</div>'
-      + '<input type="text" inputmode="decimal" class="segibi-input-ibi" value="' + ibiVal + '" placeholder="0" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
+      + '<input type="text" inputmode="decimal" class="segibi-input-ibi" value="' + ibiVal + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:7px 9px;font-family:\'Rajdhani\',sans-serif;"></div>'
       + '</div>'
       + (segibi_histAbierto[x.idx] ? histHtml : '')
       + '</div>';
