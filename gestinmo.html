@@ -2211,7 +2211,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261001_04';
+const BUILD_ID = '261001_05';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -19311,6 +19311,7 @@ function fin_patHist_render() {
   }
   if (sec) sec.style.display = '';
   if (emp === 'patricio') fin_patHist_migrarFinper(); // PUNTO 220
+  fin_patHist_corregirExcel(); // PUNTO 222
   var lista = fin_patHist_load();
   var mesActual = fin_patHist_mesActual();
   var tieneEsteMes = lista.some(function(r) { return r.id === mesActual; });
@@ -19373,7 +19374,7 @@ function fin_patHist_render() {
       if (r.urbanitae) partesB.push('Urbanitae ' + fin_fmt(r.urbanitae));
       if (partesB.length) html += '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">🏦 ' + partesB.join(' · ') + '</div>';
     }
-    if (r.origen === 'importado') html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:2px;">Traspasado de "Patrimonio financiero" (inmobiliario con el valor actual)</div>';
+    if (r.origen === 'importado') html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:2px;">Traspasado de "Patrimonio financiero"</div>';
     html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">Diferencia vs. mes anterior: ' + difHtml + '</div>';
     if (r.nota) html += '<div style="font-size:11px;color:var(--silver-bright);font-style:italic;margin-top:4px;">📝 ' + notas_esc(r.nota) + '</div>';
     html += '<div class="fin-card-actions">';
@@ -19419,8 +19420,12 @@ function fin_patHist_desglose() {
   fin_visibles('fin:fondos').forEach(function(f) {
     var v = parseFloat(f.valor) || 0;
     if (f.cuenta) _linea(f.cuenta, _nombreClave(f.cuenta)).invertido += v;
+    else if (f.gestora) _linea('g_' + String(f.gestora).toLowerCase().replace(/\s+/g, ''), f.gestora).invertido += v;
+    else if (emp === 'patrimer') _linea('indexa', 'Indexa').invertido += v; // PUNTO 222: en Patrimer, los fondos son de Indexa
     else _linea(SIN, 'Sin banco asignado').invertido += v;
   });
+  // PUNTO 222 (01/10/2026): en Patrimer todas las acciones están en Caixa (Patry).
+  var accPorDefecto = emp === 'patrimer' ? 'caixa' : '';
   // Acciones: la asignación de broker por valor solo existe para Patricio.
   var cuentaAcc = emp === 'patricio' ? _finAccionesCuentaLoad() : {};
   var simples = fin_accSimpleLoad();
@@ -19429,7 +19434,7 @@ function fin_patHist_desglose() {
     if (!s || s.deleted) return;
     var v = parseFloat(s.valorActual) || 0;
     if (s.origenTicker) origenSimple[s.origenTicker] = true;
-    var c = s.origenTicker ? cuentaAcc[s.origenTicker] : '';
+    var c = (s.origenTicker ? cuentaAcc[s.origenTicker] : '') || accPorDefecto;
     if (c) _linea(c, _nombreClave(c)).invertido += v;
     else _linea(SIN, 'Sin banco asignado').invertido += v;
   });
@@ -19447,7 +19452,7 @@ function fin_patHist_desglose() {
     var cot = _finCotizaciones[t] || null;
     if (!cot) return;
     var v = cot * pos[t];
-    var c = cuentaAcc[t];
+    var c = cuentaAcc[t] || accPorDefecto;
     if (c) _linea(c, _nombreClave(c)).invertido += v;
     else _linea(SIN, 'Sin banco asignado').invertido += v;
   });
@@ -19560,6 +19565,70 @@ function fin_patHist_guardarFoto() {
   info('✓ Patrimonio de ' + fin_patHist_nombreMes(mesId) + ' guardado: ' + fin_fmt(row.total));
 }
 
+// PUNTO 222 (01/10/2026): los 9 meses del Excel PERSONAL de Patry
+// (nov-25 → jul-26) se cargaron por error el 05/09/2026 en el histórico de
+// PATRIMER (y luego, vía "Patrimonio financiero", también en Patricio con el
+// inmobiliario de hoy). Decisión de Patry: borrarlos de Patrimer, y en
+// Patricio usar el inmobiliario REAL de cada mes (el de su Excel, con
+// Sierra Nevada todavía en cartera) en vez del valor actual.
+var PATHIST_EXCEL_PATRICIO = {
+  '2025-11': { liq: 31675.02, inv: 19128.53, inm: 540000.00 },
+  '2025-12': { liq: 43377.04, inv: 17122.98, inm: 530000.40 },
+  '2026-01': { liq: 47045.79, inv: 18754.77, inm: 530000.00 },
+  '2026-02': { liq: 47660.52, inv: 19157.62, inm: 535000.00 },
+  '2026-03': { liq: 48061.40, inv: 20414.23, inm: 535000.00 },
+  '2026-04': { liq: 47075.89, inv: 21070.93, inm: 535000.00 },
+  '2026-05': { liq: 49524.83, inv: 20720.57, inm: 535000.00 },
+  '2026-06': { liq: 51568.69, inv: 22005.47, inm: 535000.00 },
+  '2026-07': { liq: 51568.69, inv: 22005.47, inm: 535000.00 }
+};
+function _patHistEsFilaExcel(r) {
+  var x = r && PATHIST_EXCEL_PATRICIO[r.id];
+  return !!x && Math.abs((parseFloat(r.liquidez) || 0) - x.liq) < 0.01 && Math.abs((parseFloat(r.invertido) || 0) - x.inv) < 0.01;
+}
+// Idempotente: solo actúa si encuentra algo que corregir.
+function fin_patHist_corregirExcel() {
+  try {
+    if (typeof getRol === 'function' && getRol() === 'viewer') return false;
+    if (!window._appEstable) return false;
+    var cambiado = false;
+    // a) Patrimer: fuera las filas del Excel personal (solo si los importes coinciden exactos).
+    var kPat = fin_patHist_key('patrimer');
+    var listaP = fin_patHist_load('patrimer');
+    var quitar = listaP.filter(_patHistEsFilaExcel);
+    if (quitar.length) {
+      // Se apuntan a mano en el registro de borrados (son más de 5 de golpe y
+      // el vigilante automático no los apuntaría) para que no "resuciten"
+      // desde la nube ni desde otro aparato.
+      var mapa = {};
+      try { mapa = JSON.parse(localStorage.getItem('sync:borrados') || '{}') || {}; } catch (e) { mapa = {}; }
+      var ahora = new Date().toISOString();
+      mapa[kPat] = mapa[kPat] || {};
+      quitar.forEach(function(r) { mapa[kPat][r.id] = ahora; });
+      localStorage.setItem('sync:borrados', JSON.stringify(mapa));
+      fin_patHist_save(listaP.filter(function(r) { return !_patHistEsFilaExcel(r); }), 'patrimer');
+      cambiado = true;
+    }
+    // b) Patricio: inmobiliario real de cada mes del Excel.
+    var listaC = fin_patHist_load('patricio');
+    var tocadas = 0;
+    listaC.forEach(function(r) {
+      if (!_patHistEsFilaExcel(r)) return;
+      var x = PATHIST_EXCEL_PATRICIO[r.id];
+      if (Math.abs((parseFloat(r.inmobiliario) || 0) - x.inm) < 0.01) return;
+      r.inmobiliario = x.inm;
+      r.total = Math.round((x.liq + x.inv + x.inm) * 100) / 100;
+      r.updatedAt = new Date().toISOString();
+      tocadas++;
+    });
+    if (tocadas) { fin_patHist_save(listaC, 'patricio'); cambiado = true; }
+    return cambiado;
+  } catch (e) {
+    console.warn('Corrección del histórico (Excel) fallida:', e.message);
+    return false;
+  }
+}
+
 // Traspaso (una vez por mes y aparato) de los meses del antiguo
 // "Patrimonio financiero (personal)" al histórico unificado de Patricio.
 // - Solo meses que el histórico todavía no tenga (los que ya había, se respetan).
@@ -19591,8 +19660,9 @@ function fin_patHist_migrarFinper() {
       hechos.push(r.id);
       if (tiene[r.id]) return;
       var liq = finper_liquidez(r), inv = finper_invertido(r);
-      var row = { id: r.id, fecha: r.id + '-01', liquidez: liq, invertido: inv, inmobiliario: inmActual,
-        total: liq + inv + inmActual, urbanitae: 0, nota: '', origen: 'importado', updatedAt: '2026-10-01T00:00:00.000Z' };
+      var inmMes = (PATHIST_EXCEL_PATRICIO[r.id] && _patHistEsFilaExcel({ id: r.id, liquidez: liq, invertido: inv })) ? PATHIST_EXCEL_PATRICIO[r.id].inm : inmActual; // PUNTO 222
+      var row = { id: r.id, fecha: r.id + '-01', liquidez: liq, invertido: inv, inmobiliario: inmMes,
+        total: liq + inv + inmMes, urbanitae: 0, nota: '', origen: 'importado', updatedAt: '2026-10-01T00:00:00.000Z' };
       if (r.caixa !== undefined && r.caixa !== null) {
         row.bancos = [
           { nombre: 'Caixa', liquidez: parseFloat(r.caixa) || 0, invertido: 0 },
@@ -19612,7 +19682,9 @@ function fin_patHist_migrarFinper() {
   }
 }
 setTimeout(function() {
-  if (fin_patHist_migrarFinper()) {
+  var a = fin_patHist_migrarFinper();
+  var b = fin_patHist_corregirExcel(); // PUNTO 222
+  if (a || b) {
     var m = document.getElementById('mod-finanzas');
     if (m && m.classList.contains('active') && typeof fin_render === 'function') fin_render();
   }
