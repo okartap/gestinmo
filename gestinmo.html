@@ -2030,6 +2030,7 @@ const DATA_KEYS = [
   'inmuebles:documentos',
   // PUNTO 219 (01/10/2026): administradores de fincas (lista compartida por varios inmuebles)
   'inmuebles:administradores',
+  'trading:capital_inicial', // PUNTO 225
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
   // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
   // anuales" de Inicio junto con los alquileres reales.
@@ -2211,7 +2212,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261001_06';
+const BUILD_ID = '261001_08';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2752,7 +2753,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -3502,7 +3503,10 @@ async function _tradingConsultarModo(modo) {
     if (typeof d.resultadoEUR === 'number') { eurAcumulado += d.resultadoEUR; tieneEUR++; }
     const fh = (d.fecha || '') + ' ' + (d.hora || '');
     if (fh > ultimaFecha) ultimaFecha = fh;
-    ops.push({ fh: fh, eur: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR : null });
+    ops.push({ fh: fh, eur: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR : null,
+      // PUNTO 225 (01/10/2026): detalle para la gráfica "Evolución de la cuenta".
+      fecha: d.fecha || '', hora: d.hora || '', instrumento: d.instrumento || '',
+      neto: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR - ((typeof d.comision === 'number') ? d.comision : 0) : null });
   });
   // PUNTO 165 (10/09/2026): serie cronológica del € acumulado, para la
   // gráfica de líneas pedida en este punto — se ordena por fecha+hora
@@ -3518,25 +3522,21 @@ async function _tradingConsultarModo(modo) {
     acumSerie += ops[i].eur;
     serieEUR.push(acumSerie);
   }
-  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, serieEUR, ultimaFecha };
+  return { numOperaciones, ganadoras, rAcumulada, tieneR, eurAcumulado, tieneEUR, serieEUR, ultimaFecha, ops };
 }
 window.cargarTradingOkarStats = async function() {
+  // PUNTO 225 (01/10/2026): se leen las dos cuentas (Real y Demo) — el panel
+  // tiene selector. Se mantienen los campos de antes (cuenta Real, o Demo si
+  // aún no hay reales) por compatibilidad.
   try {
-    let stats = await _tradingConsultarModo('real');
-    // PUNTO 141 (07/09/2026): mientras no haya ninguna operación REAL
-    // registrada todavía (antes de que empieces a operar en real de
-    // verdad), se enseña la cuenta DEMO en su lugar, claramente etiquetada
-    // — así la tarjeta no se queda vacía mientras solo hay pruebas. En
-    // cuanto TradingOkar registre al menos 1 operación real, esta tarjeta
-    // cambia sola a mostrar la cuenta real, sin que haga falta tocar nada.
-    let esDemo = false;
-    if (!stats.numOperaciones) {
-      const demoStats = await _tradingConsultarModo('demo');
-      if (demoStats.numOperaciones) { stats = demoStats; esDemo = true; }
-    }
+    const real = await _tradingConsultarModo('real');
+    const demo = await _tradingConsultarModo('demo');
+    const esDemo = !real.numOperaciones && !!demo.numOperaciones;
+    const stats = esDemo ? demo : real;
     return {
       ok: true,
       esDemo,
+      modos: { real: real, demo: demo },
       numOperaciones: stats.numOperaciones,
       winrate: stats.numOperaciones ? (stats.ganadoras / stats.numOperaciones) * 100 : null,
       rAcumulada: stats.rAcumulada, tieneR: stats.tieneR,
@@ -7275,6 +7275,7 @@ const BACKUP_KEYS = [
   // PUNTO 166 (14/09/2026): documentos por inmueble (enlaces a Drive).
   'inmuebles:documentos',
   'inmuebles:administradores', // PUNTO 219
+  'trading:capital_inicial', // PUNTO 225
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
   'ingresos:otros:patricio',
   'fin:cotizaciones',
@@ -9892,6 +9893,7 @@ function renderDetalleContrato(c) {
       const ref = (c.ref || '').toUpperCase();
       const todosLosDocs = JSON.parse(localStorage.getItem('documentos:lista') || '[]');
       docsVinculados = ref ? todosLosDocs.filter(d => (d.inmueble || '').toUpperCase() === ref) : [];
+      docsVinculados.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || ''))); // PUNTO 224
     } catch(e) {}
     if (docsVinculados.length === 0) {
       elDocsVinc.innerHTML = '';
@@ -10093,7 +10095,9 @@ function sp_render(c) {
   }
   const esRustica = c.tipo === 'rustica' || c.tipo === 'rusticatemp';
   const unidad = esRustica ? '/año' : '/mes';
-  cont.innerHTML = lista.map((s, i) => {
+  // PUNTO 224 (01/10/2026): lo más reciente primero. (se conserva el índice real para los botones)
+  const ordenSp = lista.map((s, i) => ({ s: s, i: i })).sort((a, b) => (b.s.fecha || '').localeCompare(a.s.fecha || ''));
+  cont.innerHTML = ordenSp.map(({ s, i }) => {
     const importe = fmtE(parseFloat(s.importe) || 0) + unidad;
     const fecha = fmtDate(s.fecha);
     return '<div style="display:flex;align-items:center;gap:10px;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
@@ -10686,8 +10690,9 @@ function det_renderPadronHistorial(c) {
     return;
   }
 
-  const activos = historial.filter(h => !h.fechaBaja);
-  const bajas = historial.filter(h => h.fechaBaja);
+  // PUNTO 224 (01/10/2026): lo más reciente primero.
+  const activos = historial.filter(h => !h.fechaBaja).sort((a, b) => String(b.fechaAlta || '').localeCompare(String(a.fechaAlta || '')));
+  const bajas = historial.filter(h => h.fechaBaja).sort((a, b) => String(b.fechaBaja || '').localeCompare(String(a.fechaBaja || '')));
 
   elEstado.textContent = activos.length
     ? activos.length + ' persona(s) empadronada(s) actualmente en este contrato.'
@@ -13019,7 +13024,7 @@ var RUS_MESES_NOMBRE = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio
 function rus_renderModalContent() {
   var ref = RUS_MODAL_REF, nombre = RUS_MODAL_NOMBRE;
   var hist = rus_loadHistorico();
-  var anios = Object.keys(hist).sort();
+  var anios = Object.keys(hist).sort().reverse(); // PUNTO 224 (01/10/2026): lo más reciente primero.
   var html = '<div style="font-size:13px;font-weight:700;color:var(--silver-bright);margin-bottom:12px;">📋 ' + nombre + '</div>';
   html += '<table style="width:100%;border-collapse:collapse;">';
   html += '<tr><th style="text-align:left;font-size:11px;color:var(--silver-dim);padding:4px 0;">Año</th><th style="text-align:left;font-size:11px;color:var(--silver-dim);padding:4px 0;">Mes</th><th style="text-align:right;font-size:11px;color:var(--silver-dim);padding:4px 0;">Importe</th><th></th></tr>';
@@ -13809,7 +13814,8 @@ function kurra_abrirCuenta(){
 }
 
 function kurra_render(){
-  const movs=kurra_load().slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  // PUNTO 224 (01/10/2026): lo más reciente primero.
+  const movs=kurra_load().slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const tot=kurra_calcularTotales(movs);
   document.getElementById('kurra-total-debe').textContent=fmtE(tot.debe);
   document.getElementById('kurra-total-haber').textContent=fmtE(tot.haber);
@@ -14174,8 +14180,11 @@ function showCuenta(idx, nombreOverride){
   if(movs.length===0){
     movsEl.innerHTML='<div class="empty-state">Sin movimientos registrados.</div>';
   } else {
-    movsEl.innerHTML=movs.map((m,i)=>{
-      saldoAcum+=(m.tipo==='fra'?-m.importe:m.importe);
+    // PUNTO 224 (01/10/2026): lo más reciente primero. El saldo acumulado se sigue
+    // calculando en orden cronológico; solo se invierte el orden de pintado.
+    movs.forEach(m=>{ saldoAcum+=(m.tipo==='fra'?-m.importe:m.importe); m._saldo=saldoAcum; });
+    movsEl.innerHTML=movs.slice().reverse().map((m,i)=>{
+      saldoAcum=m._saldo;
       const saldoCls=saldoAcum>0?'sp':saldoAcum<0?'sn':'sz';
       const fraVal=m.tipo==='fra'?fmt(m.importe):'—';
       const cobVal=m.tipo==='cob'?fmt(m.importe):'—';
@@ -14200,7 +14209,8 @@ function renderNotasCuenta(idx){
   const notas=load(KEYS.notas).filter(n=>n.inmuebleIdx===idx);
   const el=document.getElementById('cta-notas');
   if(notas.length===0){el.innerHTML='<div style="font-size:12px;color:var(--silver-dim);padding:8px 0;">Sin tareas.</div>';return;}
-  el.innerHTML=notas.map((n,i)=>{
+  // PUNTO 224 (01/10/2026): lo más reciente primero. (índice local real conservado para marcar hecha)
+  el.innerHTML=notas.map((n,i)=>({n,i})).sort((a,b)=>String(b.n.fecha||'').localeCompare(String(a.n.fecha||''))).map(({n,i})=>{
     const doneCls=n.done?'done':'';
     const checkCls=n.done?'done':'';
     const checkTxt=n.done?'✓':'';
@@ -17834,6 +17844,81 @@ function fin_renderTrading(forzar) {
     _pintarTrading(r);
   });
 }
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 225 (01/10/2026): TRADING — "Evolución de la cuenta" (mismo diseño
+// que el panel de TradingOkar, sin el bloque de resultado neto por día).
+// Decisiones de Patry: capital inicial lo mete él aquí (uno para Demo y
+// otro para Real, clave sincronizada 'trading:capital_inicial'); selector
+// Demo / Real. Saldo = capital inicial + suma de resultados netos.
+// Neto de cada operación = resultadoEUR − comisión (si la trae).
+// ═══════════════════════════════════════════════════════════════════════
+var _trdModo = null;          // 'real' | 'demo'
+var _trdPeriodo = '1M';       // '1S' | '1M' | '3M' | 'TODO'
+var _trdSel = null;           // índice del punto seleccionado
+var _trdPuntos = [];          // puntos pintados (para el toque)
+var TRD_MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
+var TRD_DIAS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+
+function trd_capitalLoad() {
+  try { return (JSON.parse(localStorage.getItem('trading:capital_inicial') || '[]') || []).filter(function(x) { return x && !x.deleted; }); } catch (e) { return []; }
+}
+function trd_capital(modo) {
+  var r = trd_capitalLoad().find(function(x) { return x.id === modo; });
+  return r ? (parseFloat(r.valor) || 0) : null;
+}
+function trd_editarCapital() {
+  if (bloqueaSiViewer('Cambiar el capital inicial de Trading')) return;
+  var modo = _trdModo || 'real';
+  var actual = trd_capital(modo);
+  var txt = prompt('Capital inicial de la cuenta ' + (modo === 'demo' ? 'DEMO' : 'REAL') + ' (€):', actual !== null ? fmtGlobal(actual) : '');
+  if (txt === null) return;
+  var v = parseFmtGlobal(txt);
+  if (!(v >= 0)) { alert('Importe no válido.'); return; }
+  var todos = [];
+  try { todos = JSON.parse(localStorage.getItem('trading:capital_inicial') || '[]') || []; } catch (e) { todos = []; }
+  var row = { id: modo, valor: v, updatedAt: new Date().toISOString() };
+  var i = todos.findIndex(function(x) { return x && x.id === modo; });
+  if (i >= 0) todos[i] = row; else todos.push(row);
+  localStorage.setItem('trading:capital_inicial', JSON.stringify(todos));
+  if (_tradingCache) _pintarTrading(_tradingCache);
+}
+function trd_setModo(m) { _trdModo = m; _trdSel = null; if (_tradingCache) _pintarTrading(_tradingCache); }
+function trd_setPeriodo(p) { _trdPeriodo = p; _trdSel = null; if (_tradingCache) _pintarTrading(_tradingCache); }
+
+function _trdFechaCorta(f) { var p = String(f).split('-'); return p[2] + ' ' + (TRD_MESES[parseInt(p[1], 10) - 1] || ''); }
+function _trdFechaLarga(f) {
+  var p = String(f).split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  return TRD_DIAS[d.getDay()] + ', ' + p[2] + ' ' + (TRD_MESES[+p[1] - 1] || '').toUpperCase() + ' ' + p[0];
+}
+function _trdIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _trdEur(v, signo, dec) {
+  var s = dec ? fin_fmt(Math.abs(v)) : fmtE(Math.abs(v));
+  if (signo) return (v > 0.005 ? '+' : (v < -0.005 ? '−' : '')) + s;
+  return (v < -0.005 ? '−' : '') + s;
+}
+function _trdCap(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
+
+// Serie diaria completa (todos los días con operaciones) → saldo al cierre.
+function _trdSerieDiaria(ops, capital) {
+  var porDia = {};
+  ops.forEach(function(o) {
+    if (o.neto === null || !o.fecha) return;
+    if (!porDia[o.fecha]) porDia[o.fecha] = { fecha: o.fecha, neto: 0, ops: [] };
+    porDia[o.fecha].neto += o.neto;
+    porDia[o.fecha].ops.push(o);
+  });
+  var dias = Object.keys(porDia).sort();
+  var saldo = capital, max = capital, maxFecha = null, serie = [];
+  dias.forEach(function(f) {
+    saldo += porDia[f].neto;
+    var dia = porDia[f];
+    dia.ops.sort(function(a, b) { return String(a.hora || '').localeCompare(String(b.hora || '')); });
+    if (saldo > max + 0.005) { max = saldo; maxFecha = f; }
+    serie.push({ fecha: f, saldo: saldo, neto: dia.neto, ops: dia.ops, max: max });
+  });
+  return { serie: serie, max: max, maxFecha: maxFecha, saldo: saldo };
+}
+
 function _pintarTrading(r) {
   var cont = document.getElementById('fin-trading-content');
   if (!cont) return;
@@ -17841,68 +17926,178 @@ function _pintarTrading(r) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">No se han podido cargar los datos de Trading' + (r && r.error ? ' (' + r.error + ')' : '') + '. Prueba a pulsar &#8635; para reintentar.</div>';
     return;
   }
-  if (!r.numOperaciones) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin operaciones registradas todavía en TradingOkar.</div>';
-    return;
-  }
-  var winTxt = r.winrate === null ? '—' : r.winrate.toFixed(1).replace('.', ',') + '%';
-  var rTxt = (r.rAcumulada >= 0 ? '+' : '') + r.rAcumulada.toFixed(1).replace('.', ',') + 'R';
-  // PUNTO 165 (10/09/2026): a petición tuya, el € ganado/perdido pasa a ser
-  // el dato principal de esta tarjeta (es lo que de verdad te dice cómo va
-  // tu rentabilidad) — la R acumulada se mantiene debajo, porque sigues
-  // queriéndola para analizar tu operativa (calidad de las entradas/salidas
-  // respecto al riesgo asumido), solo que ya no es el dato destacado.
-  var eurTxt = (typeof r.eurAcumulado === 'number') ? ((r.eurAcumulado >= 0 ? '+' : '') + fmtE(r.eurAcumulado)) : '—';
+  var modos = r.modos || {};
+  if (!_trdModo) _trdModo = (modos.real && modos.real.numOperaciones) ? 'real' : 'demo';
+  var st = modos[_trdModo] || { numOperaciones: 0, ops: [] };
   var html = '';
-  if (r.esDemo) {
-    html += '<div style="font-size:11px;color:#d9a441;background:rgba(217,164,65,0.12);border:1px dashed #d9a441;border-radius:8px;padding:6px 10px;margin-bottom:8px;text-align:center;">🧪 Cuenta demo — todavía no hay operaciones reales en TradingOkar</div>';
+  // Selector Demo / Real
+  var btn = function(id, txt, act, fn) {
+    return '<button onclick="' + fn + '(\'' + id + '\')" style="background:' + (act ? 'var(--navy-mid)' : 'transparent') + ';border:' + (act ? '1px solid var(--border)' : '1px solid transparent') + ';border-radius:8px;color:' + (act ? 'var(--silver-bright)' : 'var(--silver-dim)') + ';font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;padding:5px 12px;cursor:pointer;">' + txt + '</button>';
+  };
+  html += '<div style="display:flex;justify-content:center;gap:4px;margin-bottom:8px;">' +
+    btn('real', 'REAL', _trdModo === 'real', 'trd_setModo') + btn('demo', 'DEMO', _trdModo === 'demo', 'trd_setModo') + '</div>';
+  html += '<div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--silver-dim);font-weight:700;margin-bottom:8px;">EVOLUCIÓN DE LA CUENTA · ' + (_trdModo === 'demo' ? 'DEMO' : 'REAL') + '</div>';
+  if (!st.numOperaciones) {
+    html += '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin operaciones ' + (_trdModo === 'demo' ? 'demo' : 'reales') + ' registradas todavía en TradingOkar.</div>';
+    cont.innerHTML = html; return;
   }
-  html += '<div class="fin-patrimonio-rows compact">';
-  html += '<div class="row"><span>Operaciones</span><span>' + r.numOperaciones + '</span></div>';
+  var capital = trd_capital(_trdModo);
+  var sinCapital = capital === null;
+  var cap = sinCapital ? 0 : capital;
+  var full = _trdSerieDiaria(st.ops || [], cap);
+  // Periodo
+  html += '<div style="display:flex;justify-content:center;gap:4px;margin-bottom:10px;">' +
+    ['1S', '1M', '3M', 'TODO'].map(function(p) { return btn(p, p, _trdPeriodo === p, 'trd_setPeriodo'); }).join('') + '</div>';
+  var hoy = new Date();
+  var diasAtras = { '1S': 7, '1M': 30, '3M': 91 }[_trdPeriodo];
+  var desde = diasAtras ? _trdIso(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - diasAtras)) : null;
+  var serieP = desde ? full.serie.filter(function(d) { return d.fecha > desde; }) : full.serie.slice();
+  var previos = desde ? full.serie.filter(function(d) { return d.fecha <= desde; }) : [];
+  var saldoIni = previos.length ? previos[previos.length - 1].saldo : cap;
+  var maxIni = previos.length ? previos[previos.length - 1].max : cap;
+  var fechaIni = desde || (full.serie.length ? _trdIso(new Date(+full.serie[0].fecha.slice(0, 4), +full.serie[0].fecha.slice(5, 7) - 1, +full.serie[0].fecha.slice(8, 10) - 1)) : _trdIso(hoy));
+  var ganado = full.saldo - saldoIni;
+  var caida = full.saldo - full.max;
+  var enMax = caida > -0.005;
+  // KPIs
+  var kpi = function(val, lab, color, sub) {
+    return '<div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:8px 4px;text-align:center;">' +
+      '<div style="font-size:15px;font-weight:700;color:' + color + ';white-space:nowrap;">' + val + '</div>' +
+      '<div style="font-size:8.5px;letter-spacing:.5px;color:var(--silver-dim);margin-top:2px;text-transform:uppercase;line-height:1.25;">' + lab + (sub ? '<div style="white-space:nowrap;font-size:8px;">' + sub + '</div>' : '') + '</div></div>';
+  };
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;">' +
+    kpi(_trdEur(full.saldo), sinCapital ? 'Resultado acum.' : 'Saldo actual', 'var(--silver-bright)') +
+    kpi(_trdEur(ganado, true), 'Ganado ' + (_trdPeriodo === 'TODO' ? 'total' : _trdPeriodo), ganado >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', 'desde ' + _trdEur(saldoIni)) +
+    kpi(_trdEur(full.max), 'Máximo', 'var(--silver-bright)') +
+    kpi(enMax ? 'En máximos' : _trdEur(caida, true), 'Desde máximo', enMax ? 'var(--accent-green)' : 'var(--accent-red)') +
+    '</div>';
+  if (sinCapital) {
+    html += '<div style="font-size:11px;color:var(--accent-gold);text-align:center;margin-bottom:8px;">Sin capital inicial: la gráfica muestra el resultado acumulado. <span onclick="trd_editarCapital()" style="text-decoration:underline;cursor:pointer;">Ponerlo</span></div>';
+  }
+  // Gráfica
+  html += '<div id="trd-chart-wrap" style="position:relative;">' + _trdChartSVG(serieP, fechaIni, saldoIni, maxIni, cap, sinCapital, full) + '<div id="trd-tip"></div></div>';
+  // Leyenda
+  var tri = function(c, down) { return '<svg width="9" height="8" viewBox="0 0 10 9"><polygon points="' + (down ? '0,0 10,0 5,9' : '5,0 10,9 0,9') + '" fill="' + c + '"/></svg>'; };
+  html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;font-size:10px;color:var(--silver-dim);margin-top:6px;">' +
+    '<span><span style="display:inline-block;width:14px;height:2px;background:var(--silver-bright);vertical-align:middle;"></span> Saldo</span>' +
+    (sinCapital ? '' : '<span><span style="display:inline-block;width:14px;border-top:1px dashed var(--silver-dim);vertical-align:middle;"></span> Capital inicial</span>') +
+    '<span>' + tri('#4caf82') + ' Ganada</span><span>' + tri('#e57373', true) + ' Pérdida</span>' +
+    '<span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa6bd;vertical-align:middle;"></span> BE</span></div>';
+  html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:11px;color:var(--silver-dim);margin-top:6px;">' +
+    '<span><span style="color:#e6b84f;">★</span> Máximo histórico <b style="color:var(--silver-bright);">' + _trdEur(full.max, false, true) + '</b></span>' +
+    '<span><span style="display:inline-block;width:10px;height:8px;background:rgba(229,115,115,.45);vertical-align:middle;"></span> Caída desde máximo <b style="color:' + (enMax ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + (enMax ? '0,00 € · en máximos' : _trdEur(caida, true, true)) + '</b></span></div>';
+  // Estadísticas
+  var winTxt = st.numOperaciones ? (st.ganadoras / st.numOperaciones * 100).toFixed(1).replace('.', ',') + '%' : '—';
+  var rTxt = (st.rAcumulada >= 0 ? '+' : '') + st.rAcumulada.toFixed(1).replace('.', ',') + 'R';
+  html += '<div class="fin-patrimonio-rows compact" style="margin-top:10px;">';
+  html += '<div class="row"><span>Operaciones</span><span>' + st.numOperaciones + '</span></div>';
   html += '<div class="row"><span>Winrate</span><span>' + winTxt + '</span></div>';
-  html += '<div class="row"><span>Resultado (€)</span><span style="color:' + (r.eurAcumulado >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';font-weight:700;">' + eurTxt + '</span></div>';
-  html += '<div class="row"><span>R acumulada</span><span style="color:' + (r.rAcumulada >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + rTxt + '</span></div>';
+  html += '<div class="row"><span>R acumulada</span><span style="color:' + (st.rAcumulada >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + rTxt + '</span></div>';
+  html += '<div class="row"><span>Capital inicial</span><span onclick="trd_editarCapital()" style="cursor:pointer;">' + (sinCapital ? '—' : _trdEur(capital)) + ' ✏️</span></div>';
   html += '</div>';
-  if (r.tieneR < r.numOperaciones) {
-    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:8px;">' + (r.numOperaciones - r.tieneR) + ' operación(es) sin stop puesto — no cuentan en la R acumulada.</div>';
-  }
-  // PUNTO 165 (10/09/2026): gráfica de líneas del € acumulado, operación a
-  // operación en orden cronológico ("las entradas" que pediste) — SVG
-  // dibujado a mano, mismo criterio que el resto de la app (nada de
-  // librerías externas de gráficas). Con menos de 2 puntos no se dibuja
-  // (no hay línea que trazar).
-  var chartHtml = _tradingBuildChart(r.serieEUR);
-  if (chartHtml) {
-    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:10px;margin-bottom:2px;">Evolución del resultado acumulado (€) por operación</div>';
-    html += chartHtml;
+  if (st.tieneR < st.numOperaciones) {
+    html += '<div style="font-size:10px;color:var(--silver-dim);margin-top:6px;">' + (st.numOperaciones - st.tieneR) + ' operación(es) sin stop puesto — no cuentan en la R acumulada.</div>';
   }
   cont.innerHTML = html;
+  _trdPintarTip();
 }
-// PUNTO 165 (10/09/2026): dibuja la línea de € acumulado (serie ya viene
-// ordenada cronológicamente desde _tradingConsultarModo). SVG simple sin
-// librerías — mismo criterio "vanilla" que el resto de la app. El color
-// de la línea depende del signo del último punto (verde si el acumulado
-// termina en positivo, rojo si termina en negativo); la línea discontinua
-// marca el 0 para ver de un vistazo si estás por encima o por debajo.
-function _tradingBuildChart(serie) {
-  if (!serie || serie.length < 2) return '';
-  var w = 280, h = 70, pad = 4;
-  var valores = serie.concat([0]);
-  var mn = Math.min.apply(null, valores), mx = Math.max.apply(null, valores);
-  var rango = (mx - mn) || 1;
-  var stepX = (w - pad * 2) / (serie.length - 1);
-  var pts = serie.map(function(v, i) {
-    var x = pad + i * stepX;
-    var y = h - pad - ((v - mn) / rango) * (h - pad * 2);
-    return x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
-  var zeroY = h - pad - ((0 - mn) / rango) * (h - pad * 2);
-  var ultimo = serie[serie.length - 1];
-  var colorVar = ultimo >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:60px;display:block;">' +
-    '<line x1="' + pad + '" y1="' + zeroY.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + zeroY.toFixed(1) + '" style="stroke:var(--border);stroke-width:1;stroke-dasharray:2,2;"/>' +
-    '<polyline points="' + pts + '" style="fill:none;stroke:' + colorVar + ';stroke-width:2;" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '</svg>';
+
+function _trdChartSVG(serie, fechaIni, saldoIni, maxIni, cap, sinCapital, full) {
+  var W = 340, H = 190, L = 6, R = 40, T = 14, B = 22;
+  var t0 = new Date(fechaIni + 'T00:00:00').getTime();
+  var hoyT = new Date(_trdIso(new Date()) + 'T00:00:00').getTime();
+  var tUlt = serie.length ? new Date(serie[serie.length - 1].fecha + 'T00:00:00').getTime() : hoyT;
+  var t1 = Math.max(hoyT, tUlt, t0 + 86400000);
+  var vals = [saldoIni].concat(serie.map(function(d) { return d.saldo; }));
+  if (!sinCapital) vals.push(cap);
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  var pad = (mx - mn) * 0.12 || Math.max(1, Math.abs(mx) * 0.05);
+  mn -= pad; mx += pad;
+  var X = function(f) { return L + ((new Date(f + 'T00:00:00').getTime() - t0) / (t1 - t0)) * (W - L - R); };
+  var Y = function(v) { return T + (1 - (v - mn) / (mx - mn)) * (H - T - B); };
+  var pts = [{ x: X(fechaIni), y: Y(saldoIni), d: null }];
+  serie.forEach(function(d) { pts.push({ x: X(d.fecha), y: Y(d.saldo), d: d }); });
+  _trdPuntos = pts;
+  var s = '<svg id="trd-svg" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;touch-action:pan-y;" onclick="_trdToque(event)" onmousemove="_trdToque(event)">';
+  s += '<defs><linearGradient id="trd-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b8dee" stop-opacity="0.35"/><stop offset="1" stop-color="#5b8dee" stop-opacity="0"/></linearGradient></defs>';
+  // Rejilla y eje Y (marcas "redondas")
+  var bruto = (mx - mn) / 3, mag = Math.pow(10, Math.floor(Math.log10(bruto || 1)));
+  var paso = [1, 2, 2.5, 5, 10].map(function(m) { return m * mag; }).find(function(v) { return v >= bruto; }) || 10 * mag;
+  for (var vt = Math.ceil(mn / paso) * paso; vt <= mx; vt += paso) {
+    var yy = Y(vt);
+    if (yy < T + 4 || yy > H - B - 2) continue;
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy.toFixed(1) + '" y2="' + yy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)"/>';
+    s += '<text x="' + (W - R + 6) + '" y="' + (yy + 3).toFixed(1) + '" font-size="9" fill="#9aa6bd">' + String(Math.round(vt)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '</text>';
+  }
+  // Capital inicial
+  if (!sinCapital) {
+    var yc = Y(cap);
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yc.toFixed(1) + '" y2="' + yc.toFixed(1) + '" stroke="#9aa6bd" stroke-dasharray="3,3" stroke-width="1"/>';
+  }
+  // Zonas de caída desde máximo (bajo el máximo previo)
+  for (var i = 1; i < pts.length; i++) {
+    var dd = pts[i].d;
+    if (dd.saldo < dd.max - 0.005) {
+      var x0 = pts[i - 1].x, x1 = pts[i].x;
+      s += '<rect x="' + x0.toFixed(1) + '" y="' + Y(dd.max).toFixed(1) + '" width="' + Math.max(1, x1 - x0).toFixed(1) + '" height="' + Math.max(0, Y(dd.saldo) - Y(dd.max)).toFixed(1) + '" fill="rgba(229,115,115,0.18)"/>';
+    }
+  }
+  // Área + línea
+  var lin = pts.map(function(p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
+  s += '<polygon points="' + pts[0].x.toFixed(1) + ',' + (H - B) + ' ' + lin + ' ' + pts[pts.length - 1].x.toFixed(1) + ',' + (H - B) + '" fill="url(#trd-grad)"/>';
+  s += '<polyline points="' + lin + '" fill="none" stroke="#e8edf6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  // Marcadores por día
+  for (var j = 1; j < pts.length; j++) {
+    var p = pts[j], n = p.d.neto;
+    if (n > 0.005) s += '<polygon points="' + p.x.toFixed(1) + ',' + (p.y - 5).toFixed(1) + ' ' + (p.x + 4.5).toFixed(1) + ',' + (p.y + 3).toFixed(1) + ' ' + (p.x - 4.5).toFixed(1) + ',' + (p.y + 3).toFixed(1) + '" fill="#4caf82"/>';
+    else if (n < -0.005) s += '<polygon points="' + (p.x - 4.5).toFixed(1) + ',' + (p.y - 3).toFixed(1) + ' ' + (p.x + 4.5).toFixed(1) + ',' + (p.y - 3).toFixed(1) + ' ' + p.x.toFixed(1) + ',' + (p.y + 5).toFixed(1) + '" fill="#e57373"/>';
+    else s += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3.2" fill="#9aa6bd"/>';
+  }
+  // Estrella en el máximo histórico (si cae dentro del periodo)
+  if (full.maxFecha) {
+    var pm = pts.find(function(q) { return q.d && q.d.fecha === full.maxFecha; });
+    if (pm) s += '<text x="' + pm.x.toFixed(1) + '" y="' + (pm.y - 8).toFixed(1) + '" font-size="13" text-anchor="middle" fill="#e6b84f">★</text>';
+  }
+  // Eje X (5 fechas)
+  var nEt = 5;
+  for (var e = 0; e < nEt; e++) {
+    var te = t0 + (t1 - t0) * (e / (nEt - 1));
+    var fe = _trdIso(new Date(te));
+    var xe = L + (e / (nEt - 1)) * (W - L - R);
+    s += '<text x="' + xe.toFixed(1) + '" y="' + (H - 6) + '" font-size="9" fill="#9aa6bd" text-anchor="' + (e === 0 ? 'start' : (e === nEt - 1 ? 'end' : 'middle')) + '">' + _trdFechaCorta(fe) + '</text>';
+  }
+  s += '<g id="trd-sel"></g></svg>';
+  return s;
+}
+
+function _trdToque(ev) {
+  var svg = document.getElementById('trd-svg');
+  if (!svg || _trdPuntos.length < 2) return;
+  var rect = svg.getBoundingClientRect();
+  var x = (ev.clientX - rect.left) / rect.width * 340;
+  var best = 1, bd = Infinity;
+  for (var i = 1; i < _trdPuntos.length; i++) { var d = Math.abs(_trdPuntos[i].x - x); if (d < bd) { bd = d; best = i; } }
+  if (best === _trdSel) return;
+  _trdSel = best;
+  _trdPintarTip();
+}
+function _trdPintarTip() {
+  var tip = document.getElementById('trd-tip');
+  var g = document.getElementById('trd-sel');
+  if (!tip || !g || _trdPuntos.length < 2) { if (tip) tip.innerHTML = ''; return; }
+  if (_trdSel === null || _trdSel >= _trdPuntos.length) _trdSel = _trdPuntos.length - 1;
+  var p = _trdPuntos[_trdSel], d = p.d;
+  g.innerHTML = '<line x1="' + p.x.toFixed(1) + '" x2="' + p.x.toFixed(1) + '" y1="14" y2="168" stroke="#9aa6bd" stroke-dasharray="2,3"/>' +
+    '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5.5" fill="none" stroke="#e8edf6" stroke-width="1.5"/>';
+  var caida = d.saldo - d.max;
+  var filas = '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--silver-dim);">Saldo</span><b style="color:var(--silver-bright);">' + _trdEur(d.saldo, false, true) + '</b></div>' +
+    '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--silver-dim);">Neto del día</span><b style="color:' + (d.neto >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + _trdEur(d.neto, true, true) + '</b></div>';
+  d.ops.forEach(function(o) {
+    filas += '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--silver-dim);">' + notas_esc((o.hora || '').slice(0, 5)) + ' · ' + notas_esc(_trdCap(o.instrumento)) + '</span><span style="color:' + (o.neto >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + _trdEur(o.neto, true, true) + '</span></div>';
+  });
+  filas += '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--silver-dim);">Desde máximo</span><b style="color:' + (caida > -0.005 ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + (caida > -0.005 ? 'En máximos' : _trdEur(caida, true, true)) + '</b></div>';
+  tip.innerHTML = '<div style="position:absolute;top:0;' + (p.x > 170 ? 'right:' + Math.max(4, (340 - p.x) / 340 * 100 + 4).toFixed(0) + '%;' : 'left:' + Math.max(1, p.x / 340 * 100 + 4).toFixed(0) + '%;') + 'background:rgba(14,22,40,0.96);border:1px solid var(--border);border-radius:10px;padding:6px 9px;font-size:10px;line-height:1.35;min-width:150px;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.4);">' +
+    '<div style="text-align:center;font-size:10px;letter-spacing:1px;color:var(--silver-bright);font-weight:700;margin-bottom:4px;">' + _trdFechaLarga(d.fecha) + '</div>' + filas + '</div>';
 }
 
 // --- CUENTAS ---
@@ -18210,7 +18405,7 @@ function fin_verHistorico(ticker) {
     openModalById('fin-modal-historico');
     return;
   }
-  movs.sort(function(a, b) { return (a.op.fecha || '').localeCompare(b.op.fecha || ''); });
+  movs.sort(function(a, b) { return (b.op.fecha || '').localeCompare(a.op.fecha || ''); }); // PUNTO 224 (01/10/2026): lo más reciente primero.
   // Agrupar por año
   var porAnio = {};
   for (var j = 0; j < movs.length; j++) {
@@ -18218,7 +18413,7 @@ function fin_verHistorico(ticker) {
     if (!porAnio[anio]) porAnio[anio] = [];
     porAnio[anio].push(movs[j]);
   }
-  var anios = Object.keys(porAnio).sort();
+  var anios = Object.keys(porAnio).sort().reverse(); // PUNTO 224
   var totalDivHist = 0;
   var html = '<div style="padding:4px 0 0;display:flex;justify-content:flex-end;">';
   html += '<div class="fin-action-btn" onclick="fin_nuevaAccionPre(\'' + ticker + '\',\'compra\')">+ Nuevo movimiento</div>';
@@ -21577,6 +21772,7 @@ window._refreshCurrentModule = function(key) {
     'fin:urbanitae:industrias': 'finanzas',
     'fin:patrimonio_historico:patrimer': 'finanzas',
     'fin:patrimonio_historico:patricio': 'finanzas',
+    'trading:capital_inicial': 'finanzas',
     'fin:patrimonio_financiero:patricio': 'finanzas',
     // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — pantalla propia
     // (mod-finperdash), no la de Finanzas.
@@ -23520,7 +23716,10 @@ function renta_renderGastos() {
   }
   var total = 0;
   var html = '';
-  for (var i = 0; i < gastos.length; i++) {
+  // PUNTO 224 (01/10/2026): lo más reciente primero. (índice real conservado para ver/compartir/borrar)
+  var ordenG = gastos.map(function(_, k) { return k; }).sort(function(a, b) { return String(gastos[b].fecha || '').localeCompare(String(gastos[a].fecha || '')); });
+  for (var oi = 0; oi < ordenG.length; oi++) {
+    var i = ordenG[oi];
     var g = gastos[i];
     total += parseFloat(g.importe) || 0;
     // PUNTO 167 (14/09/2026): además del "ver", un botón de compartir
