@@ -2212,7 +2212,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261001_09';
+const BUILD_ID = '261001_10';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -3505,7 +3505,7 @@ async function _tradingConsultarModo(modo) {
     if (fh > ultimaFecha) ultimaFecha = fh;
     ops.push({ fh: fh, eur: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR : null,
       // PUNTO 225 (01/10/2026): detalle para la gráfica "Evolución de la cuenta".
-      fecha: d.fecha || '', hora: d.hora || '', instrumento: d.instrumento || '',
+      id: docSnap.id, fecha: d.fecha || '', hora: d.hora || '', instrumento: d.instrumento || '',
       neto: (typeof d.resultadoEUR === 'number') ? d.resultadoEUR - ((typeof d.comision === 'number') ? d.comision : 0) : null });
   });
   // PUNTO 165 (10/09/2026): serie cronológica del € acumulado, para la
@@ -3531,12 +3531,21 @@ window.cargarTradingOkarStats = async function() {
   try {
     const real = await _tradingConsultarModo('real');
     const demo = await _tradingConsultarModo('demo');
+    // PUNTO 227: ajustes de TradingOkar (capital inicial, margen BE) — mismo
+    // documento que usa TradingOkar: trading_operaciones/ajustes_<uid>.
+    let ajustes = null;
+    try {
+      if (auth.currentUser) {
+        const aSnap = await getDoc(doc(db, 'trading_operaciones', 'ajustes_' + auth.currentUser.uid));
+        if (aSnap.exists()) ajustes = aSnap.data();
+      }
+    } catch (eAj) { ajustes = null; }
     const esDemo = !real.numOperaciones && !!demo.numOperaciones;
     const stats = esDemo ? demo : real;
     return {
       ok: true,
       esDemo,
-      modos: { real: real, demo: demo },
+      modos: { real: real, demo: demo }, ajustes: ajustes,
       numOperaciones: stats.numOperaciones,
       winrate: stats.numOperaciones ? (stats.ganadoras / stats.numOperaciones) * 100 : null,
       rAcumulada: stats.rAcumulada, tieneR: stats.tieneR,
@@ -3551,6 +3560,313 @@ window.cargarTradingOkarStats = async function() {
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* PUNTO 227: ajustes de la gráfica OKCHART dentro de GestInmo (igual que en Okartap) */
+#trd-okc .okc-head{flex-direction:column;justify-content:center;margin-bottom:8px}
+#trd-okc .okc-title{text-align:center}
+#trd-okc .okc-kpis{gap:6px;margin-bottom:8px}
+#trd-okc .okc-kpi{padding:6px 3px;border-radius:8px}
+#trd-okc .okc-kpi .v{font-size:clamp(11.5px,3.3vw,14px)}
+#trd-okc .okc-kpi .l{font-size:8.5px}
+#trd-okc .okc-seg button{padding:5px 8px;font-size:10.5px;font-family:'Rajdhani',sans-serif}
+#trd-okc .okc-legend{align-items:center}
+#trd-okc .okc-leg-row{justify-content:center}
+#trd-okc .okc-btn{font-family:'Rajdhani',sans-serif}
+#trd-okc .okc-tbl th,#trd-okc .okc-tbl td{text-align:center!important}
+#trd-okc{font-family:'Rajdhani',sans-serif}
+</style>
+<script>
+// =====================================================================
+// OKCHART — Gráfica "Evolución de la cuenta" (compartida Okartap / GestInmo)
+// Versión 1 · 24/09/2026. SVG dibujado a mano, sin librerías externas.
+// Mismo bloque en las dos apps: si se cambia aquí, copiarlo igual en la otra.
+//
+// Uso:  okChart(contenedor, {
+//         ops: [{ id, fecha:"AAAA-MM-DD", hora:"HH:MM", neto: €, instrumento }],  // TODAS las del modo
+//         capital: 10000,        // capital inicial del modo
+//         beMargen: 1,           // ± € que cuentan como BE
+//         titulo: "Evolución de la cuenta · Demo",
+//         periodo: 30,           // días iniciales (0 = todo)
+//         selectorPeriodo: true, // botones 1S/1M/3M/Todo dentro de la tarjeta
+//         desde, hasta: "AAAA-MM-DD" (opcional, si la pantalla ya filtra por periodo)
+//         onPeriodo: function(dias) {}  // opcional: recordar el periodo elegido
+//       })
+// =====================================================================
+(function () {
+  var CSS = ".okc{position:relative}" +
+    ".okc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}" +
+    ".okc-title{margin:0;font-size:10.5px;color:#7a8db0;text-transform:uppercase;letter-spacing:2.2px;font-weight:700}" +
+    ".okc-seg{display:flex;background:#161f38;border:1px solid #253050;border-radius:10px;padding:3px;gap:2px}" +
+    ".okc-seg button{background:none;border:0;color:#7a8db0;font:inherit;font-weight:700;font-size:11px;letter-spacing:1px;padding:6px 10px;border-radius:7px;cursor:pointer;text-transform:uppercase}" +
+    ".okc-seg button.on{background:#202d50;color:#c8d4e8}" +
+    ".okc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}" +
+    ".okc-kpi{background:#161f38;border:1px solid #253050;border-radius:10px;padding:9px 4px;text-align:center;min-width:0}" +
+    ".okc-kpi .v{font-size:clamp(12px,3.4vw,15px);font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e8eef8}" +
+    ".okc-kpi .l{font-size:9px;color:#7a8db0;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}" +
+    ".okc .pos{color:#4caf82!important}.okc .neg{color:#e05555!important}" +
+    ".okc-chart{position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none}" +
+    ".okc svg{display:block;width:100%;overflow:visible}" +
+    ".okc text.ax{fill:#7a8db0;font-size:10px;font-weight:600;font-family:inherit}" +
+    ".okc text.sub{fill:#7a8db0;font-size:9.5px;font-weight:700;letter-spacing:1.4px;font-family:inherit}" +
+    ".okc-tip{position:absolute;top:6px;pointer-events:none;background:#161f38;border:1px solid #253050;border-radius:10px;padding:8px 10px;font-size:12px;min-width:160px;max-width:240px;box-shadow:0 6px 20px rgba(0,0,0,.45);opacity:0;transition:opacity .1s;z-index:5;color:#e8eef8}" +
+    ".okc-tip.show{opacity:1}" +
+    ".okc-tip .d{color:#7a8db0;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-weight:700}" +
+    ".okc-tip .row{display:flex;justify-content:space-between;gap:12px;align-items:center;line-height:1.55}" +
+    ".okc-tip .row span{color:#7a8db0;display:flex;align-items:center;gap:6px;white-space:nowrap}" +
+    ".okc-tip .row b{font-weight:700;color:#e8eef8;white-space:nowrap}" +
+    ".okc-key{display:inline-block;width:12px;height:2px;border-radius:1px}" +
+    ".okc-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:11px;color:#7a8db0;font-weight:600}" +
+    ".okc-legend{flex-direction:column;gap:6px}" +
+    ".okc-leg-row{display:flex;flex-wrap:wrap;gap:6px 14px}" +
+    ".okc-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}" +
+    ".okc-lv{color:#e8eef8;font-weight:700;margin-left:2px}" +
+    ".okc-btn{background:none;border:1px solid #253050;color:#7a8db0;font:inherit;font-weight:700;font-size:11px;letter-spacing:1px;border-radius:8px;padding:6px 10px;margin-top:12px;cursor:pointer;text-transform:uppercase}" +
+    ".okc-tbl{max-height:260px;overflow:auto;display:none}" +
+    ".okc-tbl table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}" +
+    ".okc-tbl th,.okc-tbl td{text-align:right;padding:6px 4px;border-bottom:1px solid #253050;color:#e8eef8}" +
+    ".okc-tbl th:first-child,.okc-tbl td:first-child{text-align:left}" +
+    ".okc-tbl th{color:#7a8db0;font-size:9.5px;text-transform:uppercase;letter-spacing:1px}" +
+    ".okc-empty{text-align:center;color:#7a8db0;font-size:12px;padding:24px 8px}";
+  function injectCSS() {
+    if (document.getElementById("okc-css")) return;
+    var st = document.createElement("style"); st.id = "okc-css"; st.textContent = CSS; document.head.appendChild(st);
+  }
+  var COL = { win: "#4caf82", loss: "#e05555", be: "#8a97b8" };
+  var NS = "http://www.w3.org/2000/svg";
+  var EUR = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
+  var EUR0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0, useGrouping: "always" });
+  function fE(n, s) { return (s && n > 0 ? "+" : "") + EUR.format(n) + " €"; }
+  function fE0(n, s) { return (s && n > 0 ? "+" : "") + EUR0.format(n) + " €"; }
+  function parseF(f) { var p = (f || "").split("-"); return new Date(+p[0], (+p[1] || 1) - 1, +p[2] || 1); }
+  function ymd(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function fD(f) { return parseF(f).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }).replace(".", ""); }
+  function fDL(f) { return parseF(f).toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }); }
+  function el(tag, attrs, parent) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+  function niceStep(range, n) { var raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw || 1))), m = raw / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
+  function div(cls, txt) { var d = document.createElement("div"); if (cls) d.className = cls; if (txt != null) d.textContent = txt; return d; }
+
+  window.okChart = function (cont, cfg) {
+    if (!cont) return;
+    injectCSS();
+    var be = typeof cfg.beMargen === "number" ? cfg.beMargen : 1;
+    var capital = typeof cfg.capital === "number" ? cfg.capital : 0;
+    var tipo = function (n) { return Math.abs(n) <= be ? "be" : n > 0 ? "win" : "loss"; };
+    // Orden cronológico y saldo acumulado desde el capital inicial (todas las fechas)
+    var todas = (cfg.ops || []).filter(function (o) { return typeof o.neto === "number" && !isNaN(o.neto) && o.fecha; })
+      .map(function (o) { return { id: o.id, fecha: o.fecha, hora: o.hora || "", neto: o.neto, instrumento: o.instrumento || "" }; })
+      .sort(function (a, b) { return (a.fecha + a.hora).localeCompare(b.fecha + b.hora); });
+    var acc = capital, pico = capital;
+    todas.forEach(function (o) { acc += o.neto; o.saldo = acc; pico = Math.max(pico, acc); o.pico = pico; });
+    var periodo = cfg.periodo == null ? 30 : cfg.periodo;
+
+    cont.innerHTML = "";
+    var root = div("okc"); cont.appendChild(root);
+    var head = div("okc-head"); root.appendChild(head);
+    head.appendChild(div("okc-title", cfg.titulo || "Evolución de la cuenta"));
+    var seg = null;
+    if (cfg.selectorPeriodo) {
+      seg = div("okc-seg"); head.appendChild(seg);
+      [[7, "1S"], [30, "1M"], [90, "3M"], [0, "Todo"]].forEach(function (p) {
+        var b = document.createElement("button"); b.type = "button"; b.textContent = p[1];
+        if (p[0] === periodo) b.className = "on";
+        b.onclick = function () { periodo = p[0]; if (cfg.onPeriodo) cfg.onPeriodo(periodo); [].forEach.call(seg.children, function (x) { x.className = x === b ? "on" : ""; }); dibujar(); };
+        seg.appendChild(b);
+      });
+    }
+    var kpis = div("okc-kpis"); root.appendChild(kpis);
+    function kpi() { var k = div("okc-kpi"); var v = div("v", "—"), l = div("l", ""); k.appendChild(v); k.appendChild(l); kpis.appendChild(k); return { v: v, l: l }; }
+    var kSaldo = kpi(), kRes = kpi(), kMax = kpi(), kDD = kpi();
+    kSaldo.l.textContent = "Saldo actual"; kMax.l.textContent = "Máximo"; kDD.l.textContent = "Desde máximo";
+    var chart = div("okc-chart"); root.appendChild(chart);
+    var svg = el("svg", { role: "img", "aria-label": "Evolución del saldo y resultado neto por día" }, chart);
+    var tip = div("okc-tip"); chart.appendChild(tip);
+    var leg = div("okc-legend"); root.appendChild(leg);
+    // Leyenda en dos filas: 1) qué es cada marca; 2) máximo histórico y caída
+    // desde el máximo CON SUS CIFRAS (lo que falta para volver al máximo).
+    leg.innerHTML =
+      '<div class="okc-leg-row">' +
+      '<span><i class="okc-key" style="background:#c8d4e8"></i>Saldo</span>' +
+      '<span><i class="okc-key" style="background:none;border-top:2px dashed #55628a;height:0"></i>Capital inicial</span>' +
+      '<span><svg width="10" height="10"><path d="M5 1 L9 9 L1 9Z" fill="#4caf82"/></svg>Ganada</span>' +
+      '<span><svg width="10" height="10"><path d="M5 9 L9 1 L1 1Z" fill="#e05555"/></svg>Perdida</span>' +
+      '<span><svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="#8a97b8"/></svg>BE</span>' +
+      '</div><div class="okc-leg-row okc-leg-vals">' +
+      '<span><svg width="12" height="12"><path d="M6 1l1.5 3.2 3.5.4-2.6 2.4.7 3.5L6 8.8 2.9 10.5l.7-3.5L1 4.6l3.5-.4z" fill="#c9a84c"/></svg>Máximo histórico <b class="okc-lv" data-k="max">—</b></span>' +
+      '<span><i class="okc-key" style="background:rgba(224,85,85,.35);height:9px"></i>Caída desde máximo <b class="okc-lv" data-k="dd">—</b></span>' +
+      '</div>';
+    var btn = document.createElement("button"); btn.type = "button"; btn.className = "okc-btn"; btn.textContent = "Ver tabla por días"; root.appendChild(btn);
+    var tblw = div("okc-tbl"); root.appendChild(tblw);
+    btn.onclick = function () { var v = tblw.style.display === "block"; tblw.style.display = v ? "none" : "block"; btn.textContent = v ? "Ver tabla por días" : "Ocultar tabla"; };
+
+    function dibujar() {
+      var hoy = new Date();
+      var desde = cfg.desde || (periodo ? ymd(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - periodo + 1)) : "0000-00-00");
+      var hasta = cfg.hasta || "9999-99-99";
+      var sel = todas.filter(function (o) { return o.fecha >= desde && o.fecha <= hasta; });
+      var antes = todas.filter(function (o) { return o.fecha < desde; });
+      var saldoIni = antes.length ? antes[antes.length - 1].saldo : capital;
+      var picoIni = antes.length ? antes[antes.length - 1].pico : capital;
+      var saldo = todas.length ? todas[todas.length - 1].saldo : capital;
+      var maxH = todas.length ? todas[todas.length - 1].pico : capital;
+      var saldoFin = sel.length ? sel[sel.length - 1].saldo : saldoIni;
+      var resP = saldoFin - saldoIni, dd = saldo - maxH;
+      kSaldo.v.textContent = fE0(saldo);
+      kRes.v.textContent = fE0(resP, true); kRes.v.className = "v " + (resP >= 0 ? "pos" : "neg");
+      // Se indica el periodo y el saldo con el que EMPEZÓ, para que cuadre:
+      // saldo al inicio del periodo + ganado en el periodo = saldo actual.
+      var nomPer = cfg.desde ? "periodo" : ({ 7: "1S", 30: "1M", 90: "3M", 0: "todo" })[periodo] || "periodo";
+      kRes.l.innerHTML = "";
+      kRes.l.appendChild(document.createTextNode((resP >= 0 ? "Ganado " : "Perdido ") + nomPer));
+      kRes.l.appendChild(document.createElement("br"));
+      kRes.l.appendChild(document.createTextNode("desde " + fE0(saldoIni)));
+      kMax.v.textContent = fE0(maxH);
+      kDD.v.textContent = dd < -0.5 ? fE0(dd) : "En máximos"; kDD.v.className = "v " + (dd < -0.5 ? "neg" : "pos");
+      var lvMax = leg.querySelector('[data-k="max"]'), lvDD = leg.querySelector('[data-k="dd"]');
+      lvMax.textContent = fE(maxH);
+      lvDD.textContent = dd < -0.005 ? fE(dd) : "0,00 € · en máximos";
+      lvDD.className = "okc-lv " + (dd < -0.005 ? "neg" : "pos");
+
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      tip.className = "okc-tip"; tblw.innerHTML = "";
+      // Agrupar por día (solo días con operaciones: sin huecos de fines de semana)
+      var dias = [];
+      sel.forEach(function (o) { var d = dias[dias.length - 1]; if (!d || d.fecha !== o.fecha) { d = { fecha: o.fecha, ops: [] }; dias.push(d); } d.ops.push(o); });
+      dias.forEach(function (d) { d.neto = d.ops.reduce(function (a, o) { return a + o.neto; }, 0); var u = d.ops[d.ops.length - 1]; d.saldo = u.saldo; d.pico = u.pico; });
+      var n = dias.length;
+      if (!n) {
+        svg.setAttribute("height", 0);
+        var e = chart.querySelector(".okc-empty"); if (!e) { e = div("okc-empty", "Sin operaciones en este periodo."); chart.appendChild(e); }
+        return;
+      }
+      var vacio = chart.querySelector(".okc-empty"); if (vacio) vacio.remove();
+
+      var W = chart.clientWidth || 600;
+      // GestInmo (01/10/2026): opción barras:false — sin "Resultado neto por día".
+      var conBarras = cfg.barras !== false;
+      var H1 = 230, GAP = conBarras ? 26 : 0, H2 = conBarras ? 70 : 0, AX = 20, H = H1 + GAP + H2 + AX;
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("height", H);
+      var PL = 4, PR = 52;
+      var slot = (W - PL - PR) / n;
+      var xDia = function (i) { return PL + slot * (i + 0.5); };
+      var pts = [{ x: PL, y: saldoIni, pico: picoIni }];
+      dias.forEach(function (d, i) { d.ops.forEach(function (o, j) { o.x = PL + slot * i + slot * (j + 1) / (d.ops.length + 1); pts.push({ x: o.x, y: o.saldo, pico: o.pico, o: o }); }); });
+      var vals = pts.map(function (p) { return p.y; }).concat(pts.map(function (p) { return p.pico; }));
+      var yMin = Math.min.apply(null, vals), yMax = Math.max.apply(null, vals);
+      var padV = (yMax - yMin) * 0.08 || 50; yMin -= padV; yMax += padV;
+      var Y = function (v) { return 8 + (1 - (v - yMin) / (yMax - yMin)) * (H1 - 16); };
+
+      var step = niceStep(yMax - yMin, 4);
+      for (var v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {
+        el("line", { x1: PL, x2: W - PR, y1: Y(v), y2: Y(v), stroke: "#222c4a", "stroke-width": 1 }, svg);
+        el("text", { x: W - PR + 6, y: Y(v) + 3.5, "class": "ax" }, svg).textContent = EUR0.format(v);
+      }
+      if (capital >= yMin && capital <= yMax) el("line", { x1: PL, x2: W - PR, y1: Y(capital), y2: Y(capital), stroke: "#55628a", "stroke-width": 1.2, "stroke-dasharray": "4 4" }, svg);
+      // Zona de caída desde el máximo
+      el("path", { d: "M" + pts.map(function (p) { return p.x + "," + Y(p.pico); }).join(" L") + " L" + pts.slice().reverse().map(function (p) { return p.x + "," + Y(p.y); }).join(" L") + "Z", fill: "rgba(224,85,85,.22)" }, svg);
+      var gid = "okcg" + Math.random().toString(36).slice(2, 8);
+      var grad = el("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, el("defs", {}, svg));
+      el("stop", { offset: "0%", "stop-color": "#5b8dee", "stop-opacity": .28 }, grad);
+      el("stop", { offset: "100%", "stop-color": "#5b8dee", "stop-opacity": 0 }, grad);
+      var linea = "M" + pts.map(function (p) { return p.x + "," + Y(p.y); }).join(" L");
+      el("path", { d: linea + " L" + pts[pts.length - 1].x + "," + H1 + " L" + PL + "," + H1 + "Z", fill: "url(#" + gid + ")" }, svg);
+      el("path", { d: linea, fill: "none", stroke: "#c8d4e8", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+      // Marcas por operación: ▲ ganada · ▼ perdida · ● BE (forma + color)
+      var s = pts.length > 60 ? 3.2 : 4.2;
+      pts.slice(1).forEach(function (p) {
+        var t = tipo(p.o.neto), x = p.x, y = Y(p.y);
+        if (t === "win") el("path", { d: "M" + x + " " + (y - s - 1) + " L" + (x + s) + " " + (y + s - 1) + " L" + (x - s) + " " + (y + s - 1) + "Z", fill: COL.win, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
+        else if (t === "loss") el("path", { d: "M" + x + " " + (y + s + 1) + " L" + (x + s) + " " + (y - s + 1) + " L" + (x - s) + " " + (y - s + 1) + "Z", fill: COL.loss, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
+        else el("circle", { cx: x, cy: y, r: s - 0.6, fill: COL.be, stroke: "#1a2440", "stroke-width": 1.5 }, svg);
+      });
+      var top = pts.reduce(function (a, p) { return p.y > a.y ? p : a; }, pts[0]);
+      if (top.o && top.y >= maxH - 0.01) el("path", { d: "M" + top.x + " " + (Y(top.y) - 17) + "l1.8 3.8 4.2.5-3.1 2.9.8 4.1-3.7-2-3.7 2 .8-4.1-3.1-2.9 4.2-.5z", fill: "#c9a84c" }, svg);
+
+      var y0 = H1 + GAP;
+      var barras = [];
+      if (conBarras) {
+      // Barras: resultado neto por día
+      el("text", { x: PL, y: y0 - 8, "class": "sub" }, svg).textContent = "RESULTADO NETO POR DÍA";
+      var bMax = Math.max.apply(null, dias.map(function (d) { return Math.abs(d.neto); }).concat([1]));
+      var yb0 = y0 + H2 / 2;
+      var YB = function (v) { return yb0 - (v / bMax) * (H2 / 2 - 2); };
+      el("line", { x1: PL, x2: W - PR, y1: yb0, y2: yb0, stroke: "#253050", "stroke-width": 1 }, svg);
+      el("text", { x: W - PR + 6, y: y0 + 8, "class": "ax" }, svg).textContent = "+" + EUR0.format(bMax);
+      el("text", { x: W - PR + 6, y: y0 + H2, "class": "ax" }, svg).textContent = "−" + EUR0.format(bMax);
+      var bw = Math.max(2, Math.min(18, slot - 2));
+      barras = dias.map(function (d, i) {
+        var t = tipo(d.neto), yT = Math.min(YB(d.neto), yb0), h = Math.max(1.5, Math.abs(YB(d.neto) - yb0));
+        var rr = Math.min(3, bw / 2, h), x = xDia(i) - bw / 2;
+        var path = d.neto >= 0
+          ? "M" + x + "," + yb0 + " V" + (yT + rr) + " Q" + x + "," + yT + " " + (x + rr) + "," + yT + " H" + (x + bw - rr) + " Q" + (x + bw) + "," + yT + " " + (x + bw) + "," + (yT + rr) + " V" + yb0 + "Z"
+          : "M" + x + "," + yb0 + " V" + (yT + h - rr) + " Q" + x + "," + (yT + h) + " " + (x + rr) + "," + (yT + h) + " H" + (x + bw - rr) + " Q" + (x + bw) + "," + (yT + h) + " " + (x + bw) + "," + (yT + h - rr) + " V" + yb0 + "Z";
+        return el("path", { d: path, fill: COL[t] }, svg);
+      });
+      }
+      // Eje de fechas
+      var nT = Math.min(n, W < 420 ? 4 : 6);
+      for (var k = 0; k < nT; k++) {
+        var i = Math.round(k * (n - 1) / Math.max(nT - 1, 1));
+        el("text", { x: xDia(i), y: H - 4, "text-anchor": nT === 1 ? "middle" : k === 0 ? "start" : k === nT - 1 ? "end" : "middle", "class": "ax" }, svg).textContent = fD(dias[i].fecha);
+      }
+
+      // Crosshair + recuadro al tocar
+      var cross = el("line", { y1: 0, y2: y0 + H2, stroke: "#7a8db0", "stroke-width": 1, "stroke-dasharray": "2 3", opacity: 0 }, svg);
+      var halo = el("circle", { r: 6, fill: "none", stroke: "#c8d4e8", "stroke-width": 2, opacity: 0 }, svg);
+      var hit = el("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" }, svg);
+      var activo = -1;
+      function fila(lbl, val, cls, color) {
+        var r = div("row"), a = document.createElement("span");
+        if (color) { var kk = document.createElement("i"); kk.className = "okc-key"; kk.style.background = color; a.appendChild(kk); }
+        a.appendChild(document.createTextNode(lbl));
+        var b = document.createElement("b"); b.textContent = val; if (cls) b.className = cls;
+        r.appendChild(a); r.appendChild(b); tip.appendChild(r);
+      }
+      function mostrar(clientX) {
+        var bb = svg.getBoundingClientRect();
+        var x = (clientX - bb.left) * (W / bb.width);
+        var i = Math.max(0, Math.min(n - 1, Math.floor((x - PL) / slot)));
+        if (i === activo) return; activo = i;
+        var d = dias[i], xc = xDia(i);
+        cross.setAttribute("x1", xc); cross.setAttribute("x2", xc); cross.setAttribute("opacity", 1);
+        halo.setAttribute("cx", d.ops[d.ops.length - 1].x); halo.setAttribute("cy", Y(d.saldo)); halo.setAttribute("opacity", 1);
+        barras.forEach(function (b, j) { b.setAttribute("opacity", j === i ? 1 : .45); });
+        while (tip.firstChild) tip.removeChild(tip.firstChild);
+        tip.appendChild(div("d", fDL(d.fecha)));
+        fila("Saldo", fE(d.saldo), "", "#c8d4e8");
+        var td = tipo(d.neto);
+        fila("Neto del día", fE(d.neto, true), td === "win" ? "pos" : td === "loss" ? "neg" : "");
+        d.ops.forEach(function (o, j) { var t = tipo(o.neto); fila((o.hora || "Op " + (j + 1)) + (o.instrumento ? " · " + o.instrumento : ""), fE(o.neto, true), t === "win" ? "pos" : t === "loss" ? "neg" : "", COL[t]); });
+        var ddd = d.saldo - d.pico;
+        fila("Desde máximo", ddd < -0.5 ? fE(ddd) : "En máximos", ddd < -0.5 ? "neg" : "pos");
+        tip.className = "okc-tip show";
+        var px = xc * (bb.width / W), tw = tip.offsetWidth;
+        tip.style.left = Math.max(0, Math.min(bb.width - tw, px < bb.width / 2 ? px + 14 : px - tw - 14)) + "px";
+      }
+      function ocultar() { activo = -1; cross.setAttribute("opacity", 0); halo.setAttribute("opacity", 0); barras.forEach(function (b) { b.setAttribute("opacity", 1); }); tip.className = "okc-tip"; }
+      hit.addEventListener("pointermove", function (e) { mostrar(e.clientX); });
+      hit.addEventListener("pointerdown", function (e) { mostrar(e.clientX); });
+      hit.addEventListener("pointerleave", ocultar);
+
+      // Tabla por días (misma información sin tocar la gráfica)
+      var tbl = document.createElement("table"), trh = tbl.insertRow();
+      ["Día", "Ops", "Neto", "Saldo"].forEach(function (t) { var th = document.createElement("th"); th.textContent = t; trh.appendChild(th); });
+      dias.slice().reverse().forEach(function (d) {
+        var tr = tbl.insertRow(), t = tipo(d.neto);
+        [fD(d.fecha), d.ops.length, fE(d.neto, true), fE(d.saldo)].forEach(function (v, j) { var td = tr.insertCell(); td.textContent = v; if (j === 2) td.className = t === "win" ? "pos" : t === "loss" ? "neg" : ""; });
+      });
+      tblw.appendChild(tbl);
+    }
+    dibujar();
+    // Redibujar si cambia el ancho (girar el móvil, redimensionar ventana)
+    if (window.ResizeObserver) {
+      var ancho = chart.clientWidth, rt;
+      new ResizeObserver(function () { if (chart.clientWidth !== ancho && chart.clientWidth > 0) { ancho = chart.clientWidth; clearTimeout(rt); rt = setTimeout(dibujar, 120); } }).observe(chart);
+    }
+  };
+})();
+
+
+</script>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -17845,24 +18161,18 @@ function fin_renderTrading(forzar) {
   });
 }
 // ═══════════════════════════════════════════════════════════════════════
-// PUNTO 225/226 (01/10/2026): TRADING — "Evolución de la cuenta", mismo
-// diseño que TradingOkar sin el bloque de "Resultado neto por día".
-// Capital inicial (Demo/Real) lo mete Patry aquí — clave sincronizada
-// 'trading:capital_inicial'. Saldo = capital inicial + suma de resultados
-// netos (resultadoEUR − comisión, si TradingOkar la trae; hoy no la trae).
-// PUNTO 226: un punto por operación (como TradingOkar), ficha del día solo
-// al tocar, desplegables "Ver tabla por días" y "Capital inicial"; fuera
-// Operaciones / Winrate / R acumulada.
+// PUNTO 227 (01/10/2026): TRADING — "Evolución de la cuenta" con la MISMA
+// gráfica que TradingOkar (bloque OKCHART copiado tal cual, más abajo), sin
+// el bloque "Resultado neto por día" (opción barras:false). El capital
+// inicial y el margen de BE se leen de los ajustes de TradingOkar
+// (documento ajustes_<uid> de trading_operaciones) para que las dos apps
+// cuadren siempre; si no se pudieran leer, se usa el capital guardado aquí
+// ('trading:capital_inicial', PUNTO 225).
 // ═══════════════════════════════════════════════════════════════════════
 var _trdModo = null;          // 'real' | 'demo'
-var _trdPeriodo = '1M';       // '1S' | '1M' | '3M' | 'TODO'
-var _trdSel = null;           // índice del punto tocado (null = ninguno)
-var _trdPuntos = [];          // puntos pintados (para el toque)
-var _trdTablaAbierta = false;
+var _trdPeriodo = 30;         // días (0 = todo) — se recuerda al cambiarlo
 var _trdCapAbierto = false;
-var TRD_W = 340, TRD_H = 210;
-var TRD_MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
-var TRD_DIAS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+var TRD_INSTR = { NASDAQ: 'Nasdaq', DAX: 'DAX', SP500: 'S&P 500', ORO: 'Oro', DOWJONES: 'Dow Jones' };
 
 function trd_capitalLoad() {
   try { return (JSON.parse(localStorage.getItem('trading:capital_inicial') || '[]') || []).filter(function(x) { return x && !x.deleted; }); } catch (e) { return []; }
@@ -17870,6 +18180,13 @@ function trd_capitalLoad() {
 function trd_capital(modo) {
   var r = trd_capitalLoad().find(function(x) { return x.id === modo; });
   return r ? (parseFloat(r.valor) || 0) : null;
+}
+// Capital del modo: primero TradingOkar; si no, el guardado en GestInmo.
+function _trdCapitalDe(r, modo) {
+  var aj = r && r.ajustes;
+  if (aj && aj.capital && typeof aj.capital[modo] === 'number') return { valor: aj.capital[modo], deOkar: true };
+  var loc = trd_capital(modo);
+  return { valor: loc === null ? 0 : loc, deOkar: false, falta: loc === null };
 }
 function trd_guardarCapital() {
   if (bloqueaSiViewer('Cambiar el capital inicial de Trading')) return;
@@ -17886,53 +18203,15 @@ function trd_guardarCapital() {
   _trdCapAbierto = false;
   if (_tradingCache) _pintarTrading(_tradingCache);
 }
-// Se mantiene por compatibilidad (enlace "Ponerlo"): abre el desplegable.
 function trd_editarCapital() { _trdCapAbierto = true; if (_tradingCache) _pintarTrading(_tradingCache); }
-function trd_toggleTabla() { _trdTablaAbierta = !_trdTablaAbierta; if (_tradingCache) _pintarTrading(_tradingCache); }
-function trd_toggleCap() { _trdCapAbierto = !_trdCapAbierto; if (_tradingCache) _pintarTrading(_tradingCache); }
-function trd_setModo(m) { _trdModo = m; _trdSel = null; if (_tradingCache) _pintarTrading(_tradingCache); }
-function trd_setPeriodo(p) { _trdPeriodo = p; _trdSel = null; if (_tradingCache) _pintarTrading(_tradingCache); }
-
-function _trdFechaCorta(f) { var p = String(f).split('-'); return p[2] + ' ' + (TRD_MESES[parseInt(p[1], 10) - 1] || ''); }
-function _trdFechaLarga(f) {
-  var p = String(f).split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]);
-  return TRD_DIAS[d.getDay()] + ', ' + p[2] + ' ' + (TRD_MESES[+p[1] - 1] || '').toUpperCase() + ' ' + p[0];
+function trd_toggleCap() {
+  _trdCapAbierto = !_trdCapAbierto;
+  var p = document.getElementById('trd-cap-panel');
+  if (p) p.style.display = _trdCapAbierto ? 'block' : 'none';
+  var b = document.getElementById('trd-cap-btn');
+  if (b) b.textContent = b.textContent.replace(/[▾▴]$/, _trdCapAbierto ? '▴' : '▾');
 }
-function _trdIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-// Importe: dec=true → con céntimos; si no, redondeado al euro (tarjetas).
-function _trdEur(v, signo, dec) {
-  var a = Math.abs(v);
-  var s = dec ? fin_fmt(a) : (String(Math.round(a)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €');
-  if (signo) return (v > 0.005 ? '+' : (v < -0.005 ? '−' : '')) + s;
-  return (v < -0.005 ? '−' : '') + s;
-}
-function _trdCap(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
-function _trdT(fecha, hora) {
-  var hm = String(hora || '12:00').split(':');
-  var p = String(fecha).split('-');
-  return new Date(+p[0], +p[1] - 1, +p[2], +hm[0] || 0, +hm[1] || 0).getTime();
-}
-
-// Una entrada por operación (en orden) y otra por día.
-function _trdSerie(ops, capital) {
-  var lista = (ops || []).filter(function(o) { return o.neto !== null && o.fecha; }).slice()
-    .sort(function(a, b) { return (a.fecha + ' ' + (a.hora || '')).localeCompare(b.fecha + ' ' + (b.hora || '')); });
-  var dias = {}, ordenDias = [];
-  var saldo = capital, max = capital, maxIdx = -1, porOp = [];
-  lista.forEach(function(o, i) {
-    saldo += o.neto;
-    if (saldo > max + 0.005) { max = saldo; maxIdx = i; }
-    if (!dias[o.fecha]) { dias[o.fecha] = { fecha: o.fecha, neto: 0, ops: [] }; ordenDias.push(o.fecha); }
-    dias[o.fecha].neto += o.neto; dias[o.fecha].ops.push(o);
-    dias[o.fecha].saldo = saldo; dias[o.fecha].max = max;
-    porOp.push({ op: o, fecha: o.fecha, t: _trdT(o.fecha, o.hora), saldo: saldo, max: max, dia: dias[o.fecha] });
-  });
-  return { porOp: porOp, dias: ordenDias.map(function(f) { return dias[f]; }), max: max, maxIdx: maxIdx, saldo: saldo };
-}
-
-function _trdBtn(id, txt, act, fn) {
-  return '<button onclick="' + fn + '(\'' + id + '\')" style="background:' + (act ? 'var(--navy-mid)' : 'transparent') + ';border:1px solid ' + (act ? 'var(--border)' : 'transparent') + ';border-radius:7px;color:' + (act ? 'var(--silver-bright)' : 'var(--silver-dim)') + ';font-family:\'Rajdhani\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:3px 10px;cursor:pointer;">' + txt + '</button>';
-}
+function trd_setModo(m) { _trdModo = m; if (_tradingCache) _pintarTrading(_tradingCache); }
 
 function _pintarTrading(r) {
   var cont = document.getElementById('fin-trading-content');
@@ -17944,184 +18223,55 @@ function _pintarTrading(r) {
   var modos = r.modos || {};
   if (!_trdModo) _trdModo = (modos.real && modos.real.numOperaciones) ? 'real' : 'demo';
   var st = modos[_trdModo] || { numOperaciones: 0, ops: [] };
-  var html = '<div style="display:flex;justify-content:center;gap:4px;margin-bottom:6px;">' +
-    _trdBtn('real', 'REAL', _trdModo === 'real', 'trd_setModo') + _trdBtn('demo', 'DEMO', _trdModo === 'demo', 'trd_setModo') + '</div>';
-  html += '<div style="text-align:center;font-size:10px;letter-spacing:2px;color:var(--silver-dim);font-weight:700;margin-bottom:8px;">EVOLUCIÓN DE LA CUENTA · ' + (_trdModo === 'demo' ? 'DEMO' : 'REAL') + '</div>';
-  if (!st.numOperaciones) {
-    html += '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin operaciones ' + (_trdModo === 'demo' ? 'demo' : 'reales') + ' registradas todavía en TradingOkar.</div>';
-    html += _trdPie(null);
-    cont.innerHTML = html; return;
-  }
-  var capital = trd_capital(_trdModo);
-  var sinCapital = capital === null;
-  var cap = sinCapital ? 0 : capital;
-  var full = _trdSerie(st.ops, cap);
-  html += '<div style="display:flex;justify-content:center;margin-bottom:10px;"><div style="display:flex;gap:2px;border:1px solid var(--border);border-radius:9px;padding:2px;">' +
-    ['1S', '1M', '3M', 'TODO'].map(function(p) { return _trdBtn(p, p, _trdPeriodo === p, 'trd_setPeriodo'); }).join('') + '</div></div>';
-  var hoy = new Date();
-  var diasAtras = { '1S': 7, '1M': 30, '3M': 91 }[_trdPeriodo];
-  var desde = diasAtras ? _trdIso(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - diasAtras)) : null;
-  var opsP = desde ? full.porOp.filter(function(x) { return x.fecha > desde; }) : full.porOp.slice();
-  var previos = desde ? full.porOp.filter(function(x) { return x.fecha <= desde; }) : [];
-  var saldoIni = previos.length ? previos[previos.length - 1].saldo : cap;
-  var tIni = desde ? new Date(desde + 'T00:00:00').getTime()
-    : (full.porOp.length ? full.porOp[0].t - 86400000 : hoy.getTime() - 86400000);
-  var ganado = full.saldo - saldoIni;
-  var caida = full.saldo - full.max;
-  var enMax = caida > -0.005;
-  var kpi = function(val, lab, color, sub) {
-    return '<div style="background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:9px;padding:8px 3px 7px;text-align:center;">' +
-      '<div style="font-size:13px;font-weight:700;color:' + color + ';white-space:nowrap;">' + val + '</div>' +
-      '<div style="font-size:7.5px;letter-spacing:.6px;color:var(--silver-dim);margin-top:3px;text-transform:uppercase;line-height:1.3;">' + lab + (sub ? '<div style="white-space:nowrap;font-size:7px;">' + sub + '</div>' : '') + '</div></div>';
+  var bt = function(m, txt) {
+    var on = _trdModo === m;
+    return '<button onclick="trd_setModo(\'' + m + '\')" style="flex:1;background:' + (on ? '#202d50' : 'none') + ';border:' + (on ? '1px solid #253050' : '1px solid transparent') + ';color:' + (on ? '#c8d4e8' : '#7a8db0') + ';font-family:\'Rajdhani\',sans-serif;font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:1.4px;padding:7px 0;border-radius:10px;cursor:pointer;">' + txt + '</button>';
   };
-  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:6px;">' +
-    kpi(_trdEur(full.saldo), sinCapital ? 'Resultado' : 'Saldo actual', 'var(--silver-bright)') +
-    kpi(_trdEur(ganado, true), 'Ganado ' + (_trdPeriodo === 'TODO' ? 'total' : _trdPeriodo), ganado >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', 'desde ' + _trdEur(saldoIni)) +
-    kpi(_trdEur(full.max), 'Máximo', 'var(--silver-bright)') +
-    kpi(enMax ? 'En máximos' : _trdEur(caida, true), 'Desde máximo', enMax ? 'var(--accent-green)' : 'var(--accent-red)') +
-    '</div>';
-  if (sinCapital) {
-    html += '<div style="font-size:10.5px;color:var(--accent-gold);text-align:center;margin:4px 0;">Sin capital inicial: se muestra el resultado acumulado.</div>';
-  }
-  html += '<div id="trd-chart-wrap" style="position:relative;" onmouseleave="_trdOcultar()">' +
-    _trdChartSVG(opsP, tIni, saldoIni, cap, sinCapital, full) + '<div id="trd-tip"></div></div>';
-  var tri = function(c, down) { return '<svg width="8" height="7" viewBox="0 0 10 9" style="vertical-align:middle;"><polygon points="' + (down ? '0,0 10,0 5,9' : '5,0 10,9 0,9') + '" fill="' + c + '"/></svg>'; };
-  html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:3px 12px;font-size:9.5px;color:var(--silver-dim);margin-top:4px;">' +
-    '<span><span style="display:inline-block;width:12px;height:2px;background:var(--silver-bright);vertical-align:middle;"></span> Saldo</span>' +
-    (sinCapital ? '' : '<span><span style="display:inline-block;width:12px;border-top:1px dashed var(--silver-dim);vertical-align:middle;"></span> Capital inicial</span>') +
-    '<span>' + tri('#4caf82') + ' Ganada</span><span>' + tri('#e57373', true) + ' Pérdida</span>' +
-    '<span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#9aa6bd;vertical-align:middle;"></span> BE</span></div>';
-  html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:3px 14px;font-size:10px;color:var(--silver-dim);margin-top:6px;">' +
-    '<span><span style="color:#e6b84f;">★</span> Máximo histórico <b style="color:var(--silver-bright);">' + _trdEur(full.max, false, true) + '</b></span>' +
-    '<span><span style="display:inline-block;width:9px;height:7px;background:rgba(229,115,115,.45);vertical-align:middle;"></span> Caída desde máximo <b style="color:' + (enMax ? 'var(--accent-green)' : 'var(--accent-red)') + ';">' + (enMax ? '0,00 € · en máximos' : _trdEur(caida, true, true)) + '</b></span></div>';
-  html += _trdPie({ full: full, desde: desde, sinCapital: sinCapital, capital: capital });
+  var html = '<div style="display:flex;gap:8px;margin:0 auto 12px;max-width:260px;background:#161f38;border:1px solid #253050;border-radius:12px;padding:3px;">' + bt('demo', 'Demo') + bt('real', 'Real') + '</div>';
+  html += '<div id="trd-okc"></div>';
   cont.innerHTML = html;
-  _trdPintarTip();
-}
-
-// Botones "Ver tabla por días" y "Capital inicial" + sus desplegables.
-function _trdPie(d) {
-  var estBtn = 'background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1.2px;padding:7px 12px;cursor:pointer;';
-  var cap = trd_capital(_trdModo);
-  var html = '<div style="display:flex;justify-content:center;gap:8px;margin-top:12px;">';
-  if (d) html += '<button onclick="trd_toggleTabla()" style="' + estBtn + '">' + (_trdTablaAbierta ? 'OCULTAR TABLA' : 'VER TABLA POR DÍAS') + '</button>';
-  html += '<button onclick="trd_toggleCap()" style="' + estBtn + 'color:var(--silver-dim);">CAPITAL ' + (cap === null ? '—' : _trdEur(cap)) + ' ' + (_trdCapAbierto ? '▴' : '▾') + '</button></div>';
-  if (_trdCapAbierto) {
-    html += '<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:8px;">' +
-      '<span style="font-size:10px;color:var(--silver-dim);letter-spacing:.5px;">CAPITAL INICIAL ' + (_trdModo === 'demo' ? 'DEMO' : 'REAL') + '</span>' +
-      '<input id="trd-cap-input" type="text" inputmode="decimal" value="' + (cap === null ? '' : fmtGlobal(cap)) + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:96px;background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13px;padding:5px 8px;text-align:right;">' +
-      '<button onclick="trd_guardarCapital()" style="background:#4caf82;border:none;border-radius:8px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">GUARDAR</button></div>';
-  }
-  if (d && _trdTablaAbierta) {
-    // Tabla por días — lo más reciente primero (regla fija de Patry).
-    var dias = d.full.dias.filter(function(x) { return !d.desde || x.fecha > d.desde; }).slice().reverse();
-    var th = 'font-size:9px;letter-spacing:1px;color:var(--silver-dim);font-weight:700;padding:6px 4px;text-transform:uppercase;';
-    html += '<div style="margin-top:10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">' +
-      '<div style="display:grid;grid-template-columns:1.2fr .6fr 1fr 1.2fr;background:rgba(255,255,255,0.03);">' +
-      '<div style="' + th + '">Día</div><div style="' + th + 'text-align:center;">Ops</div><div style="' + th + 'text-align:right;">Neto</div><div style="' + th + 'text-align:right;">' + (d.sinCapital ? 'Acumulado' : 'Saldo') + '</div></div>';
-    if (!dias.length) html += '<div style="font-size:11px;color:var(--silver-dim);text-align:center;padding:10px;">Sin operaciones en este periodo.</div>';
-    dias.forEach(function(x) {
-      var c = x.neto > 0.005 ? 'var(--accent-green)' : (x.neto < -0.005 ? 'var(--accent-red)' : 'var(--silver-dim)');
-      html += '<div style="display:grid;grid-template-columns:1.2fr .6fr 1fr 1.2fr;border-top:1px solid rgba(255,255,255,0.05);font-size:11.5px;">' +
-        '<div style="padding:6px 4px;color:var(--silver-bright);">' + _trdFechaCorta(x.fecha) + '</div>' +
-        '<div style="padding:6px 4px;text-align:center;color:var(--silver-dim);">' + x.ops.length + '</div>' +
-        '<div style="padding:6px 4px;text-align:right;color:' + c + ';font-weight:600;">' + _trdEur(x.neto, true, true) + '</div>' +
-        '<div style="padding:6px 4px;text-align:right;color:var(--silver-bright);">' + _trdEur(x.saldo, false, true) + '</div></div>';
-    });
-    html += '</div>';
-  }
-  return html;
-}
-
-function _trdChartSVG(ops, tIni, saldoIni, cap, sinCapital, full) {
-  var W = TRD_W, H = TRD_H, L = 4, R = 38, T = 16, B = 22;
-  var tFin = Math.max(Date.now(), ops.length ? ops[ops.length - 1].t : 0, tIni + 86400000);
-  var vals = [saldoIni].concat(ops.map(function(x) { return x.saldo; }));
-  if (!sinCapital) vals.push(cap);
-  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
-  var pad = (mx - mn) * 0.1 || Math.max(1, Math.abs(mx) * 0.05);
-  mn -= pad; mx += pad;
-  var X = function(t) { return L + ((t - tIni) / (tFin - tIni)) * (W - L - R); };
-  var Y = function(v) { return T + (1 - (v - mn) / (mx - mn)) * (H - T - B); };
-  var pts = [{ x: X(tIni), y: Y(saldoIni), d: null }];
-  ops.forEach(function(o) { pts.push({ x: X(o.t), y: Y(o.saldo), d: o }); });
-  _trdPuntos = pts;
-  var s = '<svg id="trd-svg" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;touch-action:pan-y;cursor:crosshair;" onclick="_trdToque(event)" onmousemove="_trdToque(event)">';
-  s += '<defs><linearGradient id="trd-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b8dee" stop-opacity="0.32"/><stop offset="1" stop-color="#5b8dee" stop-opacity="0.02"/></linearGradient></defs>';
-  var bruto = (mx - mn) / 3, mag = Math.pow(10, Math.floor(Math.log10(bruto || 1)));
-  var paso = [1, 2, 2.5, 5, 10].map(function(m) { return m * mag; }).find(function(v) { return v >= bruto; }) || 10 * mag;
-  for (var vt = Math.ceil(mn / paso) * paso; vt <= mx; vt += paso) {
-    var yy = Y(vt);
-    if (yy < T + 4 || yy > H - B - 2) continue;
-    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy.toFixed(1) + '" y2="' + yy.toFixed(1) + '" stroke="rgba(255,255,255,0.05)"/>';
-    s += '<text x="' + (W - R + 6) + '" y="' + (yy + 3).toFixed(1) + '" font-size="8.5" fill="#8f9bb3">' + String(Math.round(vt)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '</text>';
-  }
-  if (!sinCapital) {
-    var yc = Y(cap);
-    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yc.toFixed(1) + '" y2="' + yc.toFixed(1) + '" stroke="#8f9bb3" stroke-dasharray="3,3" stroke-width="0.8"/>';
-  }
-  for (var i = 1; i < pts.length; i++) {
-    var dd = pts[i].d;
-    if (dd.saldo < dd.max - 0.005) {
-      var x0 = pts[i - 1].x, x1 = pts[i].x;
-      s += '<rect x="' + x0.toFixed(1) + '" y="' + Y(dd.max).toFixed(1) + '" width="' + Math.max(1, x1 - x0).toFixed(1) + '" height="' + Math.max(0, Y(dd.saldo) - Y(dd.max)).toFixed(1) + '" fill="rgba(229,115,115,0.16)"/>';
+  var okc = document.getElementById('trd-okc');
+  var cap = _trdCapitalDe(r, _trdModo);
+  var ops = (st.ops || []).filter(function(o) { return typeof o.neto === 'number'; }).map(function(o, i) {
+    return { id: o.id || ('op' + i), fecha: o.fecha, hora: o.hora, neto: o.neto, instrumento: TRD_INSTR[o.instrumento] || o.instrumento || '' };
+  });
+  var be = (r.ajustes && typeof r.ajustes.beMargen === 'number') ? r.ajustes.beMargen : 1;
+  window.okChart(okc, {
+    ops: ops, capital: cap.valor, beMargen: be,
+    titulo: 'Evolución de la cuenta · ' + (_trdModo === 'demo' ? 'Demo' : 'Real'),
+    periodo: _trdPeriodo, selectorPeriodo: true, onPeriodo: function(d) { _trdPeriodo = d; },
+    barras: false
+  });
+  // "Ver tabla por días" + desplegable pequeño de capital, uno al lado del otro.
+  var root = okc.querySelector('.okc');
+  var btnTabla = okc.querySelector('.okc-btn');
+  var tbl = okc.querySelector('.okc-tbl');
+  if (root && btnTabla) {
+    var fila = document.createElement('div');
+    fila.style.cssText = 'display:flex;justify-content:center;gap:8px;flex-wrap:wrap;';
+    root.insertBefore(fila, btnTabla);
+    fila.appendChild(btnTabla);
+    var bCap = document.createElement('button');
+    bCap.type = 'button'; bCap.className = 'okc-btn'; bCap.id = 'trd-cap-btn';
+    bCap.textContent = 'Capital ' + (cap.falta ? '—' : _trdEur0(cap.valor)) + ' ' + (_trdCapAbierto ? '▴' : '▾');
+    bCap.onclick = trd_toggleCap;
+    fila.appendChild(bCap);
+    var panel = document.createElement('div');
+    panel.id = 'trd-cap-panel';
+    panel.style.cssText = 'display:' + (_trdCapAbierto ? 'block' : 'none') + ';text-align:center;font-size:11.5px;color:#7a8db0;margin-top:10px;line-height:1.5;';
+    var aj = r.ajustes && r.ajustes.capital;
+    if (cap.deOkar) {
+      panel.innerHTML = 'Capital inicial · Demo <b style="color:#e8eef8;">' + _trdEur0(aj.demo || 0) + '</b> · Real <b style="color:#e8eef8;">' + _trdEur0(aj.real || 0) + '</b><br>' +
+        '<span style="font-size:10.5px;">Se lee de TradingOkar (Más → Capital inicial): si lo cambias allí, aquí se actualiza solo.</span>';
+    } else {
+      panel.innerHTML = '<span style="font-size:10.5px;">No se ha podido leer de TradingOkar. Capital ' + (_trdModo === 'demo' ? 'Demo' : 'Real') + ':</span> ' +
+        '<input id="trd-cap-input" type="text" inputmode="decimal" value="' + (cap.falta ? '' : fmtGlobal(cap.valor)) + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="width:90px;background:#161f38;border:1px solid #253050;border-radius:8px;color:#e8eef8;font-family:\'Rajdhani\',sans-serif;font-size:13px;padding:5px 8px;text-align:center;"> ' +
+        '<button type="button" onclick="trd_guardarCapital()" class="okc-btn" style="margin-top:0;">Guardar</button>';
     }
+    root.insertBefore(panel, tbl);
   }
-  var lin = pts.map(function(p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
-  s += '<polygon points="' + pts[0].x.toFixed(1) + ',' + (H - B) + ' ' + lin + ' ' + pts[pts.length - 1].x.toFixed(1) + ',' + (H - B) + '" fill="url(#trd-grad)"/>';
-  s += '<polyline points="' + lin + '" fill="none" stroke="#e8edf6" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>';
-  for (var j = 1; j < pts.length; j++) {
-    var p = pts[j], n = p.d.op.neto;
-    if (n > 0.005) s += '<polygon points="' + p.x.toFixed(1) + ',' + (p.y - 4.5).toFixed(1) + ' ' + (p.x + 3.8).toFixed(1) + ',' + (p.y + 2.5).toFixed(1) + ' ' + (p.x - 3.8).toFixed(1) + ',' + (p.y + 2.5).toFixed(1) + '" fill="#4caf82"/>';
-    else if (n < -0.005) s += '<polygon points="' + (p.x - 3.8).toFixed(1) + ',' + (p.y - 2.5).toFixed(1) + ' ' + (p.x + 3.8).toFixed(1) + ',' + (p.y - 2.5).toFixed(1) + ' ' + p.x.toFixed(1) + ',' + (p.y + 4.5).toFixed(1) + '" fill="#e57373"/>';
-    else s += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="2.6" fill="#9aa6bd"/>';
-  }
-  if (full.maxIdx >= 0) {
-    var maxOp = full.porOp[full.maxIdx];
-    var pm = pts.find(function(q) { return q.d === maxOp; });
-    if (pm) s += '<text x="' + pm.x.toFixed(1) + '" y="' + (pm.y - 8).toFixed(1) + '" font-size="12" text-anchor="middle" fill="#e6b84f">★</text>';
-  }
-  var nEt = 5;
-  for (var e = 0; e < nEt; e++) {
-    var fe = _trdIso(new Date(tIni + (tFin - tIni) * (e / (nEt - 1))));
-    var xe = L + (e / (nEt - 1)) * (W - L - R);
-    s += '<text x="' + xe.toFixed(1) + '" y="' + (H - 6) + '" font-size="8.5" fill="#8f9bb3" text-anchor="' + (e === 0 ? 'start' : (e === nEt - 1 ? 'end' : 'middle')) + '">' + _trdFechaCorta(fe) + '</text>';
-  }
-  s += '<g id="trd-sel"></g></svg>';
-  return s;
 }
-
-function _trdToque(ev) {
-  var svg = document.getElementById('trd-svg');
-  if (!svg || _trdPuntos.length < 2) return;
-  var rect = svg.getBoundingClientRect();
-  var x = (ev.clientX - rect.left) / rect.width * TRD_W;
-  var best = 1, bd = Infinity;
-  for (var i = 1; i < _trdPuntos.length; i++) { var d = Math.abs(_trdPuntos[i].x - x); if (d < bd) { bd = d; best = i; } }
-  if (best === _trdSel && ev.type !== 'click') return;
-  _trdSel = best;
-  _trdPintarTip();
-}
-function _trdOcultar() { _trdSel = null; _trdPintarTip(); }
-function _trdPintarTip() {
-  var tip = document.getElementById('trd-tip');
-  var g = document.getElementById('trd-sel');
-  if (!tip || !g) return;
-  if (_trdSel === null || _trdSel >= _trdPuntos.length || !_trdPuntos[_trdSel] || !_trdPuntos[_trdSel].d) { tip.innerHTML = ''; g.innerHTML = ''; return; }
-  var p = _trdPuntos[_trdSel], o = p.d, dia = o.dia;
-  g.innerHTML = '<line x1="' + p.x.toFixed(1) + '" x2="' + p.x.toFixed(1) + '" y1="16" y2="' + (TRD_H - 22) + '" stroke="#8f9bb3" stroke-dasharray="2,3" stroke-width="0.8"/>' +
-    '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="none" stroke="#e8edf6" stroke-width="1.4"/>';
-  var caida = o.saldo - o.max;
-  var fila = function(a, b, c, bold) { return '<div style="display:flex;justify-content:space-between;gap:12px;"><span style="color:var(--silver-dim);">' + a + '</span><span style="color:' + c + ';' + (bold ? 'font-weight:700;' : '') + '">' + b + '</span></div>'; };
-  // PUNTO 226: la ficha es de la OPERACIÓN tocada (cada punto = 1 operación).
-  var filas = fila(notas_esc((o.op.hora || '').slice(0, 5)) + ' · ' + notas_esc(_trdCap(o.op.instrumento)), _trdEur(o.op.neto, true, true), o.op.neto >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', true) +
-    fila('Saldo', _trdEur(o.saldo, false, true), 'var(--silver-bright)', true);
-  if (dia.ops.length > 1) filas += fila('Neto del día (' + dia.ops.length + ' ops)', _trdEur(dia.neto, true, true), dia.neto >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', false);
-  filas += fila('Desde máximo', caida > -0.005 ? 'En máximos' : _trdEur(caida, true, true), caida > -0.005 ? 'var(--accent-green)' : 'var(--accent-red)', true);
-  var pct = p.x / TRD_W * 100;
-  tip.innerHTML = '<div style="position:absolute;top:2px;' + (pct > 50 ? 'right:' + Math.max(2, 100 - pct + 3).toFixed(0) + '%;' : 'left:' + Math.max(1, pct + 3).toFixed(0) + '%;') + 'background:rgba(12,19,35,0.95);border:1px solid var(--border);border-radius:9px;padding:6px 9px;font-size:9.5px;line-height:1.45;min-width:140px;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.45);">' +
-    '<div style="text-align:center;font-size:9px;letter-spacing:1px;color:var(--silver-bright);font-weight:700;margin-bottom:3px;">' + _trdFechaLarga(o.fecha) + '</div>' + filas + '</div>';
-}
+function _trdEur0(v) { return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €'; }
 
 // --- CUENTAS ---
 function fin_renderCuentas() {
