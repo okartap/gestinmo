@@ -2230,7 +2230,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261002_01';
+const BUILD_ID = '261002_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2558,6 +2558,37 @@ window._inmueblesMerge = _inmueblesMerge; // expuesta para pruebas automáticas
 // también le pone la fecha de sello (updatedAt) — así, el contrato que se
 // acaba de tocar en un aparato nunca puede ser pisado por una copia de la
 // nube más vieja, la traiga quien la traiga.
+// PUNTO 229 (02/10/2026) — BUG REAL: el IPC/renovación de Helena Abbey
+// Boateng (VIV01) se aplicó 3 veces en el iPhone (con su PDF) y las 3 veces
+// volvió la versión antigua (renta y fecha de fin de antes). Blindaje: una
+// actualización de IPC ya aplicada NUNCA se pierde al fusionar dos versiones
+// del mismo contrato, gane la que gane por fecha de sello. Se juntan las
+// adendas de las dos versiones (por mes) y, si la versión "perdedora" tiene
+// la adenda más reciente, la renta y la fecha de fin salen de ella. (En la
+// app no existe "deshacer un IPC", así que juntar nunca resucita nada borrado.)
+function _contratosBlindarIpc(ganador, otro) {
+  try {
+    if (!ganador || !otro) return ganador;
+    var a = ganador.ipcAplicado || [], b = otro.ipcAplicado || [];
+    if (!b.length) return ganador;
+    var porMes = {};
+    a.concat(b).forEach(function(x) { if (x && x.mes && !porMes[x.mes]) porMes[x.mes] = x; });
+    var union = Object.keys(porMes).sort().map(function(m) { return porMes[m]; });
+    var ultA = a.length ? String(a[a.length - 1].mes || '') : '';
+    var ultB = String(b[b.length - 1].mes || '');
+    if (union.length === a.length && ultB <= ultA) return ganador; // nada que rescatar
+    var r = Object.assign({}, ganador);
+    r.ipcAplicado = union;
+    if (ultB > ultA) {
+      if (otro.renta != null) r.renta = otro.renta;
+      if (otro.rentaAnterior != null) r.rentaAnterior = otro.rentaAnterior;
+    }
+    if (otro.fin && (!r.fin || String(otro.fin) > String(r.fin))) r.fin = otro.fin;
+    return r;
+  } catch (e) { return ganador; }
+}
+window._contratosBlindarIpc = _contratosBlindarIpc;
+
 function _contratosMerge(localJSON, remoteJSON) {
   try {
     const locales = localJSON ? JSON.parse(localJSON) : [];
@@ -2577,7 +2608,12 @@ function _contratosMerge(localJSON, remoteJSON) {
       // cuando LAS DOS versiones ya tienen sello — un contrato local recién
       // tocado, todavía sin sello confirmado, nunca se deja pisar por la
       // copia de la nube, sea esta la que sea.
-      else if (actual.updatedAt && String(c.updatedAt || '') > String(actual.updatedAt)) mapa[c.id] = c;
+      // PUNTO 229 (02/10/2026): una copia local SIN sello (dato antiguo, de
+      // antes de que existieran los sellos) ya no bloquea a la versión
+      // sellada de la nube — antes se quedaba para siempre con la versión
+      // vieja y, al guardar cualquier contrato, la volvía a subir.
+      else if (!actual.updatedAt ? !!c.updatedAt : String(c.updatedAt || '') > String(actual.updatedAt)) mapa[c.id] = _contratosBlindarIpc(c, actual);
+      else mapa[c.id] = _contratosBlindarIpc(actual, c);
     });
     return JSON.stringify(orden.map(function(id) { return mapa[id]; }));
   } catch (e) {
@@ -15454,7 +15490,10 @@ document.addEventListener('firebaseLoaded', function() {
           c.empadronadosHistorial = c.padronPersonas.map(function(p) {
             return { nombre: p.nombre || '', dni: p.dni || '', rel: p.rel || '', fechaAlta: c.inicio || '', fechaBaja: null, motivoBaja: '' };
           });
-          c.updatedAt = new Date().toISOString();
+          // PUNTO 229: SIN sello de fecha — es un dato que cada aparato
+          // calcula igual por su cuenta; sellarlo hacía que un aparato con
+          // una copia antigua del contrato la "rejuveneciera" y pisara en la
+          // nube una renovación más reciente.
           cambios++;
         }
       });
