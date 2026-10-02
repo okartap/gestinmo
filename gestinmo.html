@@ -942,6 +942,23 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .fin-patrimonio-rows .row:last-child{border-bottom:none;}
 .fin-patrimonio-rows .row span:first-child{font-size:17px;color:var(--silver-mid);}
 .fin-patrimonio-rows .row span:last-child{color:var(--silver-bright);font-weight:700;font-size:18px;}
+/* PUNTO 228 (02/10/2026): con una ventana abierta (formularios de Cobros,
+   Kurra, etc.), la barra de navegación de abajo se oculta — antes tapaba el
+   botón GUARDAR en el iPhone. */
+body:has(.moverlay.open) .bottom-nav, body:has(.moverlay.open) .bnav,
+body:has(.moverlay[style*="display: flex"]) .bottom-nav, body:has(.moverlay[style*="display: flex"]) .bnav,
+body:has(.moverlay[style*="display:flex"]) .bottom-nav, body:has(.moverlay[style*="display:flex"]) .bnav,
+body:has(.modal-overlay.open) .bottom-nav, body:has(.modal-overlay.open) .bnav,
+body:has(.baja-modal.open) .bottom-nav, body:has(.baja-modal.open) .bnav,
+body:has(.moverlay.open) #global-bottom-nav.gnav-show,
+body:has(.moverlay[style*="display: flex"]) #global-bottom-nav.gnav-show,
+body:has(.moverlay[style*="display:flex"]) #global-bottom-nav.gnav-show,
+body:has(.modal-overlay.open) #global-bottom-nav.gnav-show,
+body:has(.baja-modal.open) #global-bottom-nav.gnav-show { display:none !important; }
+/* PUNTO 228 (02/10/2026): Patrimonio Total de Inicio con decimales — letra que se ajusta al ancho para que quepa en el iPhone */
+#dash-pat-rows .row{gap:6px;}
+#dash-pat-rows .row span:first-child{font-size:clamp(12px,3.6vw,17px);white-space:nowrap;}
+#dash-pat-rows .row span:last-child{font-size:clamp(12.5px,3.8vw,18px);white-space:nowrap;}
 /* PUNTO 41 — ajuste encontrado al verificar (25/08/2026): en Inicio esta
    tarjeta comparte fila con "Reparto" (mitad de ancho), y a 17/18px el texto
    de "Inmuebles" + su importe no cabía en una línea. .compact la reduce un
@@ -2031,6 +2048,7 @@ const DATA_KEYS = [
   // PUNTO 219 (01/10/2026): administradores de fincas (lista compartida por varios inmuebles)
   'inmuebles:administradores',
   'trading:capital_inicial', // PUNTO 225
+  'renta:dividendos_manuales', // PUNTO 228
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
   // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
   // anuales" de Inicio junto con los alquileres reales.
@@ -2212,7 +2230,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261001_10';
+const BUILD_ID = '261002_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2753,7 +2771,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -4162,8 +4180,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       mantiene el desglose completo (4 líneas), no se toca. -->
       <div class="kpi" onclick="showModule('finanzas')" style="cursor:pointer;background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:14px;">
         <div class="kpi-l" style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:8px;text-align:center;">PATRIMONIO TOTAL</div>
-        <div id="dash-patrimonio-total" style="font-size:22px;font-weight:700;color:var(--accent-gold);text-align:center;">—</div>
-        <div class="fin-patrimonio-rows compact">
+        <div id="dash-patrimonio-total" style="font-size:clamp(15px,4.6vw,22px);font-weight:700;color:var(--accent-gold);text-align:center;white-space:nowrap;">—</div>
+        <div class="fin-patrimonio-rows compact" id="dash-pat-rows">
           <div class="row"><span>Inmob.</span><span id="dash-pat-inmuebles">—</span></div>
           <div class="row"><span>Financ.</span><span id="dash-pat-financiero">—</span></div>
           <!-- PUNTO 72 (28/08/2026): "Cuentas + Fondos" — misma liquidez para
@@ -4481,7 +4499,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="form-row two">
         <div class="form-group">
           <div class="form-label">C.P.</div>
-          <input class="form-input" id="f-cp" type="text" maxlength="5">
+          <input class="form-input" id="f-cp" type="text" inputmode="numeric" maxlength="5">
         </div>
         <div class="form-group">
           <div class="form-label">Localidad</div>
@@ -5808,7 +5826,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
         </div>
         <!-- Modo %: pct → calcula € -->
         <div id="com-modo-pct" style="display:none;align-items:center;gap:4px;">
-          <input class="finput finput-pct" id="e_comision_pct" style="width:48px;" oninput="onComisionPctChange()">
+          <input class="finput finput-pct" id="e_comision_pct" inputmode="decimal" style="width:48px;" oninput="onComisionPctChange()">
           <div class="funit">%</div>
           <div class="imp-arrow">→</div>
           <div class="funit" id="e_comision_calculada" style="color:var(--silver-bright);font-weight:700;font-size:14px;min-width:60px;text-align:right;">0€</div>
@@ -5820,21 +5838,21 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div class="frow frow-imp">
         <div class="flabel">Impuestos</div>
         <div class="imp-pct-wrap">
-          <input class="finput finput-pct" id="e_imp_pct" value="7,75" oninput="onImpPctChange()">
+          <input class="finput finput-pct" id="e_imp_pct" inputmode="decimal" value="7,75" oninput="onImpPctChange()">
           <div class="funit">%</div>
           <div class="imp-arrow">→</div>
-          <input class="finput finput-imp" id="e_impuestos" oninput="onImpImporteChange()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          <input class="finput finput-imp" id="e_impuestos" inputmode="decimal" oninput="onImpImporteChange()" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
           <div class="funit">€</div>
         </div>
       </div>
       <div class="frow" style="background:rgba(91,141,238,.06);border-color:rgba(91,141,238,.3)">
         <div class="flabel" style="color:var(--blue)">📋 Notaría <span style="font-size:10px;opacity:.6">(auto)</span></div>
-        <input class="finput" id="e_notaria" oninput="_notariaManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_notaria" inputmode="decimal" oninput="_notariaManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow" style="background:rgba(91,141,238,.06);border-color:rgba(91,141,238,.3)">
         <div class="flabel" style="color:var(--blue)">🏛️ Registro <span style="font-size:10px;opacity:.6">(auto)</span></div>
-        <input class="finput" id="e_registro" oninput="_registroManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+        <input class="finput" id="e_registro" inputmode="decimal" oninput="_registroManual=true;calcEstudio()" style="color:var(--blue)" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
         <div class="funit">€</div>
       </div>
       <div class="frow">
@@ -6887,6 +6905,7 @@ con editar/borrar en cada línea. -->
     <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">Previsión IRPF a pagar / devolver</div>
     <div style="font-size:28px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-prevision-irpf">— €</div>
     <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="renta-prevision-nota">Añade datos para ver la previsión</div>
+    <div style="display:none;font-size:10.5px;color:var(--text-secondary);margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;" id="renta-prevision-estim"></div>
   </div>
 
   <!-- PUNTO 125 (06/09/2026): tarjeta aparte para el impacto de una venta de
@@ -7016,8 +7035,9 @@ con editar/borrar en cada línea. -->
       </div>
     </div>
     <div id="bloque-capital" style="display:none;padding:0 16px 14px;">
-      <div style="font-size:12px;color:var(--text-secondary);padding:8px 0 12px;">Datos cargados desde el módulo Finanzas de Patricio.</div>
+      <div style="font-size:12px;color:var(--text-secondary);padding:8px 0 12px;">Dividendos de Finanzas de Patricio + los añadidos a mano (importe bruto).</div>
       <div id="renta-lista-capital"></div>
+      <button onclick="rdiv_abrir()" style="width:100%;margin-top:4px;background:rgba(255,255,255,0.06);border:1px dashed var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:10px;cursor:pointer;">＋ Añadir dividendo</button>
     </div>
   </div>
 
@@ -7124,6 +7144,7 @@ con editar/borrar en cada línea. -->
         <option value="Gestoría">Gestoría / Asesoría</option>
         <option value="Suministros">Suministros</option>
         <option value="Otros">Otros</option>
+        <option value="Gasto de venta de inmueble">Gasto de venta de inmueble (no resta del alquiler)</option>
       </select>
     </div>
     <div style="margin-bottom:20px;">
@@ -7592,6 +7613,7 @@ const BACKUP_KEYS = [
   'inmuebles:documentos',
   'inmuebles:administradores', // PUNTO 219
   'trading:capital_inicial', // PUNTO 225
+  'renta:dividendos_manuales', // PUNTO 228
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
   'ingresos:otros:patricio',
   'fin:cotizaciones',
@@ -13361,7 +13383,7 @@ function rus_renderModalContent() {
   html += '</table>';
   html += '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">';
   html += '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);margin-bottom:8px;">Añadir / corregir un año</div>';
-  html += '<div class="mfield"><div class="mflabel">Año</div><input class="minput" id="rus-form-anio" type="number"></div>';
+  html += '<div class="mfield"><div class="mflabel">Año</div><input class="minput" id="rus-form-anio" type="number" inputmode="numeric"></div>';
   html += '<div class="mfield"><div class="mflabel">Mes de cobro</div><select class="minput" id="rus-form-mes">';
   html += '<option value="">-- Selecciona --</option>';
   for (var mm = 1; mm <= 12; mm++) { html += '<option value="' + mm + '">' + RUS_MESES_NOMBRE[mm] + '</option>'; }
@@ -15757,7 +15779,7 @@ function addOtroConcepto(desc='', importe=''){
   div.id = id;
   div.innerHTML = `
     <input class="otros-sub-desc" value="${desc}">
-    <input class="otros-sub-amount" value="${importe}" oninput="calcOtrosTotal()">
+    <input class="otros-sub-amount" inputmode="decimal" value="${importe}" oninput="calcOtrosTotal()">
     <span class="otros-sub-del" onclick="document.getElementById('${id}').remove();calcOtrosTotal()">✕</span>
   `;
   container.appendChild(div);
@@ -15829,7 +15851,7 @@ function addGasto(cat, color, desc='', amount=''){
   div.innerHTML = `
     <div class="gasto-cat-dot" style="background:${color}"></div>
     <input class="gasto-desc" value="${desc}">
-    <input class="gasto-amount" value="${amount}" oninput="calcTotalGastos()">
+    <input class="gasto-amount" inputmode="decimal" value="${amount}" oninput="calcTotalGastos()">
     <div class="gasto-del" onclick="document.getElementById('${id}').remove();calcTotalGastos()">✕</div>
   `;
   container.appendChild(div);
@@ -18652,12 +18674,46 @@ function fin_verHistorico(ticker) {
   lista.innerHTML = html;
   openModalById('fin-modal-historico');
 }
+// PUNTO 228 (02/10/2026): pedir un número con TECLADO NUMÉRICO (sustituye a
+// prompt(), que en el móvil siempre abre el teclado de letras).
+function gi_pedirNumero(titulo, inicial, onOk) {
+  var prev = document.getElementById('gi-num-ov'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'gi-num-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = '<div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;max-width:340px;text-align:center;">' +
+    '<div style="font-size:14px;font-weight:700;color:var(--silver-bright);margin-bottom:12px;">' + notas_esc(titulo) + '</div>' +
+    '<input id="gi-num-in" type="text" inputmode="decimal" value="' + (inicial === '' || inicial == null ? '' : fmtGlobal(inicial)) + '" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:18px;padding:10px 12px;text-align:center;">' +
+    '<div style="display:flex;gap:8px;margin-top:14px;">' +
+    '<button id="gi-num-cancel" style="flex:1;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:11px;cursor:pointer;">Cancelar</button>' +
+    '<button id="gi-num-ok" style="flex:1;background:#4caf82;border:none;border-radius:10px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;">Guardar</button></div></div>';
+  document.body.appendChild(ov);
+  var inp = document.getElementById('gi-num-in');
+  setTimeout(function() { inp.focus(); }, 50);
+  document.getElementById('gi-num-cancel').onclick = function() { ov.remove(); };
+  document.getElementById('gi-num-ok').onclick = function() {
+    var v = (typeof parseImporteFlexible === 'function') ? parseImporteFlexible(inp.value) : parseFmtGlobal(inp.value);
+    ov.remove();
+    onOk(v);
+  };
+}
+// Red de seguridad: cualquier casilla de tipo número sin teclado indicado
+// abre el teclado numérico (con coma decimal).
+document.addEventListener('focusin', function(ev) {
+  var t = ev.target;
+  if (t && t.tagName === 'INPUT' && t.type === 'number' && !t.getAttribute('inputmode')) t.setAttribute('inputmode', 'decimal');
+}, true);
 function fin_setCotizacion(ticker) {
   if (bloqueaSiViewer('Actualizar la cotización de una acción')) return;
-  var val = prompt('Precio actual de ' + (FIN_NOMBRES[ticker] || ticker) + ' (euros):');
-  if (val === null) return;
-  var n = parseFloat(val.replace(',', '.'));
-  if (isNaN(n) || n <= 0) { alert('Precio no valido.'); return; }
+  // PUNTO 228 (02/10/2026): antes era un prompt() del navegador, que en el
+  // móvil abre el teclado de letras — ahora una ventanita con teclado numérico.
+  gi_pedirNumero('Precio actual de ' + (FIN_NOMBRES[ticker] || ticker) + ' (€)', '', function(n) {
+    if (isNaN(n) || n <= 0) { alert('Precio no valido.'); return; }
+    fin_guardarCotizacion(ticker, n);
+    fin_renderAcciones();
+  });
+  return;
+  var n = 0;
   // CAMBIO 1 (21/09/2026): mismo camino interno que el asistente y que las
   // cotizaciones automáticas — ver fin_guardarCotizacion() junto a
   // FIN_NOMBRES. Este botón sigue funcionando igual en cualquier modo (vía
@@ -21214,15 +21270,22 @@ function dash_render() {
   var fondos = fin_visibles('fin:fondos').reduce(function(s,f){return s+(parseFloat(f.valor)||0);},0);
   var _ops = fin_visibles('fin:acciones');
   var _cotiz = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}');
+  // PUNTO 228 (02/10/2026) — BUG: Inicio no sumaba las acciones en "modo
+  // simple" (sí lo hacía Finanzas). Mismo criterio que fin_calcPatrimonio:
+  // se suma su valor actual y se salta su ticker de origen para no duplicar.
+  var _simplesDash = (typeof fin_accSimpleLoad === 'function') ? fin_accSimpleLoad() : [];
+  var _origenDash = {}, _accSimpleDash = 0;
+  _simplesDash.forEach(function(sx) { if (!sx || sx.deleted) return; _accSimpleDash += parseFloat(sx.valorActual) || 0; if (sx.origenTicker) _origenDash[sx.origenTicker] = true; });
   var _pos = {};
   for (var _i = 0; _i < _ops.length; _i++) {
     var _op = _ops[_i]; var _t = _op.ticker;
+    if (_origenDash[_t]) continue;
     if (!_pos[_t]) _pos[_t] = { num: 0, coste: 0 };
     if (_op.tipo === 'compra') { _pos[_t].num += parseFloat(_op.cantidad)||0; _pos[_t].coste += (parseFloat(_op.cantidad)||0)*(parseFloat(_op.precio)||0); }
     else if (_op.tipo === 'venta') { _pos[_t].num -= parseFloat(_op.cantidad)||0; }
     else if (_op.tipo === 'scrip') { _pos[_t].num += parseFloat(_op.scripAcciones)||0; }
   }
-  var acciones = 0;
+  var acciones = _accSimpleDash;
   var _tks = Object.keys(_pos);
   for (var _j = 0; _j < _tks.length; _j++) {
     var _p = _pos[_tks[_j]]; if (_p.num <= 0) continue;
@@ -21244,19 +21307,19 @@ function dash_render() {
   // AJUSTE 25/08/2026 (noche): igual que en Finanzas — el número grande ya no
   // incluye el IGC, se muestra aparte como fila "Total+IGC".
   var total = cuentas + fondos + acciones + urbanitae + _inmobDash.total;
-  var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmtEntero(total) : '—';
-  var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmtEnteroSinSimbolo(_inmobDash.total) : '—';
+  var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmt(total) : '—'; // PUNTO 228: con decimales
+  var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmtSinSimbolo(_inmobDash.total) : '—';
   var dPatIgcRow = document.getElementById('dash-pat-igc-row');
   var dPatIgc = document.getElementById('dash-pat-igc');
   if (dPatIgcRow) dPatIgcRow.style.display = _igcDash > 0 ? '' : 'none';
-  if (dPatIgc) dPatIgc.textContent = _igcDash > 0 ? fin_fmtEnteroSinSimbolo(total + _igcDash) : '';
+  if (dPatIgc) dPatIgc.textContent = _igcDash > 0 ? fin_fmtSinSimbolo(total + _igcDash) : '';
   // AJUSTE 25/08/2026 (tarde): en Inicio ya no se desglosan Cuentas/Acciones/
   // Fondos por separado — se juntan en un único dato "Financiero".
   // PUNTO 89 (03/09/2026): Urbanitae se suma también aquí, dentro de
   // "Financiero" — en Inicio no hay sitio para desglosarlo aparte (a
   // diferencia de Finanzas, que sí tiene su propia fila).
   var _financiero = cuentas + acciones + fondos + urbanitae;
-  var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmtEnteroSinSimbolo(_financiero) : '—';
+  var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmtSinSimbolo(_financiero) : '—';
   // PUNTO 72 (28/08/2026): "Cuentas + Fondos", misma liquidez para inversión
   // que en Finanzas — ver comentario junto a fin_calcPatrimonio().
   var dPatLiqRow = document.getElementById('dash-pat-liquidez-row');
@@ -21946,6 +22009,7 @@ window._refreshCurrentModule = function(key) {
     'fin:patrimonio_historico:patrimer': 'finanzas',
     'fin:patrimonio_historico:patricio': 'finanzas',
     'trading:capital_inicial': 'finanzas',
+    'renta:dividendos_manuales': 'renta',
     'fin:patrimonio_financiero:patricio': 'finanzas',
     // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — pantalla propia
     // (mod-finperdash), no la de Finanzas.
@@ -23833,6 +23897,104 @@ function segibi_guardarAnio() {
 }
 
 // ── Capital mobiliario (desde Finanzas patricio) ───────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 228 (02/10/2026): DIVIDENDOS AÑADIDOS A MANO (Renta Patricio →
+// Capital mobiliario) — para dividendos que no vienen de Finanzas (ej. el
+// dividendo de Patrimer Levante a Patricio). Importe BRUTO + retención (19 %
+// por defecto, editable). Clave sincronizada 'renta:dividendos_manuales'
+// (fusión por id; el borrado deja una marca "deleted" que viaja a todos los
+// aparatos). Suman en Capital mobiliario y en la previsión del IRPF.
+// ═══════════════════════════════════════════════════════════════════════
+var RDIV_KEY = 'renta:dividendos_manuales';
+function rdiv_loadTodo() { try { return JSON.parse(localStorage.getItem(RDIV_KEY) || '[]') || []; } catch (e) { return []; } }
+function rdiv_delAnio(anio) {
+  return rdiv_loadTodo().filter(function(x) { return x && !x.deleted && x.fecha && parseInt(x.fecha.slice(0, 4), 10) === anio; });
+}
+function rdiv_abrir(id) {
+  if (bloqueaSiViewer('Añadir o editar un dividendo')) return;
+  var x = id ? rdiv_loadTodo().find(function(y) { return y.id === id; }) : null;
+  document.getElementById('rdiv-id').value = x ? x.id : '';
+  var hoy = _fechaHoyLocal();
+  document.getElementById('rdiv-fecha').value = x ? x.fecha : (renta_anio === new Date().getFullYear() ? hoy : renta_anio + '-12-31');
+  document.getElementById('rdiv-pagador').value = x ? (x.pagador || '') : 'Patrimer Levante';
+  document.getElementById('rdiv-bruto').value = x ? numMiles_fmtDinero(x.bruto) : '';
+  document.getElementById('rdiv-ret').value = x ? numMiles_fmtDinero(x.retencion) : '';
+  document.getElementById('rdiv-ret').dataset.manual = x ? '1' : '';
+  document.getElementById('rdiv-titulo').textContent = x ? 'Editar dividendo' : 'Añadir dividendo';
+  document.getElementById('rdiv-borrar').style.display = x ? '' : 'none';
+  rdiv_recalc();
+  document.getElementById('rdiv-modal').classList.add('open');
+}
+function rdiv_cerrar() { document.getElementById('rdiv-modal').classList.remove('open'); }
+// Retención 19 % automática mientras no se escriba a mano.
+function rdiv_onBruto() {
+  var r = document.getElementById('rdiv-ret');
+  if (!r.dataset.manual) {
+    var b = parseImporteFlexible(document.getElementById('rdiv-bruto').value) || 0;
+    r.value = b ? numMiles_fmtDinero(Math.round(b * 0.19 * 100) / 100) : '';
+  }
+  rdiv_recalc();
+}
+function rdiv_recalc() {
+  var b = parseImporteFlexible(document.getElementById('rdiv-bruto').value) || 0;
+  var r = parseImporteFlexible(document.getElementById('rdiv-ret').value) || 0;
+  document.getElementById('rdiv-neto').textContent = b ? 'Neto a cobrar: ' + numMiles_fmtDinero(b - r) + ' €' : '';
+}
+function rdiv_guardar() {
+  if (bloqueaSiViewer('Guardar un dividendo')) return;
+  var fecha = document.getElementById('rdiv-fecha').value;
+  var pagador = document.getElementById('rdiv-pagador').value.trim();
+  var bruto = parseImporteFlexible(document.getElementById('rdiv-bruto').value) || 0;
+  var ret = parseImporteFlexible(document.getElementById('rdiv-ret').value) || 0;
+  if (!fecha || !bruto) { alert('Pon la fecha y el importe bruto.'); return; }
+  var todos = rdiv_loadTodo();
+  var id = document.getElementById('rdiv-id').value || ('rdiv_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  var row = { id: id, fecha: fecha, pagador: pagador || 'Dividendo', bruto: bruto, retencion: ret, updatedAt: new Date().toISOString() };
+  var i = todos.findIndex(function(y) { return y.id === id; });
+  if (i >= 0) todos[i] = row; else todos.push(row);
+  localStorage.setItem(RDIV_KEY, JSON.stringify(todos));
+  rdiv_cerrar();
+  renta_renderCapital();
+  renta_calcPrevision();
+}
+function rdiv_borrar() {
+  if (bloqueaSiViewer('Borrar un dividendo')) return;
+  var id = document.getElementById('rdiv-id').value;
+  if (!id || !confirm('¿Borrar este dividendo?')) return;
+  var todos = rdiv_loadTodo().map(function(y) { return y.id === id ? { id: y.id, fecha: y.fecha, deleted: true, updatedAt: new Date().toISOString() } : y; });
+  localStorage.setItem(RDIV_KEY, JSON.stringify(todos));
+  rdiv_cerrar();
+  renta_renderCapital();
+  renta_calcPrevision();
+}
+
+// PUNTO 228: la comisión de venta de Sierra Nevada (6.050 €, metida en
+// "Otros gastos" de 2026) pasa al tipo "Gasto de venta de inmueble" —
+// decidido con Patry el 02/10/2026. Se conserva el gasto y su factura; solo
+// deja de restar del alquiler. Una sola vez, y solo si hay exactamente un
+// gasto de 6.050 € ese año. Se le fija antes el mismo identificador que ya
+// le da la sincronización, para que el cambio no lo duplique en la nube.
+function renta_migrarGastoVenta2026() {
+  try {
+    if (localStorage.getItem('migracion:gasto_venta_sn_v1')) return;
+    if (typeof getRol === 'function' && getRol() === 'viewer') return;
+    var key = 'renta:gastos:2026';
+    var arr = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!arr.length) return; // aún no ha llegado de la nube: se reintenta otro día
+    var cand = arr.filter(function(g) { return g && !g.deleted && Math.abs((parseFloat(g.importe) || 0) - 6050) < 0.01; });
+    if (cand.length === 1 && cand[0].categoria !== RENTA_CAT_GASTO_VENTA) {
+      var g = cand[0];
+      if (!g.id) g.id = 'leg_gastos_' + (g.concepto || '') + '|' + (g.fecha || '') + '|' + (g.categoria || '');
+      g.categoria = RENTA_CAT_GASTO_VENTA;
+      g.updatedAt = new Date().toISOString();
+      localStorage.setItem(key, JSON.stringify(arr));
+    }
+    localStorage.setItem('migracion:gasto_venta_sn_v1', '1');
+  } catch (e) { console.warn('Migración gasto de venta:', e.message); }
+}
+setTimeout(renta_migrarGastoVenta2026, 11000);
+
+
 function renta_renderCapital() {
   var cont = document.getElementById('renta-lista-capital');
   if (!cont) return;
@@ -23848,24 +24010,43 @@ function renta_renderCapital() {
     if (new Date(o.fecha).getFullYear() !== renta_anio) continue;
     divs.push(o);
   }
+  // PUNTO 228 (02/10/2026): + dividendos añadidos a mano (importe bruto).
+  var manuales = rdiv_delAnio(renta_anio);
 
-  if (divs.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos registrados en Finanzas para ' + renta_anio + '.</div>';
+  if (divs.length === 0 && manuales.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos para ' + renta_anio + '.</div>';
     document.getElementById('renta-total-capital').textContent = '— €';
     return;
   }
 
+  // Todo junto, lo más reciente primero (PUNTO 224).
+  var filas = [];
+  divs.forEach(function(d) { filas.push({ fecha: d.fecha || '', man: null, d: d }); });
+  manuales.forEach(function(m) { filas.push({ fecha: m.fecha || '', man: m, d: null }); });
+  filas.sort(function(a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+
   var total = 0;
   var html = '';
-  for (var j = 0; j < divs.length; j++) {
-    var d = divs[j];
-    var importe = parseFloat(d.divImporte) || 0;
-    total += importe;
-    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + (d.ticker || '—') + '</div>'
-      + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + (d.divObs ? ' · ' + d.divObs : '') + '</div></div>'
-      + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(importe) + ' €</div>'
-      + '</div>';
+  for (var j = 0; j < filas.length; j++) {
+    var f = filas[j];
+    if (f.man) {
+      var m = f.man, br = parseFloat(m.bruto) || 0, rt = parseFloat(m.retencion) || 0;
+      total += br;
+      html += '<div onclick="rdiv_abrir(\'' + m.id + '\')" style="cursor:pointer;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+        + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + (m.pagador || 'Dividendo') + ' <span style="font-size:10px;font-weight:600;color:var(--text-secondary);">✎ a mano</span></div>'
+        + '<div style="font-size:11px;color:var(--text-secondary);">' + (m.fecha || '') + ' · retención ' + fmtGlobal(rt) + ' € · neto ' + fmtGlobal(br - rt) + ' €</div></div>'
+        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);white-space:nowrap;">' + fmtGlobal(br) + ' €</div>'
+        + '</div>';
+    } else {
+      var d = f.d;
+      var importe = parseFloat(d.divImporte) || 0;
+      total += importe;
+      html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+        + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + (d.ticker || '—') + '</div>'
+        + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + (d.divObs ? ' · ' + d.divObs : '') + '</div></div>'
+        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);white-space:nowrap;">' + fmtGlobal(importe) + ' €</div>'
+        + '</div>';
+    }
   }
   cont.innerHTML = html;
   document.getElementById('renta-total-capital').textContent = fmtGlobal(total) + ' €';
@@ -24222,66 +24403,113 @@ function ingotros_totalAnioDeclarable(year) {
 }
 
 // ── Previsión IRPF (estimación simplificada 2025) ─────────────────────────
-function renta_calcPrevision() {
+// PUNTO 228 (02/10/2026): el cálculo de la previsión pasa a una función
+// propia, para poder hacerlo dos veces: con lo metido hasta hoy (el número
+// grande) y proyectando el año completo (la línea pequeña de debajo).
+// Cambios de cálculo decididos con Patry el 02/10/2026:
+//  · se restan del alquiler la comunidad (Cobros mensuales) y el seguro e
+//    IBI (Seguro e IBI) de cada piso — antes no se restaban;
+//  · los "Otros gastos" marcados como "Gasto de venta de inmueble" ya no
+//    restan del alquiler (cuentan en la ganancia de la venta);
+//  · los dividendos añadidos a mano (Capital mobiliario) suman en la base
+//    del ahorro con su retención real.
+var RENTA_MESES_NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+var RENTA_CAT_GASTO_VENTA = 'Gasto de venta de inmueble';
+function renta_calcPrevisionDatos(proy) {
   var nominas = renta_getNominas();
-  // PUNTO 126 (06/09/2026): "ssTrabajo" venía de un campo que se llamaba
-  // "Seguridad Social" en el formulario (pensado para un empleado normal) —
-  // como Patricio es autónomo y cobra nómina de Patrimer (es el CEO), ese
-  // campo no se usaba para SS de verdad; ahora en pantalla se llama "Cuota
-  // de autónomo" y es donde mete su cuota RETA. El nombre de la variable
-  // interna (ssTrabajo) y del dato guardado (nominas[ni].ss) se dejan igual
-  // a propósito, para no romper nada de lo que ya hubiera guardado.
+  // "ssTrabajo" = cuota de autónomo (ver PUNTO 126).
   var brutoTrabajo = 0, retencionAcum = 0, ssTrabajo = 0;
+  var nReg = 0, brutoReg = 0, retReg = 0, ssReg = 0, ultimoMes = 0, extraJun = null, extraDic = null;
   for (var ni = 0; ni < nominas.length; ni++) {
-    brutoTrabajo += parseFloat(nominas[ni].bruto) || 0;
-    retencionAcum += parseFloat(nominas[ni].retencion) || 0;
-    ssTrabajo += parseFloat(nominas[ni].ss) || 0;
+    var nm = nominas[ni];
+    if (!nm || nm.deleted) continue;
+    var b = parseFloat(nm.bruto) || 0, r = parseFloat(nm.retencion) || 0, ss = parseFloat(nm.ss) || 0;
+    brutoTrabajo += b; retencionAcum += r; ssTrabajo += ss;
+    var im = RENTA_MESES_NOM.indexOf(nm.mes);
+    if (im >= 0) { nReg++; brutoReg += b; retReg += r; ssReg += ss; if (im + 1 > ultimoMes) ultimoMes = im + 1; }
+    else if (nm.mes === 'Extra junio') extraJun = nm;
+    else if (nm.mes === 'Extra diciembre') extraDic = nm;
+  }
+  if (proy && nReg > 0 && ultimoMes < 12) {
+    var faltan = 12 - ultimoMes;
+    brutoTrabajo += brutoReg / nReg * faltan;
+    retencionAcum += retReg / nReg * faltan;
+    ssTrabajo += ssReg / nReg * faltan;
+    if (extraJun && !extraDic) {
+      brutoTrabajo += parseFloat(extraJun.bruto) || 0;
+      retencionAcum += parseFloat(extraJun.retencion) || 0;
+    }
   }
 
-  // Alquileres Patricio: ingresos, amortización y reducción por tipo
+  // Alquileres de Patricio: ingreso y comunidad por piso (Cobros mensuales)
   var todosInm = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
   var inmPatricio = [];
   for (var ii = 0; ii < todosInm.length; ii++) {
     if ((todosInm[ii].propietario || '').toLowerCase() === 'patricio') inmPatricio.push(ii);
   }
-  // PUNTO 120 (06/09/2026): esto leía de 'facturacion:facturas' — el
-  // desglose por inmueble que se desactivó el 30/08/2026 (punto 88) y que
-  // Patricio nunca ha usado, así que su alquiler real quedaba siempre en
-  // 0 aquí. PUNTO 121: unificado con inm_alqMenTotalAnioPorInm (mismo dato
-  // real que ya usa "Ingresos anuales" de Inicio), en vez de tener este
-  // cálculo por duplicado aquí también.
-  var ingresosPorInm = (typeof inm_alqMenTotalAnioPorInm === 'function') ? inm_alqMenTotalAnioPorInm(inmPatricio, renta_anio).porInm : {};
+  var porInm = {};
+  inmPatricio.forEach(function(ix) { porInm[ix] = { ingreso: 0, comunidad: 0, meses: 0, ultimo: 0, segibi: 0 }; });
+  var hayComunidad = false;
+  (typeof inm_alqMenLoad === 'function' ? inm_alqMenLoad() : []).forEach(function(reg) {
+    if (!reg || reg.deleted || !reg.mes || !porInm[reg.inmuebleIdx]) return;
+    var p = reg.mes.split('-');
+    if (parseInt(p[0], 10) !== renta_anio) return;
+    var o = porInm[reg.inmuebleIdx];
+    var alq = parseFloat(reg.alquiler) || 0, com = parseFloat(reg.comunidad) || 0;
+    o.ingreso += alq; o.comunidad += com;
+    if (com > 0) hayComunidad = true;
+    if (alq > 0) { o.meses++; var mm = parseInt(p[1], 10); if (mm > o.ultimo) o.ultimo = mm; }
+  });
+  if (proy) {
+    inmPatricio.forEach(function(ix) {
+      var o = porInm[ix];
+      if (o.meses > 0 && o.ultimo < 12) {
+        var falt = 12 - o.ultimo;
+        var comMedia = o.comunidad / Math.max(1, o.meses);
+        o.ingreso += o.ingreso / o.meses * falt;
+        o.comunidad += comMedia * falt;
+      }
+    });
+  }
+  // Seguro e IBI del año (dato anual por piso)
+  var haySegIbi = false;
+  (typeof inm_seguroIbiLoad === 'function' ? inm_seguroIbiLoad() : []).forEach(function(reg) {
+    if (!reg || reg.deleted || parseInt(reg.anio, 10) !== renta_anio || !porInm[reg.inmuebleIdx]) return;
+    var v = (parseFloat(reg.seguro) || 0) + (parseFloat(reg.ibi) || 0);
+    porInm[reg.inmuebleIdx].segibi += v;
+    if (v > 0) haySegIbi = true;
+  });
 
-  // Gastos deducibles generales (bloque D)
+  // Otros gastos deducibles. Fuera: gastos de venta de inmueble; y si ya hay
+  // datos de comunidad / seguro-IBI en sus pantallas, los de esas mismas
+  // categorías aquí no se cuentan otra vez (evita contarlos dos veces).
   var gastosArr = renta_getGastos();
   var gastosDeducibles = 0;
-  for (var gi = 0; gi < gastosArr.length; gi++) { gastosDeducibles += parseFloat(gastosArr[gi].importe) || 0; }
+  for (var gi = 0; gi < gastosArr.length; gi++) {
+    var gx = gastosArr[gi];
+    if (!gx || gx.deleted) continue;
+    var cat = gx.categoria || '';
+    if (cat === RENTA_CAT_GASTO_VENTA) continue;
+    if (hayComunidad && cat === 'Comunidad') continue;
+    if (haySegIbi && (cat === 'IBI' || cat === 'Seguro')) continue;
+    gastosDeducibles += parseFloat(gx.importe) || 0;
+  }
 
-  // PUNTO 210 (24/09/2026) — CORREGIDO, confirmado con el manual de la AEAT
-  // (Renta 2025, art. 23.2 LIRPF): la reducción por alquiler de vivienda se
-  // aplica sobre el rendimiento NETO (ingresos − gastos − amortización), no
-  // antes de restar los gastos; y es del 60% en contratos firmados antes del
-  // 26/05/2023 y del 50% (general) en los posteriores. Antes la app aplicaba
-  // un 50% a todos y restaba luego los gastos al 100% — salía menos impuesto
-  // del real. Los gastos de "Gastos deducibles" no están ligados a un piso
-  // concreto, así que se reparten entre los inmuebles en proporción a lo que
-  // ingresa cada uno. Un rendimiento negativo (más gastos que ingresos) ya no
-  // se pone a 0: la ley permite que reste en la base general.
+  // PUNTO 210: reducción por alquiler de vivienda sobre el rendimiento NETO
+  // (60% contratos anteriores al 26/05/2023, 50% el resto).
   var datos = renta_getInmDatos();
   var _ctrsRenta = [];
   try { _ctrsRenta = JSON.parse(localStorage.getItem('contratos:lista') || '[]'); } catch (eC) {}
   var ingresoAlquilerTotal = 0;
-  for (var mt = 0; mt < inmPatricio.length; mt++) ingresoAlquilerTotal += ingresosPorInm[inmPatricio[mt]] || 0;
+  inmPatricio.forEach(function(ix) { ingresoAlquilerTotal += porInm[ix].ingreso; });
   var baseAlquilerTotal = 0;
   for (var mi = 0; mi < inmPatricio.length; mi++) {
     var idx = inmPatricio[mi];
-    var inmId = 'inm_' + idx;
-    var d = datos[inmId] || {};
-    var ingreso = ingresosPorInm[idx] || 0;
-    var gastoAsignado = ingresoAlquilerTotal > 0 ? gastosDeducibles * (ingreso / ingresoAlquilerTotal) : gastosDeducibles / inmPatricio.length;
-    var amorBase = parseFloat(d.amorBase) || 0;
-    var amorAnual = amorBase * 0.03;
-    var rendNeto = ingreso - gastoAsignado - amorAnual;
+    var d = datos['inm_' + idx] || {};
+    var o2 = porInm[idx];
+    var gastoAsignado = ingresoAlquilerTotal > 0 ? gastosDeducibles * (o2.ingreso / ingresoAlquilerTotal) : gastosDeducibles / inmPatricio.length;
+    var amorAnual = (parseFloat(d.amorBase) || 0) * 0.03;
+    var rendNeto = o2.ingreso - gastoAsignado - o2.comunidad - o2.segibi - amorAnual;
     if (d.tipo === 'vivienda' && rendNeto > 0) {
       var _refInm = (todosInm[idx] || {}).ref;
       var _ctrV = _ctrsRenta.filter(function(c) { return c.ref === _refInm && c.estado === 'activo'; })[0];
@@ -24291,30 +24519,21 @@ function renta_calcPrevision() {
     baseAlquilerTotal += rendNeto;
   }
 
-  // Capital mobiliario (dividendos)
+  // Capital mobiliario: dividendos de Finanzas (bruto, retención 19%) +
+  // dividendos añadidos a mano (bruto y retención reales).
   var ops = JSON.parse(localStorage.getItem('fin:acciones:patricio') || '[]');
-  var capitalMobiliario = 0;
+  var capFinanzas = 0;
   for (var oi = 0; oi < ops.length; oi++) {
     var op = ops[oi];
-    if (!op.deleted && op.tipo === 'dividendo' && op.fecha && new Date(op.fecha).getFullYear() === renta_anio) { // PUNTO 209: sin borrados
-      capitalMobiliario += parseFloat(op.divImporte) || 0;
-    }
+    if (!op.deleted && op.tipo === 'dividendo' && op.fecha && new Date(op.fecha).getFullYear() === renta_anio) capFinanzas += parseFloat(op.divImporte) || 0;
   }
+  var capManual = 0, retManual = 0;
+  rdiv_delAnio(renta_anio).forEach(function(x) { capManual += parseFloat(x.bruto) || 0; retManual += parseFloat(x.retencion) || 0; });
+  var capitalMobiliario = capFinanzas + capManual;
 
-  // Mínimo personal y familiar (2025) — casado, sin hijos
-  var minimoPersonal = 5550;
-  var minimoFamiliar = minimoPersonal; // sin hijos: 0 adicional
-  
-  if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0) {
-    document.getElementById('renta-prevision-irpf').textContent = '\u2014 \u20ac';
-    document.getElementById('renta-prevision-irpf').style.color = 'var(--silver-bright)';
-    document.getElementById('renta-prevision-nota').textContent = 'A\u00f1ade datos para ver la previsi\u00f3n';
-    // PUNTO 125: sin datos, tampoco tiene sentido mostrar el impacto de venta
-    var elVentaCardVacio = document.getElementById('renta-impacto-venta-card');
-    if (elVentaCardVacio) elVentaCardVacio.style.display = 'none';
-    return;
-  }
+  if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0) return { sinDatos: true };
 
+  var minimoFamiliar = 5550; // mínimo personal (sin hijos)
   function calcIRPF(base) {
     var tramos = [[0,12450,0.19],[12450,20200,0.24],[20200,35200,0.30],[35200,60000,0.37],[60000,300000,0.45],[300000,999999999,0.47]];
     var imp = 0;
@@ -24324,24 +24543,43 @@ function renta_calcPrevision() {
     }
     return imp;
   }
-  // PUNTO 125 (06/09/2026): la tabla de tramos del ahorro ya no vive aqui "a
-  // mano" -- se usa la funcion comun renta_calcAhorroTramos (ver mas abajo
-  // en el archivo, junto a inm_gananciaPatrimonialVenta), para que esta
-  // prevision y el impacto de una venta usen siempre la misma tabla.
-  function calcAhorro(base) { return renta_calcAhorroTramos(base); }
-
   var baseGeneral = Math.max(0, brutoTrabajo - ssTrabajo - 2000);
-  var baseTotal = Math.max(0, baseGeneral + baseAlquilerTotal); // PUNTO 210: el alquiler puede ser negativo
-
-  // Cuota general menos efecto del mínimo personal/familiar
+  var baseTotal = Math.max(0, baseGeneral + baseAlquilerTotal);
   var cuotaGeneral = Math.max(0, calcIRPF(baseTotal) - calcIRPF(minimoFamiliar));
-  var cuotaAhorro = calcAhorro(capitalMobiliario);
+  var cuotaAhorro = renta_calcAhorroTramos(capitalMobiliario);
   var cuotaTotal = cuotaGeneral + cuotaAhorro;
-  // PUNTO 211 (24/09/2026): los dividendos se apuntan en BRUTO y el banco ya
-  // retuvo el 19% al cobrarlos — esa retención se descuenta igual que la de
-  // las nóminas (antes no se restaba y salía más "a pagar" de lo real).
-  retencionAcum += capitalMobiliario * 0.19;
-  var resultado = cuotaTotal - retencionAcum;
+  retencionAcum += capFinanzas * 0.19 + retManual;
+  return {
+    sinDatos: false, todosInm: todosInm, inmPatricio: inmPatricio, capitalMobiliario: capitalMobiliario,
+    cuotaGeneral: cuotaGeneral, cuotaAhorro: cuotaAhorro, cuotaTotal: cuotaTotal,
+    retencionAcum: retencionAcum, resultado: cuotaTotal - retencionAcum
+  };
+}
+function renta_calcPrevision() {
+  var D = renta_calcPrevisionDatos(false);
+  var elEst = document.getElementById('renta-prevision-estim');
+  if (D.sinDatos) {
+    document.getElementById('renta-prevision-irpf').textContent = '— €';
+    document.getElementById('renta-prevision-irpf').style.color = 'var(--silver-bright)';
+    document.getElementById('renta-prevision-nota').textContent = 'Añade datos para ver la previsión';
+    if (elEst) elEst.style.display = 'none';
+    var elVentaCardVacio = document.getElementById('renta-impacto-venta-card');
+    if (elVentaCardVacio) elVentaCardVacio.style.display = 'none';
+    return;
+  }
+  var todosInm = D.todosInm, inmPatricio = D.inmPatricio, capitalMobiliario = D.capitalMobiliario;
+  var cuotaGeneral = D.cuotaGeneral, cuotaAhorro = D.cuotaAhorro, cuotaTotal = D.cuotaTotal;
+  var retencionAcum = D.retencionAcum, resultado = D.resultado;
+  // PUNTO 228: estimación del año completo, en pequeño, solo en el año en curso.
+  if (elEst) {
+    if (renta_anio === new Date().getFullYear()) {
+      var E = renta_calcPrevisionDatos(true);
+      if (!E.sinDatos) {
+        elEst.style.display = '';
+        elEst.innerHTML = 'Estimación año completo: <b style="color:' + (E.resultado > 0 ? '#e07070' : '#4caf82') + ';">' + (E.resultado >= 0 ? '+' : '') + fmtGlobal(E.resultado.toFixed(0)) + ' €</b> <span style="opacity:.8;">(nóminas y alquileres proyectados hasta diciembre)</span>';
+      } else elEst.style.display = 'none';
+    } else elEst.style.display = 'none';
+  }
 
   var elPrev = document.getElementById('renta-prevision-irpf');
   var notaPrev = document.getElementById('renta-prevision-nota');
@@ -24442,5 +24680,23 @@ if ('serviceWorker' in navigator) {
 }
 
 </script>
+<!-- PUNTO 228 (02/10/2026): dividendo añadido a mano (Renta Patricio) -->
+<div class="moverlay" id="rdiv-modal" onclick="if(event.target===this)rdiv_cerrar()" style="z-index:9000;">
+  <div class="modal">
+    <div class="mtitle"><span id="rdiv-titulo">Añadir dividendo</span><span onclick="rdiv_cerrar()" style="cursor:pointer;font-size:20px;color:var(--text-secondary);">✕</span></div>
+    <input type="hidden" id="rdiv-id">
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">FECHA DE COBRO</div>
+    <input type="date" id="rdiv-fecha" style="width:100%;background:var(--navy);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-size:15px;padding:10px 12px;box-sizing:border-box;margin-bottom:12px;">
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">PAGADOR</div>
+    <input type="text" id="rdiv-pagador" style="width:100%;background:var(--navy);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-size:15px;padding:10px 12px;box-sizing:border-box;margin-bottom:12px;">
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">IMPORTE BRUTO (€)</div>
+    <input type="text" inputmode="decimal" id="rdiv-bruto" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="rdiv_onBruto()" style="width:100%;background:var(--navy);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-size:15px;padding:10px 12px;box-sizing:border-box;margin-bottom:12px;">
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;">RETENCIÓN (€) — 19 % automático, puedes cambiarlo</div>
+    <input type="text" inputmode="decimal" id="rdiv-ret" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="this.dataset.manual='1';rdiv_recalc()" style="width:100%;background:var(--navy);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-size:15px;padding:10px 12px;box-sizing:border-box;margin-bottom:8px;">
+    <div id="rdiv-neto" style="font-size:12px;color:var(--accent-green);margin-bottom:16px;min-height:16px;"></div>
+    <button onclick="rdiv_guardar()" style="width:100%;background:var(--accent-green);border:none;border-radius:12px;color:#0b1220;font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;padding:12px;cursor:pointer;margin-bottom:8px;">GUARDAR</button>
+    <button id="rdiv-borrar" onclick="rdiv_borrar()" style="width:100%;background:transparent;border:1px solid rgba(255,90,90,.5);border-radius:12px;color:#ff7b7b;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;padding:10px;cursor:pointer;">Borrar dividendo</button>
+  </div>
+</div>
 </body>
 </html>
