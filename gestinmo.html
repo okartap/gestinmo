@@ -2230,7 +2230,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261002_02';
+const BUILD_ID = '261003_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -6325,6 +6325,9 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <button class="fin-add-btn" onclick="fin_nuevoUrbanitae()">&#xFF0B;</button>
     </div>
     <div id="fin-urbanitae-body">
+    <!-- PUNTO 230 (03/10/2026): resumen de la cartera de Urbanitae arriba,
+    las fichas debajo. -->
+    <div id="fin-urbanitae-resumen"></div>
     <div id="fin-urbanitae-lista"></div>
     <!-- PUNTO 163 (10/09/2026): mismo estilo que "Total Liquidez". -->
     <div class="fin-total-row" id="fin-urbanitae-total" style="display:none;justify-content:center;padding:14px 4px 4px;">
@@ -6683,12 +6686,21 @@ cálculo a mano. -->
     <div class="mfield"><div class="mflabel">Interés pactado (% anual)</div><input class="minput" id="fin-urb-interes" type="text" inputmode="decimal" oninput="fin_urbanitaeActualizarPreview()"></div>
     <div class="mfield"><div class="mflabel">Plazo (meses)</div><input class="minput" id="fin-urb-meses" type="number" inputmode="numeric" oninput="fin_urbanitaeActualizarPreview()"></div>
     <div class="form-hint" id="fin-urb-preview" style="margin:-4px 2px 10px;"></div>
+    <!-- PUNTO 230 (03/10/2026): datos de Urbanitae que antes solo iban en el texto del detalle -->
+    <div class="mfield"><div class="mflabel">Vencimiento previsto según Urbanitae (opcional)</div><input class="minput" id="fin-urb-vencurb" type="date"></div>
+    <div class="form-hint" style="margin:-4px 2px 10px;">Si Urbanitae solo da el trimestre, pon el último día del trimestre. Si se deja vacío, se usa fecha de inversión + plazo.</div>
+    <div class="mfield"><div class="mflabel">Intereses mínimos garantizados — make-whole (meses, opcional)</div><input class="minput" id="fin-urb-makewhole" type="number" inputmode="numeric"></div>
+    <div class="mfield"><div class="mflabel">Prórroga posible (meses, opcional)</div><input class="minput" id="fin-urb-prorroga" type="number" inputmode="numeric"></div>
     <div class="mfield">
       <div class="mflabel">Estado</div>
-      <select class="minput" id="fin-urb-estado">
+      <select class="minput" id="fin-urb-estado" onchange="fin_urbanitaeCobroVisible()">
         <option value="en_curso">En curso</option>
         <option value="cobrado">Cobrado</option>
       </select>
+    </div>
+    <div id="fin-urb-cobro-box" style="display:none;">
+      <div class="mfield"><div class="mflabel">Fecha real de cobro</div><input class="minput" id="fin-urb-fechacobro" type="date"></div>
+      <div class="mfield"><div class="mflabel">Intereses brutos cobrados (euros)</div><input class="minput" id="fin-urb-intcobrados" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
     </div>
     <div class="mfield"><div class="mflabel">Detalle (opcional)</div><textarea class="mtextarea minput" id="fin-urb-detalle" rows="3"></textarea></div>
     <input type="hidden" id="fin-urb-idx" value="">
@@ -19377,6 +19389,7 @@ function fin_renderUrbanitae() {
   // vacía la lista.
   if (!data.some(function(u) { return u && !u.deleted; })) {
     lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin proyectos de Urbanitae. Pulsa + para añadir.</div>';
+    var rz0 = document.getElementById('fin-urbanitae-resumen'); if (rz0) rz0.innerHTML = '';
     if (totEl) totEl.style.display = 'none';
     fin_calcPatrimonio(); fin_renderUltimaActualizacion(); return;
   }
@@ -19412,7 +19425,16 @@ function fin_renderUrbanitae() {
     html += '<div class="fin-meta-item">Interés: <span class="fin-meta-val">' + fin_fmtPct(u.interes) + '</span></div>';
     html += '<div class="fin-meta-item">Plazo: <span class="fin-meta-val">' + (u.meses || 0) + ' meses</span></div>';
     var vencDate = ordenUrb[oi].venc;
-    html += '<div class="fin-meta-item">Vencimiento previsto: <span class="fin-meta-val">' + (vencDate ? fin_urbanitaeFechaCortaDate(vencDate) : '—') + '</span></div>';
+    html += '<div class="fin-meta-item">Vencimiento previsto' + (u.vencUrb ? ' (Urbanitae)' : '') + ': <span class="fin-meta-val">' + (vencDate ? fin_urbanitaeFechaCortaDate(vencDate) : '—') + '</span></div>';
+    // PUNTO 230: datos nuevos de la ficha
+    var vCon = fin_urbanitaeVencContrato(u);
+    if (u.vencUrb && vCon) html += '<div class="fin-meta-item">Según contrato: <span class="fin-meta-val">' + fin_urbanitaeFechaCortaDate(vCon) + '</span></div>';
+    if (parseFloat(u.prorroga) > 0) html += '<div class="fin-meta-item">Prórroga posible: <span class="fin-meta-val">+' + parseFloat(u.prorroga) + ' meses</span></div>';
+    if (parseFloat(u.makeWhole) > 0) {
+      var mwMin = fin_urbanitaeCalcular(capital, u.interes, u.makeWhole);
+      html += '<div class="fin-meta-item">Mínimo garantizado: <span class="fin-meta-val">' + parseFloat(u.makeWhole) + ' meses (' + fin_fmt(mwMin.bruto) + ' brutos)</span></div>';
+    }
+    if (cobrado && u.fechaCobro) html += '<div class="fin-meta-item">Cobrado el: <span class="fin-meta-val">' + fin_urbanitaeFechaCorta(u.fechaCobro) + (u.intCobrados ? ' · ' + fin_fmt(u.intCobrados) + ' intereses' : '') + '</span></div>';
     html += '<div class="fin-meta-item" style="width:100%;">Resultado previsto: <span class="fin-meta-val fin-plus">' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos</span></div>';
     html += '<div class="fin-meta-item" style="width:100%;">Estado: <span class="fin-meta-val" style="' + (cobrado ? 'color:var(--accent-blue);' : 'color:var(--accent-green);') + '">' + (cobrado ? '✅ Cobrado' : '🟢 En curso') + '</span></div>';
     html += '</div>';
@@ -19425,6 +19447,7 @@ function fin_renderUrbanitae() {
     html += '</div></div>';
   }
   lista.innerHTML = html;
+  fin_urbanitaeRenderResumen(data);
   if (totEl) {
     totEl.style.display = 'flex';
     var tv = document.getElementById('fin-urbanitae-total-val');
@@ -19436,6 +19459,12 @@ function fin_renderUrbanitae() {
 // PUNTO 100.6 (06/09/2026): fecha de vencimiento = fecha de inversión + plazo
 // en meses. Devuelve null si falta cualquiera de los dos datos.
 function fin_urbanitaeVencimiento(u) {
+  // PUNTO 230: si hay fecha prevista por Urbanitae, manda esa.
+  if (u.vencUrb) { var dv = new Date(u.vencUrb + 'T00:00:00'); if (!isNaN(dv.getTime())) return dv; }
+  return fin_urbanitaeVencContrato(u);
+}
+// Vencimiento según contrato: fecha de inversión + plazo en meses.
+function fin_urbanitaeVencContrato(u) {
   if (!u.fecha || !u.meses) return null;
   try {
     var d = new Date(u.fecha + 'T00:00:00');
@@ -19457,6 +19486,104 @@ function fin_urbanitaeFechaCortaDate(d) {
   var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return d.getDate() + ' ' + meses[d.getMonth()] + ' ' + d.getFullYear();
 }
+// ═══════════════════════════════════════════════════════════════════════
+// PUNTO 230 (03/10/2026): RESUMEN DE URBANITAE (arriba de la pestaña)
+// 4 bloques pedidos por Patry: (1) resumen — capital vivo, intereses
+// esperados brutos/netos, total a recoger, interés medio ponderado y
+// próximo vencimiento (sin plazo medio, decidido); (2) calendario de cobros
+// por trimestre; (3) reparto por proyecto; (4) histórico de cobrados (solo
+// aparece cuando hay alguno). Los intereses esperados se calculan con el
+// plazo del contrato (el mismo criterio que cada ficha); la fecha de cobro
+// usa la de Urbanitae si está puesta.
+// ═══════════════════════════════════════════════════════════════════════
+function fin_urbanitaeCobroVisible() {
+  var e = document.getElementById('fin-urb-estado'), b = document.getElementById('fin-urb-cobro-box');
+  if (e && b) b.style.display = e.value === 'cobrado' ? '' : 'none';
+}
+function fin_urbanitaeRenderResumen(data) {
+  var cont = document.getElementById('fin-urbanitae-resumen');
+  if (!cont) return;
+  var vivos = [], cobrados = [];
+  (data || []).forEach(function(u) { if (!u || u.deleted) return; (u.estado === 'cobrado' ? cobrados : vivos).push(u); });
+  if (!vivos.length && !cobrados.length) { cont.innerHTML = ''; return; }
+  var caja = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;';
+  var tit = function(t) { return '<div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--text-secondary);text-align:center;margin-bottom:8px;">' + t + '</div>'; };
+  var fila = function(l, v, color, bold) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:12px;"><span style="color:var(--silver-dim);">' + l + '</span><span style="font-weight:' + (bold ? 800 : 700) + ';color:' + (color || 'var(--silver-bright)') + ';text-align:right;">' + v + '</span></div>'; };
+  var html = '';
+  // (1) Resumen
+  var capital = 0, bruto = 0, neto = 0, sumPond = 0;
+  vivos.forEach(function(u) {
+    var c = parseFloat(u.capital) || 0, r = fin_urbanitaeCalcular(c, u.interes, u.meses);
+    capital += c; bruto += r.bruto; neto += r.neto; sumPond += c * (parseFloat(u.interes) || 0);
+  });
+  if (vivos.length) {
+    var prox = null;
+    vivos.forEach(function(u) { var d = fin_urbanitaeVencimiento(u); if (d && (!prox || d < prox.d)) prox = { u: u, d: d }; });
+    html += '<div style="' + caja + '">' + tit('📊 RESUMEN DE LA CARTERA');
+    html += fila('Capital invertido', fin_fmt(capital) + ' · ' + vivos.length + ' proyecto' + (vivos.length === 1 ? '' : 's'));
+    html += fila('Intereses esperados', fin_fmt(bruto) + ' brutos · ' + fin_fmt(neto) + ' netos', 'var(--accent-green)');
+    html += fila('Total a recoger', fin_fmt(capital + bruto), 'var(--accent-green)', true);
+    html += fila('Interés medio ponderado', (capital > 0 ? (sumPond / capital).toFixed(2).replace('.', ',') : '0,00') + ' %');
+    if (prox) {
+      var rp = fin_urbanitaeCalcular(prox.u.capital, prox.u.interes, prox.u.meses);
+      html += fila('Próximo vencimiento', (prox.u.nombre || 'Proyecto') + ' · ' + fin_urbanitaeFechaCortaDate(prox.d) + ' · ' + fin_fmt((parseFloat(prox.u.capital) || 0) + rp.bruto));
+    }
+    html += '</div>';
+    // (2) Calendario de cobros por trimestre
+    var trim = {}, claves = [];
+    vivos.forEach(function(u) {
+      var d = fin_urbanitaeVencimiento(u);
+      var k = d ? (d.getFullYear() + '-' + (Math.floor(d.getMonth() / 3) + 1)) : 'zz';
+      if (!trim[k]) { trim[k] = { total: 0, nombres: [] }; claves.push(k); }
+      trim[k].total += (parseFloat(u.capital) || 0) + fin_urbanitaeCalcular(u.capital, u.interes, u.meses).bruto;
+      trim[k].nombres.push(u.nombre || 'Proyecto');
+    });
+    claves.sort();
+    var maxT = 0; claves.forEach(function(k) { if (trim[k].total > maxT) maxT = trim[k].total; });
+    html += '<div style="' + caja + '">' + tit('🗓️ CALENDARIO DE COBROS (capital + intereses brutos)');
+    claves.forEach(function(k) {
+      var t = trim[k], etq = k === 'zz' ? 'Sin fecha' : (k.split('-')[1] + 'T ' + k.split('-')[0]);
+      var pct = maxT > 0 ? Math.max(4, t.total / maxT * 100) : 0;
+      html += '<div style="padding:5px 0;"><div style="display:flex;justify-content:space-between;font-size:12px;"><span style="font-weight:700;color:var(--silver-bright);">' + etq + '</span><span style="font-weight:700;color:var(--accent-green);">' + fin_fmt(t.total) + '</span></div>'
+        + '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;margin:4px 0 3px;"><div style="height:6px;width:' + pct.toFixed(1) + '%;background:var(--accent-green);border-radius:3px;"></div></div>'
+        + '<div style="font-size:10.5px;color:var(--silver-dim);">' + t.nombres.join(' · ') + '</div></div>';
+    });
+    html += '</div>';
+    // (3) Reparto por proyecto
+    var orden = vivos.slice().sort(function(a, b) { return (parseFloat(b.capital) || 0) - (parseFloat(a.capital) || 0); });
+    html += '<div style="' + caja + '">' + tit('🥧 REPARTO POR PROYECTO');
+    orden.forEach(function(u) {
+      var c = parseFloat(u.capital) || 0, pc = capital > 0 ? c / capital * 100 : 0;
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11.5px;">'
+        + '<span style="flex:0 0 40%;color:var(--silver-bright);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (u.nombre || 'Proyecto') + '</span>'
+        + '<span style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;"><span style="display:block;height:6px;width:' + pc.toFixed(1) + '%;background:var(--accent-blue);border-radius:3px;"></span></span>'
+        + '<span style="flex:0 0 auto;font-weight:700;color:var(--silver-bright);">' + pc.toFixed(0) + ' %</span></div>';
+    });
+    html += '</div>';
+  }
+  // (4) Histórico de cobrados (solo si hay alguno)
+  if (cobrados.length) {
+    var capDev = 0, intCob = 0;
+    var filasH = '';
+    cobrados.slice().sort(function(a, b) { return String(b.fechaCobro || '').localeCompare(String(a.fechaCobro || '')); }).forEach(function(u) {
+      var c = parseFloat(u.capital) || 0;
+      var ic = (u.intCobrados != null && u.intCobrados !== '' && parseFloat(u.intCobrados) > 0) ? parseFloat(u.intCobrados) : fin_urbanitaeCalcular(c, u.interes, u.meses).bruto;
+      capDev += c; intCob += ic;
+      var prev = fin_urbanitaeVencimiento(u), txtRet = '';
+      if (u.fechaCobro && prev) {
+        var real = new Date(u.fechaCobro + 'T00:00:00');
+        var dias = Math.round((real - prev) / 86400000);
+        txtRet = dias > 15 ? (' · ' + Math.round(dias / 30.4) + ' mes(es) de retraso') : (dias < -15 ? (' · ' + Math.round(-dias / 30.4) + ' mes(es) antes') : ' · en plazo');
+      }
+      filasH += '<div style="font-size:11px;color:var(--silver-dim);padding:2px 0;">' + (u.nombre || 'Proyecto') + (u.fechaCobro ? ' · ' + fin_urbanitaeFechaCorta(u.fechaCobro) : '') + ' · ' + fin_fmt(ic) + ' intereses' + txtRet + '</div>';
+    });
+    html += '<div style="' + caja + '">' + tit('✅ HISTÓRICO DE COBRADOS');
+    html += fila('Capital devuelto', fin_fmt(capDev) + ' · ' + cobrados.length + ' proyecto' + (cobrados.length === 1 ? '' : 's'));
+    html += fila('Intereses cobrados (brutos)', fin_fmt(intCob) + ' · netos ' + fin_fmt(intCob * (1 - FIN_URB_IRPF)), 'var(--accent-green)');
+    html += filasH + '</div>';
+  }
+  cont.innerHTML = html;
+}
 function fin_nuevoUrbanitae() {
   document.getElementById('fin-urb-nombre').value = '';
   document.getElementById('fin-urb-fecha').value = '';
@@ -19465,6 +19592,12 @@ function fin_nuevoUrbanitae() {
   document.getElementById('fin-urb-meses').value = '';
   document.getElementById('fin-urb-estado').value = 'en_curso';
   document.getElementById('fin-urb-detalle').value = '';
+  document.getElementById('fin-urb-vencurb').value = '';
+  document.getElementById('fin-urb-makewhole').value = '';
+  document.getElementById('fin-urb-prorroga').value = '';
+  document.getElementById('fin-urb-fechacobro').value = '';
+  document.getElementById('fin-urb-intcobrados').value = '';
+  fin_urbanitaeCobroVisible();
   document.getElementById('fin-urb-idx').value = '';
   document.getElementById('fin-urb-preview').textContent = '';
   document.getElementById('fin-modal-urbanitae').classList.add('open');
@@ -19480,6 +19613,12 @@ function fin_editarUrbanitae(idx) {
   document.getElementById('fin-urb-meses').value = u.meses || '';
   document.getElementById('fin-urb-estado').value = u.estado || 'en_curso';
   document.getElementById('fin-urb-detalle').value = u.detalle || '';
+  document.getElementById('fin-urb-vencurb').value = u.vencUrb || '';
+  document.getElementById('fin-urb-makewhole').value = u.makeWhole || '';
+  document.getElementById('fin-urb-prorroga').value = u.prorroga || '';
+  document.getElementById('fin-urb-fechacobro').value = u.fechaCobro || '';
+  document.getElementById('fin-urb-intcobrados').value = u.intCobrados ? numMiles_fmtDinero(u.intCobrados) : '';
+  fin_urbanitaeCobroVisible();
   document.getElementById('fin-urb-idx').value = idx;
   fin_urbanitaeActualizarPreview();
   document.getElementById('fin-modal-urbanitae').classList.add('open');
@@ -19497,6 +19636,12 @@ function fin_guardarUrbanitae() {
   var idx = document.getElementById('fin-urb-idx').value;
   var data = fin_load('fin:urbanitae');
   var obj = { nombre: nombre, fecha: fecha, capital: capital, interes: interes, meses: meses, estado: estado, detalle: detalle };
+  // PUNTO 230 (03/10/2026): datos nuevos de la ficha (todos opcionales).
+  obj.vencUrb = document.getElementById('fin-urb-vencurb').value || '';
+  obj.makeWhole = parseFloat(document.getElementById('fin-urb-makewhole').value) || 0;
+  obj.prorroga = parseFloat(document.getElementById('fin-urb-prorroga').value) || 0;
+  obj.fechaCobro = estado === 'cobrado' ? (document.getElementById('fin-urb-fechacobro').value || '') : '';
+  obj.intCobrados = estado === 'cobrado' ? (parseImporteFlexible(document.getElementById('fin-urb-intcobrados').value) || 0) : 0;
   // Mismo blindaje de sincronización que Cuentas/Acciones/Fondos (PUNTO 93):
   // conserva el id si ya existía (edición) y siempre refresca updatedAt.
   if (idx !== '' && data[parseInt(idx)]) { obj.id = data[parseInt(idx)].id || _finGenId(); }
@@ -20401,8 +20546,13 @@ function finperdash_render() {
   var trInv = inv.traderepublic;
   var myTotal = myLiq + myInv;
   var trTotal = trLiq + trInv;
+  // PUNTO 230 (03/10/2026): Urbanitae (capital de los proyectos en curso,
+  // mismo criterio que Inicio) y lo invertido con broker "Caixa" — antes el
+  // panel no los sumaba y no cuadraba con la tarjeta de Inicio.
+  var urbInv = fin_visibles('fin:urbanitae').reduce(function(s, u) { return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0)); }, 0);
+  var caixaInv = inv.caixa || 0;
   var totalLiq = caixa + efectivo + myLiq + trLiq;
-  var totalInv = myInv + trInv;
+  var totalInv = myInv + trInv + urbInv + caixaInv;
   var totalFinanciero = totalLiq + totalInv;
   var pctLiq = totalFinanciero > 0 ? (totalLiq / totalFinanciero * 100) : 0;
   var pctInv = totalFinanciero > 0 ? (totalInv / totalFinanciero * 100) : 0;
@@ -20421,7 +20571,13 @@ function finperdash_render() {
   var html = '';
   // Bloque cuentas
   html += '<div class="fin-section" style="padding:0;overflow:hidden;">';
-  html += fila('CAIXA', fin_fmt(caixa), { bold: true, colorVal: 'var(--accent-blue)' });
+  if (caixaInv > 0) {
+    html += fila('Caixa · Liquidez', fin_fmt(caixa));
+    html += fila('Caixa · Invertido', fin_fmt(caixaInv));
+    html += fila('Caixa · Total', fin_fmt(caixa + caixaInv), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
+  } else {
+    html += fila('CAIXA', fin_fmt(caixa), { bold: true, colorVal: 'var(--accent-blue)' });
+  }
   if (efectivo > 0) html += fila('Efectivo', fin_fmt(efectivo), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
   html += fila('MyInvestor · Liquidez', fin_fmt(myLiq), { borderTop: true });
   html += fila('MyInvestor · Invertido', fin_fmt(myInv));
@@ -20429,6 +20585,7 @@ function finperdash_render() {
   html += fila('Trade Republic · Liquidez', fin_fmt(trLiq), { borderTop: true });
   html += fila('Trade Republic · Invertido', fin_fmt(trInv));
   html += fila('Trade Republic · Total', fin_fmt(trTotal), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
+  if (urbInv > 0) html += fila('Urbanitae · Invertido', fin_fmt(urbInv), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
   html += '</div>';
   // Bloque totales financiero
   html += '<div class="fin-section" style="padding:0;overflow:hidden;margin-top:10px;background:rgba(76,175,130,.08);">';
