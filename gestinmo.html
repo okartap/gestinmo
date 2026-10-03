@@ -320,7 +320,7 @@
    pantalla queda todavía más limpia. Elegida de 3 opciones mostradas antes
    de tocar código (opción C, "todo en una sola línea"). */
 .inm-resumen { padding: 2px 2px 16px; }
-.inm-resumen-linea { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.inm-resumen-linea { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; text-align:center; } /* PUNTO 233: centrado */
 .inm-resumen-texto { font-size:14px; color:var(--silver-dim); }
 .inm-resumen-texto b { color:var(--silver-bright); font-weight:700; }
 .inm-resumen-pill { background:rgba(224,156,58,0.15); color:var(--accent-amber); border:1px solid rgba(224,156,58,0.4); border-radius:20px; padding:4px 12px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; }
@@ -1171,6 +1171,8 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 #estudios-guardados-title{color:var(--silver-bright)!important;text-align:center;width:100%;}
 .btn-new{background:var(--navy-card);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:11px;font-weight:600;letter-spacing:1px;color:var(--silver-mid);cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all .2s;}
 .btn-new:active{transform:scale(.95);}
+/* PUNTO 233 (03/10/2026): botón de añadir solo con "＋" (sin la palabra Nuevo) */
+.btn-new.btn-new-solo{font-size:20px !important;line-height:1 !important;padding:6px 14px !important;letter-spacing:0 !important;min-width:44px;}
 
 /* Resumen comparativo */
 .resumen{background:var(--navy-card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:20px;}
@@ -2230,7 +2232,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261003_04';
+const BUILD_ID = '261003_07';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2267,22 +2269,42 @@ function _guardarDiagnostico() {
   } catch (e) { /* no crítico */ }
 }
 
+// PUNTO 233 (03/10/2026): vuelve el indicador de nube, a petición de Patry,
+// como un PUNTO de color pequeño arriba a la derecha (en vez de la bolita
+// con texto de abajo, que tapaba el menú). Verde = todo subido; ámbar = hay
+// cambios pendientes de subir; rojo = sin sesión en la nube; gris =
+// comprobando. Al tocarlo explica el estado en lenguaje normal y, si hace
+// falta, intenta arreglarlo (mismo flujo que el aviso de "Pendiente de
+// gestionar", PUNTO 232).
 function _crearBadgeSync() {
   try {
     if (document.getElementById('syncBadge')) return;
     const b = document.createElement('div');
     b.id = 'syncBadge';
-    b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'
-      + 'background:#333;color:#fff;font:11px/1.3 monospace;padding:4px 9px;'
-      + 'border-radius:12px;opacity:0.85;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);'
-      + 'user-select:none;';
-    b.textContent = '☁️ …';
-    b.onclick = async function() {
-      _mostrarEstadoSync();
-      await _probarSincronizacionAhora();
-    };
+    b.title = 'Estado de la nube';
+    b.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top, 0px) + 5px);right:7px;z-index:99999;'
+      + 'width:10px;height:10px;border-radius:50%;background:#777;cursor:pointer;'
+      + 'box-shadow:0 0 0 2px rgba(10,16,30,.85);';
+    // zona de toque más grande que el punto, sin que se vea
+    const hit = document.createElement('span');
+    hit.style.cssText = 'position:absolute;left:-10px;top:-8px;width:30px;height:28px;';
+    b.appendChild(hit);
+    b.onclick = function() { _tocarPuntoNube(); };
     document.body.appendChild(b);
+    _actualizarBadgeSync();
   } catch (e) { /* si esto falla, no debe romper el resto de la app */ }
+}
+function _tocarPuntoNube() {
+  const pendientes = Object.keys(_syncOutbox || {}).length;
+  if (_authOk === true && pendientes === 0) {
+    if (typeof _nubeMsg === 'function') _nubeMsg('🟢', 'Todo sincronizado', 'Este aparato está conectado a la nube y no tiene nada pendiente de subir.\n\nVersión de la app: ' + BUILD_ID);
+    return;
+  }
+  if (_authOk === null) {
+    if (typeof _nubeMsg === 'function') _nubeMsg('⚪', 'Comprobando…', 'La app está conectando con la nube. Espera unos segundos y vuelve a tocar el punto.');
+    return;
+  }
+  if (typeof pend_gestionarNube === 'function') pend_gestionarNube();
 }
 
 function _actualizarBadgeSync() {
@@ -2290,19 +2312,11 @@ function _actualizarBadgeSync() {
     const b = document.getElementById('syncBadge');
     if (!b) return;
     const pendientes = Object.keys(_syncOutbox || {}).length;
-    if (_authOk === false) {
-      b.textContent = '☁️✗ sesión';
-      b.style.background = '#7a1f1f';
-    } else if (pendientes > 0) {
-      b.textContent = '☁️⏳ ' + pendientes;
-      b.style.background = '#7a5b1f';
-    } else if (_authOk === null) {
-      b.textContent = '☁️ …';
-      b.style.background = '#333';
-    } else {
-      b.textContent = '☁️✓';
-      b.style.background = '#1f6b2f';
-    }
+    let color = '#2ecc71'; // verde
+    if (_authOk === false) color = '#e74c3c';        // rojo: sin sesión
+    else if (pendientes > 0) color = '#f0a830';      // ámbar: pendiente de subir
+    else if (_authOk === null) color = '#777';       // gris: comprobando
+    b.style.background = color;
   } catch (e) { /* no romper la app por esto */ }
 }
 
@@ -2349,6 +2363,26 @@ async function _probarSincronizacionAhora() {
   alert(msg);
 }
 window._actualizarBadgeSync = _actualizarBadgeSync;
+// PUNTO 232 (03/10/2026): estado de la nube para el aviso de Inicio
+// ("Pendiente de gestionar") — la bolita ☁️ sigue oculta por decisión de Patry.
+window._estadoNube = function() {
+  const pend = Object.keys(_syncOutbox || {}).map(function(k) {
+    const v = _syncOutbox[k];
+    return { clave: k, desde: (typeof v === 'string') ? v : (_pendingLocalWrites[k] || '') };
+  });
+  return { sesion: _authOk, errorSesion: _authError, pendientes: pend, ultimoError: _ultimoErrorSync, ultimoErrorClave: _ultimoErrorSyncClave, ultimoErrorFecha: _ultimoErrorSyncFecha, version: BUILD_ID };
+};
+window._nubeAbrirLogin = function() { if (window._nubeMostrarLoginGlobal) window._nubeMostrarLoginGlobal(true); };
+window._nubeReintentarAhora = async function() {
+  const claves = Object.keys(_syncOutbox || {});
+  for (const k of claves) {
+    const v = localStorage.getItem(k);
+    if (!DATA_KEYS.includes(k) || !_valorValido(v)) { delete _syncOutbox[k]; continue; }
+    try { await window.syncToFirestore(k, v); } catch (e) {}
+  }
+  _guardarOutbox();
+  return Object.keys(_syncOutbox || {});
+};
 window._mostrarEstadoSync = _mostrarEstadoSync;
 window._probarSincronizacionAhora = _probarSincronizacionAhora;
 
@@ -2361,11 +2395,12 @@ window._probarSincronizacionAhora = _probarSincronizacionAhora;
 // protegiendo los datos igual que antes; solo se ha quitado el elemento
 // que se veía en pantalla. Si algún día hiciera falta volver a diagnosticar
 // algo así, basta con volver a llamar a _crearBadgeSync() (o pedírmelo).
-// if (document.readyState === 'loading') {
-//   document.addEventListener('DOMContentLoaded', _crearBadgeSync);
-// } else {
-//   _crearBadgeSync();
-// }
+// PUNTO 233 (03/10/2026): vuelve, como punto de color arriba a la derecha.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _crearBadgeSync);
+} else {
+  _crearBadgeSync();
+}
 
 // Comprueba que un valor es "de verdad" antes de guardarlo o propagarlo —
 // ni vacío (undefined/null) ni el texto literal "undefined"/"null" (lo que
@@ -3100,6 +3135,31 @@ function _limpiarConBorrados() {
 // las dos, nunca solo la copia local. Para las claves sin fusión definida
 // (datos sueltos, no listas) el comportamiento no cambia: se sigue subiendo
 // tal cual, como siempre — ahí no hay riesgo de "pisar" nada de otro aparato.
+// PUNTO 231 (03/10/2026) — KURRA: cada aparato generaba su propia carga
+// inicial de los 10 apuntes de jun-sep con identificadores DISTINTOS, así
+// que al juntar dos aparatos el mismo recibo podía salir dos veces. Aquí se
+// deja uno solo por apunte "igual" (fecha + concepto + tipo + importe): se
+// queda el de sello más reciente (si ese es un borrado, cuenta como borrado).
+function _kurraDedupe(json) {
+  try {
+    const arr = JSON.parse(json);
+    if (!Array.isArray(arr)) return json;
+    const porHuella = {}, orden = [];
+    arr.forEach(function(m) {
+      if (!m) return;
+      const h = m.deleted ? ('del|' + m.id) : [m.fecha, m.concepto, m.tipo, Number(m.importe).toFixed(2)].join('|');
+      const prev = porHuella[h];
+      if (!prev) { porHuella[h] = m; orden.push(h); return; }
+      // Gana el sello más reciente; a igualdad, el id menor (así todos los
+      // aparatos se quedan con el MISMO apunte y no se reenvían sin fin).
+      const um = String(m.updatedAt || ''), up = String(prev.updatedAt || '');
+      if (um > up || (um === up && String(m.id) < String(prev.id))) porHuella[h] = m;
+    });
+    const res = orden.map(function(h) { return porHuella[h]; });
+    return res.length === arr.length ? json : JSON.stringify(res);
+  } catch (e) { return json; }
+}
+window._kurraDedupe = _kurraDedupe;
 function _fusionParaClave(key, localValue, remoteValue) {
   if (_esBorradosClave(key)) return _borradosMerge(localValue, remoteValue);
   if (key === 'app:notas_mejoras') return _notasMerge(localValue, remoteValue);
@@ -3108,6 +3168,7 @@ function _fusionParaClave(key, localValue, remoteValue) {
   if (key === 'contratos:lista') return _contratosMerge(localValue, remoteValue);
   const finTipo = _finTipoDeClave(key);
   if (finTipo) return _finListaMerge(finTipo, localValue, remoteValue);
+  if (key === 'kurra:movimientos') return _kurraDedupe(_patHistMerge(localValue, remoteValue)); // PUNTO 231
   if (_esPatHistClave(key) || _esInmRegistroClave(key) || _esListaPorIdClave(key)) return _patHistMerge(localValue, remoteValue);
   if (_esListaPorCampoClave(key)) return _mergePorCampo('mes', localValue, remoteValue);
   const tipoGenerico = _tipoGenericoDeClave(key);
@@ -3136,7 +3197,8 @@ window.syncToFirestore = async function(key, value) {
   // confirmar" ANTES de intentar la subida — si el intento falla, el
   // cambio se queda anotado aquí para reintentarlo más adelante (ver
   // _flushOutbox), en vez de perderse en silencio.
-  _syncOutbox[key] = true;
+  // PUNTO 232: se guarda desde cuándo está pendiente (la 1ª vez que falta subirlo).
+  if (!_syncOutbox[key] || _syncOutbox[key] === true) _syncOutbox[key] = new Date().toISOString();
   _guardarOutbox();
   _actualizarBadgeSync();
   try {
@@ -3220,7 +3282,7 @@ window.syncToFirestore = async function(key, value) {
       _ultimoErrorSyncClave = key;
       _ultimoErrorSyncFecha = new Date().toLocaleString('es-ES');
       _guardarDiagnostico();
-      _syncOutbox[key] = true; _guardarOutbox(); // PUNTO 200
+      if (!_syncOutbox[key] || _syncOutbox[key] === true) _syncOutbox[key] = new Date().toISOString(); _guardarOutbox(); // PUNTO 200
       _actualizarBadgeSync();
       return; // se deja pendiente en _syncOutbox (no se borra más abajo) — se reintentará solo
     }
@@ -3237,7 +3299,7 @@ window.syncToFirestore = async function(key, value) {
     _ultimoErrorSyncClave = key;
     _ultimoErrorSyncFecha = new Date().toLocaleString('es-ES');
     _guardarDiagnostico();
-    _syncOutbox[key] = true; _guardarOutbox(); // PUNTO 200
+    if (!_syncOutbox[key] || _syncOutbox[key] === true) _syncOutbox[key] = new Date().toISOString(); _guardarOutbox(); // PUNTO 200
     _actualizarBadgeSync();
   }
 };
@@ -3246,9 +3308,11 @@ window.syncToFirestore = async function(key, value) {
 window.loadFromFirestore = async function() {
   try {
     let loaded = 0;
+    const _remotoLeido = {}; // PUNTO 231: lo que había en la nube al abrir
     for (const key of DATA_KEYS) {
       const docId = keyToDoc(key);
       const snap = await getDoc(doc(db, 'gestinmo_data', docId));
+      _remotoLeido[key] = snap.exists() ? (snap.data() || {}).value : undefined;
       if (snap.exists()) {
         const data = snap.data();
         if (_valorValido(data.value)) {
@@ -3328,6 +3392,7 @@ window.loadFromFirestore = async function() {
       }
     }
     _limpiarConBorrados(); // PUNTO 198
+    try { _reconciliarConNube(_remotoLeido); } catch (eRec) { console.warn('Reconciliación con la nube:', eRec.message); }
     console.log(`Firebase: ${loaded} colecciones cargadas`);
     window._firebaseReady = true;
     // Notificar que los datos están listos
@@ -3338,6 +3403,47 @@ window.loadFromFirestore = async function() {
     document.dispatchEvent(new CustomEvent('firebaseLoaded'));
   }
 };
+
+// PUNTO 231 (03/10/2026) — BUG REAL CONFIRMADO CON DATOS REALES: KURRA tenía
+// 12 apuntes en el iPhone (los 2 de agua del 28/09 incluidos) y 10 en el
+// Windows. Comprobado directamente en Firebase: el documento de KURRA NO
+// EXISTÍA en la nube — nunca se había llegado a subir (la carga inicial se
+// hacía antes de que la sincronización estuviera lista, y un cambio que no
+// llega a subirse se quedaba solo en el aparato donde se hizo, sin que nada
+// volviera a intentarlo al abrir la app). Arreglo general, para TODOS los
+// datos: cada vez que la app abre y lee la nube, compara lo que tiene este
+// aparato con lo que hay arriba y, si este aparato tiene algo que la nube
+// no tiene (un documento que no existe, o apuntes/filas que faltan), lo sube
+// en ese momento — siempre juntándolo con lo de la nube, nunca pisándolo.
+// Solo se toca lo que sabe juntarse elemento a elemento (listas con id,
+// contratos, inmuebles, finanzas…) o lo que directamente no existe arriba;
+// un dato suelto que ya existe en la nube se sigue tratando como siempre.
+function _canonLista(json) {
+  try {
+    const v = JSON.parse(json);
+    if (Array.isArray(v)) return JSON.stringify(v.map(function(x) { return JSON.stringify(x); }).sort());
+    return JSON.stringify(v);
+  } catch (e) { return String(json); }
+}
+function _reconciliarConNube(remotoLeido) {
+  try { if (typeof getRol === 'function' && getRol() === 'viewer') return; } catch (e) {}
+  const subidos = [];
+  for (const key of DATA_KEYS) {
+    const local = localStorage.getItem(key);
+    if (!_valorValido(local) || local === '' || local === '[]' || local === '{}') continue;
+    const remoto = remotoLeido[key];
+    if (remoto === undefined || !_valorValido(remoto)) {
+      // No existe en la nube: se sube lo de este aparato.
+      window.syncToFirestore(key, local); subidos.push(key); continue;
+    }
+    const fus = _fusionConBorrados(key, local, remoto);
+    if (fus == null) continue; // dato suelto: comportamiento de siempre
+    if (_canonLista(fus) !== _canonLista(remoto)) { window.syncToFirestore(key, local); subidos.push(key); }
+  }
+  if (subidos.length) console.log('[Reconciliación] subido a la nube lo que faltaba en: ' + subidos.join(', '));
+  window._ultimaReconciliacion = { ts: new Date().toISOString(), subidos: subidos };
+}
+window._reconciliarConNube = _reconciliarConNube;
 
 // ── ESCUCHAR CAMBIOS EN TIEMPO REAL ───────────────────────────────
 window.startFirebaseSync = function() {
@@ -3481,6 +3587,8 @@ function _nubeMostrarLogin(mostrar) {
   const el = document.getElementById('nube-login');
   if (el) el.style.display = mostrar ? 'flex' : 'none';
 }
+// PUNTO 232: accesible desde el aviso de Inicio (definida antes de usarse).
+window._nubeMostrarLoginGlobal = _nubeMostrarLogin;
 onAuthStateChanged(auth, (user) => {
   if (user && user.isAnonymous) {
     // Sesión anónima de versiones anteriores: ya no da acceso, se cierra.
@@ -4344,7 +4452,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
   </div>
   <div class="header-action">
-    <button class="btn-new" onclick="openModal()">＋ Nuevo</button>
+    <button class="btn-new btn-new-solo" title="Nuevo" aria-label="Nuevo" onclick="openModal()">＋</button>
   </div>
 </header>
 <div class="view active" id="inm-view-lista">
@@ -4814,7 +4922,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
   </div>
   <div class="header-action">
-    <button class="btn-new" onclick="abrirWizardNuevo()">＋ Nuevo</button>
+    <button class="btn-new btn-new-solo" title="Nuevo" aria-label="Nuevo" onclick="abrirWizardNuevo()">＋</button>
   </div>
 </header>
 <div class="view active" id="con-view-lista">
@@ -4843,7 +4951,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
     </div>
     <div id="con-lista-contratos">
-      <div style="text-align:center;padding:40px 20px;color:var(--silver-dim);font-size:14px">Sin contratos aún.<br>Pulsa ＋ Nuevo para crear el primero.</div>
+      <div style="text-align:center;padding:40px 20px;color:var(--silver-dim);font-size:14px">Sin contratos aún.<br>Pulsa ＋ (arriba a la derecha) para crear el primero.</div>
     </div>
   </main>
 </div>
@@ -5734,7 +5842,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     </div>
   </div>
   <div class="header-action">
-    <button class="btn-new" onclick="cal_nuevoEstudio()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--silver-mid);cursor:pointer;">＋ Nuevo</button>
+    <button class="btn-new" onclick="cal_nuevoEstudio()" style="background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--silver-mid);cursor:pointer;" title="Nuevo" aria-label="Nuevo">＋</button>
   </div>
 </header>
 <div class="view active" id="cal-view-lista">
@@ -6759,7 +6867,7 @@ con editar/borrar en cada línea. -->
     </div>
   </div>
   <div class="header-action">
-    <button class="btn-new" onclick="cli_abrirNuevo()">＋ Nuevo</button>
+    <button class="btn-new btn-new-solo" title="Nuevo" aria-label="Nuevo" onclick="cli_abrirNuevo()">＋</button>
   </div>
 </header>
 
@@ -14355,49 +14463,10 @@ function kurra_borrarApunte(){
   ]);
 }
 
-// PUNTO 156 (08/09/2026): carga inicial de los datos de KURRA que pasó Patry
-// (hoja de suministros jun-sep 2026: 5 recibos de luz/agua, repartidos entre
-// Pedro 1K y Andrey 1J = 10 apuntes al Debe, total 658,22 €). Se ejecuta una
-// sola vez — si ya hay movimientos guardados, o esta carga ya se hizo antes
-// (aunque los hayas borrado todos después), no vuelve a tocar nada.
-(function kurra_seedInicial(){
-  try{
-    if(localStorage.getItem('kurra:seed_2026_v1')) return;
-    if(kurra_load().length===0){
-      const datosIniciales=[
-        {fecha:'2026-06-04',concepto:'Pedro luz',tipo:'debe',importe:78.38},
-        {fecha:'2026-06-04',concepto:'Andrey luz',tipo:'debe',importe:45.41},
-        {fecha:'2026-07-06',concepto:'Pedro luz',tipo:'debe',importe:68.15},
-        {fecha:'2026-07-06',concepto:'Andrey luz',tipo:'debe',importe:53.42},
-        {fecha:'2026-07-29',concepto:'Pedro agua',tipo:'debe',importe:96.91},
-        {fecha:'2026-07-29',concepto:'Andrey agua',tipo:'debe',importe:86.54},
-        {fecha:'2026-08-05',concepto:'Pedro luz',tipo:'debe',importe:57.73},
-        {fecha:'2026-08-05',concepto:'Andrey luz',tipo:'debe',importe:47.10},
-        {fecha:'2026-09-05',concepto:'Pedro luz',tipo:'debe',importe:73.34},
-        {fecha:'2026-09-05',concepto:'Andrey luz',tipo:'debe',importe:51.24}
-      ];
-      // BUG REAL CORREGIDO (08/09/2026, mismo día): esta carga se ejecuta muy
-      // pronto, mientras el navegador todavía está leyendo el archivo de
-      // arriba abajo — y `_finGenId` vive dentro del bloque `<script
-      // type="module">` de más arriba, que el navegador retrasa a propósito
-      // hasta que termina de leer TODO el archivo (así funcionan los módulos
-      // JS). Resultado: al llegar aquí, `_finGenId` todavía no existe, y la
-      // consola marcaba "ReferenceError: _finGenId is not defined" — los 10
-      // apuntes NO se llegaban a guardar. Se genera el id con la misma
-      // fórmula pero sin depender de esa función.
-      const generarIdApunte=()=>'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-      datosIniciales.forEach(d=>{ d.id=generarIdApunte(); });
-      kurra_save(datosIniciales);
-      // Esta carga ocurre muy pronto en el arranque (antes de que se instale
-      // el interceptor que sube automáticamente a Firebase todo lo que se
-      // guarda), así que aquí se sube a mano — mismo patrón que otras
-      // migraciones de arranque de la app.
-      if (window.syncToFirestore) window.syncToFirestore('kurra:movimientos', JSON.stringify(datosIniciales));
-    }
-    localStorage.setItem('kurra:seed_2026_v1','1');
-    if (window.syncToFirestore) window.syncToFirestore('kurra:seed_2026_v1', '1');
-  }catch(e){ console.error('Error cargando datos iniciales KURRA', e); }
-})();
+// PUNTO 156 (08/09/2026) → retirado en PUNTO 231 (03/10/2026): la carga
+// inicial de KURRA (10 apuntes de jun-sep con sus importes) ya está en la
+// nube y no debe ir en el archivo (repositorio público). Además cada aparato
+// la creaba con identificadores distintos, lo que podía duplicar apuntes.
 
 // PUNTO 177 (17/09/2026): BUG REAL ENCONTRADO — Patry detectó que, en
 // Chrome, "Otros ingresos" y "Gastos" de Renta Patricio aparecían vacíos,
@@ -21812,8 +21881,54 @@ function pend_subidasPactadas() {
   } catch (e) { return []; }
 }
 
+// PUNTO 232 (03/10/2026): aviso de nube. Sale solo si (a) este aparato no
+// tiene la sesión de la nube iniciada, o (b) hay cambios que llevan más de
+// 10 minutos sin poder subirse. "Gestionar" intenta arreglarlo y, si no
+// puede, explica qué hacer.
+var PEND_NUBE_MIN = 10;
+function pend_avisoNube() {
+  try {
+    if (typeof window._estadoNube !== 'function') return null;
+    var e = window._estadoNube();
+    if (e.sesion === false) {
+      return { icon: '☁️', t: 'Este aparato NO está conectado a la nube', s: 'Lo que metas aquí no llega a tus otros aparatos, y aquí no ves lo último. Pulsa Gestionar para entrar.', accion: 'nube', urgente: true };
+    }
+    if (e.sesion !== true) return null; // aún comprobando
+    var ahora = Date.now(), viejos = e.pendientes.filter(function(p) { var t = Date.parse(p.desde); return !isNaN(t) && (ahora - t) > PEND_NUBE_MIN * 60000; });
+    if (!viejos.length) return null;
+    var desde = viejos.map(function(p) { return p.desde; }).sort()[0];
+    var d = new Date(desde);
+    var cuando = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    return { icon: '☁️', t: viejos.length + ' cambio' + (viejos.length === 1 ? '' : 's') + ' sin subir a la nube desde el ' + cuando, s: 'Tus otros aparatos todavía no los tienen. Pulsa Gestionar para reintentarlo ahora.', accion: 'nube', urgente: true };
+  } catch (e) { return null; }
+}
+function _nubeMsg(icon, titulo, msg, btns) {
+  showConfirm(icon, titulo, msg, btns || [{ label: 'Aceptar', cls: 'g', fn: function() {} }]);
+  var el = document.getElementById('cm-s'); if (el) el.style.whiteSpace = 'pre-line';
+}
+async function pend_gestionarNube() {
+  var e = window._estadoNube ? window._estadoNube() : null;
+  if (!e) return;
+  if (e.sesion === false) {
+    _nubeMsg('☁️', 'Conectar este aparato a la nube', 'Ahora verás la pantalla "Acceso a la nube".\n\n1. Escribe el email y la contraseña de la nube (los de siempre en este aparato).\n2. Pulsa Entrar.\n\nSi no recuerdas la contraseña, usa "¿Has olvidado la contraseña?" y te llegará un correo para cambiarla. Al entrar, todo lo pendiente se sube solo.',
+      [{ label: 'Ir a la pantalla', cls: 'g', fn: function() { if (window._nubeAbrirLogin) window._nubeAbrirLogin(); } }, { label: 'Ahora no', cls: 'c', fn: function() {} }]);
+    return;
+  }
+  if (!navigator.onLine) { _nubeMsg('📶', 'Sin internet', 'Ahora mismo este aparato no tiene internet. Conéctate (wifi o datos) y vuelve a pulsar Gestionar.'); return; }
+  _nubeMsg('⏳', 'Subiendo a la nube…', 'Un momento, estoy reintentando la subida.', []);
+  var quedan = await window._nubeReintentarAhora();
+  pend_render();
+  closeConfirm();
+  if (!quedan.length) { _nubeMsg('✅', 'Todo subido', 'Todo está ya en la nube. Tus otros aparatos lo verán al abrir la app.'); return; }
+  var e2 = window._estadoNube();
+  _nubeMsg('⚠️', 'No se ha podido subir', 'No es algo que tengas que arreglar tú: haz una captura de esta ventana y pásamela a Claude.\n\n' +
+       'Versión: ' + e2.version + '\nPendiente: ' + quedan.join(', ') + '\nMotivo: ' + (e2.ultimoError || 'sin detalle') + (e2.ultimoErrorFecha ? ' (' + e2.ultimoErrorFecha + ')' : '') +
+       '\n\nMientras tanto, sigue usando este aparato con normalidad: no se pierde nada, se queda guardado aquí y se subirá en cuanto se resuelva.');
+}
+setInterval(function() { try { if (typeof pend_render === 'function') pend_render(); } catch (e) {} }, 60000);
 function pend_calcular() {
   var items = [];
+  var _avNube = pend_avisoNube(); if (_avNube) items.push(_avNube); // PUNTO 232
   try {
     var b = (typeof backupNecesitaAviso === 'function') ? backupNecesitaAviso() : null;
     if (b && b.necesita) {
@@ -21984,6 +22099,8 @@ function pend_gestionar(i) {
     setTimeout(function() {
       if (typeof rus_verHistorico === 'function') rus_verHistorico(it.ref, it.nombre);
     }, 250);
+  } else if (it.accion === 'nube') {
+    pend_gestionarNube(); // PUNTO 232
   } else if (it.accion === 'registro') {
     // PUNTO 90b: intentos bloqueados / posible fuga → abre el registro
     if (typeof registro_abrir === 'function') registro_abrir();
@@ -22471,7 +22588,7 @@ function con_renderLista() {
   if (!elLista) return;
 
   if (filtrados.length === 0) {
-    elLista.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--silver-dim);font-size:14px">Sin contratos aún.<br>Pulsa ＋ Nuevo para crear el primero.</div>`;
+    elLista.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--silver-dim);font-size:14px">Sin contratos aún.<br>Pulsa ＋ (arriba a la derecha) para crear el primero.</div>`;
     return;
   }
 
