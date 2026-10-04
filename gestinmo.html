@@ -1172,7 +1172,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .btn-new{background:var(--navy-card);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:11px;font-weight:600;letter-spacing:1px;color:var(--silver-mid);cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all .2s;}
 .btn-new:active{transform:scale(.95);}
 /* PUNTO 234 (03/10/2026): la flecha de volver (‹) toma el color del estado de la nube */
-html body .header-back.header-back, html body .back-btn.back-btn{color:var(--sync-color,var(--silver-dim,#6b7fa3))!important;font-weight:700!important;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:color .4s!important;}
+html body .header-back.header-back, html body .back-btn.back-btn{color:var(--sync-color,var(--silver-dim,#6b7fa3))!important;border:1.5px solid var(--sync-color,var(--border))!important;background:var(--navy-card,#1e2a52)!important;background:color-mix(in srgb, var(--sync-color,transparent) 14%, var(--navy-card,#1e2a52))!important;box-shadow:0 0 8px -2px var(--sync-color,transparent)!important;font-size:28px!important;line-height:1!important;padding-bottom:3px!important;font-weight:800!important;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:color .4s,border-color .4s,box-shadow .4s,background .4s!important;}
 /* PUNTO 233 (03/10/2026): botón de añadir solo con "＋" (sin la palabra Nuevo) */
 .btn-new.btn-new-solo{font-size:20px !important;line-height:1 !important;padding:6px 14px !important;letter-spacing:0 !important;min-width:44px;}
 
@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261003_08';
+const BUILD_ID = '261004_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
