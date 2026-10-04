@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261004_04';
+const BUILD_ID = '261004_06';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4374,16 +4374,25 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-ingresos-otros">— €</div>
+          <!-- PUNTO 239 (04/10/2026): media mensual debajo del total -->
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:700;color:var(--accent-green);" id="renta-total-ingresos-otros">— €</div>
+            <div style="font-size:10.5px;color:var(--text-secondary);margin-top:1px;display:none;" id="renta-media-ingresos-otros"></div>
+          </div>
           <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-ingresos">›</span>
         </div>
       </div>
       <div id="bloque-ingresos" style="display:none;padding:0 16px 14px;">
+        <!-- PUNTO 239 (04/10/2026): botón de añadir arriba, antes de la lista. -->
+        <button onclick="ingotros_abrirModal()" style="width:100%;margin-bottom:12px;background:rgba(76,175,130,0.15);border:1px dashed rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir ingreso</button>
         <!-- PUNTO 132 (07/09/2026): sumatorio por concepto (Lala/Tortugas/
         Otros), a petición tuya — antes solo se veía el total general. -->
         <div id="ingotros-subtotales" style="display:flex;gap:8px;margin-bottom:12px;"></div>
+        <!-- PUNTO 240 (04/10/2026): ingresos por mes del año en curso -->
+        <div id="ingotros-meses" style="margin-bottom:12px;"></div>
         <div id="renta-lista-ingresos-otros" style="margin-bottom:12px;"></div>
-        <button onclick="ingotros_abrirModal()" style="width:100%;background:rgba(76,175,130,0.15);border:1px dashed rgba(76,175,130,0.4);border-radius:10px;color:var(--accent-green);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir ingreso</button>
+        <!-- PUNTO 240 (04/10/2026): una ficha plegable por cada año anterior -->
+        <div id="ingotros-anteriores"></div>
       </div>
     </div>
 
@@ -24730,31 +24739,45 @@ function ingotros_subtotalesPorConcepto(arr) {
   }
   return t;
 }
-function ingotros_render() {
-  var cont = document.getElementById('renta-lista-ingresos-otros');
-  if (!cont) return;
-  var arr = ingotros_load().slice().sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
-  var subEl = document.getElementById('ingotros-subtotales');
-  if (arr.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin ingresos añadidos.</div>';
-    document.getElementById('renta-total-ingresos-otros').textContent = '— €';
-    if (subEl) subEl.innerHTML = '';
-    return;
+// PUNTO 240 (04/10/2026) — Otros ingresos por años (decidido con Patry):
+// la cabecera y el bloque principal muestran solo el año en curso (el 1 de
+// enero empieza en 0); cada año anterior queda en su propia ficha plegable
+// con sus totales, su tabla de ingresos por mes y sus apuntes. El reparto
+// por año es automático según la fecha de cada apunte: no se borra nada.
+var INGOTROS_MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+window._ingotrosAniosAbiertos = window._ingotrosAniosAbiertos || {};
+function ingotros_anioDe(it) { return it && it.fecha ? parseInt(String(it.fecha).split('-')[0], 10) : NaN; }
+function ingotros_htmlChips(arr) {
+  var sub = ingotros_subtotalesPorConcepto(arr);
+  var chip = function (label, val) {
+    return '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 6px;text-align:center;">'
+      + '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">' + label + '</div>'
+      + '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);">' + ingotros_fmt2(val) + ' €</div></div>';
+  };
+  return chip('Lala', sub.Lala) + chip('Tortugas', sub.Tortugas) + chip('Otros', sub.Otros);
+}
+// Tabla de ingresos por mes: nMeses = 12 en años cerrados, o los meses que
+// lleva el año en curso.
+function ingotros_htmlMeses(arr, nMeses) {
+  var porMes = [0,0,0,0,0,0,0,0,0,0,0,0];
+  for (var i = 0; i < arr.length; i++) {
+    var m = parseInt(String(arr[i].fecha || '').split('-')[1], 10);
+    if (m >= 1 && m <= 12) porMes[m - 1] += parseFloat(arr[i].importe) || 0;
   }
-  if (subEl) {
-    var sub = ingotros_subtotalesPorConcepto(arr);
-    var chip = function (label, val) {
-      return '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 6px;text-align:center;">'
-        + '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">' + label + '</div>'
-        + '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);">' + ingotros_fmt2(val) + ' €</div></div>';
-    };
-    subEl.innerHTML = chip('Lala', sub.Lala) + chip('Tortugas', sub.Tortugas) + chip('Otros', sub.Otros);
+  var h = '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:0 0 6px 2px;">Ingresos por mes</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">';
+  for (var k = 0; k < nMeses; k++) {
+    var v = porMes[k];
+    h += '<div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:6px 4px;text-align:center;">'
+      + '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;">' + INGOTROS_MESES[k] + '</div>'
+      + '<div style="font-size:11px;font-weight:700;color:' + (v ? 'var(--silver-bright)' : 'var(--text-secondary)') + ';">' + (v ? ingotros_fmt2(v) + ' €' : '—') + '</div></div>';
   }
-  var total = 0;
+  return h + '</div>';
+}
+function ingotros_htmlLista(arr) {
   var html = '';
   for (var i = 0; i < arr.length; i++) {
     var it = arr[i];
-    total += parseFloat(it.importe) || 0;
     html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + notas_esc(it.concepto)
       + (it.declaraIrpf ? ' <span style="font-size:9px;font-weight:700;color:#5b8dee;background:rgba(91,141,238,0.15);border-radius:4px;padding:2px 5px;vertical-align:middle;">IRPF</span>' : '') + '</div>'
@@ -24765,8 +24788,82 @@ function ingotros_render() {
       + '<button onclick="ingotros_borrar(\'' + it.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
       + '</div></div>';
   }
-  cont.innerHTML = html;
-  document.getElementById('renta-total-ingresos-otros').textContent = ingotros_fmt2(total) + ' €';
+  return html;
+}
+function ingotros_sumar(arr) {
+  var t = 0;
+  for (var i = 0; i < arr.length; i++) t += parseFloat(arr[i].importe) || 0;
+  return t;
+}
+function ingotros_toggleAnio(y) {
+  window._ingotrosAniosAbiertos[y] = !window._ingotrosAniosAbiertos[y];
+  ingotros_render();
+}
+function ingotros_render() {
+  var cont = document.getElementById('renta-lista-ingresos-otros');
+  if (!cont) return;
+  var arr = ingotros_load().slice().sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  var subEl = document.getElementById('ingotros-subtotales');
+  var mesesEl = document.getElementById('ingotros-meses');
+  var antEl = document.getElementById('ingotros-anteriores');
+  var mediaEl = document.getElementById('renta-media-ingresos-otros');
+  if (arr.length === 0) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin ingresos añadidos.</div>';
+    document.getElementById('renta-total-ingresos-otros').textContent = '— €';
+    if (mediaEl) mediaEl.style.display = 'none';
+    if (subEl) subEl.innerHTML = '';
+    if (mesesEl) mesesEl.innerHTML = '';
+    if (antEl) antEl.innerHTML = '';
+    return;
+  }
+  var hoy = new Date();
+  var anioActual = hoy.getFullYear();
+  var mesActual = hoy.getMonth() + 1;
+  // Reparto por año (todo apunte tiene fecha: el formulario la exige).
+  var porAnio = {};
+  for (var i = 0; i < arr.length; i++) {
+    var y = ingotros_anioDe(arr[i]);
+    if (isNaN(y)) y = anioActual;
+    (porAnio[y] = porAnio[y] || []).push(arr[i]);
+  }
+  var actual = porAnio[anioActual] || [];
+  var totalActual = ingotros_sumar(actual);
+  // Cabecera: año en curso y su media mensual (total ÷ mes actual).
+  document.getElementById('renta-total-ingresos-otros').textContent = ingotros_fmt2(totalActual) + ' €';
+  if (mediaEl) {
+    mediaEl.textContent = ingotros_fmt2(totalActual / mesActual) + ' €/mes';
+    mediaEl.style.display = '';
+  }
+  if (subEl) subEl.innerHTML = ingotros_htmlChips(actual);
+  if (mesesEl) mesesEl.innerHTML = ingotros_htmlMeses(actual, mesActual);
+  cont.innerHTML = actual.length ? ingotros_htmlLista(actual)
+    : '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin ingresos en ' + anioActual + ' todavía.</div>';
+  // Fichas de los demás años, el más reciente primero.
+  if (antEl) {
+    var anios = Object.keys(porAnio).map(Number).filter(function (a) { return a !== anioActual; }).sort(function (a, b) { return b - a; });
+    if (anios.length === 0) { antEl.innerHTML = ''; return; }
+    var h = '<div style="font-size:9px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:4px 0 8px 2px;">' + (anios.some(function (a) { return a > anioActual; }) ? 'Otros años' : 'Años anteriores') + '</div>';
+    anios.forEach(function (a) {
+      var lista = porAnio[a];
+      var tot = ingotros_sumar(lista);
+      var abierto = !!window._ingotrosAniosAbiertos[a];
+      h += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;">'
+        + '<div onclick="ingotros_toggleAnio(' + a + ')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;">'
+        + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">' + a + '</div>'
+        + '<div style="display:flex;align-items:center;gap:10px;"><div style="text-align:right;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">' + ingotros_fmt2(tot) + ' €</div>'
+        + '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:1px;">' + ingotros_fmt2(tot / 12) + ' €/mes</div>'
+        + '</div><span style="color:var(--text-secondary);font-size:16px;">' + (abierto ? '⌄' : '›') + '</span></div></div>';
+      if (abierto) {
+        h += '<div style="padding:0 12px 10px;">'
+          + '<div style="display:flex;gap:8px;margin-bottom:12px;">' + ingotros_htmlChips(lista) + '</div>'
+          + '<div style="margin-bottom:12px;">' + ingotros_htmlMeses(lista, 12) + '</div>'
+          + ingotros_htmlLista(lista) + '</div>';
+      }
+      h += '</div>';
+    });
+    antEl.innerHTML = h;
+  }
 }
 function ingotros_totalAnio(year) {
   var arr = ingotros_load();
