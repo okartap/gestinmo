@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261004_01';
+const BUILD_ID = '261004_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -19321,8 +19321,15 @@ function fin_dcaComprobarPendientes() {
   var yaAbierto = document.querySelector('.moverlay.open, .moverlay[style*="flex"]');
   if (yaAbierto) return;
   var data = fin_load('fin:fondos');
-  var hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+  // PUNTO 236 (04/10/2026): las fechas se comparan como "número de día" del
+  // calendario (sin horas), para que el cambio de hora de primavera/otoño
+  // no haga perder un día ni se guarde la fecha un día antes.
+  var _diaNum = function(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    return m ? Math.round(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000) : NaN;
+  };
+  var _ahora = new Date();
+  var hoyNum = Math.round(Date.UTC(_ahora.getFullYear(), _ahora.getMonth(), _ahora.getDate()) / 86400000);
   var pendientes = [];
   for (var i = 0; i < data.length; i++) {
     var f = data[i];
@@ -19331,12 +19338,12 @@ function fin_dcaComprobarPendientes() {
     var periodo = parseInt(f.dcaPeriodicidad) || 0;
     var base = f.dcaUltimaAplicada || f.dcaFechaInicio;
     if (importe <= 0 || periodo <= 0 || !base) continue;
-    var baseDate = new Date(base + 'T00:00:00');
-    if (isNaN(baseDate.getTime())) continue;
-    var diasPasados = Math.floor((hoy - baseDate) / 86400000);
+    var baseNum = _diaNum(base);
+    if (isNaN(baseNum)) continue;
+    var diasPasados = hoyNum - baseNum;
     var ciclos = Math.floor(diasPasados / periodo);
     if (ciclos < 1) continue;
-    var nuevaFecha = new Date(baseDate.getTime() + ciclos * periodo * 86400000);
+    var nuevaFecha = new Date((baseNum + ciclos * periodo) * 86400000);
     pendientes.push({
       idx: i,
       nombre: f.nombre || 'Fondo',
