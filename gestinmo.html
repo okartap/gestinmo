@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261004_03';
+const BUILD_ID = '261004_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -3590,10 +3590,21 @@ function _arrancarSincronizacion() {
 // escribir a Patricio (Mercedes, únicamente el registro de actividad). El
 // PIN se sigue usando igual, como cerradura rápida del aparato.
 let _syncArrancada = false;
+// PUNTO 238 (04/10/2026): un usuario de Visualización (Mercedes) no puede
+// saltarse el acceso a la nube con "Ahora no" — así siempre ve datos al día
+// y sus entradas en la app le llegan a Patricio.
+function _nubeEsVisor() {
+  try { return typeof window.getRol === 'function' && window.getRol() === 'viewer'; } catch (e) { return false; }
+}
 function _nubeMostrarLogin(mostrar) {
   const el = document.getElementById('nube-login');
   if (el) el.style.display = mostrar ? 'flex' : 'none';
+  const ap = document.getElementById('nube-aplazar');
+  if (ap) ap.style.display = (mostrar && _nubeEsVisor()) ? 'none' : '';
 }
+// PUNTO 238: estado de la sesión de la nube visible para el resto de la app
+// (null = comprobando, true = con sesión, false = sin sesión).
+window._nubeSesionActiva = function() { return _authOk; };
 // PUNTO 232: accesible desde el aviso de Inicio (definida antes de usarse).
 window._nubeMostrarLoginGlobal = _nubeMostrarLogin;
 onAuthStateChanged(auth, (user) => {
@@ -3613,7 +3624,7 @@ onAuthStateChanged(auth, (user) => {
     _authOk = false;
     _authError = 'Sin sesión en la nube';
     _actualizarBadgeSync();
-    if (!window._nubeLoginAplazado) _nubeMostrarLogin(true);
+    if (!window._nubeLoginAplazado || _nubeEsVisor()) _nubeMostrarLogin(true); // PUNTO 238
   }
 });
 window.nubeEntrar = async function() {
@@ -3638,6 +3649,7 @@ window.nubeEntrar = async function() {
   }
 };
 window.nubeAplazar = function() {
+  if (_nubeEsVisor()) return; // PUNTO 238: Mercedes no puede aplazarlo
   // "Ahora no": la app sigue funcionando con los datos de este aparato; los
   // cambios quedan pendientes y se suben solos al entrar en la nube.
   window._nubeLoginAplazado = true;
@@ -4071,7 +4083,7 @@ window.cargarTradingOkarStats = async function() {
     </div>
   </div>
 </div>
-<div id="nube-login" style="display:none;position:fixed;inset:0;z-index:900;background:var(--navy-deep);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+<div id="nube-login" style="display:none;position:fixed;inset:0;z-index:950;background:var(--navy-deep);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:320px;">
     <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--silver-dim);text-align:center;margin-bottom:10px;">Patrimer · Gestión</div>
     <div style="font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--silver-bright);text-align:center;margin-bottom:6px;">Acceso a la nube</div>
@@ -4080,7 +4092,7 @@ window.cargarTradingOkarStats = async function() {
     <input id="nube-pass" type="password" autocomplete="current-password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')nubeEntrar()" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:12px;color:var(--silver-bright);padding:13px 14px;font-size:15px;margin-bottom:10px;">
     <div id="nube-error" style="color:var(--accent-red);font-size:12px;text-align:center;min-height:18px;margin-bottom:8px;"></div>
     <button id="nube-btn" onclick="nubeEntrar()" style="width:100%;background:var(--gold);color:#111;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;">Entrar</button>
-    <div onclick="nubeAplazar()" style="margin-top:16px;text-align:center;font-size:12px;color:var(--silver-dim);cursor:pointer;">Ahora no (trabajar solo con los datos de este aparato)</div>
+    <div id="nube-aplazar" onclick="nubeAplazar()" style="margin-top:16px;text-align:center;font-size:12px;color:var(--silver-dim);cursor:pointer;">Ahora no (trabajar solo con los datos de este aparato)</div>
   </div>
 </div>
 <div id="login-screen">
@@ -6856,7 +6868,7 @@ con editar/borrar en cada línea. -->
 <div class="moverlay" id="registro-modal">
   <div class="modal" style="max-height:75vh;display:flex;flex-direction:column;">
     <div class="mtitle">Registro de actividad<span class="mclose" onclick="closeModalById('registro-modal')">&#10005;</span></div>
-    <div style="font-size:11px;color:var(--silver-dim);margin:-6px 0 8px;">Intentos de crear/editar/borrar de los usuarios en modo Visualización, de los últimos 90 días. No lo ve Mercedes, solo tú.</div>
+    <div style="font-size:11px;color:var(--silver-dim);margin:-6px 0 8px;">Entradas en la app (👤) e intentos de crear/editar/borrar (🔒) de los usuarios en modo Visualización, de los últimos 90 días. No lo ve Mercedes, solo tú.</div>
     <div id="registro-lista" style="overflow-y:auto;flex:1;"></div>
     <button class="btn2" onclick="closeModalById('registro-modal')" style="margin-top:12px;">Cerrar</button>
   </div>
@@ -17426,6 +17438,43 @@ function _registroLoad() {
   try { return JSON.parse(localStorage.getItem('app:registro_actividad') || '[]'); }
   catch (e) { return []; }
 }
+// PUNTO 238 (04/10/2026): nombre sencillo del aparato desde el que se usa la app.
+function _registroDispositivo() {
+  try {
+    const ua = navigator.userAgent || '';
+    if (/iPhone/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua)) return 'iPad';
+    if (/Android/i.test(ua)) return 'Android';
+    if (/Windows/i.test(ua)) return 'Windows';
+    if (/Macintosh|Mac OS X/i.test(ua)) return (navigator.maxTouchPoints > 1) ? 'iPad' : 'Mac';
+    return 'Otro';
+  } catch (e) { return ''; }
+}
+// PUNTO 238 (04/10/2026) — Entradas de Mercedes en la app. Cuenta como
+// entrada abrir la app o volver a ella tras más de 30 minutos sin usarla
+// (para no llenar el registro si cambia de app y vuelve al momento).
+const _ACCESO_PAUSA_MS = 30 * 60 * 1000;
+function _registrarAccesoSiToca() {
+  try {
+    if (getRol() !== 'viewer') return;
+    const ahora = Date.now();
+    const ultimo = parseInt(localStorage.getItem('app:acceso_ultimo_uso') || '0', 10) || 0;
+    if (!ultimo || (ahora - ultimo) > _ACCESO_PAUSA_MS) {
+      _registrarActividad('acceso', 'Entró en la app');
+    }
+    localStorage.setItem('app:acceso_ultimo_uso', String(ahora));
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', function() {
+  try {
+    if (getRol() !== 'viewer') return;
+    if (document.visibilityState === 'visible') _registrarAccesoSiToca();
+    else localStorage.setItem('app:acceso_ultimo_uso', String(Date.now()));
+  } catch (e) {}
+});
+window.addEventListener('pagehide', function() {
+  try { if (getRol() === 'viewer') localStorage.setItem('app:acceso_ultimo_uso', String(Date.now())); } catch (e) {}
+});
 function _registrarActividad(tipo, etiqueta) {
   try {
     if (getRol() !== 'viewer') return;
@@ -17438,7 +17487,9 @@ function _registrarActividad(tipo, etiqueta) {
       usuario: nombre,
       tipo: tipo,
       etiqueta: etiqueta,
-      empresa: localStorage.getItem('patrimer:empresa') || ''
+      // PUNTO 238: en las entradas de acceso aún no se ha elegido empresa.
+      empresa: tipo === 'acceso' ? '' : (localStorage.getItem('patrimer:empresa') || ''),
+      dispositivo: _registroDispositivo()
     });
     // Recorte también aquí (además del que hace la fusión con la nube), para
     // que un aparato que nunca llega a sincronizar no acumule sin límite.
@@ -17609,6 +17660,17 @@ function loginEntrar(key) {
   saveUsuario(key);
   document.getElementById('login-screen').classList.add('hidden');
   aplicarRol();
+  // PUNTO 238 (04/10/2026): entrada de Mercedes al registro y, si su aparato
+  // no tiene sesión en la nube, pantalla de acceso obligatoria (sin "Ahora no").
+  if (USUARIOS[key] && USUARIOS[key].rol === 'viewer') {
+    _registrarAccesoSiToca();
+    try {
+      if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() === false) {
+        window._nubeLoginAplazado = false;
+        if (typeof window._nubeMostrarLoginGlobal === 'function') window._nubeMostrarLoginGlobal(true);
+      }
+    } catch (e) {}
+  }
   // Filtrar empresas permitidas para este usuario
   const u = USUARIOS[key];
   if (u && u.empresas) {
@@ -21978,6 +22040,14 @@ function pend_calcular() {
       if (fugas.length > 0) {
         items.push({ icon: '🚨', t: 'Posible fallo de protección detectado (' + fugas.length + ')', s: 'Se ha guardado un cambio real en modo Visualización — revísalo cuanto antes', accion: 'registro' });
       }
+      // PUNTO 238 (04/10/2026): entradas de Mercedes desde tu última revisión.
+      var accesos = reg.filter(function(e) { return e.tipo === 'acceso'; })
+        .sort(function(a, b) { return String(b.ts || '').localeCompare(String(a.ts || '')); });
+      if (accesos.length > 0) {
+        var ultAcc = accesos[0], fUlt = '';
+        try { var dU = new Date(ultAcc.ts); fUlt = dU.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) + ' ' + dU.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); } catch (eF) {}
+        items.push({ icon: '👤', t: (ultAcc.usuario || 'Mercedes') + ' ha entrado ' + accesos.length + (accesos.length === 1 ? ' vez' : ' veces') + ' desde tu última revisión', s: 'Última: ' + fUlt + (ultAcc.dispositivo ? ' · ' + ultAcc.dispositivo : '') + ' — Registro de actividad', accion: 'registro' });
+      }
       if (bloqueados.length > 0) {
         items.push({ icon: '🔒', t: bloqueados.length + ' intento' + (bloqueados.length === 1 ? '' : 's') + ' bloqueado' + (bloqueados.length === 1 ? '' : 's') + ' desde tu última revisión', s: 'Registro de actividad — repásalo cuando puedas', accion: 'registro' });
       }
@@ -22141,13 +22211,13 @@ function registro_render() {
       fecha = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     } catch (err) { fecha = e.ts || ''; }
     var esFuga = e.tipo === 'posible_fuga';
-    var icono = esFuga ? '🚨' : '🔒';
+    var icono = esFuga ? '🚨' : (e.tipo === 'acceso' ? '👤' : '🔒'); // PUNTO 238
     var color = esFuga ? 'var(--accent-red)' : 'var(--silver-bright)';
     return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
       '<div style="font-size:15px;flex-shrink:0;margin-top:1px;">' + icono + '</div>' +
       '<div style="flex:1;min-width:0;">' +
         '<div style="font-size:12.5px;color:' + color + ';line-height:1.35;">' + notas_esc(e.etiqueta || '') + '</div>' +
-        '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:1px;">' + notas_esc(e.usuario || '') + ' · ' + fecha + (e.empresa ? ' · ' + notas_esc(e.empresa) : '') + '</div>' +
+        '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:1px;">' + notas_esc(e.usuario || '') + ' · ' + fecha + (e.dispositivo ? ' · ' + notas_esc(e.dispositivo) : '') + (e.empresa ? ' · ' + notas_esc(e.empresa) : '') + '</div>' +
       '</div>' +
     '</div>';
   }).join('');
