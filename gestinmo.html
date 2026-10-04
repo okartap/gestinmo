@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261004_02';
+const BUILD_ID = '261004_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -8776,25 +8776,15 @@ function renderLista() {
             ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">${inm.edificio}</div>` : ''}
           </div>
         </div>`
-      : `<div style="display:flex;align-items:flex-start;gap:10px;">
-        <div style="font-size:22px;flex-shrink:0;line-height:1.35;">${emojis[inm.tipo]||'🏠'}</div>
-        <!-- PUNTO 38 (25/08/2026): la sangría de la 2ª línea se hacía antes con
-        un "padding-left:44px;text-indent:-44px" a pixel fijo, calculado a ojo
-        para que la línea de abajo cuadrara justo debajo de la dirección (no
-        debajo de la referencia VIV01). En el iPhone la referencia se
-        renderiza con un ancho distinto al de Windows, así que esos 44px no
-        cuadraban ahí y se veía torcido. Se sustituye por una rejilla CSS
-        (grid) que mide el ancho real de la referencia en cada pantalla, en
-        vez de un número fijo — así cuadra igual en cualquier dispositivo. -->
-        <div style="flex:1;min-width:0;${inm.ref ? 'display:grid;grid-template-columns:auto 1fr;column-gap:6px;align-items:baseline;' : ''}">
-          ${inm.ref ? `<span style="font-size:13px;font-weight:700;color:var(--accent-blue);">${inm.ref}</span>` : ''}
-          <!-- AJUSTE 27/08/2026: misma dirección corta (sin C.P. ni población)
-          que ya se usa en la cabecera de la ficha (punto 51.5) — a petición
-          tuya, para que la lista de tarjetas quede igual de limpia. El
-          código postal y la población siguen saliendo dentro de la ficha,
-          en la pestaña Info (dato completo, ahí sí tiene sentido). -->
-          <div style="font-size:13px;font-weight:700;color:var(--silver-bright);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${[inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ')}</div>
-          ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;${inm.ref ? 'grid-column:2;' : ''}">${inm.edificio}</div>` : ''}
+      : `<div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;">
+        <div style="font-size:26px;line-height:1.2;">${emojis[inm.tipo]||'🏠'}</div>
+        <!-- PUNTO 237 (04/10/2026): a petición tuya, icono y texto centrados
+        en la tarjeta (igual que ya estaba en los inmuebles vendidos). La
+        referencia (VIV01) va en azul delante de la dirección, en la misma
+        línea, y la dirección sigue limitada a 2 líneas. -->
+        <div style="min-width:0;max-width:100%;">
+          <div style="font-size:13px;font-weight:700;color:var(--silver-bright);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${inm.ref ? `<span style="color:var(--accent-blue);margin-right:6px;">${inm.ref}</span>` : ''}${[inm.direccionCalle || inm.direccion, inm.piso, inm.letra].filter(Boolean).join(' ')}</div>
+          ${inm.edificio ? `<div style="font-size:11px;color:var(--silver-dim);margin-top:2px;">${inm.edificio}</div>` : ''}
         </div>
       </div>`;
     // Fila "● Vendido / Rent. neta" — solo en inmuebles no vendidos (ver
