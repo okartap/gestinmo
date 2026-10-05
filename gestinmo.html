@@ -2053,6 +2053,7 @@ const DATA_KEYS = [
   'inmuebles:administradores',
   'trading:capital_inicial', // PUNTO 225
   'renta:dividendos_manuales', // PUNTO 228
+  'renta:intereses_cuenta', // PUNTO 250 (05/10/2026): intereses de la cuenta (Trade Republic)
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
   // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
   // anuales" de Inicio junto con los alquileres reales.
@@ -2234,7 +2235,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_07';
+const BUILD_ID = '261005_08';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2914,7 +2915,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:intereses_cuenta';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -6862,6 +6863,15 @@ abierto. -->
       <div class="mfield"><div class="mflabel">Días del mes</div><input class="minput" id="fin-fondo-dca-dias" type="text" inputmode="numeric" placeholder="1, 15"></div>
       <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Aportado". El "Valor actual" se sigue actualizando a mano.</div>
     </div>
+    <!-- PUNTO 250 (05/10/2026): Saveback de la tarjeta (Trade Republic). -->
+    <div class="mfield" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="fin-fondo-save-activo" onchange="fin_toggleSaveCampos()" style="width:18px;height:18px;flex-shrink:0;">
+      <label for="fin-fondo-save-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Recibe Saveback de la tarjeta</label>
+    </div>
+    <div id="fin-fondo-save-campos" style="display:none;">
+      <div class="mfield"><div class="mflabel">Saveback mensual (euros)</div><input class="minput" id="fin-fondo-save-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Cada mes te saldrá un aviso para confirmarlo. Al activarlo se apuntan en el histórico los meses de este año ya pasados (sin sumarlos al "Aportado", que ya los incluye).</div>
+    </div>
     <button class="btn1" onclick="fin_guardarFondo()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-fondo')" style="margin-top:8px;">Cancelar</button>
   </div>
@@ -7299,8 +7309,9 @@ con editar/borrar en cada línea. -->
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:20px;">📈</span>
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">CAPITAL MOBILIARIO</div>
-          <div style="font-size:11px;color:var(--text-secondary);">Dividendos · Plusvalías fondos/acciones</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">CAPITAL MOBILIARIO <span id="renta-aviso-capital-ico" style="display:none;">⚠️</span></div>
+          <div style="font-size:11px;color:var(--text-secondary);">Dividendos · Intereses · Saveback</div>
+          <div id="renta-aviso-capital" style="display:none;font-size:11px;font-weight:600;color:#f0a830;margin-top:2px;"></div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -7888,6 +7899,7 @@ const BACKUP_KEYS = [
   'inmuebles:administradores', // PUNTO 219
   'trading:capital_inicial', // PUNTO 225
   'renta:dividendos_manuales', // PUNTO 228
+  'renta:intereses_cuenta', // PUNTO 250
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
   'ingresos:otros:patricio',
   'fin:cotizaciones',
@@ -18771,7 +18783,9 @@ function fin_renderAcciones() {
     html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (plS>=0?'fin-plus':'fin-minus') + '">' + fin_fmt(plS) + (plpS!==null ? ' (' + fin_fmtPct(plpS) + ')' : '') + '</span></div>'
       + ((rs.dcaActivo && (parseFloat(rs.dcaImporte) || 0) > 0) ? '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">' + fin_dcaTextoTarjeta(rs) + '</div>' : '') + '</div>';
     html += '<div class="fin-card-actions">';
+    html += fin_movHtml('accion', idxS, rs); // PUNTO 250
     html += '<div class="fin-action-btn" onclick="fin_editarAccionSimple(' + idxS + ')">Editar</div>';
+    html += '<div class="fin-action-btn" onclick="fin_extraAbrir(\'accion\',' + idxS + ')">＋ Aportación</div>';
     html += '<div class="fin-action-btn" onclick="fin_pasarADetallado(' + idxS + ')">Pasar a detallado</div>';
     html += '<div class="fin-action-btn red" onclick="fin_borrarAccionSimple(' + idxS + ')">Eliminar</div>';
     html += '</div></div>';
@@ -19090,6 +19104,8 @@ function fin_guardarAccionSimple() {
   if (_antA.num != null) obj.num = _antA.num;
   if (_antA.precioMedioCompra != null) obj.precioMedioCompra = _antA.precioMedioCompra;
   if (_antA.precioMercado != null) obj.precioMercado = _antA.precioMercado;
+  if (_antA.dcaUltimas) obj.dcaUltimas = _antA.dcaUltimas; // PUNTO 250
+  if (_antA.extras) obj.extras = _antA.extras;
   // PUNTO 248 (05/10/2026): aportación automática en acciones.
   var _accDcaActivo = document.getElementById('fin-accsimple-dca-activo').checked;
   var _accDcaImporte = parseImporteFlexible(document.getElementById('fin-accsimple-dca-importe').value);
@@ -19363,7 +19379,10 @@ function fin_renderFondos() {
     }
     html += '</div>';
     html += '<div class="fin-card-actions">';
+    // PUNTO 250: Saveback, historial de aportaciones y aportación extra.
+    html += fin_movHtml('fondo', i, f);
     html += '<div class="fin-action-btn" onclick="fin_editarFondo(' + i + ')">Actualizar valor</div>';
+    html += '<div class="fin-action-btn" onclick="fin_extraAbrir(\'fondo\',' + i + ')">＋ Aportación</div>';
     html += '<div class="fin-action-btn" onclick="fin_editarFondoNombre(' + i + ')">Editar nombre</div>';
     html += '<div class="fin-action-btn red" onclick="fin_borrarFondo(' + i + ')">Eliminar</div>';
     html += '</div></div>';
@@ -19387,6 +19406,7 @@ function fin_nuevoFondo() {
   document.getElementById('fin-fondo-dca-activo').checked = false;
   document.getElementById('fin-fondo-dca-importe').value = '';
   document.getElementById('fin-fondo-dca-dias').value = '1, 15';
+  if (document.getElementById('fin-fondo-save-activo')) { document.getElementById('fin-fondo-save-activo').checked = false; document.getElementById('fin-fondo-save-importe').value = numMiles_fmtDinero(15); fin_toggleSaveCampos(); }
   fin_toggleDcaCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
 }
@@ -19403,6 +19423,9 @@ function fin_editarFondo(idx) {
   document.getElementById('fin-fondo-dca-importe').value = f.dcaImporte ? numMiles_fmtDinero(f.dcaImporte) : '';
   document.getElementById('fin-fondo-dca-dias').value = fin_dcaDiasTexto(f.dcaDias);
   fin_toggleDcaCampos();
+  document.getElementById('fin-fondo-save-activo').checked = !!f.saveActivo;
+  document.getElementById('fin-fondo-save-importe').value = numMiles_fmtDinero(f.saveImporte != null ? f.saveImporte : 15);
+  fin_toggleSaveCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
   setTimeout(function() { var el = document.getElementById('fin-fondo-valor'); if (el) { el.focus(); el.select(); } }, 150);
 }
@@ -19454,6 +19477,21 @@ function fin_guardarFondo() {
     // ahora, se empieza a contar desde hoy (el "Aportado" escrito ya incluye hoy).
     dcaAplicadoHasta: (dcaActivo && _prevF && _prevF.dcaActivo && _prevF.dcaAplicadoHasta) ? _prevF.dcaAplicadoHasta : (dcaActivo ? fin_dcaHoy() : '')
   };
+  // PUNTO 250: se conservan los historiales al editar (antes se perdían).
+  if (_prevF && _prevF.dcaUltimas) obj.dcaUltimas = _prevF.dcaUltimas;
+  if (_prevF && _prevF.extras) obj.extras = _prevF.extras;
+  // PUNTO 250: Saveback.
+  obj.saveActivo = document.getElementById('fin-fondo-save-activo').checked;
+  obj.saveImporte = parseImporteFlexible(document.getElementById('fin-fondo-save-importe').value) || 15;
+  obj.saveHist = (_prevF && _prevF.saveHist) ? _prevF.saveHist : [];
+  if (obj.saveActivo && !obj.saveHist.length) {
+    // Primera vez: meses de este año ya pasados (hasta el anterior), marcados
+    // "inicial" — no se suman al Aportado porque ya están incluidos en él.
+    var _hS = new Date();
+    for (var _mS = 1; _mS <= _hS.getMonth(); _mS++) {
+      obj.saveHist.push({ mes: _hS.getFullYear() + '-' + String(_mS).padStart(2, '0'), importe: obj.saveImporte, inicial: true });
+    }
+  }
   // PUNTO 93: conservamos el id si ya existía (edición) y siempre refrescamos
   // updatedAt, para que la fusión elemento a elemento con la nube funcione.
   // AJUSTE 5 (21/09/2026): mismo arreglo que en Cuentas — un fondo legacy sin
@@ -19482,6 +19520,155 @@ function fin_borrarFondo(idx) {
   if (data[idx]) { data[idx].deleted = true; data[idx].updatedAt = new Date().toISOString(); }
   fin_save('fin:fondos', data);
   fin_renderFondos();
+}
+
+// ─── PUNTO 250 (05/10/2026): SAVEBACK, APORTACIÓN EXTRA E HISTORIAL ─────
+// Decidido con Patry: Trade Republic mete en su fondo el Saveback de la
+// tarjeta (máx. 15 €/mes, que casi siempre alcanza). Cada mes sale un aviso en
+// "Pendiente de gestionar" para confirmarlo (15 € por defecto, editable); al
+// confirmar se suma al "Aportado". Además, cualquier fondo o acción simple
+// admite aportaciones extra, y su tarjeta muestra el historial de todo lo que
+// ha entrado (automáticas 🔄, extra ＋, Saveback 💳), lo más reciente primero,
+// con los meses de Saveback que falten en ámbar. El Saveback cuenta como
+// capital mobiliario en la Renta (confirmado por Patry).
+var FIN_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function fin_mesTxt(ym) { var p = String(ym || '').split('-'); return (FIN_MESES[parseInt(p[1], 10) - 1] || '') + ' ' + (p[0] || ''); }
+function fin_mesAnterior() { var d = new Date(); var a = new Date(d.getFullYear(), d.getMonth() - 1, 1); return a.getFullYear() + '-' + String(a.getMonth() + 1).padStart(2, '0'); }
+function fin_toggleSaveCampos() {
+  var chk = document.getElementById('fin-fondo-save-activo');
+  var c = document.getElementById('fin-fondo-save-campos');
+  if (c) c.style.display = (chk && chk.checked) ? 'block' : 'none';
+}
+// Meses de Saveback que faltan: este año, de enero al mes anterior.
+function fin_saveFaltan(f) {
+  if (!f || !f.saveActivo) return [];
+  var d = new Date(), out = [];
+  var hist = f.saveHist || [];
+  for (var m = 1; m <= d.getMonth(); m++) {
+    var ym = d.getFullYear() + '-' + String(m).padStart(2, '0');
+    if (!hist.some(function(h) { return h && h.mes === ym; })) out.push(ym);
+  }
+  return out;
+}
+var _finMovAbierto = {};
+function fin_movToggle(clave) { _finMovAbierto[clave] = !_finMovAbierto[clave]; fin_renderFondos(); fin_renderAcciones(); }
+function fin_movHtml(tipo, idx, it) {
+  try {
+    var movs = [];
+    (it.dcaUltimas || []).forEach(function(x) { movs.push({ fecha: x.fecha, txt: '🔄 Aportación automática', imp: x.importe }); });
+    (it.extras || []).forEach(function(x) { movs.push({ fecha: x.fecha, txt: '＋ Aportación extra', imp: x.importe }); });
+    (it.saveHist || []).forEach(function(x) { movs.push({ fecha: x.mes + '-99', txt: '💳 Saveback ' + fin_mesTxt(x.mes) + (x.inicial ? ' (ya incluido)' : ''), imp: x.importe, mes: x.mes }); });
+    var faltan = (tipo === 'fondo') ? fin_saveFaltan(it) : [];
+    faltan.forEach(function(ym) { movs.push({ fecha: ym + '-99', txt: '💳 Saveback ' + fin_mesTxt(ym), falta: true, mes: ym }); });
+    var cab = '';
+    if (tipo === 'fondo' && it.saveActivo) {
+      cab = '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">💳 Saveback ' + fin_fmt(it.saveImporte != null ? it.saveImporte : 15) + '/mes' + (faltan.length ? ' · <span style="color:#f0a830;font-weight:700;">falta' + (faltan.length > 1 ? 'n ' + faltan.length + ' meses' : ' ' + fin_mesTxt(faltan[0])) + '</span>' : ' · al día') + '</div>';
+    }
+    if (!movs.length) return cab ? '<div class="fin-card-meta" style="margin-top:-4px;">' + cab + '</div>' : '';
+    movs.sort(function(a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+    var clave = tipo + '_' + (it.id || idx);
+    var abierto = !!_finMovAbierto[clave];
+    var h = '<div class="fin-card-meta" style="margin-top:-4px;">' + cab
+      + '<div class="fin-meta-item" style="width:100%;font-size:11px;margin-top:2px;"><span onclick="fin_movToggle(\'' + clave + '\')" style="cursor:pointer;color:var(--silver-dim);text-decoration:underline;">' + (abierto ? '▾' : '▸') + ' Historial de aportaciones (' + movs.length + ')</span></div>';
+    if (abierto) {
+      h += '<div style="width:100%;margin-top:4px;">';
+      movs.forEach(function(m) {
+        var fechaTxt = m.mes ? '' : (String(m.fecha).slice(8, 10) + '/' + String(m.fecha).slice(5, 7) + '/' + String(m.fecha).slice(0, 4) + ' · ');
+        var click = (tipo === 'fondo' && m.mes) ? ' onclick="fin_saveAbrir(\'' + fin_emp() + '\',\'' + (it.id || '') + '\',\'' + m.mes + '\')" style="cursor:pointer;' : ' style="';
+        h += '<div' + click + 'display:flex;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+          + '<span style="color:' + (m.falta ? '#f0a830' : 'var(--silver-bright)') + ';">' + fechaTxt + m.txt + '</span>'
+          + '<span style="font-weight:700;color:' + (m.falta ? '#f0a830' : 'var(--accent-green)') + ';">' + (m.falta ? 'Falta' : ('+' + fin_fmt(m.imp))) + '</span></div>';
+      });
+      h += '</div>';
+    }
+    return h + '</div>';
+  } catch (e) { return ''; }
+}
+// --- Aportación extra ---
+var _finExtra = null;
+function fin_extraAbrir(tipo, idx) {
+  if (bloqueaSiViewer('Añadir una aportación')) return;
+  var lista = tipo === 'fondo' ? fin_load('fin:fondos') : fin_accSimpleLoad();
+  var it = lista[idx]; if (!it) return;
+  _finExtra = { tipo: tipo, idx: idx };
+  document.getElementById('fin-extra-titulo').textContent = 'Aportación extra · ' + (it.nombre || '');
+  document.getElementById('fin-extra-importe').value = '';
+  document.getElementById('fin-extra-fecha').value = fin_dcaHoy();
+  openModalById('fin-modal-extra');
+  setTimeout(function() { var el = document.getElementById('fin-extra-importe'); if (el) el.focus(); }, 150);
+}
+function fin_extraGuardar() {
+  if (bloqueaSiViewer('Añadir una aportación')) return;
+  if (!_finExtra) return;
+  var imp = parseImporteFlexible(document.getElementById('fin-extra-importe').value) || 0;
+  var fecha = document.getElementById('fin-extra-fecha').value || fin_dcaHoy();
+  if (imp <= 0) { alert('Pon el importe de la aportación.'); return; }
+  var base = _finExtra.tipo === 'fondo' ? 'fin:fondos' : 'fin:acciones_simple';
+  var lista = fin_load(base);
+  var it = lista[_finExtra.idx]; if (!it) return;
+  if (_finExtra.tipo === 'fondo') it.aportado = Math.round(((parseFloat(it.aportado) || 0) + imp) * 100) / 100;
+  else it.coste = Math.round(((parseFloat(it.coste) || 0) + imp) * 100) / 100;
+  it.extras = (it.extras || []).concat({ fecha: fecha, importe: imp });
+  it.updatedAt = new Date().toISOString();
+  fin_save(base, lista);
+  closeModalById('fin-modal-extra');
+  _finExtra = null;
+  fin_renderFondos(); fin_renderAcciones();
+}
+// --- Saveback: confirmar / corregir un mes ---
+var _finSave = null;
+function fin_saveAbrir(emp, fondoId, mes) {
+  if (bloqueaSiViewer('Confirmar el Saveback')) return;
+  var k = 'fin:fondos:' + emp;
+  var lista = []; try { lista = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
+  var f = lista.find(function(x) { return x && x.id === fondoId; }); if (!f) return;
+  var h = (f.saveHist || []).find(function(x) { return x && x.mes === mes; });
+  _finSave = { emp: emp, id: fondoId, mes: mes };
+  document.getElementById('fin-save-titulo').textContent = 'Saveback de ' + fin_mesTxt(mes);
+  document.getElementById('fin-save-sub').textContent = (f.nombre || 'Fondo') + (h && h.inicial ? ' · ya incluido en el Aportado' : '');
+  document.getElementById('fin-save-importe').value = numMiles_fmtDinero(h ? h.importe : (f.saveImporte != null ? f.saveImporte : 15));
+  document.getElementById('fin-save-quitar').style.display = h ? '' : 'none';
+  openModalById('fin-modal-save');
+}
+function fin_saveGuardar(quitar) {
+  if (bloqueaSiViewer('Confirmar el Saveback')) return;
+  if (!_finSave) return;
+  var k = 'fin:fondos:' + _finSave.emp;
+  var lista = []; try { lista = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
+  var f = lista.find(function(x) { return x && x.id === _finSave.id; }); if (!f) return;
+  f.saveHist = f.saveHist || [];
+  var i = f.saveHist.findIndex(function(x) { return x && x.mes === _finSave.mes; });
+  var ant = i >= 0 ? f.saveHist[i] : null;
+  var imp = quitar === true ? 0 : (parseImporteFlexible(document.getElementById('fin-save-importe').value) || 0);
+  if (quitar !== true && imp <= 0) { alert('Pon el importe del Saveback.'); return; }
+  // Lo "ya incluido" (inicial) no toca el Aportado; lo demás ajusta la diferencia.
+  var antImp = (ant && !ant.inicial) ? (parseFloat(ant.importe) || 0) : 0;
+  var nuevoCuenta = (ant && ant.inicial) ? 0 : imp;
+  f.aportado = Math.round(((parseFloat(f.aportado) || 0) - antImp + nuevoCuenta) * 100) / 100;
+  if (quitar === true) { if (i >= 0) f.saveHist.splice(i, 1); }
+  else {
+    var reg = { mes: _finSave.mes, importe: imp };
+    if (ant && ant.inicial) reg.inicial = true;
+    if (i >= 0) f.saveHist[i] = reg; else f.saveHist.push(reg);
+  }
+  f.updatedAt = new Date().toISOString();
+  localStorage.setItem(k, JSON.stringify(lista));
+  closeModalById('fin-modal-save');
+  _finSave = null;
+  try { fin_renderFondos(); } catch (e) {}
+  try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
+  try { if (typeof renta_renderCapital === 'function') { renta_renderCapital(); renta_calcPrevision(); } } catch (e) {}
+}
+// Saveback de un año (todos los fondos de Patricio) — para la Renta.
+function fin_saveTotalAnio(anio) {
+  var t = 0, n = 0;
+  try {
+    (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(f) {
+      if (!f || f.deleted) return;
+      (f.saveHist || []).forEach(function(h) { if (h && String(h.mes).slice(0, 4) === String(anio)) { t += parseFloat(h.importe) || 0; n++; } });
+    });
+  } catch (e) {}
+  return { total: Math.round(t * 100) / 100, meses: n };
 }
 
 // ─── PUNTO 248 (05/10/2026): DCA SIMPLIFICADO Y AUTOMÁTICO ──────────────
@@ -22322,6 +22509,16 @@ function pend_calcular() {
     if (getRol() === 'admin' && typeof renta_datosMesPendientes === 'function') {
       var pRenta = renta_datosMesPendientes();
       if (pRenta.nomina) items.push({ icon: '📋', t: 'Renta: falta la nómina de ' + pRenta.nomina.mes.toLowerCase() + ' ' + pRenta.nomina.anio, s: 'Renta Patricio → Trabajo → "+ Añadir nómina"', accion: 'renta_datos', bloque: 'bloque-trabajo', empresa: 'patricio' });
+      // PUNTO 250: intereses de la cuenta y Saveback
+      if (pRenta.intereses) items.push({ icon: '🏦', t: 'Renta: faltan los intereses de la cuenta de ' + pRenta.intereses.mes.toLowerCase() + ' ' + pRenta.intereses.anio, s: 'Trade Republic · bruto y retención', accion: 'intereses', mes: pRenta.intereses.ym });
+      try {
+        var _mAntS = fin_mesAnterior();
+        (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(fS) {
+          if (!fS || fS.deleted || !fS.saveActivo) return;
+          if ((fS.saveHist || []).some(function(h) { return h && h.mes === _mAntS; })) return;
+          items.push({ icon: '💳', t: 'Saveback de ' + fin_mesTxt(_mAntS) + ': ¿' + fmtGlobal(fS.saveImporte != null ? fS.saveImporte : 15) + ' €?', s: (fS.nombre || 'Fondo') + ' · pulsa para confirmarlo', accion: 'saveback', fondoId: fS.id, mes: _mAntS });
+        });
+      } catch (eS) {}
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
     }
   } catch (e) {}
@@ -22450,6 +22647,10 @@ function pend_gestionar(i) {
   } else if (it.accion === 'registro') {
     // PUNTO 90b: intentos bloqueados / posible fuga → abre el registro
     if (typeof registro_abrir === 'function') registro_abrir();
+  } else if (it.accion === 'saveback') {
+    if (typeof fin_saveAbrir === 'function') fin_saveAbrir('patricio', it.fondoId, it.mes);
+  } else if (it.accion === 'intereses') {
+    if (typeof rint_abrir === 'function') rint_abrir(it.mes);
   } else if (it.accion === 'renta_datos') {
     // PUNTO 246: lleva a Renta Patricio, al año y mes en curso, con la tarjeta abierta.
     if (typeof saveProfile === 'function') saveProfile('patricio');
@@ -22689,6 +22890,7 @@ window._refreshCurrentModule = function(key) {
     'fin:patrimonio_historico:patricio': 'finanzas',
     'trading:capital_inicial': 'finanzas',
     'renta:dividendos_manuales': 'renta',
+    'renta:intereses_cuenta': 'renta', // PUNTO 250
     'fin:patrimonio_financiero:patricio': 'finanzas',
     // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — pantalla propia
     // (mod-finperdash), no la de Finanzas.
@@ -24072,7 +24274,13 @@ var renta_anio = new Date().getFullYear();
 var RENTA_MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function renta_datosMesPendientes() {
   var hoyD = new Date();
-  var res = { nomina: null, alquileres: null };
+  var res = { nomina: null, alquileres: null, intereses: null };
+  try {
+    // PUNTO 250: intereses de la cuenta del mes anterior
+    var dAI = new Date(hoyD.getFullYear(), hoyD.getMonth() - 1, 1);
+    var ymAI = dAI.getFullYear() + '-' + String(dAI.getMonth() + 1).padStart(2, '0');
+    if (typeof rint_loadTodo === 'function' && !rint_loadTodo().some(function(x) { return x && !x.deleted && x.mes === ymAI; })) res.intereses = { mes: RENTA_MESES_NOMBRE[dAI.getMonth()], anio: dAI.getFullYear(), ym: ymAI };
+  } catch (e) {}
   try {
     // Nómina del mes anterior (en enero, diciembre del año anterior)
     var dAnt = new Date(hoyD.getFullYear(), hoyD.getMonth() - 1, 1);
@@ -24098,13 +24306,14 @@ function renta_datosMesPendientes() {
 function renta_pintarAvisosMes() {
   try {
     var esAdmin = (typeof getRol === 'function') ? getRol() === 'admin' : true;
-    var p = esAdmin ? renta_datosMesPendientes() : { nomina: null, alquileres: null };
+    var p = esAdmin ? renta_datosMesPendientes() : { nomina: null, alquileres: null, intereses: null };
     var pinta = function(id, texto) {
       var el = document.getElementById(id), ico = document.getElementById(id + '-ico');
       if (el) { el.textContent = texto || ''; el.style.display = texto ? '' : 'none'; }
       if (ico) ico.style.display = texto ? '' : 'none';
     };
     pinta('renta-aviso-trabajo', p.nomina ? ('Falta la nómina de ' + p.nomina.mes.toLowerCase() + ' ' + p.nomina.anio) : '');
+    pinta('renta-aviso-capital', p.intereses ? ('Faltan los intereses de ' + p.intereses.mes.toLowerCase() + ' ' + p.intereses.anio) : ''); // PUNTO 250
     pinta('renta-aviso-alqmen', p.alquileres ? ('Faltan los cobros de ' + p.alquileres.mes.toLowerCase() + ' (' + p.alquileres.faltan + ' de ' + p.alquileres.total + ' inmuebles)') : '');
   } catch (e) {}
 }
@@ -24766,6 +24975,99 @@ function segibi_guardarAnio() {
 // aparatos). Suman en Capital mobiliario y en la previsión del IRPF.
 // ═══════════════════════════════════════════════════════════════════════
 var RDIV_KEY = 'renta:dividendos_manuales';
+// PUNTO 250 (05/10/2026) — INTERESES DE LA CUENTA (Trade Republic): un apunte
+// por mes (id "int_AAAA-MM") con bruto y retención (19 % por defecto). Cuentan
+// como capital mobiliario. Aviso mensual si falta el mes anterior.
+var RINT_KEY = 'renta:intereses_cuenta';
+function rint_loadTodo() { try { return (JSON.parse(localStorage.getItem(RINT_KEY) || '[]') || []); } catch (e) { return []; } }
+function rint_delAnio(anio) { return rint_loadTodo().filter(function(x) { return x && !x.deleted && String(x.mes || '').slice(0, 4) === String(anio); }); }
+function rint_abrir(mes) {
+  if (bloqueaSiViewer('Añadir intereses de la cuenta')) return;
+  var m = mes || fin_mesAnterior();
+  var x = rint_loadTodo().find(function(y) { return y && !y.deleted && y.mes === m; });
+  document.getElementById('rint-mes').value = m;
+  document.getElementById('rint-bruto').value = x ? numMiles_fmtDinero(x.bruto) : '';
+  document.getElementById('rint-ret').value = x ? numMiles_fmtDinero(x.retencion) : '';
+  document.getElementById('rint-ret').dataset.manual = x ? '1' : '';
+  document.getElementById('rint-titulo').textContent = 'Intereses de la cuenta';
+  document.getElementById('rint-borrar').style.display = x ? '' : 'none';
+  rint_recalc();
+  openModalById('rint-modal');
+  setTimeout(function() { var el = document.getElementById('rint-bruto'); if (el) el.focus(); }, 150);
+}
+function rint_onBruto() {
+  var r = document.getElementById('rint-ret');
+  if (!r.dataset.manual) {
+    var b = parseImporteFlexible(document.getElementById('rint-bruto').value) || 0;
+    r.value = b ? numMiles_fmtDinero(Math.round(b * 0.19 * 100) / 100) : '';
+  }
+  rint_recalc();
+}
+function rint_recalc() {
+  var b = parseImporteFlexible(document.getElementById('rint-bruto').value) || 0;
+  var r = parseImporteFlexible(document.getElementById('rint-ret').value) || 0;
+  document.getElementById('rint-neto').textContent = b ? 'Neto: ' + numMiles_fmtDinero(b - r) + ' €' : '';
+}
+function rint_guardar() {
+  if (bloqueaSiViewer('Guardar intereses de la cuenta')) return;
+  var mes = document.getElementById('rint-mes').value;
+  var bruto = parseImporteFlexible(document.getElementById('rint-bruto').value) || 0;
+  var ret = parseImporteFlexible(document.getElementById('rint-ret').value) || 0;
+  if (!mes || !bruto) { alert('Pon el mes y los intereses brutos.'); return; }
+  var todos = rint_loadTodo();
+  var id = 'int_' + mes;
+  var row = { id: id, mes: mes, entidad: 'Trade Republic', bruto: bruto, retencion: ret, updatedAt: new Date().toISOString() };
+  var i = todos.findIndex(function(y) { return y && y.id === id; });
+  if (i >= 0) todos[i] = row; else todos.push(row);
+  localStorage.setItem(RINT_KEY, JSON.stringify(todos));
+  closeModalById('rint-modal');
+  renta_renderCapital(); renta_calcPrevision();
+  try { renta_pintarAvisosMes(); } catch (e) {}
+  try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
+}
+function rint_borrar() {
+  if (bloqueaSiViewer('Borrar intereses de la cuenta')) return;
+  var mes = document.getElementById('rint-mes').value;
+  if (!mes || !confirm('¿Borrar los intereses de ' + fin_mesTxt(mes) + '?')) return;
+  var todos = rint_loadTodo().map(function(y) { return (y && y.id === 'int_' + mes) ? { id: y.id, mes: y.mes, deleted: true, updatedAt: new Date().toISOString() } : y; });
+  localStorage.setItem(RINT_KEY, JSON.stringify(todos));
+  closeModalById('rint-modal');
+  renta_renderCapital(); renta_calcPrevision();
+  try { renta_pintarAvisosMes(); } catch (e) {}
+}
+// Bloque que se añade al final de Capital mobiliario: intereses (con los meses
+// que faltan) y Saveback del año.
+function rint_htmlBloque(anio) {
+  var hoy = new Date();
+  var hasta = anio < hoy.getFullYear() ? 12 : (anio === hoy.getFullYear() ? hoy.getMonth() : 0);
+  var regs = rint_delAnio(anio);
+  var filas = [];
+  for (var m = 12; m >= 1; m--) {
+    var ym = anio + '-' + String(m).padStart(2, '0');
+    var r = regs.find(function(x) { return x.mes === ym; });
+    if (r) filas.push({ ym: ym, r: r });
+    else if (m <= hasta) filas.push({ ym: ym, r: null });
+  }
+  var totB = 0, totR = 0;
+  regs.forEach(function(x) { totB += parseFloat(x.bruto) || 0; totR += parseFloat(x.retencion) || 0; });
+  var faltan = filas.filter(function(f) { return !f.r; }).length;
+  var h = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 6px;">Intereses de la cuenta · Trade Republic</div>';
+  h += '<div style="font-size:11.5px;color:var(--silver-bright);margin-bottom:6px;">Bruto ' + fmtGlobal(totB) + ' € · retención ' + fmtGlobal(totR) + ' €' + (faltan ? ' · <span style="color:#f0a830;font-weight:700;">faltan ' + faltan + ' mes' + (faltan > 1 ? 'es' : '') + '</span>' : '') + '</div>';
+  filas.forEach(function(f) {
+    h += '<div onclick="rint_abrir(\'' + f.ym + '\')" style="cursor:pointer;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div style="font-size:12.5px;font-weight:700;color:' + (f.r ? 'var(--silver-bright)' : '#f0a830') + ';text-transform:capitalize;">' + fin_mesTxt(f.ym) + '</div>'
+      + (f.r ? ('<div style="text-align:right;"><div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(f.r.bruto) + ' €</div><div style="font-size:10.5px;color:var(--text-secondary);">ret. ' + fmtGlobal(f.r.retencion) + ' €</div></div>')
+             : '<div style="font-size:12px;font-weight:700;color:#f0a830;">Falta · pulsa para meterlo</div>')
+      + '</div>';
+  });
+  h += '<button onclick="rint_abrir()" style="width:100%;margin-top:2px;background:rgba(255,255,255,0.06);border:1px dashed var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:10px;cursor:pointer;">＋ Intereses de la cuenta</button>';
+  var sv = (typeof fin_saveTotalAnio === 'function') ? fin_saveTotalAnio(anio) : { total: 0, meses: 0 };
+  if (sv.meses) {
+    h += '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 6px;">Saveback de la tarjeta</div>'
+      + '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><div style="font-size:12.5px;color:var(--silver-bright);">' + sv.meses + ' mes' + (sv.meses > 1 ? 'es' : '') + ' · se gestiona en Finanzas</div><div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(sv.total) + ' €</div></div>';
+  }
+  return { html: h, bruto: totB, retencion: totR, saveback: sv.total };
+}
 function rdiv_loadTodo() { try { return JSON.parse(localStorage.getItem(RDIV_KEY) || '[]') || []; } catch (e) { return []; } }
 function rdiv_delAnio(anio) {
   return rdiv_loadTodo().filter(function(x) { return x && !x.deleted && x.fecha && parseInt(x.fecha.slice(0, 4), 10) === anio; });
@@ -24856,6 +25158,7 @@ setTimeout(renta_migrarGastoVenta2026, 11000);
 
 
 function renta_renderCapital() {
+  try { renta_pintarAvisosMes(); } catch (eAv) {} // PUNTO 250
   var cont = document.getElementById('renta-lista-capital');
   if (!cont) return;
 
@@ -24873,9 +25176,11 @@ function renta_renderCapital() {
   // PUNTO 228 (02/10/2026): + dividendos añadidos a mano (importe bruto).
   var manuales = rdiv_delAnio(renta_anio);
 
+  var _rint = rint_htmlBloque(renta_anio); // PUNTO 250
   if (divs.length === 0 && manuales.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos para ' + renta_anio + '.</div>';
-    document.getElementById('renta-total-capital').textContent = '— €';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos para ' + renta_anio + '.</div>' + _rint.html;
+    var _totSolo = _rint.bruto + _rint.saveback;
+    document.getElementById('renta-total-capital').textContent = _totSolo ? (fmtGlobal(_totSolo) + ' €') : '— €';
     return;
   }
 
@@ -24908,7 +25213,8 @@ function renta_renderCapital() {
         + '</div>';
     }
   }
-  cont.innerHTML = html;
+  cont.innerHTML = html + _rint.html;
+  total += _rint.bruto + _rint.saveback; // PUNTO 250
   document.getElementById('renta-total-capital').textContent = fmtGlobal(total) + ' €';
 }
 
@@ -25482,7 +25788,12 @@ function renta_calcPrevisionDatos(proy) {
   }
   var capManual = 0, retManual = 0;
   rdiv_delAnio(renta_anio).forEach(function(x) { capManual += parseFloat(x.bruto) || 0; retManual += parseFloat(x.retencion) || 0; });
-  var capitalMobiliario = capFinanzas + capManual;
+  // PUNTO 250: + intereses de la cuenta (bruto y retención) + Saveback (sin retención).
+  var capInt = 0, retInt = 0;
+  try { rint_delAnio(renta_anio).forEach(function(x) { capInt += parseFloat(x.bruto) || 0; retInt += parseFloat(x.retencion) || 0; }); } catch (e) {}
+  var capSave = 0;
+  try { capSave = fin_saveTotalAnio(renta_anio).total; } catch (e) {}
+  var capitalMobiliario = capFinanzas + capManual + capInt + capSave;
 
   if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0) return { sinDatos: true };
 
@@ -25501,7 +25812,7 @@ function renta_calcPrevisionDatos(proy) {
   var cuotaGeneral = Math.max(0, calcIRPF(baseTotal) - calcIRPF(minimoFamiliar));
   var cuotaAhorro = renta_calcAhorroTramos(capitalMobiliario);
   var cuotaTotal = cuotaGeneral + cuotaAhorro;
-  retencionAcum += capFinanzas * 0.19 + retManual;
+  retencionAcum += capFinanzas * 0.19 + retManual + retInt;
   return {
     sinDatos: false, todosInm: todosInm, inmPatricio: inmPatricio, capitalMobiliario: capitalMobiliario,
     cuotaGeneral: cuotaGeneral, cuotaAhorro: cuotaAhorro, cuotaTotal: cuotaTotal,
@@ -25634,6 +25945,36 @@ if ('serviceWorker' in navigator) {
 
 </script>
 <!-- PUNTO 228 (02/10/2026): dividendo añadido a mano (Renta Patricio) -->
+<!-- PUNTO 250 (05/10/2026): aportación extra, Saveback e intereses de cuenta -->
+<div class="moverlay" id="fin-modal-extra" style="z-index:9000;">
+  <div class="modal">
+    <div class="mtitle"><span id="fin-extra-titulo">Aportación extra</span><span class="mclose" onclick="closeModalById('fin-modal-extra')">&#10005;</span></div>
+    <div class="mfield"><div class="mflabel">Importe (euros)</div><input class="minput" id="fin-extra-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" id="fin-extra-fecha" type="date"></div>
+    <button class="btn1" onclick="fin_extraGuardar()">Añadir</button>
+    <button class="btn2" onclick="closeModalById('fin-modal-extra')" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+<div class="moverlay" id="fin-modal-save" style="z-index:9000;">
+  <div class="modal">
+    <div class="mtitle"><span id="fin-save-titulo">Saveback</span><span class="mclose" onclick="closeModalById('fin-modal-save')">&#10005;</span></div>
+    <div id="fin-save-sub" style="font-size:12px;color:var(--text-secondary);margin:-4px 0 10px;"></div>
+    <div class="mfield"><div class="mflabel">Importe (euros)</div><input class="minput" id="fin-save-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <button class="btn1" onclick="fin_saveGuardar()">Confirmar</button>
+    <button class="btn2" id="fin-save-quitar" onclick="if(confirm('¿Quitar el Saveback de este mes?'))fin_saveGuardar(true)" style="margin-top:8px;">Quitar este mes</button>
+  </div>
+</div>
+<div class="moverlay" id="rint-modal" style="z-index:9000;">
+  <div class="modal">
+    <div class="mtitle"><span id="rint-titulo">Intereses de la cuenta</span><span class="mclose" onclick="closeModalById('rint-modal')">&#10005;</span></div>
+    <div class="mfield"><div class="mflabel">Mes</div><input class="minput" id="rint-mes" type="month"></div>
+    <div class="mfield"><div class="mflabel">Intereses brutos (euros)</div><input class="minput" id="rint-bruto" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="rint_onBruto()"></div>
+    <div class="mfield"><div class="mflabel">Retención (euros) — 19 % automático, puedes cambiarlo</div><input class="minput" id="rint-ret" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="this.dataset.manual='1';rint_recalc()"></div>
+    <div id="rint-neto" style="font-size:12px;color:var(--accent-green);margin:-4px 2px 10px;min-height:16px;"></div>
+    <button class="btn1" onclick="rint_guardar()">Guardar</button>
+    <button class="btn2" id="rint-borrar" onclick="rint_borrar()" style="margin-top:8px;">Borrar este mes</button>
+  </div>
+</div>
 <div class="moverlay" id="rdiv-modal" onclick="if(event.target===this)rdiv_cerrar()" style="z-index:9000;">
   <div class="modal">
     <div class="mtitle"><span id="rdiv-titulo">Añadir dividendo</span><span onclick="rdiv_cerrar()" style="cursor:pointer;font-size:20px;color:var(--text-secondary);">✕</span></div>
