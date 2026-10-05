@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_04';
+const BUILD_ID = '261005_06';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -7188,8 +7188,9 @@ con editar/borrar en cada línea. -->
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:20px;">💼</span>
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">TRABAJO</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">TRABAJO <span id="renta-aviso-trabajo-ico" style="display:none;">⚠️</span></div>
           <div style="font-size:11px;color:var(--text-secondary);">Nóminas · Retención IRPF · Cuota autónomo</div>
+          <div id="renta-aviso-trabajo" style="display:none;font-size:11px;font-weight:600;color:#f0a830;margin-top:2px;"></div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -7234,8 +7235,9 @@ con editar/borrar en cada línea. -->
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:20px;">🗓️</span>
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">COBROS MENSUALES</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">COBROS MENSUALES <span id="renta-aviso-alqmen-ico" style="display:none;">⚠️</span></div>
           <div style="font-size:11px;color:var(--text-secondary);">Cobro y comunidad, mes a mes</div>
+          <div id="renta-aviso-alqmen" style="display:none;font-size:11px;font-weight:600;color:#f0a830;margin-top:2px;"></div>
         </div>
       </div>
       <span style="color:var(--text-secondary);font-size:16px;" id="renta-chevron-alqmen">›</span>
@@ -22137,6 +22139,15 @@ function pend_calcular() {
       }
     }
   } catch (e) {}
+  // PUNTO 246 (05/10/2026): datos de Renta del mes (nómina del mes anterior y
+  // cobros del mes en curso) — solo para el admin.
+  try {
+    if (getRol() === 'admin' && typeof renta_datosMesPendientes === 'function') {
+      var pRenta = renta_datosMesPendientes();
+      if (pRenta.nomina) items.push({ icon: '📋', t: 'Renta: falta la nómina de ' + pRenta.nomina.mes.toLowerCase() + ' ' + pRenta.nomina.anio, s: 'Renta Patricio → Trabajo → "+ Añadir nómina"', accion: 'renta_datos', bloque: 'bloque-trabajo', empresa: 'patricio' });
+      if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
+    }
+  } catch (e) {}
   // PUNTO 92 (05/09/2026): aviso mensual del histórico de patrimonio — se
   // queda destacado (urgente:true) hasta que se guarda el snapshot de ese
   // mes, en Patrimer y en Patricio (confirmado con Patry, aplica a las dos).
@@ -22262,6 +22273,26 @@ function pend_gestionar(i) {
   } else if (it.accion === 'registro') {
     // PUNTO 90b: intentos bloqueados / posible fuga → abre el registro
     if (typeof registro_abrir === 'function') registro_abrir();
+  } else if (it.accion === 'renta_datos') {
+    // PUNTO 246: lleva a Renta Patricio, al año y mes en curso, con la tarjeta abierta.
+    if (typeof saveProfile === 'function') saveProfile('patricio');
+    if (typeof applyProfile === 'function') applyProfile('patricio');
+    showModule('renta');
+    setTimeout(function() {
+      try {
+        var hoyR = new Date();
+        if (it.bloque === 'bloque-trabajo') {
+          var dA = new Date(hoyR.getFullYear(), hoyR.getMonth() - 1, 1);
+          if (typeof renta_anio !== 'undefined' && renta_anio !== dA.getFullYear()) { renta_anio = dA.getFullYear(); renta_render(); }
+        } else {
+          alqmen_mes = hoyR.getFullYear() + '-' + String(hoyR.getMonth() + 1).padStart(2, '0');
+          alqmen_render();
+        }
+        var bl = document.getElementById(it.bloque);
+        if (bl && bl.style.display === 'none') renta_toggleBloque(it.bloque);
+        if (bl && bl.scrollIntoView) bl.parentNode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (eR) {}
+    }, 300);
   } else if (it.accion === 'patrimonio_snapshot') {
     // PUNTO 92: snapshot mensual sin guardar → Finanzas, ya con la empresa
     // correcta seleccionada (Patrimer o Patricio, según el aviso concreto).
@@ -23852,6 +23883,54 @@ function compartirArchivoDrive(url, nombreSugerido) {
 
 var renta_anio = new Date().getFullYear();
 
+// PUNTO 246 (05/10/2026) — AVISO MENSUAL DE DATOS DE RENTA (decidido con Patry):
+// desde el día 1 de cada mes hay que meter
+//  · la NÓMINA del mes anterior (se cobra al acabar el mes trabajado; las
+//    pagas extra van sumadas dentro de la nómina normal, no se exigen aparte);
+//  · los COBROS (alquileres) del mes en curso (se cobran por adelantado; se
+//    pueden meter ya el mes anterior, y entonces no salta el aviso).
+// Cuenta como hecho lo GUARDADO: lo que la tabla rellena copiando el mes
+// anterior no cuenta hasta pulsar "Guardar este mes". Un piso guardado con
+// 0 € cuenta como hecho.
+var RENTA_MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function renta_datosMesPendientes() {
+  var hoyD = new Date();
+  var res = { nomina: null, alquileres: null };
+  try {
+    // Nómina del mes anterior (en enero, diciembre del año anterior)
+    var dAnt = new Date(hoyD.getFullYear(), hoyD.getMonth() - 1, 1);
+    var nombreAnt = RENTA_MESES_NOMBRE[dAnt.getMonth()];
+    var noms = JSON.parse(localStorage.getItem('renta:nominas:' + dAnt.getFullYear()) || '[]');
+    var hayNomina = noms.some(function(n) { return n && n.mes === nombreAnt; });
+    if (!hayNomina) res.nomina = { mes: nombreAnt, anio: dAnt.getFullYear() };
+  } catch (e) {}
+  try {
+    // Cobros del mes en curso, de todos los inmuebles activos de Patricio
+    var ym = hoyD.getFullYear() + '-' + String(hoyD.getMonth() + 1).padStart(2, '0');
+    var inms = (typeof alqmen_inmActivos === 'function') ? alqmen_inmActivos() : [];
+    if (inms.length) {
+      var regs = (typeof inm_alqMenLoad === 'function') ? inm_alqMenLoad() : [];
+      var faltan = inms.filter(function(x) {
+        return !regs.some(function(r) { return r.inmuebleIdx === x.idx && r.mes === ym; });
+      }).length;
+      if (faltan > 0) res.alquileres = { mes: RENTA_MESES_NOMBRE[hoyD.getMonth()], anio: hoyD.getFullYear(), ym: ym, faltan: faltan, total: inms.length };
+    }
+  } catch (e) {}
+  return res;
+}
+function renta_pintarAvisosMes() {
+  try {
+    var esAdmin = (typeof getRol === 'function') ? getRol() === 'admin' : true;
+    var p = esAdmin ? renta_datosMesPendientes() : { nomina: null, alquileres: null };
+    var pinta = function(id, texto) {
+      var el = document.getElementById(id), ico = document.getElementById(id + '-ico');
+      if (el) { el.textContent = texto || ''; el.style.display = texto ? '' : 'none'; }
+      if (ico) ico.style.display = texto ? '' : 'none';
+    };
+    pinta('renta-aviso-trabajo', p.nomina ? ('Falta la nómina de ' + p.nomina.mes.toLowerCase() + ' ' + p.nomina.anio) : '');
+    pinta('renta-aviso-alqmen', p.alquileres ? ('Faltan los cobros de ' + p.alquileres.mes.toLowerCase() + ' (' + p.alquileres.faltan + ' de ' + p.alquileres.total + ' inmuebles)') : '');
+  } catch (e) {}
+}
 function renta_render() {
   document.getElementById('renta-anio-label').textContent = renta_anio;
   renta_renderNominas();
@@ -23862,6 +23941,7 @@ function renta_render() {
   renta_calcPrevision();
   alqmen_render();
   segibi_render();
+  renta_pintarAvisosMes(); // PUNTO 246
 }
 
 function renta_anioAnterior() {
@@ -23922,6 +24002,7 @@ function renta_totalNominaAnio(year, mesNombreActual) {
 // no de la lista en pantalla) siguen siendo correctos.
 var RENTA_ORDEN_MESES = ['Diciembre','Extra diciembre','Noviembre','Octubre','Septiembre','Agosto','Julio','Junio','Extra junio','Mayo','Abril','Marzo','Febrero','Enero'];
 function renta_renderNominas() {
+  try { renta_pintarAvisosMes(); } catch (eAv) {} // PUNTO 246
   var nominas = renta_getNominas();
   var cont = document.getElementById('renta-lista-nominas');
   if (!cont) return;
@@ -24226,6 +24307,7 @@ function alqmen_sumarMes(ym, delta) {
 function alqmen_mesAnterior() { alqmen_mes = alqmen_sumarMes(alqmen_mes, -1); alqmen_render(); }
 function alqmen_mesSiguiente() { alqmen_mes = alqmen_sumarMes(alqmen_mes, 1); alqmen_render(); }
 function alqmen_render() {
+  try { renta_pintarAvisosMes(); } catch (eAv) {} // PUNTO 246
   var cont = document.getElementById('alqmen-filas');
   if (!cont) return;
   if (!alqmen_mes) {
@@ -24278,9 +24360,38 @@ function alqmen_render() {
     avisoEl.style.display = 'none';
   }
 }
-function alqmen_guardarMes() {
+function alqmen_guardarMes(forzar) {
   if (bloqueaSiViewer('Guardar alquileres del mes')) return;
   var filas = document.querySelectorAll('#alqmen-filas [data-alqmen-idx]');
+  // PUNTO 246 (05/10/2026) — SEGURIDAD DE COBROS (pedida por Patry): antes de
+  // guardar, se compara el cobro de cada piso con la renta de su contrato
+  // activo (la misma que enseña la tarjeta de Inmuebles). Si no coinciden,
+  // se avisa y se puede revisar o guardar igualmente.
+  if (forzar !== true) {
+    try {
+      var todosInmChk = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+      var difs = [];
+      filas.forEach(function(fila) {
+        var idxC = parseInt(fila.dataset.alqmenIdx, 10);
+        var inmC = todosInmChk[idxC];
+        if (!inmC || inmC.tipo === 'rustico' || inmC.estado !== 'alquilado') return;
+        var rentaC = (typeof inm_rentaActiva === 'function') ? (parseFloat(inm_rentaActiva(inmC)) || 0) : 0;
+        if (!rentaC) return;
+        var cobroC = parseFmtGlobal(fila.querySelector('.alqmen-input-alquiler').value) || 0;
+        if (Math.abs(cobroC - rentaC) > 0.005) {
+          difs.push('• ' + (inmC.direccion || inmC.ref || ('Inmueble ' + (idxC + 1))) + ': has puesto ' + fmtGlobal(cobroC) + ' €, el contrato dice ' + fmtGlobal(rentaC) + ' €');
+        }
+      });
+      if (difs.length) {
+        showConfirm('⚠️', 'Revisa los cobros de ' + mesNombre(alqmen_mes),
+          'Estos importes no coinciden con la renta del contrato:\n\n' + difs.join('\n') + '\n\nSi el contrato está mal, corrígelo en Contratos.',
+          [{ label: 'Revisar', cls: 'c', fn: function() {} },
+           { label: 'Guardar igualmente', cls: 'g', fn: function() { alqmen_guardarMes(true); } }]);
+        var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
+        return;
+      }
+    } catch (eChk) { console.warn('Comprobación de cobros:', eChk.message); }
+  }
   var registros = inm_alqMenLoad();
   var ahora = new Date().toISOString();
   filas.forEach(function(fila) {
@@ -24303,6 +24414,93 @@ function alqmen_guardarMes() {
   if (typeof renta_renderAlquileres === 'function') renta_renderAlquileres();
   if (typeof renta_calcPrevision === 'function') renta_calcPrevision();
 }
+
+// PUNTO 247 (05/10/2026) — CORRECCIÓN DE UNA SOLA VEZ, autorizada por Patry:
+// las subidas de renta de Daniel (VIV-P02) y Aziati (VIV-P03) se hicieron
+// fuera de la app, así que sus contratos seguían con la renta original.
+// Se apunta el historial real de subidas SIN mover fechas de fin y SIN generar
+// adendas en PDF, y se corrigen los cobros de 2025 de esos dos pisos (solo los
+// meses que ya existen; los que faltan se dejan vacíos y se avisa).
+//  · Daniel: 04/2024 450→465 · 04/2025 465→480 · 04/2026 480→494,70
+//  · Aziati: 11/2025 800→825
+// Solo cambia algo si el contrato sigue con la renta original y sin historial;
+// los cobros, solo si el importe no es ya el correcto. Se puede ejecutar en
+// varios aparatos sin duplicar nada.
+var CORR247 = [
+  { ref: 'VIV-P02', original: 450, final: 494.70, hist: [
+      { mes: '2024-04', rentaAnterior: 450, rentaNueva: 465 },
+      { mes: '2025-04', rentaAnterior: 465, rentaNueva: 480 },
+      { mes: '2026-04', rentaAnterior: 480, rentaNueva: 494.70 } ],
+    cobros2025: function(m) { return m <= 3 ? 465 : 480; } },
+  { ref: 'VIV-P03', original: 800, final: 825, hist: [
+      { mes: '2025-11', rentaAnterior: 800, rentaNueva: 825 } ],
+    cobros2025: function(m) { return m <= 10 ? 800 : 825; } }
+];
+function correccion247() {
+  var FLAG = 'app:correccion_247_hecha';
+  try {
+    if (localStorage.getItem(FLAG)) return;
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    // Solo con la sesión de la nube activa: así se parte de los datos al día.
+    if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() !== true) return;
+    var ahora = new Date().toISOString();
+    var informe = [];
+    var inms = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+    var contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
+    var cambiosCon = false;
+    CORR247.forEach(function(cfg) {
+      var c = contratos.find(function(x) { return x.ref === cfg.ref && x.estado === 'activo'; });
+      if (!c) { informe.push(cfg.ref + ': no se encuentra el contrato activo — sin cambios'); return; }
+      var rentaAct = parseRentaMixta(c.renta);
+      var yaHist = (c.ipcAplicado || []).length > 0;
+      if (Math.abs(rentaAct - cfg.original) < 0.005 && !yaHist) {
+        c.ipcAplicado = cfg.hist.map(function(h) {
+          return { mes: h.mes, pct: Math.round((h.rentaNueva / h.rentaAnterior - 1) * 10000) / 100, rentaAnterior: h.rentaAnterior, rentaNueva: h.rentaNueva, correccion: true };
+        });
+        c.renta = cfg.final;
+        c.rentaAnterior = cfg.hist[cfg.hist.length - 1].rentaAnterior;
+        c.updatedAt = ahora;
+        cambiosCon = true;
+        informe.push(cfg.ref + ': contrato a ' + fmtGlobal(cfg.final) + ' €/mes, con ' + cfg.hist.length + ' subida(s) apuntada(s)');
+      } else if (Math.abs(rentaAct - cfg.final) < 0.005) {
+        informe.push(cfg.ref + ': el contrato ya estaba a ' + fmtGlobal(cfg.final) + ' € — sin cambios');
+      } else {
+        informe.push(cfg.ref + ': el contrato tiene ' + fmtGlobal(rentaAct) + ' € (no es el original) — no se toca, revisar a mano');
+      }
+    });
+    if (cambiosCon) localStorage.setItem('contratos:lista', JSON.stringify(contratos));
+    // Cobros 2025
+    var regs = inm_alqMenLoad();
+    var cambiosCob = 0;
+    CORR247.forEach(function(cfg) {
+      var idx = inms.findIndex(function(i) { return i && i.ref === cfg.ref && (i.propietario || '').toLowerCase() === 'patricio'; });
+      if (idx < 0) return;
+      var faltan = [];
+      for (var m = 1; m <= 12; m++) {
+        var ym = '2025-' + String(m).padStart(2, '0');
+        var r = regs.find(function(x) { return x.inmuebleIdx === idx && x.mes === ym; });
+        if (!r) { faltan.push(RENTA_MESES_NOMBRE[m - 1].slice(0, 3).toLowerCase()); continue; }
+        var debe = cfg.cobros2025(m);
+        if (Math.abs((parseFloat(r.alquiler) || 0) - debe) > 0.005) { r.alquiler = debe; r.updatedAt = ahora; cambiosCob++; }
+      }
+      if (faltan.length) informe.push(cfg.ref + ' — meses de 2025 sin dato (se dejan vacíos): ' + faltan.join(', '));
+    });
+    if (cambiosCob) { inm_alqMenSave(regs); informe.push('Cobros de 2025 corregidos: ' + cambiosCob + ' mes(es)'); }
+    localStorage.setItem(FLAG, ahora);
+    if (cambiosCon || cambiosCob) {
+      if (typeof renderLista === 'function') { try { renderLista(); } catch (e) {} }
+      if (typeof dash_render === 'function') { try { dash_render(); } catch (e) {} }
+    }
+    window._informeCorreccion247 = informe;
+    if (cambiosCon || cambiosCob || informe.some(function(t) { return /sin dato|revisar a mano|no se encuentra/.test(t); })) {
+      setTimeout(function() {
+        showConfirm('🛠️', 'Corrección de Daniel y Aziati', informe.join('\n'), [{ label: 'Aceptar', cls: 'g', fn: function() {} }]);
+        var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
+      }, 400);
+    }
+  } catch (e) { console.warn('[PUNTO 247] corrección:', e.message); }
+}
+document.addEventListener('firebaseLoaded', function() { setTimeout(correccion247, 4000); });
 
 // ── PUNTO 97 (05/09/2026): SEGURO E IBI ANUAL ──────────────────────────────
 // Un dato al año por inmueble, con histórico desplegable de años anteriores
