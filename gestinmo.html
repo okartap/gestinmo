@@ -2235,7 +2235,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_10';
+const BUILD_ID = '261005_12';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -7320,9 +7320,9 @@ con editar/borrar en cada línea. -->
       </div>
     </div>
     <div id="bloque-capital" style="display:none;padding:0 16px 14px;">
-      <div style="font-size:12px;color:var(--text-secondary);padding:8px 0 12px;">Dividendos de Finanzas de Patricio + los añadidos a mano (importe bruto).</div>
+      <div style="display:none;font-size:12px;color:var(--text-secondary);padding:8px 0 12px;">Dividendos de Finanzas de Patricio + los añadidos a mano (importe bruto).</div>
       <div id="renta-lista-capital"></div>
-      <button onclick="rdiv_abrir()" style="width:100%;margin-top:4px;background:rgba(255,255,255,0.06);border:1px dashed var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:10px;cursor:pointer;">＋ Añadir dividendo</button>
+      <button onclick="rdiv_abrir()" style="display:none;width:100%;margin-top:4px;background:rgba(255,255,255,0.06);border:1px dashed var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:10px;cursor:pointer;">＋ Añadir dividendo</button>
     </div>
   </div>
 
@@ -25119,34 +25119,79 @@ document.addEventListener('firebaseLoaded', function() { setTimeout(rint_reparar
 // Bloque que se añade al final de Capital mobiliario: intereses (con los meses
 // que faltan) y Saveback del año.
 function rint_htmlBloque(anio) {
+  // PUNTO 253 (05/10/2026), rediseño pedido por Patry: resumen en dos
+  // recuadros (intereses de la cuenta y Saveback), histórico DESPLEGABLE con
+  // una fila por mes que junta cuenta + tarjeta, y los dos botones de añadir
+  // (intereses y dividendo) en una sola línea.
+  // Cada fila es el MES DEL RENDIMIENTO: los intereses de septiembre se cobran
+  // el 1 de octubre (apunte "int_2026-10"); el Saveback de septiembre es el
+  // apunte "2026-09" del fondo.
   var hoy = new Date();
-  var hasta = anio < hoy.getFullYear() ? 12 : (anio === hoy.getFullYear() ? hoy.getMonth() + 1 : 0); // PUNTO 251: incluye el cobro de este mes
   var regs = rint_delAnio(anio);
-  var filas = [];
-  for (var m = 12; m >= 1; m--) {
-    var ym = anio + '-' + String(m).padStart(2, '0');
-    var r = regs.find(function(x) { return x.mes === ym; });
-    if (r) filas.push({ ym: ym, r: r });
-    else if (m <= hasta) filas.push({ ym: ym, r: null });
-  }
   var totB = 0, totR = 0;
   regs.forEach(function(x) { totB += parseFloat(x.bruto) || 0; totR += parseFloat(x.retencion) || 0; });
-  var faltan = filas.filter(function(f) { return !f.r; }).length;
-  var h = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 6px;">Intereses de la cuenta · Trade Republic</div>';
-  h += '<div style="font-size:11.5px;color:var(--silver-bright);margin-bottom:6px;">Bruto ' + fmtGlobal(totB) + ' € · retención ' + fmtGlobal(totR) + ' €' + (faltan ? ' · <span style="color:#f0a830;font-weight:700;">faltan ' + faltan + ' mes' + (faltan > 1 ? 'es' : '') + '</span>' : '') + '</div>';
-  filas.forEach(function(f) {
-    h += '<div onclick="rint_abrir(\'' + f.ym + '\')" style="cursor:pointer;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="font-size:12.5px;font-weight:700;color:' + (f.r ? 'var(--silver-bright)' : '#f0a830') + ';">Cobro 1 de ' + fin_mesTxt(f.ym) + '</div><div style="font-size:10.5px;color:var(--text-secondary);">intereses de ' + rint_mesDe(f.ym) + '</div></div>'
-      + (f.r ? ('<div style="text-align:right;"><div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(f.r.bruto) + ' €</div><div style="font-size:10.5px;color:var(--text-secondary);">ret. ' + fmtGlobal(f.r.retencion) + ' €</div></div>')
-             : '<div style="font-size:12px;font-weight:700;color:#f0a830;">Falta · pulsa para meterlo</div>')
-      + '</div>';
-  });
-  h += '<button onclick="rint_abrir()" style="width:100%;margin-top:2px;background:rgba(255,255,255,0.06);border:1px dashed var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:10px;cursor:pointer;">＋ Intereses de la cuenta</button>';
   var sv = (typeof fin_saveTotalAnio === 'function') ? fin_saveTotalAnio(anio) : { total: 0, meses: 0 };
-  if (sv.meses) {
-    h += '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 6px;">Saveback de la tarjeta</div>'
-      + '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;"><div style="font-size:12.5px;color:var(--silver-bright);">' + sv.meses + ' mes' + (sv.meses > 1 ? 'es' : '') + ' · se gestiona en Finanzas</div><div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(sv.total) + ' €</div></div>';
+  // Fondo con Saveback (para poder tocar cada mes)
+  var fSave = null;
+  try { fSave = (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).find(function(f) { return f && !f.deleted && f.saveActivo; }) || null; } catch (e) {}
+  var saveDe = function(ym) { return fSave ? (fSave.saveHist || []).find(function(h) { return h && h.mes === ym; }) : null; };
+  // Filas: cobros de intereses del año (enero..mes en curso) => rendimientos de dic(año-1)..mes anterior
+  var ultimoCobro = anio < hoy.getFullYear() ? 12 : (anio === hoy.getFullYear() ? hoy.getMonth() + 1 : 0);
+  var filas = [];
+  for (var c = ultimoCobro; c >= 1; c--) {
+    var cobro = anio + '-' + String(c).padStart(2, '0');
+    var dP = new Date(anio, c - 2, 1);
+    var periodo = dP.getFullYear() + '-' + String(dP.getMonth() + 1).padStart(2, '0');
+    var ri = regs.find(function(x) { return x.mes === cobro; });
+    var enAnio = dP.getFullYear() === anio; // el Saveback de diciembre del año anterior va a la renta de ese año
+    filas.push({ cobro: cobro, periodo: periodo, ri: ri, sv: (fSave && enAnio) ? saveDe(periodo) : null, svAplica: !!fSave && enAnio });
   }
+  var faltanI = filas.filter(function(f) { return !f.ri; }).length;
+  var faltanS = filas.filter(function(f) { return f.svAplica && !f.sv; }).length;
+  var abierto = !!window._rintHistAbierto;
+  var tile = function(titulo, valor, sub, color) {
+    return '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:12px;padding:10px 8px;text-align:center;min-width:0;">'
+      + '<div style="font-size:9.5px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;">' + titulo + '</div>'
+      + '<div style="font-size:16px;font-weight:700;color:' + (color || 'var(--accent-green)') + ';margin-top:2px;">' + valor + '</div>'
+      + '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:1px;">' + sub + '</div></div>';
+  };
+  var h = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Trade Republic</div>';
+  h += '<div style="display:flex;gap:8px;">'
+    + tile('Intereses cuenta', ingotros_fmt2(totB) + ' €', 'retención ' + ingotros_fmt2(totR) + ' €')
+    + tile('Saveback tarjeta', ingotros_fmt2(sv.total) + ' €', fSave ? (sv.meses + ' mes' + (sv.meses === 1 ? '' : 'es')) : 'sin activar en Finanzas', fSave ? null : 'var(--text-secondary)')
+    + '</div>';
+  if (faltanI || faltanS) {
+    var partes = [];
+    if (faltanI) partes.push(faltanI + ' de intereses');
+    if (faltanS) partes.push(faltanS + ' de Saveback');
+    h += '<div style="font-size:11.5px;font-weight:600;color:#f0a830;margin-top:8px;">⚠️ Faltan ' + partes.join(' y ') + '</div>';
+  }
+  // Desplegable del histórico
+  h += '<div onclick="window._rintHistAbierto=!window._rintHistAbierto;renta_renderCapital();" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-top:8px;">'
+    + '<span style="font-size:12.5px;font-weight:700;color:var(--silver-bright);">Histórico ' + anio + '</span>'
+    + '<span style="color:var(--text-secondary);font-size:16px;">' + (abierto ? '⌄' : '›') + '</span></div>';
+  if (abierto) {
+    h += '<div style="display:flex;padding:8px 12px 4px;font-size:9.5px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;"><div style="flex:1.3;">Mes</div><div style="flex:1;text-align:right;">Cuenta</div><div style="flex:0.8;text-align:right;">Tarjeta</div></div>';
+    filas.forEach(function(f) {
+      var celI = f.ri
+        ? '<div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + ingotros_fmt2(f.ri.bruto) + ' €</div><div style="font-size:9.5px;color:var(--text-secondary);">ret. ' + ingotros_fmt2(f.ri.retencion) + '</div>'
+        : '<div style="font-size:12px;font-weight:700;color:#f0a830;">Falta</div>';
+      var celS = !f.svAplica ? '<div style="font-size:12px;color:var(--text-secondary);">—</div>'
+        : (f.sv ? '<div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + ingotros_fmt2(f.sv.importe) + ' €</div>' : '<div style="font-size:12px;font-weight:700;color:#f0a830;">Falta</div>');
+      var nom = fin_mesTxt(f.periodo); nom = nom.charAt(0).toUpperCase() + nom.slice(1);
+      h += '<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<div style="flex:1.3;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--silver-bright);">' + nom + '</div><div style="font-size:9.5px;color:var(--text-secondary);">cobro 1 ' + fin_mesTxt(f.cobro).slice(0, 3) + '</div></div>'
+        + '<div onclick="rint_abrir(\'' + f.cobro + '\')" style="flex:1;text-align:right;cursor:pointer;">' + celI + '</div>'
+        + '<div ' + (f.svAplica ? ('onclick="fin_saveAbrir(\'patricio\',\'' + fSave.id + '\',\'' + f.periodo + '\')" ') : '') + 'style="flex:0.8;text-align:right;cursor:' + (f.svAplica ? 'pointer' : 'default') + ';">' + celS + '</div>'
+        + '</div>';
+    });
+    h += '<div style="font-size:10.5px;color:var(--text-secondary);padding:6px 12px 0;">Toca un importe para corregirlo.</div>';
+  }
+  // Dos botones en una línea
+  var btn = function(txt, fn) {
+    return '<button onclick="' + fn + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px dashed var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:10px 6px;cursor:pointer;">' + txt + '</button>';
+  };
+  h += '<div style="display:flex;gap:8px;margin-top:12px;">' + btn('＋ Intereses', 'rint_abrir()') + btn('＋ Dividendo', 'rdiv_abrir()') + '</div>';
   return { html: h, bruto: totB, retencion: totR, saveback: sv.total };
 }
 function rdiv_loadTodo() { try { return JSON.parse(localStorage.getItem(RDIV_KEY) || '[]') || []; } catch (e) { return []; } }
@@ -25259,9 +25304,9 @@ function renta_renderCapital() {
 
   var _rint = rint_htmlBloque(renta_anio); // PUNTO 250
   if (divs.length === 0 && manuales.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos para ' + renta_anio + '.</div>' + _rint.html;
+    cont.innerHTML = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:10px 0 8px;">Dividendos</div><div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos en ' + renta_anio + '.</div>' + _rint.html;
     var _totSolo = _rint.bruto + _rint.saveback;
-    document.getElementById('renta-total-capital').textContent = _totSolo ? (fmtGlobal(_totSolo) + ' €') : '— €';
+    document.getElementById('renta-total-capital').textContent = _totSolo ? (ingotros_fmt2(_totSolo) + ' €') : '— €';
     return;
   }
 
@@ -25280,8 +25325,8 @@ function renta_renderCapital() {
       total += br;
       html += '<div onclick="rdiv_abrir(\'' + m.id + '\')" style="cursor:pointer;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
         + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + (m.pagador || 'Dividendo') + ' <span style="font-size:10px;font-weight:600;color:var(--text-secondary);">✎ a mano</span></div>'
-        + '<div style="font-size:11px;color:var(--text-secondary);">' + (m.fecha || '') + ' · retención ' + fmtGlobal(rt) + ' € · neto ' + fmtGlobal(br - rt) + ' €</div></div>'
-        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);white-space:nowrap;">' + fmtGlobal(br) + ' €</div>'
+        + '<div style="font-size:11px;color:var(--text-secondary);">' + (m.fecha || '') + ' · retención ' + ingotros_fmt2(rt) + ' € · neto ' + ingotros_fmt2(br - rt) + ' €</div></div>'
+        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);white-space:nowrap;">' + ingotros_fmt2(br) + ' €</div>'
         + '</div>';
     } else {
       var d = f.d;
@@ -25290,13 +25335,19 @@ function renta_renderCapital() {
       html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
         + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + (d.ticker || '—') + '</div>'
         + '<div style="font-size:11px;color:var(--text-secondary);">' + (d.fecha || '') + (d.divObs ? ' · ' + d.divObs : '') + '</div></div>'
-        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);white-space:nowrap;">' + fmtGlobal(importe) + ' €</div>'
+        + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);white-space:nowrap;">' + ingotros_fmt2(importe) + ' €</div>'
         + '</div>';
     }
   }
-  cont.innerHTML = html + _rint.html;
+  // PUNTO 253: dividendos en un desplegable, como el histórico de Trade Republic.
+  var _divAb = !!window._rdivAbierto;
+  var _cab = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:10px 0 8px;">Dividendos</div>'
+    + '<div onclick="window._rdivAbierto=!window._rdivAbierto;renta_renderCapital();" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:' + (_divAb ? '8px' : '0') + ';">'
+    + '<span style="font-size:12.5px;font-weight:700;color:var(--silver-bright);">' + filas.length + ' dividendo' + (filas.length === 1 ? '' : 's') + ' en ' + renta_anio + '</span>'
+    + '<span style="display:flex;align-items:center;gap:10px;"><span style="font-size:13px;font-weight:700;color:var(--accent-green);">' + ingotros_fmt2(total) + ' €</span><span style="color:var(--text-secondary);font-size:16px;">' + (_divAb ? '⌄' : '›') + '</span></span></div>';
+  cont.innerHTML = _cab + (_divAb ? html : '') + _rint.html;
   total += _rint.bruto + _rint.saveback; // PUNTO 250
-  document.getElementById('renta-total-capital').textContent = fmtGlobal(total) + ' €';
+  document.getElementById('renta-total-capital').textContent = ingotros_fmt2(total) + ' €';
 }
 
 // ── Gastos con factura ────────────────────────────────────────────────────
