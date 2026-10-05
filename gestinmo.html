@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_02';
+const BUILD_ID = '261005_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2391,6 +2391,71 @@ window._nubeReintentarAhora = async function() {
   return Object.keys(_syncOutbox || {});
 };
 window._mostrarEstadoSync = _mostrarEstadoSync;
+// PUNTO 244 (05/10/2026) — DIAGNÓSTICO TEMPORAL "Otros ingresos". La nube
+// (gestinmo_data/ingresos_otros_patricio) no cambia desde el 16/09/2026
+// aunque la flecha sale verde y el resto de datos (nóminas) sí sube. Este
+// botón hace UNA subida real y enseña cada paso, para ver dónde se pierde.
+window._diagOtrosIngresos = async function() {
+  const clave = 'ingresos:otros:patricio';
+  const docId = keyToDoc(clave);
+  const L = [];
+  const resumen = function(json) {
+    try { const a = JSON.parse(json) || []; return { n: a.length, ids: a.map(function(x){ return x && x.id; }) }; }
+    catch (e) { return { n: -1, ids: [] }; }
+  };
+  try {
+    L.push('Versión: ' + BUILD_ID);
+    const u = auth.currentUser;
+    L.push('Sesión nube: ' + (u ? (u.email + ' · uid ' + u.uid.slice(0, 6) + '…') : 'NINGUNA'));
+    const local = localStorage.getItem(clave);
+    const rl = resumen(local);
+    L.push('En este aparato: ' + rl.n + ' ingresos');
+    try {
+      const arr = JSON.parse(local) || [];
+      arr.slice().sort(function(a, b){ return String(b.fecha||'').localeCompare(String(a.fecha||'')); }).slice(0, 2).forEach(function(x) {
+        L.push('  · ' + x.fecha + ' ' + x.concepto + ' ' + x.importe + ' (id ' + String(x.id).slice(-5) + ', upd ' + (x.updatedAt ? String(x.updatedAt).slice(5, 16) : 'SIN FECHA') + ')');
+      });
+    } catch (e) {}
+    const marcas = (_leerBorrados()[clave]) || {};
+    L.push('Marcas de borrado: ' + Object.keys(marcas).length + (rl.ids.some(function(id){ return marcas[id]; }) ? ' ⚠️ alguna coincide con un ingreso actual' : ''));
+    const filtrado = _aplicarBorrados(clave, local);
+    if (filtrado !== local) L.push('⚠️ Las marcas de borrado QUITAN ' + (rl.n - resumen(filtrado).n) + ' ingreso(s) antes de subir');
+    let antes = null;
+    try { antes = await getDocFromServer(doc(db, 'gestinmo_data', docId)); }
+    catch (e) { L.push('❌ Error al LEER la nube: ' + e.message); }
+    if (antes) {
+      const ra = antes.exists() ? resumen(antes.data().value) : { n: 0, ids: [] };
+      L.push('Nube ANTES: ' + ra.n + ' ingresos · actualizada ' + (antes.exists() ? String(antes.data().updatedAt).slice(0, 16) : 'NO EXISTE'));
+      const faltan = rl.ids.filter(function(id){ return ra.ids.indexOf(id) < 0; }).length;
+      L.push('Ingresos de este aparato que faltan en la nube: ' + faltan);
+    }
+    // Subida directa, sin pasar por el resto de la app, para ver el error real.
+    const ts = new Date().toISOString();
+    let valor = filtrado;
+    try {
+      if (antes && antes.exists() && _valorValido(antes.data().value)) {
+        const f = _fusionConBorrados(clave, filtrado, antes.data().value);
+        if (f != null) valor = f;
+      }
+      L.push('Se van a subir: ' + resumen(valor).n + ' ingresos');
+      await setDoc(doc(db, 'gestinmo_data', docId), { key: clave, value: valor, updatedAt: ts });
+      L.push('Subida: la nube ha aceptado la escritura');
+    } catch (e) {
+      L.push('❌ La nube RECHAZA la subida: ' + (e.code || '') + ' ' + e.message);
+    }
+    try {
+      const despues = await getDocFromServer(doc(db, 'gestinmo_data', docId));
+      const rd = despues.exists() ? resumen(despues.data().value) : { n: 0, ids: [] };
+      L.push('Nube DESPUÉS: ' + rd.n + ' ingresos · actualizada ' + (despues.exists() ? String(despues.data().updatedAt).slice(0, 16) : 'NO EXISTE') + (despues.exists() && despues.data().updatedAt === ts ? ' ✅' : ' ❌ (no es la subida de ahora)'));
+    } catch (e) { L.push('❌ Error al releer la nube: ' + e.message); }
+    L.push('Pendientes de subir: ' + (Object.keys(_syncOutbox || {}).join(', ') || 'ninguno'));
+    L.push('Último error guardado: ' + (_ultimoErrorSync ? (_ultimoErrorSyncClave + ' — ' + _ultimoErrorSync) : 'ninguno'));
+  } catch (e) {
+    L.push('❌ Fallo del diagnóstico: ' + e.message);
+  }
+  alert('DIAGNÓSTICO OTROS INGRESOS\n\n' + L.join('\n'));
+  return L;
+};
 window._probarSincronizacionAhora = _probarSincronizacionAhora;
 
 // PUNTO 171 (22/09/2026): QUITADA LA BOLITA DE LA PANTALLA, A PETICIÓN DE
@@ -4393,6 +4458,12 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div id="renta-lista-ingresos-otros" style="margin-bottom:12px;"></div>
         <!-- PUNTO 240 (04/10/2026): una ficha plegable por cada año anterior -->
         <div id="ingotros-anteriores"></div>
+        <!-- PUNTO 244 (05/10/2026): diagnóstico TEMPORAL de la subida de Otros
+             ingresos a la nube (la nube no cambia desde el 16/09). Quitar
+             cuando se encuentre la causa. -->
+        <div data-rol="admin" style="text-align:center;margin-top:6px;">
+          <span onclick="window._diagOtrosIngresos && window._diagOtrosIngresos()" style="font-size:11px;color:var(--silver-dim);cursor:pointer;text-decoration:underline;">🔍 Diagnóstico de nube</span>
+        </div>
       </div>
     </div>
 
