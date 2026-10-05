@@ -2235,7 +2235,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_09';
+const BUILD_ID = '261005_10';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -24983,18 +24983,56 @@ var RDIV_KEY = 'renta:dividendos_manuales';
 var RINT_KEY = 'renta:intereses_cuenta';
 function rint_loadTodo() { try { return (JSON.parse(localStorage.getItem(RINT_KEY) || '[]') || []); } catch (e) { return []; } }
 function rint_delAnio(anio) { return rint_loadTodo().filter(function(x) { return x && !x.deleted && String(x.mes || '').slice(0, 4) === String(anio); }); }
-function rint_abrir(mes) {
-  if (bloqueaSiViewer('Añadir intereses de la cuenta')) return;
-  var _hR = new Date();
-  var m = mes || (_hR.getFullYear() + '-' + String(_hR.getMonth() + 1).padStart(2, '0')); // PUNTO 251: mes de cobro
+// PUNTO 252 (05/10/2026) — BUG REAL (reportado por Patry): el botón "＋"
+// abría el mes en curso (ya metido) con su retención, y al cambiar el mes en
+// la ventana no se limpiaban los importes; la retención se daba por "escrita a
+// mano" y se guardaba la de octubre (104,13 €) en todos los meses. Además, al
+// corregir el bruto de un mes guardado no se recalculaba la retención. Ahora:
+// cambiar el mes carga ESE mes (o deja la ventana vacía); la retención solo se
+// considera "a mano" si no es el 19 % del bruto; y "＋" abre el mes más
+// reciente que falte.
+// Opciones del desplegable: los últimos 24 cobros (día 1 de cada mes), lo más
+// reciente primero, más el mes pedido si fuera más antiguo.
+function rint_llenarMeses(mesSel) {
+  var sel = document.getElementById('rint-mes');
+  var h = new Date(), html = '', vistos = {};
+  for (var k = 0; k < 24; k++) {
+    var d = new Date(h.getFullYear(), h.getMonth() - k, 1);
+    var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    vistos[ym] = true;
+    html += '<option value="' + ym + '">' + (function(t){return t.charAt(0).toUpperCase()+t.slice(1);})(fin_mesTxt(ym)) + ' (de ' + rint_mesDe(ym).split(' ')[0] + ')</option>';
+  }
+  if (mesSel && !vistos[mesSel]) html += '<option value="' + mesSel + '">' + (function(t){return t.charAt(0).toUpperCase()+t.slice(1);})(fin_mesTxt(mesSel)) + ' (de ' + rint_mesDe(mesSel).split(' ')[0] + ')</option>';
+  sel.innerHTML = html;
+}
+function rint_cargarMes() {
+  var m = document.getElementById('rint-mes').value;
   var x = rint_loadTodo().find(function(y) { return y && !y.deleted && y.mes === m; });
-  document.getElementById('rint-mes').value = m;
+  var r = document.getElementById('rint-ret');
   document.getElementById('rint-bruto').value = x ? numMiles_fmtDinero(x.bruto) : '';
-  document.getElementById('rint-ret').value = x ? numMiles_fmtDinero(x.retencion) : '';
-  document.getElementById('rint-ret').dataset.manual = x ? '1' : '';
-  document.getElementById('rint-titulo').textContent = 'Intereses de la cuenta';
+  r.value = x ? numMiles_fmtDinero(x.retencion) : '';
+  var auto19 = x ? Math.round((parseFloat(x.bruto) || 0) * 0.19 * 100) / 100 : 0;
+  r.dataset.manual = (x && Math.abs((parseFloat(x.retencion) || 0) - auto19) > 0.01) ? '1' : '';
   document.getElementById('rint-borrar').style.display = x ? '' : 'none';
   rint_recalc();
+}
+function rint_abrir(mes) {
+  if (bloqueaSiViewer('Añadir intereses de la cuenta')) return;
+  var m = mes;
+  if (!m) {
+    // El mes más reciente que falte (este año, hasta el mes en curso); si no falta ninguno, el mes en curso.
+    var _hR = new Date();
+    var hechos = rint_loadTodo().filter(function(y) { return y && !y.deleted; }).map(function(y) { return y.mes; });
+    for (var k = _hR.getMonth() + 1; k >= 1 && !m; k--) {
+      var ymK = _hR.getFullYear() + '-' + String(k).padStart(2, '0');
+      if (hechos.indexOf(ymK) < 0) m = ymK;
+    }
+    if (!m) m = _hR.getFullYear() + '-' + String(_hR.getMonth() + 1).padStart(2, '0');
+  }
+  rint_llenarMeses(m);
+  document.getElementById('rint-mes').value = m;
+  document.getElementById('rint-titulo').textContent = 'Intereses de la cuenta';
+  rint_cargarMes();
   openModalById('rint-modal');
   setTimeout(function() { var el = document.getElementById('rint-bruto'); if (el) el.focus(); }, 150);
 }
@@ -25021,7 +25059,8 @@ function rint_guardar() {
   if (bloqueaSiViewer('Guardar intereses de la cuenta')) return;
   var mes = document.getElementById('rint-mes').value;
   var bruto = parseImporteFlexible(document.getElementById('rint-bruto').value) || 0;
-  var ret = parseImporteFlexible(document.getElementById('rint-ret').value) || 0;
+  var _retTxt = (document.getElementById('rint-ret').value || '').trim();
+  var ret = _retTxt === '' ? Math.round(bruto * 0.19 * 100) / 100 : (parseImporteFlexible(_retTxt) || 0);
   if (!mes || !bruto) { alert('Pon el mes y los intereses brutos.'); return; }
   var todos = rint_loadTodo();
   var id = 'int_' + mes;
@@ -25044,6 +25083,39 @@ function rint_borrar() {
   renta_renderCapital(); renta_calcPrevision();
   try { renta_pintarAvisosMes(); } catch (e) {}
 }
+// PUNTO 252: reparación de una sola vez — meses guardados con la retención de
+// otro mes (mismo importe repetido con brutos distintos y que no es su 19 %)
+// pasan al 19 % de su bruto. Se avisa de cuántos para revisarlos con el extracto.
+function rint_reparar252() {
+  try {
+    if (localStorage.getItem('app:reparacion_252_hecha')) return;
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() === false) return;
+    var todos = rint_loadTodo();
+    var vivos = todos.filter(function(x) { return x && !x.deleted; });
+    var cuenta = {};
+    vivos.forEach(function(x) { var k = String(Math.round((parseFloat(x.retencion) || 0) * 100)); cuenta[k] = (cuenta[k] || 0) + 1; });
+    var arreglados = [];
+    todos.forEach(function(x) {
+      if (!x || x.deleted) return;
+      var b = parseFloat(x.bruto) || 0, r = parseFloat(x.retencion) || 0;
+      var a19 = Math.round(b * 0.19 * 100) / 100;
+      if (cuenta[String(Math.round(r * 100))] > 1 && Math.abs(r - a19) > 0.05) {
+        x.retencion = a19; x.updatedAt = new Date().toISOString(); arreglados.push(x.mes);
+      }
+    });
+    localStorage.setItem('app:reparacion_252_hecha', new Date().toISOString());
+    if (arreglados.length) {
+      localStorage.setItem(RINT_KEY, JSON.stringify(todos));
+      try { renta_renderCapital(); renta_calcPrevision(); } catch (e) {}
+      setTimeout(function() {
+        showConfirm('🛠️', 'Retenciones de intereses corregidas', 'Tenían copiada la retención de otro mes y se han puesto al 19 % de su bruto: ' + arreglados.sort().map(function(m) { return 'cobro de ' + fin_mesTxt(m); }).join(', ') + '.\n\nSi alguna no coincide con el extracto de Trade Republic, ábrela y escríbela.', [{ label: 'Aceptar', cls: 'g', fn: function() {} }]);
+        var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
+      }, 500);
+    }
+  } catch (e) { console.warn('[PUNTO 252] reparación:', e.message); }
+}
+document.addEventListener('firebaseLoaded', function() { setTimeout(rint_reparar252, 4500); });
 // Bloque que se añade al final de Capital mobiliario: intereses (con los meses
 // que faltan) y Saveback del año.
 function rint_htmlBloque(anio) {
@@ -25976,9 +26048,11 @@ if ('serviceWorker' in navigator) {
 <div class="moverlay" id="rint-modal" style="z-index:9000;">
   <div class="modal">
     <div class="mtitle"><span id="rint-titulo">Intereses de la cuenta</span><span class="mclose" onclick="closeModalById('rint-modal')">&#10005;</span></div>
-    <div class="mfield"><div class="mflabel">Mes de cobro (se cobran el día 1)</div><input class="minput" id="rint-mes" type="month"></div>
+    <!-- PUNTO 252: desplegable propio (antes salía el calendario de meses del navegador) -->
+    <div class="mfield"><div class="mflabel">Cobrado el día 1 de</div><select class="minput" id="rint-mes" onchange="rint_cargarMes()" style="text-align:center;text-align-last:center;"></select></div>
     <div class="mfield"><div class="mflabel">Intereses brutos (euros)</div><input class="minput" id="rint-bruto" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="rint_onBruto()"></div>
     <div class="mfield"><div class="mflabel">Retención (euros) — 19 % automático, puedes cambiarlo</div><input class="minput" id="rint-ret" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="this.dataset.manual='1';rint_recalc()"></div>
+    <div style="margin:-6px 2px 8px;"><span onclick="var r=document.getElementById('rint-ret');r.dataset.manual='';rint_onBruto();" style="font-size:11px;color:var(--silver-dim);text-decoration:underline;cursor:pointer;">Calcular el 19 %</span></div>
     <div id="rint-neto" style="font-size:12px;color:var(--accent-green);margin:-4px 2px 10px;min-height:16px;"></div>
     <button class="btn1" onclick="rint_guardar()">Guardar</button>
     <button class="btn2" id="rint-borrar" onclick="rint_borrar()" style="margin-top:8px;">Borrar este mes</button>
