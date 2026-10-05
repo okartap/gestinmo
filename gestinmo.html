@@ -2235,7 +2235,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_13';
+const BUILD_ID = '261005_14';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -25208,9 +25208,10 @@ function rint_htmlBloque(anio) {
     h += '<div style="font-size:11.5px;font-weight:600;color:#f0a830;margin-top:8px;">⚠️ Faltan ' + partes.join(' y ') + '</div>';
   }
   // Desplegable del histórico
-  h += '<div onclick="window._rintHistAbierto=!window._rintHistAbierto;renta_renderCapital();" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-top:8px;">'
+  // PUNTO 255: título centrado (flecha a la derecha, sin descentrar el texto)
+  h += '<div onclick="window._rintHistAbierto=!window._rintHistAbierto;renta_renderCapital();" style="cursor:pointer;position:relative;text-align:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 32px;margin-top:8px;">'
     + '<span style="font-size:12.5px;font-weight:700;color:var(--silver-bright);">Histórico ' + anio + '</span>'
-    + '<span style="color:var(--text-secondary);font-size:16px;">' + (abierto ? '⌄' : '›') + '</span></div>';
+    + '<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:16px;">' + (abierto ? '⌄' : '›') + '</span></div>';
   if (abierto) {
     h += '<div style="display:flex;padding:8px 12px 4px;font-size:9.5px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;"><div style="flex:1.3;">Mes</div><div style="flex:1;text-align:right;">Cuenta</div><div style="flex:0.8;text-align:right;">Tarjeta</div></div>';
     filas.forEach(function(f) {
