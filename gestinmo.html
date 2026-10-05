@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_01';
+const BUILD_ID = '261005_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -24792,14 +24792,17 @@ function ingotros_htmlLista(arr) {
   var html = '';
   for (var i = 0; i < arr.length; i++) {
     var it = arr[i];
-    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+    // PUNTO 243 (05/10/2026): editar ✎ a la izquierda del nombre y borrar ✕
+    // a la derecha del importe — antes iban juntos y era fácil equivocarse.
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px 10px 6px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div style="display:flex;align-items:center;gap:6px;min-width:0;">'
+      + '<button onclick="ingotros_editar(\'' + it.id + '\')" style="background:none;border:none;color:var(--text-secondary);font-size:15px;cursor:pointer;padding:4px 6px;">✎</button>'
       + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + notas_esc(it.concepto)
       + (it.declaraIrpf ? ' <span style="font-size:9px;font-weight:700;color:#5b8dee;background:rgba(91,141,238,0.15);border-radius:4px;padding:2px 5px;vertical-align:middle;">IRPF</span>' : '') + '</div>'
-      + '<div style="font-size:11px;color:var(--text-secondary);">' + (it.fecha || '') + '</div></div>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + (it.fecha || '') + '</div></div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
       + '<div style="font-size:13px;font-weight:700;color:var(--accent-green);">+' + ingotros_fmt2(it.importe) + ' €</div>'
-      + '<button onclick="ingotros_editar(\'' + it.id + '\')" style="background:none;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;">✎</button>'
-      + '<button onclick="ingotros_borrar(\'' + it.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
+      + '<button onclick="ingotros_borrar(\'' + it.id + '\')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;padding:4px 2px;">✕</button>'
       + '</div></div>';
   }
   return html;
