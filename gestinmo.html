@@ -2235,7 +2235,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_12';
+const BUILD_ID = '261005_13';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -6870,7 +6870,7 @@ abierto. -->
     </div>
     <div id="fin-fondo-save-campos" style="display:none;">
       <div class="mfield"><div class="mflabel">Saveback mensual (euros)</div><input class="minput" id="fin-fondo-save-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-      <div class="form-hint" style="margin:-4px 2px 10px;">Cada mes te saldrá un aviso para confirmarlo. Al activarlo se apuntan en el histórico los meses de este año ya pasados (sin sumarlos al "Aportado", que ya los incluye).</div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Se cobra el día 1 del mes siguiente; ese día te saldrá un aviso para confirmarlo. Al activarlo se apuntan los cobros de este año ya recibidos (sin sumarlos al "Aportado", que ya los incluye).</div>
     </div>
     <button class="btn1" onclick="fin_guardarFondo()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-fondo')" style="margin-top:8px;">Cancelar</button>
@@ -19487,10 +19487,7 @@ function fin_guardarFondo() {
   if (obj.saveActivo && !obj.saveHist.length) {
     // Primera vez: meses de este año ya pasados (hasta el anterior), marcados
     // "inicial" — no se suman al Aportado porque ya están incluidos en él.
-    var _hS = new Date();
-    for (var _mS = 1; _mS <= _hS.getMonth(); _mS++) {
-      obj.saveHist.push({ mes: _hS.getFullYear() + '-' + String(_mS).padStart(2, '0'), importe: obj.saveImporte, inicial: true });
-    }
+    fin_savePeriodosAnio().forEach(function(ymS) { obj.saveHist.push({ mes: ymS, importe: obj.saveImporte, inicial: true }); }); // PUNTO 254
   }
   // PUNTO 93: conservamos el id si ya existía (edición) y siempre refrescamos
   // updatedAt, para que la fusión elemento a elemento con la nube funcione.
@@ -19542,13 +19539,8 @@ function fin_toggleSaveCampos() {
 // Meses de Saveback que faltan: este año, de enero al mes anterior.
 function fin_saveFaltan(f) {
   if (!f || !f.saveActivo) return [];
-  var d = new Date(), out = [];
   var hist = f.saveHist || [];
-  for (var m = 1; m <= d.getMonth(); m++) {
-    var ym = d.getFullYear() + '-' + String(m).padStart(2, '0');
-    if (!hist.some(function(h) { return h && h.mes === ym; })) out.push(ym);
-  }
-  return out;
+  return fin_savePeriodosAnio().filter(function(ym) { return !hist.some(function(h) { return h && h.mes === ym; }); });
 }
 var _finMovAbierto = {};
 function fin_movToggle(clave) { _finMovAbierto[clave] = !_finMovAbierto[clave]; fin_renderFondos(); fin_renderAcciones(); }
@@ -19659,13 +19651,31 @@ function fin_saveGuardar(quitar) {
   try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
   try { if (typeof renta_renderCapital === 'function') { renta_renderCapital(); renta_calcPrevision(); } } catch (e) {}
 }
+function fin_saveAnioCobro(ym) {
+  var p = String(ym || '').split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  return m === 12 ? y + 1 : y;
+}
+// Meses de Saveback (mes de la compra) cuyo cobro cae en el año en curso,
+// hasta el cobro de este mes: de diciembre del año anterior al mes anterior.
+function fin_savePeriodosAnio() {
+  var d = new Date(), out = [];
+  for (var k = -1; k <= d.getMonth() - 1; k++) {
+    var x = new Date(d.getFullYear(), k, 1);
+    out.push(x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'));
+  }
+  return out;
+}
 // Saveback de un año (todos los fondos de Patricio) — para la Renta.
 function fin_saveTotalAnio(anio) {
   var t = 0, n = 0;
   try {
     (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(f) {
       if (!f || f.deleted) return;
-      (f.saveHist || []).forEach(function(h) { if (h && String(h.mes).slice(0, 4) === String(anio)) { t += parseFloat(h.importe) || 0; n++; } });
+      // PUNTO 254 (05/10/2026): el Saveback de un mes se cobra el día 1 del
+      // mes siguiente; en la renta cuenta el año del COBRO (el de diciembre
+      // va al año siguiente), igual que los intereses de la cuenta.
+      (f.saveHist || []).forEach(function(h) { if (h && fin_saveAnioCobro(h.mes) === Number(anio)) { t += parseFloat(h.importe) || 0; n++; } });
     });
   } catch (e) {}
   return { total: Math.round(t * 100) / 100, meses: n };
@@ -22516,7 +22526,7 @@ function pend_calcular() {
         (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(fS) {
           if (!fS || fS.deleted || !fS.saveActivo) return;
           if ((fS.saveHist || []).some(function(h) { return h && h.mes === _mAntS; })) return;
-          items.push({ icon: '💳', t: 'Saveback de ' + fin_mesTxt(_mAntS) + ': ¿' + fmtGlobal(fS.saveImporte != null ? fS.saveImporte : 15) + ' €?', s: (fS.nombre || 'Fondo') + ' · pulsa para confirmarlo', accion: 'saveback', fondoId: fS.id, mes: _mAntS });
+          items.push({ icon: '💳', t: 'Saveback de ' + fin_mesTxt(_mAntS) + ' (cobrado el día 1): ¿' + fmtGlobal(fS.saveImporte != null ? fS.saveImporte : 15) + ' €?', s: (fS.nombre || 'Fondo') + ' · pulsa para confirmarlo', accion: 'saveback', fondoId: fS.id, mes: _mAntS });
         });
       } catch (eS) {}
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
@@ -25116,6 +25126,37 @@ function rint_reparar252() {
   } catch (e) { console.warn('[PUNTO 252] reparación:', e.message); }
 }
 document.addEventListener('firebaseLoaded', function() { setTimeout(rint_reparar252, 4500); });
+// PUNTO 254 (05/10/2026): al activar el Saveback con la versión anterior no se
+// apuntó el de diciembre del año pasado (cobrado el 1 de enero). Se añade una
+// vez, como "ya incluido", si el fondo tiene ya los meses iniciales de este año.
+function fin_saveReparar254() {
+  try {
+    if (localStorage.getItem('app:reparacion_254_hecha')) return;
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() === false) return;
+    var k = 'fin:fondos:patricio';
+    var lista = JSON.parse(localStorage.getItem(k) || '[]') || [];
+    var y = new Date().getFullYear();
+    var dic = (y - 1) + '-12', ene = y + '-01';
+    var cambiado = false;
+    lista.forEach(function(f) {
+      if (!f || f.deleted || !f.saveActivo) return;
+      var h = f.saveHist || [];
+      var eneIni = h.find(function(x) { return x && x.mes === ene && x.inicial; });
+      if (eneIni && !h.some(function(x) { return x && x.mes === dic; })) {
+        h.push({ mes: dic, importe: eneIni.importe, inicial: true });
+        f.saveHist = h; f.updatedAt = new Date().toISOString(); cambiado = true;
+      }
+    });
+    localStorage.setItem('app:reparacion_254_hecha', new Date().toISOString());
+    if (cambiado) {
+      localStorage.setItem(k, JSON.stringify(lista));
+      try { renta_renderCapital(); renta_calcPrevision(); } catch (e) {}
+      try { fin_renderFondos(); } catch (e) {}
+    }
+  } catch (e) { console.warn('[PUNTO 254] reparación Saveback:', e.message); }
+}
+document.addEventListener('firebaseLoaded', function() { setTimeout(fin_saveReparar254, 4800); });
 // Bloque que se añade al final de Capital mobiliario: intereses (con los meses
 // que faltan) y Saveback del año.
 function rint_htmlBloque(anio) {
@@ -25143,8 +25184,8 @@ function rint_htmlBloque(anio) {
     var dP = new Date(anio, c - 2, 1);
     var periodo = dP.getFullYear() + '-' + String(dP.getMonth() + 1).padStart(2, '0');
     var ri = regs.find(function(x) { return x.mes === cobro; });
-    var enAnio = dP.getFullYear() === anio; // el Saveback de diciembre del año anterior va a la renta de ese año
-    filas.push({ cobro: cobro, periodo: periodo, ri: ri, sv: (fSave && enAnio) ? saveDe(periodo) : null, svAplica: !!fSave && enAnio });
+    // PUNTO 254: el Saveback de "periodo" también se cobra el día 1 de "cobro".
+    filas.push({ cobro: cobro, periodo: periodo, ri: ri, sv: fSave ? saveDe(periodo) : null, svAplica: !!fSave });
   }
   var faltanI = filas.filter(function(f) { return !f.ri; }).length;
   var faltanS = filas.filter(function(f) { return f.svAplica && !f.sv; }).length;
