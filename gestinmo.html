@@ -2235,7 +2235,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_08';
+const BUILD_ID = '261005_09';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -22510,7 +22510,7 @@ function pend_calcular() {
       var pRenta = renta_datosMesPendientes();
       if (pRenta.nomina) items.push({ icon: '📋', t: 'Renta: falta la nómina de ' + pRenta.nomina.mes.toLowerCase() + ' ' + pRenta.nomina.anio, s: 'Renta Patricio → Trabajo → "+ Añadir nómina"', accion: 'renta_datos', bloque: 'bloque-trabajo', empresa: 'patricio' });
       // PUNTO 250: intereses de la cuenta y Saveback
-      if (pRenta.intereses) items.push({ icon: '🏦', t: 'Renta: faltan los intereses de la cuenta de ' + pRenta.intereses.mes.toLowerCase() + ' ' + pRenta.intereses.anio, s: 'Trade Republic · bruto y retención', accion: 'intereses', mes: pRenta.intereses.ym });
+      if (pRenta.intereses) items.push({ icon: '🏦', t: 'Renta: faltan los intereses cobrados el 1 de ' + pRenta.intereses.mes.toLowerCase() + ' ' + pRenta.intereses.anio, s: 'Trade Republic · bruto y retención', accion: 'intereses', mes: pRenta.intereses.ym });
       try {
         var _mAntS = fin_mesAnterior();
         (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(fS) {
@@ -24276,8 +24276,10 @@ function renta_datosMesPendientes() {
   var hoyD = new Date();
   var res = { nomina: null, alquileres: null, intereses: null };
   try {
-    // PUNTO 250: intereses de la cuenta del mes anterior
-    var dAI = new Date(hoyD.getFullYear(), hoyD.getMonth() - 1, 1);
+    // PUNTO 250 / 251 (05/10/2026): los intereses se cobran el DÍA 1 de cada
+    // mes (los del mes anterior). Se apuntan por MES DE COBRO, que es lo que
+    // cuenta en la renta — así que desde el día 1 se pide el cobro de este mes.
+    var dAI = new Date(hoyD.getFullYear(), hoyD.getMonth(), 1);
     var ymAI = dAI.getFullYear() + '-' + String(dAI.getMonth() + 1).padStart(2, '0');
     if (typeof rint_loadTodo === 'function' && !rint_loadTodo().some(function(x) { return x && !x.deleted && x.mes === ymAI; })) res.intereses = { mes: RENTA_MESES_NOMBRE[dAI.getMonth()], anio: dAI.getFullYear(), ym: ymAI };
   } catch (e) {}
@@ -24313,7 +24315,7 @@ function renta_pintarAvisosMes() {
       if (ico) ico.style.display = texto ? '' : 'none';
     };
     pinta('renta-aviso-trabajo', p.nomina ? ('Falta la nómina de ' + p.nomina.mes.toLowerCase() + ' ' + p.nomina.anio) : '');
-    pinta('renta-aviso-capital', p.intereses ? ('Faltan los intereses de ' + p.intereses.mes.toLowerCase() + ' ' + p.intereses.anio) : ''); // PUNTO 250
+    pinta('renta-aviso-capital', p.intereses ? ('Faltan los intereses cobrados el 1 de ' + p.intereses.mes.toLowerCase()) : ''); // PUNTO 250/251
     pinta('renta-aviso-alqmen', p.alquileres ? ('Faltan los cobros de ' + p.alquileres.mes.toLowerCase() + ' (' + p.alquileres.faltan + ' de ' + p.alquileres.total + ' inmuebles)') : '');
   } catch (e) {}
 }
@@ -24983,7 +24985,8 @@ function rint_loadTodo() { try { return (JSON.parse(localStorage.getItem(RINT_KE
 function rint_delAnio(anio) { return rint_loadTodo().filter(function(x) { return x && !x.deleted && String(x.mes || '').slice(0, 4) === String(anio); }); }
 function rint_abrir(mes) {
   if (bloqueaSiViewer('Añadir intereses de la cuenta')) return;
-  var m = mes || fin_mesAnterior();
+  var _hR = new Date();
+  var m = mes || (_hR.getFullYear() + '-' + String(_hR.getMonth() + 1).padStart(2, '0')); // PUNTO 251: mes de cobro
   var x = rint_loadTodo().find(function(y) { return y && !y.deleted && y.mes === m; });
   document.getElementById('rint-mes').value = m;
   document.getElementById('rint-bruto').value = x ? numMiles_fmtDinero(x.bruto) : '';
@@ -24994,6 +24997,12 @@ function rint_abrir(mes) {
   rint_recalc();
   openModalById('rint-modal');
   setTimeout(function() { var el = document.getElementById('rint-bruto'); if (el) el.focus(); }, 150);
+}
+// PUNTO 251: "de qué mes son" los intereses cobrados el día 1 de un mes.
+function rint_mesDe(ymCobro) {
+  var p = String(ymCobro || '').split('-');
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 2, 1);
+  return FIN_MESES[d.getMonth()] + ' ' + d.getFullYear();
 }
 function rint_onBruto() {
   var r = document.getElementById('rint-ret');
@@ -25028,7 +25037,7 @@ function rint_guardar() {
 function rint_borrar() {
   if (bloqueaSiViewer('Borrar intereses de la cuenta')) return;
   var mes = document.getElementById('rint-mes').value;
-  if (!mes || !confirm('¿Borrar los intereses de ' + fin_mesTxt(mes) + '?')) return;
+  if (!mes || !confirm('¿Borrar los intereses cobrados en ' + fin_mesTxt(mes) + '?')) return;
   var todos = rint_loadTodo().map(function(y) { return (y && y.id === 'int_' + mes) ? { id: y.id, mes: y.mes, deleted: true, updatedAt: new Date().toISOString() } : y; });
   localStorage.setItem(RINT_KEY, JSON.stringify(todos));
   closeModalById('rint-modal');
@@ -25039,7 +25048,7 @@ function rint_borrar() {
 // que faltan) y Saveback del año.
 function rint_htmlBloque(anio) {
   var hoy = new Date();
-  var hasta = anio < hoy.getFullYear() ? 12 : (anio === hoy.getFullYear() ? hoy.getMonth() : 0);
+  var hasta = anio < hoy.getFullYear() ? 12 : (anio === hoy.getFullYear() ? hoy.getMonth() + 1 : 0); // PUNTO 251: incluye el cobro de este mes
   var regs = rint_delAnio(anio);
   var filas = [];
   for (var m = 12; m >= 1; m--) {
@@ -25055,7 +25064,7 @@ function rint_htmlBloque(anio) {
   h += '<div style="font-size:11.5px;color:var(--silver-bright);margin-bottom:6px;">Bruto ' + fmtGlobal(totB) + ' € · retención ' + fmtGlobal(totR) + ' €' + (faltan ? ' · <span style="color:#f0a830;font-weight:700;">faltan ' + faltan + ' mes' + (faltan > 1 ? 'es' : '') + '</span>' : '') + '</div>';
   filas.forEach(function(f) {
     h += '<div onclick="rint_abrir(\'' + f.ym + '\')" style="cursor:pointer;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div style="font-size:12.5px;font-weight:700;color:' + (f.r ? 'var(--silver-bright)' : '#f0a830') + ';text-transform:capitalize;">' + fin_mesTxt(f.ym) + '</div>'
+      + '<div><div style="font-size:12.5px;font-weight:700;color:' + (f.r ? 'var(--silver-bright)' : '#f0a830') + ';">Cobro 1 de ' + fin_mesTxt(f.ym) + '</div><div style="font-size:10.5px;color:var(--text-secondary);">intereses de ' + rint_mesDe(f.ym) + '</div></div>'
       + (f.r ? ('<div style="text-align:right;"><div style="font-size:12.5px;font-weight:700;color:var(--accent-green);">' + fmtGlobal(f.r.bruto) + ' €</div><div style="font-size:10.5px;color:var(--text-secondary);">ret. ' + fmtGlobal(f.r.retencion) + ' €</div></div>')
              : '<div style="font-size:12px;font-weight:700;color:#f0a830;">Falta · pulsa para meterlo</div>')
       + '</div>';
@@ -25967,7 +25976,7 @@ if ('serviceWorker' in navigator) {
 <div class="moverlay" id="rint-modal" style="z-index:9000;">
   <div class="modal">
     <div class="mtitle"><span id="rint-titulo">Intereses de la cuenta</span><span class="mclose" onclick="closeModalById('rint-modal')">&#10005;</span></div>
-    <div class="mfield"><div class="mflabel">Mes</div><input class="minput" id="rint-mes" type="month"></div>
+    <div class="mfield"><div class="mflabel">Mes de cobro (se cobran el día 1)</div><input class="minput" id="rint-mes" type="month"></div>
     <div class="mfield"><div class="mflabel">Intereses brutos (euros)</div><input class="minput" id="rint-bruto" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="rint_onBruto()"></div>
     <div class="mfield"><div class="mflabel">Retención (euros) — 19 % automático, puedes cambiarlo</div><input class="minput" id="rint-ret" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)" oninput="this.dataset.manual='1';rint_recalc()"></div>
     <div id="rint-neto" style="font-size:12px;color:var(--accent-green);margin:-4px 2px 10px;min-height:16px;"></div>
