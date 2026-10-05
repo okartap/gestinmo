@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_06';
+const BUILD_ID = '261005_07';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -6854,13 +6854,13 @@ abierto. -->
     <!-- PUNTO 86 (30/08/2026): aportación periódica automática (DCA). -->
     <div class="mfield" style="display:flex;align-items:center;gap:10px;">
       <input type="checkbox" id="fin-fondo-dca-activo" onchange="fin_toggleDcaCampos()" style="width:18px;height:18px;flex-shrink:0;">
-      <label for="fin-fondo-dca-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Aportación periódica automática (DCA)</label>
+      <label for="fin-fondo-dca-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Aportación automática</label>
     </div>
+    <!-- PUNTO 248 (05/10/2026): DCA simplificado — importe y días del mes. -->
     <div id="fin-fondo-dca-campos" style="display:none;">
       <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-fondo-dca-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-      <div class="mfield"><div class="mflabel">Cada cuántos días</div><input class="minput" id="fin-fondo-dca-periodicidad" type="number" inputmode="numeric"></div>
-      <div class="mfield"><div class="mflabel">Fecha de inicio del DCA</div><input class="minput" id="fin-fondo-dca-fecha-inicio" type="date"></div>
-      <div class="form-hint" style="margin:-4px 2px 10px;">Al entrar en Finanzas, si toca aportar, se te avisará para confirmarlo — el "Valor actual" se sigue actualizando siempre a mano.</div>
+      <div class="mfield"><div class="mflabel">Días del mes</div><input class="minput" id="fin-fondo-dca-dias" type="text" inputmode="numeric" placeholder="1, 15"></div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Aportado". El "Valor actual" se sigue actualizando a mano.</div>
     </div>
     <button class="btn1" onclick="fin_guardarFondo()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-fondo')" style="margin-top:8px;">Cancelar</button>
@@ -6878,10 +6878,23 @@ cálculo a mano. -->
   <div class="modal">
     <div class="mtitle" id="fin-accsimple-titulo">Acción (modo simple)<span class="mclose" onclick="closeModalById('fin-modal-accion-simple')">&#10005;</span></div>
     <div class="mfield"><div class="mflabel">Nombre de la acción</div><input class="minput" id="fin-accsimple-nombre"></div>
-    <div class="mfield"><div class="mflabel">Nº de acciones</div><input class="minput" id="fin-accsimple-num" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirCantidad(this)"></div>
-    <div class="mfield"><div class="mflabel">Precio medio de compra (€/acción)</div><input class="minput" id="fin-accsimple-pmedio" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
-    <div class="mfield"><div class="mflabel">Precio de mercado actual (€/acción)</div><input class="minput" id="fin-accsimple-pmercado" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <!-- PUNTO 249 (05/10/2026), decidido con Patry: las acciones en modo simple
+         se llevan como un fondo — solo lo invertido y el valor actual, en euros.
+         El nº de acciones y los precios antiguos se conservan guardados pero
+         ya no se piden ni se enseñan. -->
+    <div class="mfield"><div class="mflabel">Invertido (euros)</div><input class="minput" id="fin-accsimple-invertido" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <div class="mfield"><div class="mflabel">Valor actual (euros)</div><input class="minput" id="fin-accsimple-valor" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
     <input type="hidden" id="fin-accsimple-idx" value="">
+    <!-- PUNTO 248 (05/10/2026): aportación automática también en acciones. -->
+    <div class="mfield" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="fin-accsimple-dca-activo" onchange="fin_toggleDcaCamposAcc()" style="width:18px;height:18px;flex-shrink:0;">
+      <label for="fin-accsimple-dca-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Aportación automática</label>
+    </div>
+    <div id="fin-accsimple-dca-campos" style="display:none;">
+      <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-accsimple-dca-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Días del mes</div><input class="minput" id="fin-accsimple-dca-dias" type="text" inputmode="numeric" placeholder="1, 15"></div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Invertido". El "Valor actual" se sigue actualizando a mano.</div>
+    </div>
     <button class="btn1" onclick="fin_guardarAccionSimple()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-accion-simple')" style="margin-top:8px;">Cancelar</button>
   </div>
@@ -8111,7 +8124,8 @@ function showModule(name) {
     if (typeof fin_autoCotiz_intentar === 'function') fin_autoCotiz_intentar();
     // PUNTO 86 (30/08/2026): comprobar aportaciones DCA pendientes solo al
     // entrar de verdad en Finanzas (no en cada refresco por sincronización).
-    if (typeof fin_dcaComprobarPendientes === 'function') fin_dcaComprobarPendientes();
+    // PUNTO 248 (05/10/2026): ya no se pregunta — se suma sola.
+    if (typeof fin_dcaAutoAplicar === 'function') fin_dcaAutoAplicar();
   }
   // Renderizar renta al abrir el módulo
   if (name === 'renta' && typeof renta_render === 'function') {
@@ -18751,9 +18765,11 @@ function fin_renderAcciones() {
     // compra por acción (el dato que se escribe a mano), no el coste total
     // — coherente con el nuevo formulario, que ya no pide totales.
     var pMedioS = rs.precioMedioCompra != null ? rs.precioMedioCompra : ((parseFloat(rs.num)||0) > 0 ? (parseFloat(rs.coste)||0) / parseFloat(rs.num) : 0);
-    html += '<div class="fin-card-sub">' + numMiles_fmtCantidad(parseFloat(rs.num)||0) + ' acc · PMC ' + fin_fmt(pMedioS) + '/acc</div>';
+    void pMedioS; // PUNTO 249: la tarjeta enseña lo invertido, no el nº de acciones
+    html += '<div class="fin-card-sub">Invertido ' + fin_fmt(rs.coste) + '</div>';
     html += '</div><div class="fin-card-saldo">' + fin_fmt(rs.valorActual) + '</div></div>';
-    html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (plS>=0?'fin-plus':'fin-minus') + '">' + fin_fmt(plS) + (plpS!==null ? ' (' + fin_fmtPct(plpS) + ')' : '') + '</span></div></div>';
+    html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (plS>=0?'fin-plus':'fin-minus') + '">' + fin_fmt(plS) + (plpS!==null ? ' (' + fin_fmtPct(plpS) + ')' : '') + '</span></div>'
+      + ((rs.dcaActivo && (parseFloat(rs.dcaImporte) || 0) > 0) ? '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">' + fin_dcaTextoTarjeta(rs) + '</div>' : '') + '</div>';
     html += '<div class="fin-card-actions">';
     html += '<div class="fin-action-btn" onclick="fin_editarAccionSimple(' + idxS + ')">Editar</div>';
     html += '<div class="fin-action-btn" onclick="fin_pasarADetallado(' + idxS + ')">Pasar a detallado</div>';
@@ -19023,9 +19039,9 @@ function fin_accSimpleSave(lista) { fin_save('fin:acciones_simple', lista); }
 function fin_nuevaAccionSimple() {
   document.getElementById('fin-accsimple-titulo').textContent = 'Acción (modo simple)';
   document.getElementById('fin-accsimple-nombre').value = '';
-  document.getElementById('fin-accsimple-num').value = '';
-  document.getElementById('fin-accsimple-pmedio').value = '';
-  document.getElementById('fin-accsimple-pmercado').value = '';
+  document.getElementById('fin-accsimple-invertido').value = '';
+  document.getElementById('fin-accsimple-valor').value = '';
+  if (document.getElementById('fin-accsimple-dca-activo')) { document.getElementById('fin-accsimple-dca-activo').checked = false; document.getElementById('fin-accsimple-dca-importe').value = ''; document.getElementById('fin-accsimple-dca-dias').value = '1, 15'; fin_toggleDcaCamposAcc(); }
   document.getElementById('fin-accsimple-idx').value = '';
   document.getElementById('fin-modal-accion-simple').classList.add('open');
 }
@@ -19035,7 +19051,8 @@ function fin_editarAccionSimple(idx) {
   if (!r || r.deleted) { alert('Esa acción ya no existe (puede que se haya borrado en otro sitio).'); return; }
   document.getElementById('fin-accsimple-titulo').textContent = 'Editar ' + (r.nombre || 'acción');
   document.getElementById('fin-accsimple-nombre').value = r.nombre || '';
-  document.getElementById('fin-accsimple-num').value = r.num != null ? numMiles_fmtCantidad(r.num) : '';
+  document.getElementById('fin-accsimple-invertido').value = r.coste != null ? numMiles_fmtDinero(parseFloat(r.coste) || 0) : '';
+  document.getElementById('fin-accsimple-valor').value = r.valorActual != null ? numMiles_fmtDinero(parseFloat(r.valorActual) || 0) : '';
   // PUNTO 158 (09/09/2026): si el registro ya tiene los precios por acción
   // guardados (los que se piden ahora), se usan tal cual. Si viene de antes
   // del cambio (solo tenía coste/valorActual totales, o de un "Pasar a
@@ -19044,19 +19061,21 @@ function fin_editarAccionSimple(idx) {
   var num = parseFloat(r.num) || 0;
   var pMedio = r.precioMedioCompra != null ? r.precioMedioCompra : (num > 0 && r.coste != null ? (parseFloat(r.coste) / num) : '');
   var pMercado = r.precioMercado != null ? r.precioMercado : (num > 0 && r.valorActual != null ? (parseFloat(r.valorActual) / num) : '');
-  document.getElementById('fin-accsimple-pmedio').value = numMiles_fmtDinero(pMedio);
-  document.getElementById('fin-accsimple-pmercado').value = numMiles_fmtDinero(pMercado);
+  void pMedio; void pMercado; // PUNTO 249: ya no se muestran
   document.getElementById('fin-accsimple-idx').value = idx;
+  document.getElementById('fin-accsimple-dca-activo').checked = !!r.dcaActivo;
+  document.getElementById('fin-accsimple-dca-importe').value = r.dcaImporte ? numMiles_fmtDinero(r.dcaImporte) : '';
+  document.getElementById('fin-accsimple-dca-dias').value = fin_dcaDiasTexto(r.dcaDias);
+  fin_toggleDcaCamposAcc();
   document.getElementById('fin-modal-accion-simple').classList.add('open');
-  setTimeout(function() { var el = document.getElementById('fin-accsimple-pmercado'); if (el) { el.focus(); el.select(); } }, 150);
+  setTimeout(function() { var el = document.getElementById('fin-accsimple-valor'); if (el) { el.focus(); el.select(); } }, 150);
 }
 function fin_guardarAccionSimple() {
   if (bloqueaSiViewer('Guardar una acción en modo simple')) return;
   var nombre = document.getElementById('fin-accsimple-nombre').value.trim();
   if (!nombre) { alert('Introduce el nombre de la acción.'); return; }
-  var num = parseImporteFlexible(document.getElementById('fin-accsimple-num').value);
-  var pMedio = parseImporteFlexible(document.getElementById('fin-accsimple-pmedio').value);
-  var pMercado = parseImporteFlexible(document.getElementById('fin-accsimple-pmercado').value);
+  var invertidoA = parseImporteFlexible(document.getElementById('fin-accsimple-invertido').value);
+  var valorA = parseImporteFlexible(document.getElementById('fin-accsimple-valor').value);
   var idx = document.getElementById('fin-accsimple-idx').value;
   var lista = fin_accSimpleLoad();
   // PUNTO 158 (09/09/2026): se guardan los 2 precios por acción tal cual se
@@ -19064,7 +19083,26 @@ function fin_guardarAccionSimple() {
   // Y, además, el coste/valorActual totales ya calculados — el resto de la
   // app (tarjeta, Patrimonio Total, Patrimonio Financiero...) sigue leyendo
   // coste/valorActual exactamente igual que antes, sin tocar nada más.
-  var obj = { nombre: nombre, num: num, precioMedioCompra: pMedio, precioMercado: pMercado, coste: num * pMedio, valorActual: num * pMercado };
+  // PUNTO 249: invertido y valor actual tal cual; se conservan (sin usarse)
+  // el nº de acciones y los precios que tuviera de antes.
+  var _antA = (idx !== '' && lista[parseInt(idx)]) ? lista[parseInt(idx)] : {};
+  var obj = { nombre: nombre, coste: invertidoA, valorActual: valorA };
+  if (_antA.num != null) obj.num = _antA.num;
+  if (_antA.precioMedioCompra != null) obj.precioMedioCompra = _antA.precioMedioCompra;
+  if (_antA.precioMercado != null) obj.precioMercado = _antA.precioMercado;
+  // PUNTO 248 (05/10/2026): aportación automática en acciones.
+  var _accDcaActivo = document.getElementById('fin-accsimple-dca-activo').checked;
+  var _accDcaImporte = parseImporteFlexible(document.getElementById('fin-accsimple-dca-importe').value);
+  var _accDcaDias = fin_dcaParseDias(document.getElementById('fin-accsimple-dca-dias').value);
+  if (_accDcaActivo && (_accDcaImporte <= 0 || !_accDcaDias.length)) {
+    alert('Para activar la aportación automática, rellena el importe y los días del mes (por ejemplo: 1, 15).');
+    return;
+  }
+  var _prevA = (idx !== '' && lista[parseInt(idx)]) ? lista[parseInt(idx)] : null;
+  obj.dcaActivo = _accDcaActivo;
+  obj.dcaImporte = _accDcaImporte;
+  obj.dcaDias = _accDcaDias;
+  obj.dcaAplicadoHasta = (_accDcaActivo && _prevA && _prevA.dcaActivo && _prevA.dcaAplicadoHasta) ? _prevA.dcaAplicadoHasta : (_accDcaActivo ? fin_dcaHoy() : '');
   if (idx !== '' && lista[parseInt(idx)]) {
     var anterior = lista[parseInt(idx)];
     obj.id = anterior.id || _finGenId();
@@ -19320,8 +19358,8 @@ function fin_renderFondos() {
     html += '<div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (pl >= 0 ? 'fin-plus' : 'fin-minus') + '">' + fin_fmt(pl) + ' (' + fin_fmtPct(plp) + ')</span></div>';
     // PUNTO 86 (30/08/2026): aviso discreto de que este fondo tiene DCA
     // configurado, y con qué importe/periodicidad.
-    if (f.dcaActivo && (parseFloat(f.dcaImporte) || 0) > 0 && (parseInt(f.dcaPeriodicidad) || 0) > 0) {
-      html += '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">&#128260; DCA activo: ' + fin_fmt(f.dcaImporte) + ' cada ' + f.dcaPeriodicidad + ' días</div>';
+    if (f.dcaActivo && (parseFloat(f.dcaImporte) || 0) > 0) {
+      html += '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">' + fin_dcaTextoTarjeta(f) + '</div>';
     }
     html += '</div>';
     html += '<div class="fin-card-actions">';
@@ -19348,8 +19386,7 @@ function fin_nuevoFondo() {
   document.getElementById('fin-fondo-idx').value = '';
   document.getElementById('fin-fondo-dca-activo').checked = false;
   document.getElementById('fin-fondo-dca-importe').value = '';
-  document.getElementById('fin-fondo-dca-periodicidad').value = '';
-  document.getElementById('fin-fondo-dca-fecha-inicio').value = '';
+  document.getElementById('fin-fondo-dca-dias').value = '1, 15';
   fin_toggleDcaCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
 }
@@ -19364,8 +19401,7 @@ function fin_editarFondo(idx) {
   document.getElementById('fin-fondo-idx').value = idx;
   document.getElementById('fin-fondo-dca-activo').checked = !!f.dcaActivo;
   document.getElementById('fin-fondo-dca-importe').value = f.dcaImporte ? numMiles_fmtDinero(f.dcaImporte) : '';
-  document.getElementById('fin-fondo-dca-periodicidad').value = f.dcaPeriodicidad || '';
-  document.getElementById('fin-fondo-dca-fecha-inicio').value = f.dcaFechaInicio || '';
+  document.getElementById('fin-fondo-dca-dias').value = fin_dcaDiasTexto(f.dcaDias);
   fin_toggleDcaCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
   setTimeout(function() { var el = document.getElementById('fin-fondo-valor'); if (el) { el.focus(); el.select(); } }, 150);
@@ -19382,6 +19418,8 @@ function fin_toggleDcaCampos() {
   var chk = document.getElementById('fin-fondo-dca-activo');
   var campos = document.getElementById('fin-fondo-dca-campos');
   if (campos) campos.style.display = (chk && chk.checked) ? 'block' : 'none';
+  var d = document.getElementById('fin-fondo-dca-dias');
+  if (chk && chk.checked && d && !d.value) d.value = '1, 15';
 }
 function fin_guardarFondo() {
   if (bloqueaSiViewer('Guardar un fondo')) return;
@@ -19398,21 +19436,23 @@ function fin_guardarFondo() {
   // 3 datos necesarios para poder calcular ciclos vencidos más adelante.
   var dcaActivo = document.getElementById('fin-fondo-dca-activo').checked;
   var dcaImporte = parseImporteFlexible(document.getElementById('fin-fondo-dca-importe').value);
-  var dcaPeriodicidad = parseInt(document.getElementById('fin-fondo-dca-periodicidad').value) || 0;
-  var dcaFechaInicio = document.getElementById('fin-fondo-dca-fecha-inicio').value || '';
-  if (dcaActivo && (dcaImporte <= 0 || dcaPeriodicidad <= 0 || !dcaFechaInicio)) {
-    alert('Para activar la aportación periódica, rellena el importe, la periodicidad en días y la fecha de inicio.');
+  // PUNTO 248 (05/10/2026): importe + días del mes (por defecto 1 y 15).
+  var dcaDias = fin_dcaParseDias(document.getElementById('fin-fondo-dca-dias').value);
+  if (dcaActivo && (dcaImporte <= 0 || !dcaDias.length)) {
+    alert('Para activar la aportación automática, rellena el importe y los días del mes (por ejemplo: 1, 15).');
     return;
   }
   var data = fin_load('fin:fondos');
   // "Última aportación aplicada" la gestiona la app sola (nunca se edita a
   // mano) — se conserva del fondo existente si ya la tenía, para no perder
   // la cuenta de los ciclos ya aplicados si solo se está editando otro dato.
-  var dcaUltimaAplicada = (idx !== '' && data[parseInt(idx)]) ? (data[parseInt(idx)].dcaUltimaAplicada || '') : '';
+  var _prevF = (idx !== '' && data[parseInt(idx)]) ? data[parseInt(idx)] : null;
   var obj = {
     nombre: nombre, gestora: gestora, cuenta: cuenta, aportado: aportado, valor: valor,
-    dcaActivo: dcaActivo, dcaImporte: dcaImporte, dcaPeriodicidad: dcaPeriodicidad,
-    dcaFechaInicio: dcaFechaInicio, dcaUltimaAplicada: dcaUltimaAplicada
+    dcaActivo: dcaActivo, dcaImporte: dcaImporte, dcaDias: dcaDias,
+    // Desde cuándo está contado: si ya estaba activo se conserva; si se activa
+    // ahora, se empieza a contar desde hoy (el "Aportado" escrito ya incluye hoy).
+    dcaAplicadoHasta: (dcaActivo && _prevF && _prevF.dcaActivo && _prevF.dcaAplicadoHasta) ? _prevF.dcaAplicadoHasta : (dcaActivo ? fin_dcaHoy() : '')
   };
   // PUNTO 93: conservamos el id si ya existía (edición) y siempre refrescamos
   // updatedAt, para que la fusión elemento a elemento con la nube funcione.
@@ -19443,6 +19483,143 @@ function fin_borrarFondo(idx) {
   fin_save('fin:fondos', data);
   fin_renderFondos();
 }
+
+// ─── PUNTO 248 (05/10/2026): DCA SIMPLIFICADO Y AUTOMÁTICO ──────────────
+// Decidido con Patry: sus aportaciones son los días 1 y 15 de cada mes, y
+// quiere que se SUMEN SOLAS (sin ventanas de confirmación). Cada fondo o
+// acción (modo simple) con "Aportación automática" guarda: importe de cada
+// aportación, días del mes y "dcaAplicadoHasta" (fecha hasta la que ya está
+// contado). Al abrir la app y al entrar en Finanzas se suman las aportaciones
+// de los días que tocaban desde esa fecha hasta hoy (incluido).
+//  · Fondos: suma al "Aportado".
+//  · Acciones (modo simple): suma al "Invertido" (coste), igual que un fondo
+//    (PUNTO 249: se dejó de usar el nº de acciones y el precio).
+// Si un mes no se hizo la aportación, se corrige a mano editando el dato.
+function fin_dcaHoy() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function fin_dcaParseDias(txt) {
+  var out = [];
+  String(txt == null || String(txt).trim() === '' ? '1, 15' : txt).split(/[^0-9]+/).forEach(function(t) {
+    var n = parseInt(t, 10);
+    if (n >= 1 && n <= 31 && out.indexOf(n) < 0) out.push(n);
+  });
+  return out.sort(function(a, b) { return a - b; });
+}
+function fin_dcaDiasTexto(dias) {
+  return (Array.isArray(dias) && dias.length) ? dias.join(', ') : '1, 15';
+}
+// Fechas de aportación en (desdeISO, hastaISO]. Un día 31 en un mes corto
+// cuenta el último día del mes.
+function fin_dcaFechasEntre(dias, desdeISO, hastaISO) {
+  var res = [];
+  var p = function(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3], 12) : null; };
+  var d0 = p(desdeISO), d1 = p(hastaISO);
+  if (!d0 || !d1 || !dias || !dias.length) return res;
+  var d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + 1, 12);
+  var guard = 0;
+  while (d <= d1 && guard++ < 800) {
+    var ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    var dia = d.getDate();
+    var toca = dias.some(function(x) { return Math.min(x, ultimo) === dia; });
+    if (toca) res.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(dia).padStart(2, '0'));
+    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 12);
+  }
+  return res;
+}
+function fin_dcaProxima(it) {
+  var hoy = fin_dcaHoy();
+  var d = new Date(); var finRango = new Date(d.getFullYear(), d.getMonth() + 2, 0);
+  var hasta = finRango.getFullYear() + '-' + String(finRango.getMonth() + 1).padStart(2, '0') + '-' + String(finRango.getDate()).padStart(2, '0');
+  var f = fin_dcaFechasEntre(it.dcaDias && it.dcaDias.length ? it.dcaDias : [1, 15], hoy, hasta);
+  return f.length ? f[0] : '';
+}
+function fin_dcaTextoTarjeta(it) {
+  var dias = (it.dcaDias && it.dcaDias.length) ? it.dcaDias : [1, 15];
+  var diasTxt = dias.length > 1 ? (dias.slice(0, -1).join(', ') + ' y ' + dias[dias.length - 1]) : String(dias[0]);
+  var prox = fin_dcaProxima(it);
+  return '&#128260; ' + fin_fmt(it.dcaImporte) + ' ' + (dias.length > 1 ? 'los días ' : 'el día ') + diasTxt + (prox ? (' · próxima ' + prox.slice(8, 10) + '/' + prox.slice(5, 7)) : '');
+}
+// Paso del sistema antiguo (cada X días + fecha de inicio) al nuevo: días 1 y
+// 15 y se empieza a contar desde HOY, para no sumar de golpe nada antiguo.
+function fin_dcaMigrar(item, hoy) {
+  if (!item || !item.dcaActivo || Array.isArray(item.dcaDias)) return false;
+  item.dcaDias = [1, 15];
+  item.dcaAplicadoHasta = hoy;
+  item.updatedAt = new Date().toISOString();
+  return true;
+}
+var _finDcaEnCurso = false;
+function fin_dcaAutoAplicar() {
+  if (_finDcaEnCurso) return;
+  try {
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() === false) return;
+    _finDcaEnCurso = true;
+    var hoy = fin_dcaHoy();
+    var resumen = [];
+    ['patrimer', 'patricio', 'industrias'].forEach(function(emp) {
+      // Fondos
+      var kF = 'fin:fondos:' + emp;
+      var fondos = []; try { fondos = JSON.parse(localStorage.getItem(kF) || '[]'); } catch (e) { fondos = []; }
+      var cambF = false;
+      fondos.forEach(function(f) {
+        if (!f || f.deleted || !f.dcaActivo) return;
+        if (fin_dcaMigrar(f, hoy)) { cambF = true; return; }
+        var imp = parseFloat(f.dcaImporte) || 0;
+        if (imp <= 0) return;
+        if (!f.dcaAplicadoHasta) { f.dcaAplicadoHasta = hoy; f.updatedAt = new Date().toISOString(); cambF = true; return; }
+        var fechas = fin_dcaFechasEntre(f.dcaDias, f.dcaAplicadoHasta, hoy);
+        if (!fechas.length) return;
+        var total = Math.round(fechas.length * imp * 100) / 100;
+        f.aportado = Math.round(((parseFloat(f.aportado) || 0) + total) * 100) / 100;
+        f.dcaAplicadoHasta = hoy;
+        f.dcaUltimas = (f.dcaUltimas || []).concat(fechas.map(function(x) { return { fecha: x, importe: imp }; })).slice(-24);
+        f.updatedAt = new Date().toISOString();
+        cambF = true;
+        resumen.push((f.nombre || 'Fondo') + ': ' + fechas.length + ' × ' + fin_fmt(imp));
+      });
+      if (cambF) localStorage.setItem(kF, JSON.stringify(fondos));
+      // Acciones en modo simple
+      var kA = 'fin:acciones_simple:' + emp;
+      var accs = []; try { accs = JSON.parse(localStorage.getItem(kA) || '[]'); } catch (e) { accs = []; }
+      var cambA = false;
+      accs.forEach(function(a) {
+        if (!a || a.deleted || !a.dcaActivo) return;
+        if (fin_dcaMigrar(a, hoy)) { cambA = true; return; }
+        var imp = parseFloat(a.dcaImporte) || 0;
+        if (imp <= 0) return;
+        if (!a.dcaAplicadoHasta) { a.dcaAplicadoHasta = hoy; a.updatedAt = new Date().toISOString(); cambA = true; return; }
+        var fechas = fin_dcaFechasEntre(a.dcaDias, a.dcaAplicadoHasta, hoy);
+        if (!fechas.length) return;
+        // PUNTO 249: como en los fondos, solo se suma al invertido (coste).
+        a.coste = Math.round(((parseFloat(a.coste) || 0) + fechas.length * imp) * 100) / 100;
+        a.dcaAplicadoHasta = hoy;
+        a.dcaUltimas = (a.dcaUltimas || []).concat(fechas.map(function(x) { return { fecha: x, importe: imp }; })).slice(-24);
+        a.updatedAt = new Date().toISOString();
+        cambA = true;
+        resumen.push((a.nombre || 'Acción') + ': ' + fechas.length + ' × ' + fin_fmt(imp));
+      });
+      if (cambA) localStorage.setItem(kA, JSON.stringify(accs));
+    });
+    if (resumen.length) {
+      if (typeof showToast === 'function') showToast('🔄 Aportaciones automáticas sumadas — ' + resumen.join(' · '), 'success');
+      window._finDcaUltimoResumen = resumen;
+    }
+    try { if (typeof fin_renderFondos === 'function') fin_renderFondos(); } catch (e) {}
+    try { if (typeof fin_renderAcciones === 'function') fin_renderAcciones(); } catch (e) {}
+  } catch (e) { console.warn('[PUNTO 248] DCA automático:', e.message); }
+  finally { _finDcaEnCurso = false; }
+}
+function fin_toggleDcaCamposAcc() {
+  var chk = document.getElementById('fin-accsimple-dca-activo');
+  var campos = document.getElementById('fin-accsimple-dca-campos');
+  if (campos) campos.style.display = (chk && chk.checked) ? 'block' : 'none';
+  var d = document.getElementById('fin-accsimple-dca-dias');
+  if (chk && chk.checked && d && !d.value) d.value = '1, 15';
+}
+document.addEventListener('firebaseLoaded', function() { setTimeout(fin_dcaAutoAplicar, 5000); });
 
 // ─── PUNTO 86 (30/08/2026): DCA AUTOMÁTICO EN FONDOS ────────────────────
 // Al entrar en Finanzas, se comprueba si algún fondo con DCA activo tiene
