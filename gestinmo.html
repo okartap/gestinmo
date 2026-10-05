@@ -2234,7 +2234,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_03';
+const BUILD_ID = '261005_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -3340,7 +3340,11 @@ window.syncToFirestore = async function(key, value) {
         let yaIncluido = false;
         if (_valorValido(valorConfirmado)) {
           const fusionTest = _fusionConBorrados(key, valorASubir, valorConfirmado);
-          yaIncluido = (fusionTest === null) ? (valorConfirmado === valorASubir) : (fusionTest === valorConfirmado);
+          // PUNTO 245 (05/10/2026) — BUG REAL: se comparaba el texto tal cual,
+          // y una lista con los MISMOS datos en otro orden se daba por "no
+          // confirmada" (falsa alarma, p.ej. facturacion:cobros el 03/10). Ahora
+          // se compara el contenido, sin importar el orden.
+          yaIncluido = (fusionTest === null) ? (valorConfirmado === valorASubir) : (_canonLista(fusionTest) === _canonLista(valorConfirmado));
         }
         if (!yaIncluido) {
           throw new Error('El servidor no confirma el guardado (escribí ' + ts + ', el servidor tiene ' + (tsConfirmado || 'nada') + ')');
