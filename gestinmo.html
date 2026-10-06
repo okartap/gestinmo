@@ -2249,7 +2249,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261006_01';
+const BUILD_ID = '261006_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -25111,7 +25111,9 @@ function correccion247() {
     }
   } catch (e) { console.warn('[PUNTO 247] corrección:', e.message); }
 }
-document.addEventListener('firebaseLoaded', function() { setTimeout(correccion247, 4000); });
+// 06/10/2026: desactivada. La corrección ya se hizo (05/10) y los datos viajaron por la nube;
+// en otros aparatos solo volvía a salir el aviso sin cambiar nada.
+// document.addEventListener('firebaseLoaded', function() { setTimeout(correccion247, 4000); });
 
 // ── PUNTO 97 (05/09/2026): SEGURO E IBI ANUAL ──────────────────────────────
 // Un dato al año por inmueble, con histórico desplegable de años anteriores
