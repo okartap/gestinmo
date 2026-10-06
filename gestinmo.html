@@ -923,6 +923,19 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .fin-action-btn{flex:1;padding:6px;background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.25);border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--accent-blue);cursor:pointer;text-align:center;}
 .fin-action-btn:active{transform:scale(.95);}
 .fin-action-btn.red{background:rgba(224,80,80,.1);border-color:rgba(224,80,80,.25);color:#e05050;}
+/* PUNTO 256 (06/10/2026): libro de caja de la cuenta Efectivo */
+.fin-action-btn.green{background:rgba(76,175,130,.1);border-color:rgba(76,175,130,.3);color:var(--accent-green);}
+.caja-toggle{margin-top:10px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-dim);cursor:pointer;padding:4px 0;}
+.caja-tbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px;table-layout:fixed;}
+.caja-tbl th{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);padding:5px 3px;border-bottom:1px solid var(--border);text-align:left;}
+.caja-tbl td{padding:6px 3px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--silver-bright);vertical-align:middle;word-wrap:break-word;}
+.caja-tbl .num{text-align:right;white-space:nowrap;}
+.caja-tbl .ico{width:30px;text-align:center;white-space:nowrap;color:var(--silver-dim);}
+.caja-tbl .ico span{cursor:pointer;padding:2px 3px;}
+.caja-tipo{display:flex;gap:6px;margin-bottom:12px;}
+.caja-tipo div{flex:1;text-align:center;padding:8px;border-radius:10px;border:1px solid var(--border);font-weight:700;font-size:13px;cursor:pointer;color:var(--silver-dim);}
+.caja-tipo div.on.ing{border-color:var(--accent-green);color:var(--accent-green);background:rgba(76,175,130,.1);}
+.caja-tipo div.on.gas{border-color:#e05c5c;color:#e05c5c;background:rgba(224,92,92,.1);}
 .fin-action-btn.green{background:rgba(76,175,130,.1);border-color:rgba(76,175,130,.25);color:var(--accent-green);}
 .fin-total-row{display:flex;justify-content:space-between;align-items:center;padding:10px 4px 2px;font-size:12px;color:var(--silver-mid);border-top:1px solid var(--border);margin-top:4px;}
 /* AJUSTE 22/09/2026: padding inferior reducido (20px→14px). El sobrante de
@@ -2054,6 +2067,7 @@ const DATA_KEYS = [
   'trading:capital_inicial', // PUNTO 225
   'renta:dividendos_manuales', // PUNTO 228
   'renta:intereses_cuenta', // PUNTO 250 (05/10/2026): intereses de la cuenta (Trade Republic)
+  'fin:caja_movs', // PUNTO 256 (06/10/2026): movimientos del libro de caja (cuenta Efectivo)
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio (sueldo y
   // cualquier otro ingreso con fecha) — alimenta la tarjeta "Ingresos
   // anuales" de Inicio junto con los alquileres reales.
@@ -2235,7 +2249,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261005_14';
+const BUILD_ID = '261006_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2915,7 +2929,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:intereses_cuenta';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -7900,6 +7914,7 @@ const BACKUP_KEYS = [
   'trading:capital_inicial', // PUNTO 225
   'renta:dividendos_manuales', // PUNTO 228
   'renta:intereses_cuenta', // PUNTO 250
+  'fin:caja_movs', // PUNTO 256
   // PUNTO 101 (06/09/2026): "Otros ingresos" de Renta Patricio.
   'ingresos:otros:patricio',
   'fin:cotizaciones',
@@ -17902,6 +17917,7 @@ function fin_abrirAsistente() {
   var cuentas = fin_load('fin:cuentas');
   for (var i = 0; i < cuentas.length; i++) {
     if (cuentas[i].deleted) continue; // PUNTO 165 (22/09/2026): cuenta borrada, se salta
+    if (cuentas[i].libroCaja) continue; // PUNTO 256: su saldo sale de los movimientos, no se pregunta
     var claveC = fin_asiClaveBrokerCuenta(cuentas[i].nombre);
     _addPaso(claveC, { tipo: 'cuenta', idx: i, nombre: cuentas[i].nombre || 'Cuenta ' + (i+1), actual: fin_fmt(cuentas[i].saldo || 0) });
   }
@@ -18592,6 +18608,8 @@ function fin_renderCuentas() {
   var lista = document.getElementById('fin-cuentas-lista');
   var totEl = document.getElementById('fin-cuentas-total');
   if (!lista) return;
+  // PUNTO 256: el saldo de las cuentas "libro de caja" se rehace con sus movimientos
+  try { if (caja_syncSaldos()) data = fin_load('fin:cuentas'); } catch (e) { console.warn('[PUNTO 256]', e.message); }
   // PUNTO 165 (22/09/2026): data sigue incluyendo las cuentas "tachadas"
   // (borradas) — se comprueba si queda alguna visible antes de dar por
   // vacía la lista.
@@ -18606,6 +18624,8 @@ function fin_renderCuentas() {
     var c = data[i];
     if (c.deleted) continue; // PUNTO 165 (22/09/2026): cuenta borrada, se salta
     total += parseFloat(c.saldo) || 0;
+    // PUNTO 256 (06/10/2026): cuenta llevada como libro de caja (Efectivo)
+    if (c.libroCaja) { html += caja_htmlCuenta(c); continue; }
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top">';
     html += '<div><div class="fin-card-nombre">' + (c.nombre || 'Cuenta') + '</div>';
@@ -18677,6 +18697,7 @@ function fin_guardarCuenta() {
     obj.id = _finGenId();
   }
   obj.updatedAt = new Date().toISOString();
+  if (idx !== '' && data[parseInt(idx)] && data[parseInt(idx)].libroCaja) obj.libroCaja = true; // PUNTO 256: no perder la marca
   if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
   fin_save('fin:cuentas', data);
   closeModalById('fin-modal-cuenta');
@@ -18693,6 +18714,197 @@ function fin_borrarCuenta(idx) {
   fin_save('fin:cuentas', data);
   fin_renderCuentas();
 }
+
+// PUNTO 256 (06/10/2026) — LIBRO DE CAJA (pedido por Patry para "Efectivo"):
+// la cuenta deja de tener "Actualizar saldo"; su saldo es la suma de sus
+// movimientos (saldo inicial + ingresos − gastos). Los movimientos viven en
+// 'fin:caja_movs' (lista por id, se fusiona fila a fila con la nube), cada uno
+// con { id, cuentaId, fecha 'AAAA-MM-DD', concepto, importe (con signo) }.
+// El saldo calculado se copia en la propia cuenta para que Patrimonio total,
+// Inicio y las fotos del histórico sigan funcionando igual que antes.
+var CAJA_KEY = 'fin:caja_movs';
+var CAJA_EMPRESAS = ['patrimer', 'patricio', 'industrias'];
+window._cajaAbierto = window._cajaAbierto || {};
+function caja_loadTodo() { try { return JSON.parse(localStorage.getItem(CAJA_KEY) || '[]') || []; } catch (e) { return []; } }
+function caja_movsDe(cuentaId) {
+  return caja_loadTodo().filter(function(m) { return m && !m.deleted && m.cuentaId === cuentaId; });
+}
+// Orden cronológico: fecha, el saldo inicial primero dentro del mismo día, y
+// luego el orden en que se apuntaron.
+function caja_ordenAsc(a, b) {
+  if (a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
+  if (!!a.inicial !== !!b.inicial) return a.inicial ? -1 : 1;
+  return String(a.creado || a.id) < String(b.creado || b.id) ? -1 : 1;
+}
+function caja_saldoDe(cuentaId) {
+  var t = 0;
+  caja_movsDe(cuentaId).forEach(function(m) { t += parseFloat(m.importe) || 0; });
+  return Math.round(t * 100) / 100;
+}
+// Copia el saldo calculado en cada cuenta "libro de caja" (de las 3 empresas)
+// solo si ha cambiado. Devuelve true si ha tocado algo.
+function caja_syncSaldos() {
+  var tocado = false;
+  CAJA_EMPRESAS.forEach(function(emp) {
+    var k = 'fin:cuentas:' + emp, lista;
+    try { lista = JSON.parse(localStorage.getItem(k) || '[]') || []; } catch (e) { return; }
+    var cambio = false;
+    lista.forEach(function(c) {
+      if (!c || c.deleted || !c.libroCaja || !c.id) return;
+      // Sin movimientos todavía (p. ej. aún no han llegado de la nube): no se toca el saldo
+      if (!caja_movsDe(c.id).length) return;
+      var s = caja_saldoDe(c.id);
+      if (Math.abs((parseFloat(c.saldo) || 0) - s) > 0.004) { c.saldo = s; c.updatedAt = new Date().toISOString(); cambio = true; }
+    });
+    if (cambio) { localStorage.setItem(k, JSON.stringify(lista)); tocado = true; }
+  });
+  return tocado;
+}
+function caja_fmtFecha(f) {
+  var p = String(f || '').split('-');
+  if (p.length < 3) return f || '';
+  var M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return parseInt(p[2], 10) + '-' + M[parseInt(p[1], 10) - 1] + '-' + p[0].slice(2);
+}
+function caja_esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function caja_htmlCuenta(c) {
+  var movs = caja_movsDe(c.id).sort(caja_ordenAsc);
+  var acc = 0;
+  movs.forEach(function(m) { acc += parseFloat(m.importe) || 0; m._saldo = acc; });
+  var abierto = !!window._cajaAbierto[c.id];
+  var h = '<div class="fin-card">';
+  h += '<div class="fin-card-top">';
+  h += '<div><div class="fin-card-nombre">' + (c.nombre || 'Efectivo') + '</div>';
+  h += '<div class="fin-card-sub">' + (c.iban ? 'IBAN ···· ' + c.iban : 'Libro de caja') + '</div></div>';
+  h += '<div class="fin-card-saldo">' + fin_fmt(c.saldo) + '</div></div>';
+  h += '<div class="fin-card-actions">';
+  h += '<div class="fin-action-btn green" onclick="caja_abrir(\'' + c.id + '\',\'ing\')">+ Ingreso</div>';
+  h += '<div class="fin-action-btn red" onclick="caja_abrir(\'' + c.id + '\',\'gas\')">− Gasto</div>';
+  h += '</div>';
+  h += '<div class="caja-toggle" onclick="caja_toggle(\'' + c.id + '\')">' + (abierto ? '▲' : '▼') + ' Movimientos (' + movs.length + ')</div>';
+  if (abierto) {
+    if (!movs.length) {
+      h += '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:8px 0;">Sin movimientos todavía.</div>';
+    } else {
+      h += '<table class="caja-tbl"><colgroup><col style="width:62px"><col><col style="width:78px"><col style="width:80px"><col style="width:40px"></colgroup>';
+      h += '<tr><th>FECHA</th><th>CONCEPTO</th><th class="num">IMPORTE</th><th class="num">SALDO</th><th></th></tr>';
+      // Lo más reciente arriba (decidido con Patry)
+      for (var i = movs.length - 1; i >= 0; i--) {
+        var m = movs[i], imp = parseFloat(m.importe) || 0;
+        h += '<tr><td>' + caja_fmtFecha(m.fecha) + '</td>';
+        h += '<td>' + caja_esc(m.concepto) + '</td>';
+        h += '<td class="num" style="color:' + (imp < 0 ? '#e05c5c' : 'var(--accent-green)') + ';">' + (imp < 0 ? '-' : '') + ingotros_fmt2(Math.abs(imp)) + '</td>';
+        h += '<td class="num">' + ingotros_fmt2(m._saldo) + '</td>';
+        h += '<td class="ico"><span onclick="caja_editar(\'' + m.id + '\')">✎</span>' + (m.inicial ? '' : '<span onclick="caja_borrar(\'' + m.id + '\')">✕</span>') + '</td></tr>';
+      }
+      h += '</table>';
+    }
+  }
+  h += '</div>';
+  return h;
+}
+function caja_toggle(cuentaId) {
+  window._cajaAbierto[cuentaId] = !window._cajaAbierto[cuentaId];
+  fin_renderCuentas();
+}
+function caja_setTipo(t) {
+  document.getElementById('caja-tipo').value = t;
+  document.getElementById('caja-tipo-ing').className = 'ing' + (t === 'ing' ? ' on' : '');
+  document.getElementById('caja-tipo-gas').className = 'gas' + (t === 'gas' ? ' on' : '');
+}
+function caja_abrir(cuentaId, tipo) {
+  if (bloqueaSiViewer('Añadir un movimiento')) return;
+  document.getElementById('caja-id').value = '';
+  document.getElementById('caja-cuenta').value = cuentaId;
+  document.getElementById('caja-titulo').textContent = 'Nuevo movimiento';
+  document.getElementById('caja-fecha').value = _fechaHoyLocal();
+  document.getElementById('caja-concepto').value = '';
+  document.getElementById('caja-importe').value = '';
+  document.getElementById('caja-tipo-fila').style.display = '';
+  caja_setTipo(tipo || 'gas');
+  openModalById('caja-modal');
+  setTimeout(function() { var el = document.getElementById('caja-concepto'); if (el) el.focus(); }, 150);
+}
+function caja_editar(id) {
+  if (bloqueaSiViewer('Editar un movimiento')) return;
+  var m = caja_loadTodo().find(function(x) { return x && x.id === id; });
+  if (!m) return;
+  var imp = parseFloat(m.importe) || 0;
+  document.getElementById('caja-id').value = m.id;
+  document.getElementById('caja-cuenta').value = m.cuentaId;
+  document.getElementById('caja-titulo').textContent = m.inicial ? 'Saldo inicial' : 'Editar movimiento';
+  document.getElementById('caja-fecha').value = m.fecha;
+  document.getElementById('caja-concepto').value = m.concepto || '';
+  document.getElementById('caja-importe').value = numMiles_fmtDinero(Math.abs(imp));
+  document.getElementById('caja-tipo-fila').style.display = m.inicial ? 'none' : '';
+  caja_setTipo(imp < 0 ? 'gas' : 'ing');
+  openModalById('caja-modal');
+}
+function caja_guardar() {
+  if (bloqueaSiViewer('Guardar un movimiento')) return;
+  var id = document.getElementById('caja-id').value;
+  var cuentaId = document.getElementById('caja-cuenta').value;
+  var fecha = document.getElementById('caja-fecha').value;
+  var concepto = document.getElementById('caja-concepto').value.trim();
+  var importe = Math.abs(parseImporteFlexible(document.getElementById('caja-importe').value) || 0);
+  var tipo = document.getElementById('caja-tipo').value;
+  if (!fecha || !concepto || !importe) { alert('Pon la fecha, el concepto y el importe.'); return; }
+  var firmado = Math.round((tipo === 'gas' ? -importe : importe) * 100) / 100;
+  var todos = caja_loadTodo();
+  var ahora = new Date().toISOString();
+  if (id) {
+    var i = todos.findIndex(function(x) { return x && x.id === id; });
+    if (i < 0) return;
+    var prev = todos[i];
+    if (prev.inicial) firmado = importe; // el saldo inicial siempre suma
+    todos[i] = { id: prev.id, cuentaId: prev.cuentaId, fecha: fecha, concepto: concepto, importe: firmado, inicial: !!prev.inicial, creado: prev.creado || prev.id, updatedAt: ahora };
+  } else {
+    todos.push({ id: 'caja_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), cuentaId: cuentaId, fecha: fecha, concepto: concepto, importe: firmado, creado: ahora, updatedAt: ahora });
+  }
+  localStorage.setItem(CAJA_KEY, JSON.stringify(todos));
+  window._cajaAbierto[cuentaId] = true;
+  closeModalById('caja-modal');
+  fin_renderCuentas();
+}
+function caja_borrar(id) {
+  if (bloqueaSiViewer('Borrar un movimiento')) return;
+  var m = caja_loadTodo().find(function(x) { return x && x.id === id; });
+  if (!m || m.inicial) return;
+  showConfirm('🗑️', 'Borrar movimiento', '¿Borrar "' + (m.concepto || '') + '" (' + ingotros_fmt2(m.importe) + ' €)?', [
+    { label: 'Borrar', cls: 'danger', fn: function() {
+      // Se deja "tachado" (no se quita) para que el borrado llegue a todos los aparatos.
+      var todos = caja_loadTodo().map(function(x) { return (x && x.id === id) ? { id: x.id, cuentaId: x.cuentaId, deleted: true, updatedAt: new Date().toISOString() } : x; });
+      localStorage.setItem(CAJA_KEY, JSON.stringify(todos));
+      fin_renderCuentas();
+    } }
+  ]);
+}
+// Puesta en marcha (una sola vez, decidido con Patry): la cuenta "Efectivo" de
+// Patricio pasa a libro de caja con un saldo inicial de 40.000 € a 1/09/2026.
+function caja_migrar256() {
+  try {
+    if (localStorage.getItem('app:migracion_caja_256')) return;
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() === false) return;
+    var k = 'fin:cuentas:patricio';
+    var lista = JSON.parse(localStorage.getItem(k) || '[]') || [];
+    var c = lista.find(function(x) { return x && !x.deleted && String(x.nombre || '').trim().toLowerCase() === 'efectivo'; });
+    if (!c) return; // aún no ha llegado de la nube: se reintenta en la próxima apertura
+    if (!c.id) c.id = 'leg_cuentas_' + window._finHuella('cuentas', c);
+    var idIni = 'caja_ini_' + c.id;
+    var todos = caja_loadTodo();
+    if (!todos.some(function(x) { return x && x.id === idIni; })) {
+      var ahora = new Date().toISOString();
+      todos.push({ id: idIni, cuentaId: c.id, fecha: '2026-09-01', concepto: 'Saldo inicial', importe: 40000, inicial: true, creado: '2026-09-01T00:00:00.000Z', updatedAt: ahora });
+      localStorage.setItem(CAJA_KEY, JSON.stringify(todos));
+    }
+    if (!c.libroCaja) { c.libroCaja = true; c.updatedAt = new Date().toISOString(); localStorage.setItem(k, JSON.stringify(lista)); }
+    localStorage.setItem('app:migracion_caja_256', new Date().toISOString());
+    caja_syncSaldos();
+    try { if (fin_emp() === 'patricio') fin_renderCuentas(); } catch (e) {}
+  } catch (e) { console.warn('[PUNTO 256] puesta en marcha libro de caja:', e.message); }
+}
+document.addEventListener('firebaseLoaded', function() { setTimeout(caja_migrar256, 5000); });
 
 // --- ACCIONES ---
 // PUNTO 114 (06/09/2026): a qué cuenta/broker pertenece cada valor (por
@@ -22901,6 +23113,7 @@ window._refreshCurrentModule = function(key) {
     'trading:capital_inicial': 'finanzas',
     'renta:dividendos_manuales': 'renta',
     'renta:intereses_cuenta': 'renta', // PUNTO 250
+    'fin:caja_movs': 'finanzas', // PUNTO 256
     'fin:patrimonio_financiero:patricio': 'finanzas',
     // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — pantalla propia
     // (mod-finperdash), no la de Finanzas.
@@ -26166,6 +26379,19 @@ if ('serviceWorker' in navigator) {
     <div id="rdiv-neto" style="font-size:12px;color:var(--accent-green);margin-bottom:16px;min-height:16px;"></div>
     <button onclick="rdiv_guardar()" style="width:100%;background:var(--accent-green);border:none;border-radius:12px;color:#0b1220;font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;padding:12px;cursor:pointer;margin-bottom:8px;">GUARDAR</button>
     <button id="rdiv-borrar" onclick="rdiv_borrar()" style="width:100%;background:transparent;border:1px solid rgba(255,90,90,.5);border-radius:12px;color:#ff7b7b;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;padding:10px;cursor:pointer;">Borrar dividendo</button>
+  </div>
+</div>
+<!-- PUNTO 256 (06/10/2026): movimiento del libro de caja (Efectivo) -->
+<div class="moverlay" id="caja-modal" style="z-index:9000;">
+  <div class="modal">
+    <div class="mtitle"><span id="caja-titulo">Nuevo movimiento</span><span class="mclose" onclick="closeModalById('caja-modal')">&#10005;</span></div>
+    <input type="hidden" id="caja-id"><input type="hidden" id="caja-cuenta"><input type="hidden" id="caja-tipo" value="gas">
+    <div class="caja-tipo" id="caja-tipo-fila"><div id="caja-tipo-ing" class="ing" onclick="caja_setTipo('ing')">+ Ingreso</div><div id="caja-tipo-gas" class="gas on" onclick="caja_setTipo('gas')">&minus; Gasto</div></div>
+    <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" id="caja-fecha" type="date"></div>
+    <div class="mfield"><div class="mflabel">Concepto</div><input class="minput" id="caja-concepto" type="text" autocapitalize="characters"></div>
+    <div class="mfield"><div class="mflabel">Importe (euros)</div><input class="minput" id="caja-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+    <button class="btn1" onclick="caja_guardar()">Guardar</button>
+    <button class="btn2" onclick="closeModalById('caja-modal')" style="margin-top:8px;">Cancelar</button>
   </div>
 </div>
 </body>
