@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_08';
+const BUILD_ID = '261008_09';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -12842,7 +12842,7 @@ async function generarPDF() {
     const _arrtFirmas = _firmantesFirma.length > 1
       ? _firmantesFirma.map(f => _nombreFirmaPersona(f))
       : [(datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—')];
-    const _SEP_FIRMA = 22; // hueco entre una firma y la siguiente en la misma columna
+    const _SEP_FIRMA = 33; // hueco entre una firma y la siguiente en la misma columna (08/10/2026: mismo sitio para firmar que la primera)
     // Alto del bloque desde el título ("EL ARRENDADOR") hasta el último nombre
     const _altoFirmas = 38 + _SEP_FIRMA * (Math.max(_arrFirmas.length, _arrtFirmas.length) - 1) + 2;
     const _dibujarFirmas = (yTop) => {
