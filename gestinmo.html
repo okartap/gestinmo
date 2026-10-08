@@ -641,7 +641,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 /* Form */
 .fsection{margin-bottom:22px;}
 .ftitle{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:10px;}
-.frow{display:flex;align-items:center;justify-content:space-between;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:7px;gap:10px;}
+.frow{display:flex;align-items:center;justify-content:space-between;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:7px;gap:10px;cursor:text;}
 .flabel{font-size:13px;color:var(--text2);flex-shrink:0;}
 .finput{background:transparent;border:none;outline:none;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:var(--silver-bright);text-align:right;flex:1;min-width:0;user-select:text;}
 .finput::placeholder{color:var(--silver-dim);font-weight:400;font-size:13px;}
@@ -2249,7 +2249,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_01';
+const BUILD_ID = '261008_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -5222,6 +5222,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div style="font-size:10px;color:var(--text2);margin-top:6px;">Lo habitual es 1 — elige 2 o más cuando el alquiler lo firman varias personas juntas</div>
       </div>
       <div id="firmante-1-label" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;display:none;">Firmante 1</div>
+      <!-- 08/10/2026: elegir un cliente ya dado de alta (solo los de la empresa que arrienda) -->
+      <div class="frow"><div class="flabel">Cliente</div><select class="finput" id="f-inq-cliente-1" onchange="wiz_elegirCliente(1)"><option value="">— Escribir a mano (nuevo) —</option></select></div>
       <!-- Toggle persona / empresa -->
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <div id="tab-inq-persona" onclick="setInqTipo('persona')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-hover);font-size:12px;font-weight:700;color:var(--silver-bright);cursor:pointer;transition:all .2s;">👤 Persona física</div>
@@ -7037,6 +7039,16 @@ con editar/borrar en cada línea. -->
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Nombre completo</div>
         <input id="cli-edit-nombre" class="finput" style="width:100%;box-sizing:border-box;">
+      </div>
+      <!-- 08/10/2026: empresa a la que pertenece el cliente (para el desplegable del asistente de contratos) -->
+      <div>
+        <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Empresa</div>
+        <select id="cli-edit-empresa" class="finput" style="width:100%;box-sizing:border-box;">
+          <option value="">— Sin asignar —</option>
+          <option value="patrimer">Patrimer Levante</option>
+          <option value="patricio">Patricio</option>
+          <option value="industrias">Industrias G&amp;C</option>
+        </select>
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">DNI / CIF</div>
@@ -10158,6 +10170,7 @@ function seleccionarInmueble(ref, dir, tipo, catastral) {
 function selectArrendador(key) {
   _privPintar(); // PUNTO 216
   arrendadorActivo = key;
+  try { wiz_llenarClientes(); } catch (e) {}
   ['patrimer','patricio','industrias'].forEach(k => {
     document.getElementById('arrcard-' + k).classList.remove('selected');
     document.getElementById('arrcheck-' + k).textContent = '';
@@ -10322,6 +10335,8 @@ function showWizard() {
    'f-rescis-luz','f-rescis-agua','f-rescis-deuda'
   ].forEach(function(_id) { const _el = document.getElementById(_id); if (_el) _el.value = ''; });
   const _fInqGenero = document.getElementById('f-inq-genero'); if (_fInqGenero) _fInqGenero.value = 'D.';
+  // 08/10/2026: el desplegable "Cliente" también vuelve a "Escribir a mano"
+  for (let _ci = 1; _ci <= 5; _ci++) { const _cs = document.getElementById('f-inq-cliente-' + _ci); if (_cs) { _cs.value = ''; _cs.dataset.prev = ''; } }
   const _fRef = document.getElementById('f-ref'); if (_fRef) _fRef.value = '';
   const _fDir = document.getElementById('f-dir'); if (_fDir) _fDir.value = '';
   const _fRefDisplay = document.getElementById('f-ref-display'); if (_fRefDisplay) _fRefDisplay.textContent = '—';
@@ -10858,6 +10873,7 @@ let _firmanteExtraEsEmpresa = {};
 function renderFirmanteExtraHTML(idx) {
   return '<div id="firmante-extra-' + idx + '" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">'
     + '<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Firmante ' + idx + '</div>'
+    + '<div class="frow"><div class="flabel">Cliente</div><select class="finput" id="f-inq-cliente-' + idx + '" onchange="wiz_elegirCliente(' + idx + ')"><option value="">— Escribir a mano (nuevo) —</option></select></div>'
     + '<div style="display:flex;gap:8px;margin-bottom:12px;">'
     + '<div id="tab-inq-persona-' + idx + '" onclick="setInqTipoExtra(' + idx + ',\'persona\')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-hover);font-size:12px;font-weight:700;color:var(--silver-bright);cursor:pointer;">👤 Persona física</div>'
     + '<div id="tab-inq-empresa-' + idx + '" onclick="setInqTipoExtra(' + idx + ',\'empresa\')" style="flex:1;padding:8px;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--navy-card);font-size:12px;font-weight:600;color:var(--silver-dim);cursor:pointer;">🏢 Empresa</div>'
@@ -10913,6 +10929,7 @@ function wizardSetNumFirmantes(n) {
   const secResp = document.getElementById('seccion-responsable-cobro');
   if (secResp) secResp.style.display = n > 1 ? 'block' : 'none';
   renderResponsableSelector();
+  try { wiz_llenarClientes(); } catch (e) {}
 }
 
 function setInqTipoExtra(idx, tipo) {
@@ -10976,7 +10993,64 @@ function renderResponsableSelector() {
   cont.innerHTML = html;
 }
 
+
+// 08/10/2026 — Pedido por Patry: en el asistente de contratos, un desplegable
+// "Cliente" por cada firmante con los clientes ACTIVOS de la empresa que
+// arrienda (solo los que tienen esa empresa asignada). Al elegir uno se
+// rellenan sus datos; siguen siendo editables. "Escribir a mano" = como antes.
+function wiz_clientesEmpresa() {
+  var emp = normEmpresa(arrendadorActivo);
+  var lista = [];
+  try { lista = cli_cargar(); } catch (e) { lista = []; }
+  return lista.filter(function(c) {
+    return c && !c.deleted && c.estado !== 'antiguo' && c.propietario && normEmpresa(c.propietario) === emp;
+  }).sort(function(a, b) { return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'); });
+}
+function wiz_llenarClientes() {
+  var clientes = wiz_clientesEmpresa();
+  for (var i = 1; i <= 5; i++) {
+    var sel = document.getElementById('f-inq-cliente-' + i);
+    if (!sel) continue;
+    var actual = sel.value;
+    var html = '<option value="">\u2014 Escribir a mano (nuevo) \u2014</option>';
+    clientes.forEach(function(c) {
+      html += '<option value="' + String(c.id).replace(/"/g, '&quot;') + '">' + String(c.nombre || '\u2014').replace(/</g, '&lt;') + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = clientes.some(function(c) { return String(c.id) === actual; }) ? actual : '';
+    sel.dataset.prev = sel.value;
+  }
+}
+function wiz_elegirCliente(idx) {
+  var sel = document.getElementById('f-inq-cliente-' + idx);
+  if (!sel) return;
+  var prev = sel.dataset.prev || '';
+  sel.dataset.prev = sel.value;
+  var c = sel.value ? wiz_clientesEmpresa().find(function(x) { return String(x.id) === sel.value; }) : null;
+  if (!c && !prev) return; // pasa de "a mano" a "a mano": no se toca nada de lo escrito
+  var suf = idx === 1 ? '' : '-' + idx;
+  var put = function(id, v) { var el = document.getElementById(id + suf); if (el) el.value = v || ''; };
+  var esEmp = !!(c && c.esEmpresa);
+  if (idx === 1) setInqTipo(esEmp ? 'empresa' : 'persona'); else setInqTipoExtra(idx, esEmp ? 'empresa' : 'persona');
+  // Se vacían los dos juegos de campos y se rellena el que toca (si es "a mano", quedan vacíos).
+  ['f-inq-nombre','f-inq-dni','f-inq-dom','f-inq-tel','f-inq-email','f-inq-empresa-nombre','f-inq-cif','f-inq-empresa-dom','f-inq-empresa-tel','f-inq-empresa-email','f-inq-rep-nombre','f-inq-rep-dni'].forEach(function(id) { put(id, ''); });
+  if (c) {
+    if (esEmp) {
+      put('f-inq-empresa-nombre', c.nombre); put('f-inq-cif', c.dni); put('f-inq-empresa-dom', c.domicilio);
+      put('f-inq-empresa-tel', c.tel); put('f-inq-empresa-email', c.email);
+      put('f-inq-rep-nombre', c.repNombre); put('f-inq-rep-dni', c.repDNI);
+    } else {
+      put('f-inq-nombre', c.nombre); put('f-inq-dni', c.dni); put('f-inq-dom', c.domicilio);
+      put('f-inq-tel', c.tel); put('f-inq-email', c.email);
+      if (c.genero) put('f-inq-genero', c.genero);
+    }
+  }
+  try { if (idx === 1 && esEmp && typeof syncInqNombreEmpresa === 'function') syncInqNombreEmpresa(); } catch (e) {}
+  try { renderResponsableSelector(); } catch (e) {}
+  try { if (typeof actualizarPreview === 'function') actualizarPreview(); } catch (e) {}
+}
 function wGoStep(n) {
+  if (n === 2) { try { wiz_llenarClientes(); } catch (e) {} }
   for (let i = 0; i <= 4; i++) {
     const p = document.getElementById('wpaso' + i);
     if (p) p.style.display = i === n ? 'block' : 'none';
@@ -23563,6 +23637,7 @@ function cli_abrirEdicion() {
   if (!cli_clienteActivo) return;
   const c = cli_clienteActivo;
   document.getElementById('cli-edit-nombre').value = c.nombre || '';
+  document.getElementById('cli-edit-empresa').value = c.propietario ? normEmpresa(c.propietario) : ''; // 08/10/2026
   document.getElementById('cli-edit-dni').value    = c.dni || '';
   document.getElementById('cli-edit-tel').value    = c.tel || '';
   document.getElementById('cli-edit-email').value  = c.email || '';
@@ -23606,6 +23681,9 @@ function cli_guardarEdicion() {
   clientes[idx].email    = document.getElementById('cli-edit-email').value.trim();
   clientes[idx].domicilio = document.getElementById('cli-edit-dom').value.trim();
   clientes[idx].notas    = document.getElementById('cli-edit-notas').value.trim();
+  // 08/10/2026: empresa del cliente (vacío = sin asignar, se ve en las 3 empresas)
+  const _empSel = document.getElementById('cli-edit-empresa').value;
+  if (_empSel) clientes[idx].propietario = _empSel; else delete clientes[idx].propietario;
   // PUNTO 160 (10/09/2026): sello de modificación — ver nota en el guardado
   // automático desde Contratos, mismo blindaje.
   clientes[idx].updatedAt = new Date().toISOString();
@@ -26318,6 +26396,21 @@ function renta_exportarCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// 08/10/2026 — BUG (reportado por Patry): en las filas del asistente de
+// contratos (Nombre completo, DNI, Teléfono...) la casilla para escribir ocupa
+// solo la mitad derecha; al tocar el texto de la izquierda no pasaba nada y
+// parecía que no se podía escribir. Ahora tocar en cualquier punto de la fila
+// pone el cursor en su casilla.
+document.addEventListener('click', function(ev) {
+  var t = ev.target;
+  if (!t || !t.closest) return;
+  if (t.closest('input, textarea, select, button, a, label, [onclick]')) return;
+  var fila = t.closest('.frow, .frow-full');
+  if (!fila) return;
+  var campo = fila.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select');
+  if (campo && !campo.disabled) { try { campo.focus(); if (campo.tagName === 'SELECT' && campo.showPicker) campo.showPicker(); } catch (e) {} }
+});
 
 // PUNTO 3 (25/08/2026): registro del Service Worker — es lo que permite que la
 // app se abra aunque no haya cobertura/wifi (guarda una copia local la primera
