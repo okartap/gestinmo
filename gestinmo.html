@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_12';
+const BUILD_ID = '261008_13';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -11614,6 +11614,9 @@ function det_padronConfirmarBaja() {
 // titular — decisión técnica, no de negocio: dímelo si prefieres que el
 // arrendador no firme aquí.
 function padron_generarJustificanteBaja(contratoId, historialIdx) {
+  _preguntarFirmado(function(f) { window._docFirmado = f; try { _padron_generarJustificanteBajaPDF(contratoId, historialIdx); } finally { window._docFirmado = false; } });
+}
+function _padron_generarJustificanteBajaPDF(contratoId, historialIdx) {
   try {
     const contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
     const c = contratos.find(x => x.id === contratoId);
@@ -11681,10 +11684,11 @@ function padron_generarJustificanteBaja(contratoId, historialIdx) {
     doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
     doc.text('EL/LA ARRENDATARIO/A', col1, y);
     doc.text('RECIBÍ (EL ARRENDADOR)', col2, y);
-    sp(12);
+    sp(window._docFirmado ? 20 : 12);
     doc.setFont('helvetica', 'normal');
     doc.text('________________________', col1, y);
     doc.text('________________________', col2, y);
+    if (window._docFirmado) _dibujarFirmaSobreRaya(doc, col2, y); // 08/10/2026
     sp(5);
     doc.text(`${inqTratamiento}${c.inqNombre || '—'}`, col1, y);
     doc.text(esPersonaFisica ? emp.rep : emp.legalName, col2, y);
@@ -13422,6 +13426,27 @@ async function compartirPDF() {
 // con el contrato dentro. Si no se puede, se hace como antes (se descarga el
 // PDF y se abre el correo) avisando de que hay que adjuntarlo a mano. El correo
 // va dirigido al email del inquilino si está puesto en el asistente.
+// 08/10/2026 (pedido por Patry): en documentos que no salen del asistente
+// (adenda de IPC, justificante de baja de empadronamiento) se pregunta si van
+// firmados. Si todavía no hay firma subida, salen sin firmar sin preguntar.
+function _preguntarFirmado(cb) {
+  if (!_privDatos().firmaPatricio) { cb(false); return; }
+  showConfirm('✍️', '¿Con tu firma?', '¿Quieres este documento firmado por ti?', [
+    { label: 'Sin firmar', cls: 'g', fn: function() { cb(false); } },
+    { label: '✍️ Firmado', cls: 'g', fn: function() { cb(true); } }
+  ]);
+}
+// Firma de Patricio encima de la raya de "______" (x = inicio de la raya, y = su línea base)
+function _dibujarFirmaSobreRaya(doc, x, y) {
+  try {
+    const img = _privDatos().firmaPatricio; if (!img) return;
+    const pr = doc.getImageProperties(img);
+    let w = 42, h = w * pr.height / pr.width;
+    if (h > 16) { h = 16; w = h * pr.width / pr.height; }
+    doc.addImage(img, 'PNG', x + (47 - w) / 2, y - h - 1, w, h);
+  } catch (e) { console.warn('[firma doc]', e.message); }
+}
+window._docFirmado = false;
 // 08/10/2026 — interruptor "Sin firmar / Firmado por Patricio"
 window._pdfFirmado = false;
 function wiz_setFirmado(si) {
@@ -15638,7 +15663,9 @@ function ipc_aplicar(){
   closeModalById('ipc-modal');
 
   // 3. Generar adenda PDF
-  setTimeout(()=>ipc_generarAdendaPDF(_ipcContratoActual,rentaAnterior,nuevaRenta,pct),300);
+  // 08/10/2026: antes de generar la adenda se pregunta si va firmada
+  const _cIpc=_ipcContratoActual;
+  setTimeout(()=>_preguntarFirmado(function(f){ window._docFirmado=f; try { ipc_generarAdendaPDF(_cIpc,rentaAnterior,nuevaRenta,pct); } finally { window._docFirmado=false; } }),300);
 }
 
 function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
@@ -15768,10 +15795,11 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
     doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
     doc.text('EL ARRENDADOR',col1,y);
     doc.text('EL/LA ARRENDATARIO/A',col2,y);
-    sp(12);
+    sp(window._docFirmado ? 20 : 12);
     doc.setFont('helvetica','normal');
     doc.text('________________________',col1,y);
     doc.text('________________________',col2,y);
+    if (window._docFirmado) _dibujarFirmaSobreRaya(doc, col1, y); // 08/10/2026
     sp(5);
     doc.text(emp.legalName,col1,y);
     doc.text(`${inqTratamiento}${c.inqNombre||'—'}`,col2,y);
