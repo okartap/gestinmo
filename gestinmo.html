@@ -339,6 +339,7 @@
 .badge-alquilado { background: rgba(76,175,130,0.2); border: 1px solid var(--accent-green); color: var(--accent-green); }
 .badge-vacio { background: rgba(224,156,58,0.2); border: 1px solid var(--accent-amber); color: var(--accent-amber); }
 .badge-reforma { background: rgba(91,141,238,0.2); border: 1px solid var(--accent-blue); color: var(--accent-blue); }
+.badge-reservado { background: rgba(110,160,255,0.18); border: 1px solid #6ea0ff; color: #8fb6ff; } /* 08/10/2026 */
 .card-owner-badge { position: absolute; top: 12px; right: 12px; padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 600; background: rgba(17,24,39,0.7); border: 1px solid var(--border); color: var(--silver-dim); }
 .card-body { padding: 14px 16px; }
 .card-address { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
@@ -2249,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_07';
+const BUILD_ID = '261008_08';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4812,6 +4813,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
           <div class="form-label">Estado</div>
           <select class="form-select" id="f-estado" onchange="inm_onEstadoChange()">
             <option value="alquilado">Alquilado</option>
+            <option value="reservado">Reservado (contrato que aún no ha empezado)</option>
             <option value="vacio">Vacío</option>
             <option value="reforma">En reforma</option>
             <option value="vendido">Vendido</option>
@@ -8579,6 +8581,31 @@ function fmtPct(n) { return n.toFixed(1).replace('.',',') + '%'; }
 // cada inmueble) y en el Histórico rústico. Si un inmueble no tiene contrato
 // activo, estas funciones devuelven null y la tarjeta simplemente no añade
 // esa información — no se inventa ni se fuerza nada.
+// 08/10/2026 (decidido con Patry): revisión al abrir la app (solo Patricio):
+// - "Reservado" pasa a "Alquilado" el día que empieza su contrato.
+// - Un inmueble "Vacío" con un contrato vigente pasa a Reservado/Alquilado
+//   según la fecha de inicio (p. ej. contratos hechos antes de este cambio).
+function inm_revisarEstadosPorContratos() {
+  try {
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    const inms = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+    const hoy = _fechaHoyLocal();
+    let cambios = 0;
+    inms.forEach(function(i) {
+      if (!i || (i.estado !== 'vacio' && i.estado !== 'reservado' && i.estado)) return;
+      const c = inm_contratoActivo(i.ref);
+      if (!c) return;
+      const nuevo = (c.inicio && c.inicio > hoy) ? 'reservado' : 'alquilado';
+      if (i.estado !== nuevo) { i.estado = nuevo; i.updatedAt = new Date().toISOString(); cambios++; }
+    });
+    if (cambios) {
+      localStorage.setItem('inmuebles:lista', JSON.stringify(inms));
+      try { renderLista(); } catch (e) {}
+    }
+  } catch (e) { console.warn('[revisión estados inmuebles]', e.message); }
+}
+document.addEventListener('firebaseLoaded', function() { setTimeout(inm_revisarEstadosPorContratos, 5500); });
+document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') setTimeout(inm_revisarEstadosPorContratos, 1500); });
 function inm_contratoActivo(ref) {
   if (!ref) return null;
   var todos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
@@ -8700,7 +8727,15 @@ function renderLista() {
     const deEsteTipo = inmueblesActivos.filter(i => (i.tipo || 'otro') === tipo);
     if (deEsteTipo.length === 0) return;
     piezasTexto.push(`<b>${deEsteTipo.length}</b> ${tipoListLabels[tipo]}`);
-    deEsteTipo.filter(i => i.estado !== 'alquilado').forEach(i => {
+    // 08/10/2026: "Reservado" no cuenta como libre, y una plaza incluida en un
+    // piso solo es libre si ese piso lo está.
+    const _estaOcupado = (x) => {
+      if (!x) return false;
+      if (x.estado === 'alquilado' || x.estado === 'reservado') return true;
+      if (x.tipo === 'garaje') { const p = inm_garajeIncluidoEn(x.ref, todos); if (p) return _estaOcupado(todos.find(t => t.ref === p)); }
+      return false;
+    };
+    deEsteTipo.filter(i => !_estaOcupado(i)).forEach(i => {
       inmueblesLibres.push({ ref: i.ref || '', tipo: tipo, idxReal: todos.findIndex(t => t.id === i.id) });
     });
   });
@@ -8813,8 +8848,8 @@ function renderLista() {
     // se avisa de qué piso la incluye, para que no se confunda con una
     // plaza realmente disponible.
     const garajeIncluidoEn = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, todos) : '';
-    const estadoColor = garajeIncluidoEn ? 'var(--accent-blue)' : inm.estado === 'alquilado' ? '#4caf82' : inm.estado === 'reforma' ? '#ffb74d' : inm.estado === 'vendido' ? '#9c88c4' : 'var(--silver-dim)';
-    const estadoTxt = garajeIncluidoEn ? ('Incluida en ' + garajeIncluidoEn) : inm.estado === 'alquilado' ? 'Alquilado' : inm.estado === 'reforma' ? 'En reforma' : inm.estado === 'vendido' ? 'Vendido' : 'Vacío';
+    const estadoColor = garajeIncluidoEn ? 'var(--accent-blue)' : inm.estado === 'alquilado' ? '#4caf82' : inm.estado === 'reservado' ? '#8fb6ff' : inm.estado === 'reforma' ? '#ffb74d' : inm.estado === 'vendido' ? '#9c88c4' : 'var(--silver-dim)';
+    const estadoTxt = garajeIncluidoEn ? ('Incluida en ' + garajeIncluidoEn) : inm.estado === 'alquilado' ? 'Alquilado' : inm.estado === 'reservado' ? 'Reservado' : inm.estado === 'reforma' ? 'En reforma' : inm.estado === 'vendido' ? 'Vendido' : 'Vacío';
 
     // Propietario
     const propTxt = propLabels[inm.propietario] || inm.propietario || '';
@@ -8838,7 +8873,7 @@ function renderLista() {
     // PUNTO 17: inquilino y fechas, sacados del contrato ya vinculado a este
     // inmueble (mismo dato que usa la ficha) — solo se muestra si hay
     // contrato activo, para no dejar huecos vacíos en las viviendas libres.
-    const contratoActivo = inm.estado === 'alquilado' ? inm_contratoActivo(inm.ref) : null;
+    const contratoActivo = (inm.estado === 'alquilado' || inm.estado === 'reservado') ? inm_contratoActivo(inm.ref) : null;
     const finTxt = contratoActivo && contratoActivo.fin
       ? new Date(contratoActivo.fin).toLocaleDateString('es-ES', {day:'2-digit', month:'short', year:'numeric'})
       : '';
@@ -9024,10 +9059,12 @@ function inm_showDetail(idx) {
   const badgeEstadoDet = document.getElementById('detail-badge-estado');
   if (badgeEstadoDet) {
     const garajeIncluidoDet = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, inmuebles) : '';
-    const estadoKeyDet = garajeIncluidoDet ? 'alquilado' : (inm.estado || 'vacio');
-    const estadoTextoDet = garajeIncluidoDet ? 'Alquilado' : ({alquilado:'Alquilado', vacio:'Vacío', reforma:'En reforma', vendido:'Vendido'}[inm.estado] || 'Vacío');
+    // 08/10/2026: una plaza incluida sigue el estado de su piso (Reservado / Alquilado)
+    const _pisoDet = garajeIncluidoDet ? inmuebles.find(function(x) { return x.ref === garajeIncluidoDet; }) : null;
+    const estadoKeyDet = garajeIncluidoDet ? ((_pisoDet && _pisoDet.estado === 'reservado') ? 'reservado' : 'alquilado') : (inm.estado || 'vacio');
+    const estadoTextoDet = ({alquilado:'Alquilado', reservado:'Reservado', vacio:'Vacío', reforma:'En reforma', vendido:'Vendido'}[estadoKeyDet] || 'Vacío');
     badgeEstadoDet.textContent = estadoTextoDet;
-    badgeEstadoDet.className = 'card-status-badge badge-' + (estadoKeyDet === 'alquilado' ? 'alquilado' : (estadoKeyDet === 'reforma' ? 'reforma' : 'vacio'));
+    badgeEstadoDet.className = 'card-status-badge badge-' + (estadoKeyDet === 'alquilado' ? 'alquilado' : (estadoKeyDet === 'reservado' ? 'reservado' : (estadoKeyDet === 'reforma' ? 'reforma' : 'vacio')));
   }
   const badgeOwnerDet = document.getElementById('detail-badge-owner');
   if (badgeOwnerDet) badgeOwnerDet.textContent = propLabelsCortos[normEmpresa(inm.propietario)] || '—';
@@ -10371,6 +10408,10 @@ function showWizard() {
   document.getElementById('no-padron-msg').style.display = 'block';
   document.getElementById('pdf-done').style.display = 'none';
   document.getElementById('btn-gen-pdf').style.display = 'flex';
+  // 08/10/2026 — BUG (reportado por Patry): al reabrir un contrato para
+  // editarlo, el botón seguía diciendo "Generando..." de la vez anterior.
+  document.getElementById('btn-gen-pdf').classList.remove('generating');
+  document.getElementById('btn-gen-pdf').innerHTML = '<span>📄</span> Generar PDF';
   document.getElementById('pdf-open-direct').style.display = 'none';
   document.getElementById('pdf-iframe').style.display = 'block';
   window._pdfDataUri = null;
@@ -11108,7 +11149,11 @@ function filtrarInmueblesPorTipo() {
   // porque las otras ya están ocupadas por otro inquilino.
   const requiereLibre = ['viv','vac','local','garaje','rustica','rusticatemp'].includes(tipoSelected);
   if (requiereLibre) {
-    window._inmueblesFiltrados = window._inmueblesFiltrados.filter(i => i.estado === 'vacio');
+    // 08/10/2026: al MODIFICAR un contrato su propio inmueble ya no está "Vacío"
+    // (está Reservado o Alquilado) — se sigue ofreciendo para poder corregirlo.
+    let _refEditando = '';
+    try { if (typeof _contratoEditandoId === 'string' && _contratoEditandoId) { const _ce = JSON.parse(localStorage.getItem('contratos:lista') || '[]').find(c => c.id === _contratoEditandoId); _refEditando = _ce ? _ce.ref : ''; } } catch (e) {}
+    window._inmueblesFiltrados = window._inmueblesFiltrados.filter(i => i.estado === 'vacio' || (_refEditando && i.ref === _refEditando));
   }
 
   // Si solo hay un inmueble compatible, preseleccionarlo automáticamente
@@ -13071,8 +13116,27 @@ async function generarPDF() {
         if (idxInmLibre >= 0) {
           inmueblesLibres[idxInmLibre].estado = 'vacio';
           inmueblesLibres[idxInmLibre].inquilino = '';
+          inmueblesLibres[idxInmLibre].updatedAt = new Date().toISOString(); // 08/10/2026: para que el cambio viaje bien a la nube
           localStorage.setItem('inmuebles:lista', JSON.stringify(inmueblesLibres));
         }
+      }
+      // 08/10/2026 (decidido con Patry): al guardar un contrato nuevo (o al
+      // modificarlo), el inmueble pasa solo a "Reservado" si el contrato aún
+      // no ha empezado, o a "Alquilado" si ya ha empezado. Nunca toca uno
+      // Vendido. Renovaciones, anexos, padrón y rescisiones no cambian nada aquí.
+      if (['viv','vac','local','garaje','rustica','rusticatemp'].includes(datos.tipo) && datos.ref) {
+        try {
+          const _inms = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+          const _ix = _inms.findIndex(i => i.ref === datos.ref);
+          if (_ix >= 0 && _inms[_ix].estado !== 'vendido') {
+            const _nuevoEst = (datos.inicio && datos.inicio > _fechaHoyLocal()) ? 'reservado' : 'alquilado';
+            if (_inms[_ix].estado !== _nuevoEst) {
+              _inms[_ix].estado = _nuevoEst;
+              _inms[_ix].updatedAt = new Date().toISOString();
+              localStorage.setItem('inmuebles:lista', JSON.stringify(_inms));
+            }
+          }
+        } catch (e) { console.warn('[estado inmueble]', e.message); }
       }
       if (typeof syncInquilinosDesdeContratos === 'function') syncInquilinosDesdeContratos();
 
@@ -13180,6 +13244,9 @@ async function generarPDF() {
     // PUNTO 192: proceso terminado con éxito dentro de los 12 segundos —
     // se desactiva el vigilante para que no salte de más.
     _pararVigilante();
+    // 08/10/2026: el botón vuelve a su estado normal al terminar bien.
+    btn.classList.remove('generating');
+    btn.innerHTML = '<span>📄</span> Generar PDF';
 
   } catch(e) {
     // PUNTO 192: también aquí, para que un error "normal" (Punto 188) no
