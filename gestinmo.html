@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_11';
+const BUILD_ID = '261008_12';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -5428,6 +5428,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="pdf-progress-bar"><div class="pdf-progress-fill" id="pdf-bar"></div></div>
       <div class="pdf-progress-label" id="pdf-progress-label">Generando contrato...</div>
     </div>
+    <!-- 08/10/2026: generar el contrato con la firma de Patricio (por defecto, sin firmar) -->
+    <div id="firma-toggle" style="display:flex;gap:8px;margin-bottom:10px;">
+      <div id="firma-opt-no" onclick="wiz_setFirmado(false)" style="flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid var(--accent-gold);background:rgba(201,168,76,.12);color:var(--accent-gold);font-size:13px;font-weight:700;cursor:pointer;">Sin firmar</div>
+      <div id="firma-opt-si" onclick="wiz_setFirmado(true)" style="flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--navy-card);color:var(--silver-dim);font-size:13px;font-weight:600;cursor:pointer;">✍️ Firmado por Patricio</div>
+    </div>
     <button class="btn-pdf-gen" id="btn-gen-pdf" onclick="generarPDF()"><span>📄</span> Generar PDF</button>
     <div id="pdf-done" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
@@ -5440,6 +5445,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="action-btn" onclick="emailPDF()"><div class="action-btn-icon">✉️</div><div class="action-btn-label">Mail</div></div>
         <div class="action-btn" onclick="whatsappPDF()"><div class="action-btn-icon">💬</div><div class="action-btn-label">WhatsApp</div></div>
       </div>
+      <!-- 08/10/2026: solo en contratos de IGC -->
+      <div id="btn-enviar-javier" class="action-btn" onclick="emailJavierPDF()" style="display:none;margin:-4px 0 14px;flex-direction:row;justify-content:center;gap:8px;"><div class="action-btn-icon" style="margin:0;">✉️</div><div class="action-btn-label">Enviar a Javier para firmar</div></div>
       <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:16px;background:white;">
         <iframe id="pdf-iframe" style="width:100%;height:480px;border:none;display:block;" src="about:blank"></iframe>
       </div>
@@ -10118,7 +10125,8 @@ function adm_pintarFicha(inm) {
 var _PRIV_CAMPOS = [
   ['dniPatricio', 'DNI de Patricio'], ['domicilioPatricio', 'Domicilio de Patricio'],
   ['dniJavier', 'DNI de Javier (IGC)'], ['domicilioJavier', 'Domicilio de Javier (IGC)'], // 08/10/2026: firman IGC Patricio y Javier (antes Mercedes, por error)
-  ['ibanPatrimer', 'IBAN Patrimer Levante'], ['ibanPatricio', 'IBAN Patricio'], ['ibanIndustrias', 'IBAN Industrias']
+  ['ibanPatrimer', 'IBAN Patrimer Levante'], ['ibanPatricio', 'IBAN Patricio'], ['ibanIndustrias', 'IBAN Industrias'],
+  ['emailJavier', 'Email de Javier (IGC)'] // 08/10/2026: para "Enviar a Javier"
 ];
 function _privDatos() {
   try { var o = JSON.parse(localStorage.getItem('app:datos_privados') || '{}'); return (o && typeof o === 'object') ? o : {}; }
@@ -10136,7 +10144,7 @@ function _privPintar() {
 }
 function _privAvisarSiFalta() {
   var d = _privDatos();
-  var faltan = _PRIV_CAMPOS.filter(function(c) { return !d[c[0]]; }).map(function(c) { return c[1]; });
+  var faltan = _PRIV_CAMPOS.filter(function(c) { return c[0] !== 'emailJavier' && !d[c[0]]; }).map(function(c) { return c[1]; });
   if (faltan.length && typeof showToast === 'function') {
     showToast('⚠️ Faltan datos privados (' + faltan.join(', ') + '): el PDF saldrá con "pendiente". Rellénalos en Contratos → paso Arrendador → 🔒 Editar DNI, domicilios e IBAN.', 'warning');
   }
@@ -10148,8 +10156,61 @@ function priv_abrir() {
     html += '<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--silver-dim);margin-bottom:4px;">' + c[1] + '</div>'
       + '<input id="priv-in-' + c[0] + '" style="width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:11px 12px;font-size:15px;" value="' + _escAttrJs(d[c[0]] || '') + '"></div>';
   });
+  // 08/10/2026: firma de Patricio (imagen) para los contratos "Firmados"
+  window._privFirmaTmp = undefined;
+  html += '<div style="margin:14px 0 6px;font-size:11px;color:var(--silver-dim);">Mi firma (para los contratos que generes como "Firmado")</div>'
+    + '<div id="priv-firma-prev" style="background:#fff;border-radius:10px;min-height:60px;display:flex;align-items:center;justify-content:center;padding:6px;margin-bottom:8px;"></div>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<label style="flex:1;text-align:center;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;color:var(--silver-bright);cursor:pointer;">📷 Subir mi firma<input type="file" accept="image/*" style="display:none" onchange="priv_firmaElegida(this)"></label>'
+    + '<div onclick="priv_firmaQuitar()" style="flex:0 0 auto;text-align:center;border:1px solid rgba(255,90,90,.5);border-radius:10px;padding:10px 12px;font-size:13px;color:#ff7b7b;cursor:pointer;">Quitar</div>'
+    + '</div>'
+    + '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:6px;">Haz una foto a tu firma en un papel blanco. La app quita el fondo sola.</div>';
   document.getElementById('priv-campos').innerHTML = html;
+  priv_firmaPintar(d.firmaPatricio || '');
   document.getElementById('priv-modal').style.display = 'flex';
+}
+function priv_firmaPintar(src) {
+  var el = document.getElementById('priv-firma-prev'); if (!el) return;
+  el.innerHTML = src ? '<img src="' + src + '" style="max-width:100%;max-height:90px;">' : '<span style="font-size:12px;color:#888;">Sin firma guardada</span>';
+}
+function priv_firmaQuitar() { window._privFirmaTmp = ''; priv_firmaPintar(''); }
+// Procesa la foto: la reduce, convierte el papel (claro) en transparente, deja
+// la tinta en azul oscuro y recorta los bordes vacíos. Resultado: PNG ligero.
+function priv_firmaElegida(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function() {
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var max = 900, k = Math.min(1, max / Math.max(img.width, img.height));
+        var w = Math.round(img.width * k), h = Math.round(img.height * k);
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        var cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+        var id = cx.getImageData(0, 0, w, h), p = id.data;
+        // umbral: media de brillo del papel menos un margen
+        var suma = 0; for (var i = 0; i < p.length; i += 4) suma += (p[i] + p[i+1] + p[i+2]) / 3;
+        var umbral = Math.min(200, (suma / (p.length / 4)) - 45);
+        var x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+          var o = (y * w + x) * 4, br = (p[o] + p[o+1] + p[o+2]) / 3;
+          if (br > umbral) { p[o+3] = 0; }
+          else { var a = Math.min(255, Math.round((umbral - br) / umbral * 255 * 2.2)); p[o] = 20; p[o+1] = 35; p[o+2] = 90; p[o+3] = Math.max(a, 90);
+            if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+        }
+        if (x1 < 0) { alert('No se ha detectado ninguna firma en la foto. Prueba con más luz y el papel bien blanco.'); return; }
+        cx.putImageData(id, 0, 0);
+        var m = 6; x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(w - 1, x1 + m); y1 = Math.min(h - 1, y1 + m);
+        var out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+        out.getContext('2d').drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+        window._privFirmaTmp = out.toDataURL('image/png');
+        priv_firmaPintar(window._privFirmaTmp);
+      } catch (e) { alert('No se pudo procesar la imagen: ' + e.message); }
+    };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+  input.value = '';
 }
 function priv_cerrar() { document.getElementById('priv-modal').style.display = 'none'; }
 function priv_guardar() {
@@ -10159,6 +10220,7 @@ function priv_guardar() {
     var el = document.getElementById('priv-in-' + c[0]);
     if (el) d[c[0]] = el.value.trim();
   });
+  if (window._privFirmaTmp !== undefined) { if (window._privFirmaTmp) d.firmaPatricio = window._privFirmaTmp; else delete d.firmaPatricio; } // 08/10/2026
   d.updatedAt = new Date().toISOString();
   localStorage.setItem('app:datos_privados', JSON.stringify(d));
   _privPintar();
@@ -10412,6 +10474,7 @@ function showWizard() {
   // editarlo, el botón seguía diciendo "Generando..." de la vez anterior.
   document.getElementById('btn-gen-pdf').classList.remove('generating');
   document.getElementById('btn-gen-pdf').innerHTML = '<span>📄</span> Generar PDF';
+  try { wiz_setFirmado(false); } catch (e) {} // 08/10/2026: cada contrato empieza "Sin firmar"
   document.getElementById('pdf-open-direct').style.display = 'none';
   document.getElementById('pdf-iframe').style.display = 'block';
   window._pdfDataUri = null;
@@ -12842,6 +12905,7 @@ async function generarPDF() {
     const _arrtFirmas = _firmantesFirma.length > 1
       ? _firmantesFirma.map(f => _nombreFirmaPersona(f))
       : [(datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—')];
+    const _firmaImg = (window._pdfFirmado && _privDatos().firmaPatricio) ? _privDatos().firmaPatricio : ''; // 08/10/2026
     const _SEP_FIRMA = 33; // hueco entre una firma y la siguiente en la misma columna (08/10/2026: mismo sitio para firmar que la primera)
     // Alto del bloque desde el título ("EL ARRENDADOR") hasta el último nombre
     const _altoFirmas = 38 + _SEP_FIRMA * (Math.max(_arrFirmas.length, _arrtFirmas.length) - 1) + 2;
@@ -12865,6 +12929,16 @@ async function generarPDF() {
       });
       col(c1, _arrFirmas);
       col(c2, _arrtFirmas);
+      // 08/10/2026: imagen de la firma de Patricio encima de SU raya (la primera del arrendador)
+      if (_firmaImg) {
+        try {
+          const pr = doc.getImageProperties(_firmaImg);
+          let fw = 55, fh = fw * pr.height / pr.width;
+          if (fh > 24) { fh = 24; fw = fh * pr.width / pr.height; }
+          const yl = yTop + 33;
+          doc.addImage(_firmaImg, 'PNG', c1 + (75 - fw) / 2, yl - fh - 1, fw, fh);
+        } catch (e) { console.warn('[firma]', e.message); }
+      }
     };
 
     chk(22 + _altoFirmas); // frase de cierre + todas las firmas, en el mismo folio
@@ -12907,6 +12981,17 @@ async function generarPDF() {
       // Rúbrica de cada hoja: solo Patrimer y Patricio (persona física) — en
       // Industrias la firma es mancomunada (Patricio + Javier), así que un
       // "Fdo." con un solo nombre no representaría bien a la empresa.
+      // 08/10/2026: con "Firmado", rúbrica (firma pequeña) de Patricio en cada hoja, también en IGC
+      if (_firmaImg) {
+        try {
+          const prR = doc.getImageProperties(_firmaImg);
+          let rh = 7, rw = rh * prR.width / prR.height;
+          if (rw > 24) { rw = 24; rh = rw * prR.height / prR.width; }
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+          const xR = arrendadorActivo !== 'industrias' ? margin + doc.getTextWidth('Fdo.: Patricio Gómez García') + 2 : margin;
+          doc.addImage(_firmaImg, 'PNG', xR, 284.5 - rh, rw, rh);
+        } catch (e) { console.warn('[rúbrica]', e.message); }
+      }
       if (arrendadorActivo !== 'industrias') {
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(7.5);
@@ -12948,6 +13033,7 @@ async function generarPDF() {
     progress.classList.remove('show');
     btn.style.display = 'none';
     document.getElementById('pdf-done').style.display = 'block';
+    { const _bj = document.getElementById('btn-enviar-javier'); if (_bj) _bj.style.display = (arrendadorActivo === 'industrias') ? 'flex' : 'none'; } // 08/10/2026
     document.getElementById('btns-pdf-footer').style.display = 'none';
 
     // ── GUARDAR CONTRATO Y CLIENTE ─────────────────────────────────
@@ -13336,6 +13422,54 @@ async function compartirPDF() {
 // con el contrato dentro. Si no se puede, se hace como antes (se descarga el
 // PDF y se abre el correo) avisando de que hay que adjuntarlo a mano. El correo
 // va dirigido al email del inquilino si está puesto en el asistente.
+// 08/10/2026 — interruptor "Sin firmar / Firmado por Patricio"
+window._pdfFirmado = false;
+function wiz_setFirmado(si) {
+  if (si && !_privDatos().firmaPatricio) {
+    showConfirm('✍️', 'Falta tu firma', 'Antes tienes que subir tu firma en Contratos → ＋ → "🔒 Editar DNI, domicilios e IBAN" → "Subir mi firma".', [{ label: 'Entendido', cls: 'g', fn: function() {} }]);
+    si = false;
+  }
+  window._pdfFirmado = !!si;
+  var no = document.getElementById('firma-opt-no'), elSi = document.getElementById('firma-opt-si');
+  var on = function(el, act) { if (!el) return; el.style.borderColor = act ? 'var(--accent-gold)' : 'var(--border)'; el.style.background = act ? 'rgba(201,168,76,.12)' : 'var(--navy-card)'; el.style.color = act ? 'var(--accent-gold)' : 'var(--silver-dim)'; el.style.fontWeight = act ? '700' : '600'; };
+  on(no, !si); on(elSi, !!si);
+}
+async function emailJavierPDF() {
+  if (!pdfDoc) return;
+  const inq = getInqNombreActual();
+  const ref = document.getElementById('f-ref').value || '';
+  const dir = (document.getElementById('f-dir').value || '').trim() || ref;
+  const genero = inqEsEmpresa ? '' : ((document.getElementById('f-inq-genero')?.value || 'D.') + ' ');
+  const inmLista = (typeof loadInmuebles === 'function') ? loadInmuebles() : [];
+  const inm = inmLista.find(function(i) { return i.ref === ref; });
+  const conGaraje = !!(inm && inm.garajeRef && inm.garajeIncluido);
+  const ini = document.getElementById('f-inicio').value || '';
+  const iniTxt = ini ? ini.split('-').reverse().join('/') : '—';
+  const rentaN = (typeof parseFmtGlobal === 'function') ? parseFmtGlobal(document.getElementById('f-con-renta').value || '0') : 0;
+  const rentaTxt = ingotros_fmt2(rentaN) + ' €';
+  const firmado = !!window._pdfFirmado;
+  const asuntoTxt = 'Contrato ' + ref + ' - ' + inq + ' - Para firmar';
+  const cuerpoTxt = 'Hola Javier,\n\nTe adjunto' + (firmado ? ', ya firmado por mí,' : '') + ' el contrato de arrendamiento del inmueble situado en ' + dir + (conGaraje ? ' con la plaza de garaje incluida' : '') + ', con el nuevo inquilino ' + genero + inq + '. Empieza el ' + iniTxt + ' y la renta es de ' + rentaTxt + ' al mes.\n\nUna cosa nueva: cuando esté firmado por todos, escanéalo y mándamelo por correo, que lo firmaré electrónicamente para el archivo.\n\nUn saludo,\nPatricio';
+  const emailJ = (_privDatos().emailJavier || '').trim();
+  // El menú Compartir no permite poner el destinatario: se copia el email de Javier para pegarlo en "Para".
+  try { if (emailJ && navigator.clipboard) await navigator.clipboard.writeText(emailJ); } catch (e) {}
+  try {
+    const archivo = new File([pdfDoc.output('blob')], getPdfFilename(), { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+      if (emailJ && typeof showToast === 'function') showToast('📋 Email de Javier copiado: pégalo en "Para".', 'success');
+      await navigator.share({ files: [archivo], title: asuntoTxt, text: cuerpoTxt });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    console.warn('[emailJavierPDF] compartir no disponible:', e && e.message);
+  }
+  descargarPDF();
+  setTimeout(() => {
+    window.location.href = 'mailto:' + encodeURIComponent(emailJ) + '?subject=' + encodeURIComponent(asuntoTxt) + '&body=' + encodeURIComponent(cuerpoTxt);
+    if (typeof showToast === 'function') showToast('📎 El PDF se ha descargado (carpeta Descargas). Arrástralo al correo.', 'warning');
+  }, 600);
+}
 function _emailInqActual() {
   return (inqEsEmpresa
     ? (document.getElementById('f-inq-empresa-email')?.value || '')
