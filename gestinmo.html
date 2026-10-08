@@ -2249,7 +2249,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261006_02';
+const BUILD_ID = '261008_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -5144,7 +5144,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         </div>
         <div class="arr-details">
           <div class="arr-detail"><div class="arr-detail-l">Administrador 1</div><div class="arr-detail-v">Patricio Gómez García</div></div>
-          <div class="arr-detail"><div class="arr-detail-l">Administrador 2</div><div class="arr-detail-v">Mercedes Gómez García</div></div>
+          <div class="arr-detail"><div class="arr-detail-l">Administrador 2</div><div class="arr-detail-v">Francisco Javier Fabregat Periago</div></div>
         </div>
         
       </div>
@@ -7731,7 +7731,7 @@ const LOGO_IMGS = {
 const PROFILES = {
   patrimer:   { name:'Patrimer',   legalName:'Patrimer Levante S.L.',            cif:'B-73110009', address:'Avda. Juan Carlos I 55, 4º, Lorca (Murcia)', arrendador:'D. Patricio Gómez García, en nombre de PATRIMER LEVANTE S.L.', get dni(){return _priv('dniPatricio');}, lau:7, type:'juridica', refPrefix:['VIV','BAJ','PG','RUS'], get iban(){return _priv('ibanPatrimer');}, banco:'CaixaBank' },
   patricio:   { name:'Patricio',   legalName:'Patricio Gómez García',             cif:null,          get address(){return _priv('domicilioPatricio');},  arrendador:'D. Patricio Gómez García', get dni(){return _priv('dniPatricio');}, lau:5, type:'fisica', refPrefix:['VIV-P'], get iban(){return _priv('ibanPatricio');}, banco:'CaixaBank' },
-  industrias: { name:'Industrias', legalName:'Industrias Gómez y Cayuela S.L.',   cif:'B30137418',   address:'Calle Cordobanes Nº15 (Carretera de Caravaca), 30800 Lorca (Murcia)',                       arrendador:'D. Patricio Gómez García y Dña. Mercedes Gómez García (administradores mancomunados)', dni:'pendiente', lau:7, type:'juridica', refPrefix:['IGC'], get iban(){return _priv('ibanIndustrias');}, banco:'CaixaBank' }
+  industrias: { name:'Industrias', legalName:'Industrias Gómez y Cayuela S.L.',   cif:'B30137418',   address:'Calle Cordobanes Nº15 (Carretera de Caravaca), 30800 Lorca (Murcia)',                       arrendador:'D. Patricio Gómez García y D. Francisco Javier Fabregat Periago (administradores mancomunados)', dni:'pendiente', lau:7, type:'juridica', refPrefix:['IGC'], get iban(){return _priv('ibanIndustrias');}, banco:'CaixaBank' }
 };
 
 
@@ -9906,7 +9906,7 @@ const ARRENDADORES = {
   },
   industrias: {
     label: 'Industrias Gómez y Cayuela S.L.', labelCorto: 'Industrias', emoji: '🏭',
-    datos: 'D. Patricio Gómez García y Dña. Mercedes Gómez García\n(Administradores mancomunados)\nINDUSTRIAS GÓMEZ Y CAYUELA S.L.',
+    datos: 'D. Patricio Gómez García y D. Francisco Javier Fabregat Periago\n(Administradores mancomunados)\nINDUSTRIAS GÓMEZ Y CAYUELA S.L.',
     tipo: 'juridica', duracion_min: 7,
     get iban() { return _priv('ibanIndustrias'); }, banco: 'CaixaBank'
   }
@@ -10059,7 +10059,7 @@ function adm_pintarFicha(inm) {
 // rellenan desde "🔒 Editar DNI, domicilios e IBAN" (Contratos → asistente → paso del arrendador).
 var _PRIV_CAMPOS = [
   ['dniPatricio', 'DNI de Patricio'], ['domicilioPatricio', 'Domicilio de Patricio'],
-  ['dniMercedes', 'DNI de Mercedes'], ['domicilioMercedes', 'Domicilio de Mercedes'],
+  ['dniJavier', 'DNI de Javier (IGC)'], ['domicilioJavier', 'Domicilio de Javier (IGC)'], // 08/10/2026: firman IGC Patricio y Javier (antes Mercedes, por error)
   ['ibanPatrimer', 'IBAN Patrimer Levante'], ['ibanPatricio', 'IBAN Patricio'], ['ibanIndustrias', 'IBAN Industrias']
 ];
 function _privDatos() {
@@ -11670,7 +11670,7 @@ function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, 
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y ');
-      addParty('', 'Dña. Mercedes Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniMercedes') + ' y domicilio en ' + _priv('domicilioMercedes') + '.');
+      addParty('', 'D. Francisco Javier Fabregat Periago', ', mayor de edad, con D.N.I. ' + _priv('dniJavier') + ' y domicilio en ' + _priv('domicilioJavier') + '.');
     } else {
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio a efectos de este contrato en ' + _priv('domicilioPatricio') + '.');
     }
@@ -11698,7 +11698,7 @@ function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
-      addParty('', 'D. Patricio y Dña. Mercedes', ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
+      addParty('', 'D. Patricio y D. Francisco Javier', ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
     } else {
       addParty('', 'D. Patricio Gómez García', ' interviene en nombre y representación, como Apoderado, de la mercantil PATRIMER LEVANTE, S.L., constituida el 14 de diciembre de 2.000, ante el Notario de Murcia, D. José Antonio Romá Riera, bajo el número de protocolo 2.524, e inscrita en el Registro Mercantil de Murcia, en la Hoja MU-34461, al Tomo 1.729, Libro 0, Folio 112, con Domicilio en Avda. Juan Carlos I 55, 4º, 30800 Lorca (Murcia), y con CIF B-73110009, (en adelante el ARRENDADOR).');
     }
@@ -11803,7 +11803,7 @@ function generarContratoLocal(doc, datos, arr, margin, pageW, maxW, addText, add
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y ');
-      addParty('', 'Dña. Mercedes Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniMercedes') + ' y domicilio en ' + _priv('domicilioMercedes') + '.');
+      addParty('', 'D. Francisco Javier Fabregat Periago', ', mayor de edad, con D.N.I. ' + _priv('dniJavier') + ' y domicilio en ' + _priv('domicilioJavier') + '.');
     } else {
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio a efectos de este contrato en ' + _priv('domicilioPatricio') + '.');
     }
@@ -11831,7 +11831,7 @@ function generarContratoLocal(doc, datos, arr, margin, pageW, maxW, addText, add
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
-      addParty('', 'D. Patricio y Dña. Mercedes', ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
+      addParty('', 'D. Patricio y D. Francisco Javier', ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
     } else {
       addParty('', 'D. Patricio Gómez García', ' interviene en nombre y representación, como Apoderado, de la mercantil PATRIMER LEVANTE, S.L., constituida el 14 de diciembre de 2.000, ante el Notario de Murcia, D. José Antonio Romá Riera, bajo el número de protocolo 2.524, e inscrita en el Registro Mercantil de Murcia, en la Hoja MU-34461, al Tomo 1.729, Libro 0, Folio 112, con Domicilio en Avda. Juan Carlos I 55, 4º, 30800 Lorca (Murcia), y con CIF B-73110009, (en adelante el ARRENDADOR).');
     }
@@ -11925,7 +11925,7 @@ function generarContratoGaraje(doc, datos, arr, margin, pageW, maxW, addText, ad
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y ');
-      addParty('', 'Dña. Mercedes Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniMercedes') + ' y domicilio en ' + _priv('domicilioMercedes') + '.');
+      addParty('', 'D. Francisco Javier Fabregat Periago', ', mayor de edad, con D.N.I. ' + _priv('dniJavier') + ' y domicilio en ' + _priv('domicilioJavier') + '.');
     } else {
       addParty('', 'D. Patricio Gómez García', ', mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio a efectos de este contrato en ' + _priv('domicilioPatricio') + '.');
     }
@@ -11949,7 +11949,7 @@ function generarContratoGaraje(doc, datos, arr, margin, pageW, maxW, addText, ad
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
-      addParty('', 'D. Patricio y Dña. Mercedes', ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
+      addParty('', 'D. Patricio y D. Francisco Javier', ' en nombre y representación, como administradores mancomunados, de la sociedad mercantil INDUSTRIAS GÓMEZ Y CAYUELA S.L., (en adelante el ARRENDADOR).');
     } else {
       addParty('', 'D. Patricio Gómez García', ' interviene en nombre y representación, como Apoderado, de la mercantil PATRIMER LEVANTE, S.L., constituida el 14 de diciembre de 2.000, ante el Notario de Murcia, D. José Antonio Romá Riera, bajo el número de protocolo 2.524, e inscrita en el Registro Mercantil de Murcia, en la Hoja MU-34461, al Tomo 1.729, Libro 0, Folio 112, con Domicilio en Avda. Juan Carlos I 55, 4º, 30800 Lorca (Murcia), y con CIF B-73110009, (en adelante el ARRENDADOR).');
     }
@@ -12031,7 +12031,7 @@ function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, a
   addTitle('REUNIDOS');
   addBlock('De una parte:');
   if (arrendadorActivo === 'industrias') {
-    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. ' + _priv('dniMercedes') + ' y domicilio en ' + _priv('domicilioMercedes') + '.');
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y D. Francisco Javier Fabregat Periago, mayor de edad, con D.N.I. ' + _priv('dniJavier') + ' y domicilio en ' + _priv('domicilioJavier') + '.');
   } else {
     addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio a efectos de este contrato en ' + _priv('domicilioPatricio') + '.');
   }
@@ -12046,7 +12046,7 @@ function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, a
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
-    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. ' + (arrendadorActivo === 'industrias' ? 'B30137418' : 'B73110009') + ' y domicilio social en ' + (arrendadorActivo === 'industrias' ? 'Calle Cordobanes Nº 15 (Carretera de Caravaca)' : 'Avda. Juan Carlos I 55, 4º') + ', 30800 Lorca (Murcia), en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
+    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y D. Francisco Javier en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. ' + (arrendadorActivo === 'industrias' ? 'B30137418' : 'B73110009') + ' y domicilio social en ' + (arrendadorActivo === 'industrias' ? 'Calle Cordobanes Nº 15 (Carretera de Caravaca)' : 'Avda. Juan Carlos I 55, 4º') + ', 30800 Lorca (Murcia), en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante, indistintamente, "el arrendador" o "la parte arrendadora".');
   }
@@ -12116,7 +12116,7 @@ function generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText,
   addTitle('REUNIDOS');
   addBlock('De una parte:');
   if (arrendadorActivo === 'industrias') {
-    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. ' + _priv('dniMercedes') + ' y domicilio en ' + _priv('domicilioMercedes') + '.');
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y D. Francisco Javier Fabregat Periago, mayor de edad, con D.N.I. ' + _priv('dniJavier') + ' y domicilio en ' + _priv('domicilioJavier') + '.');
   } else {
     addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio a efectos de este contrato en ' + _priv('domicilioPatricio') + '.');
   }
@@ -12131,7 +12131,7 @@ function generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText,
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
-    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. ' + (arrendadorActivo === 'industrias' ? 'B30137418' : 'B73110009') + ' y domicilio social en ' + (arrendadorActivo === 'industrias' ? 'Calle Cordobanes Nº 15 (Carretera de Caravaca)' : 'Avda. Juan Carlos I 55, 4º') + ', 30800 Lorca (Murcia), en adelante, indistintamente, "la arrendadora", "el arrendador" o "la parte arrendadora".');
+    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y D. Francisco Javier en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. ' + (arrendadorActivo === 'industrias' ? 'B30137418' : 'B73110009') + ' y domicilio social en ' + (arrendadorActivo === 'industrias' ? 'Calle Cordobanes Nº 15 (Carretera de Caravaca)' : 'Avda. Juan Carlos I 55, 4º') + ', 30800 Lorca (Murcia), en adelante, indistintamente, "la arrendadora", "el arrendador" o "la parte arrendadora".');
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante, indistintamente, "la arrendadora", "el arrendador" o "la parte arrendadora".');
   }
@@ -12209,7 +12209,7 @@ function generarContratoRusticoTemporada(doc, datos, arr, margin, pageW, maxW, a
   addTitle('REUNIDOS');
   addBlock('De una parte:');
   if (arrendadorActivo === 'industrias') {
-    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y Dña. Mercedes Gómez García, mayor de edad, con D.N.I. ' + _priv('dniMercedes') + ' y domicilio en ' + _priv('domicilioMercedes') + '.');
+    addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio en ' + _priv('domicilioPatricio') + ', y D. Francisco Javier Fabregat Periago, mayor de edad, con D.N.I. ' + _priv('dniJavier') + ' y domicilio en ' + _priv('domicilioJavier') + '.');
   } else {
     addBlock('D. Patricio Gómez García, mayor de edad, con D.N.I. ' + _priv('dniPatricio') + ' y domicilio a efectos de este contrato en ' + _priv('domicilioPatricio') + '.');
   }
@@ -12224,7 +12224,7 @@ function generarContratoRusticoTemporada(doc, datos, arr, margin, pageW, maxW, a
 
   addTitle('INTERVIENEN');
   if (arr.tipo === 'juridica') {
-    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y Dña. Mercedes en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. ' + (arrendadorActivo === 'industrias' ? 'B30137418' : 'B73110009') + ' y domicilio social en ' + (arrendadorActivo === 'industrias' ? 'Calle Cordobanes Nº 15 (Carretera de Caravaca)' : 'Avda. Juan Carlos I 55, 4º') + ', 30800 Lorca (Murcia), en adelante "el arrendador" o "la parte arrendadora".');
+    addBlock((arrendadorActivo === 'industrias' ? 'D. Patricio y D. Francisco Javier en nombre y representación, como administradores mancomunados' : 'D. Patricio en nombre y representación, como apoderado') + ', de la sociedad mercantil ' + arr.label + ', con C.I.F. ' + (arrendadorActivo === 'industrias' ? 'B30137418' : 'B73110009') + ' y domicilio social en ' + (arrendadorActivo === 'industrias' ? 'Calle Cordobanes Nº 15 (Carretera de Caravaca)' : 'Avda. Juan Carlos I 55, 4º') + ', 30800 Lorca (Murcia), en adelante "el arrendador" o "la parte arrendadora".');
   } else {
     addBlock('D. Patricio Gómez García actúa en su propio nombre y representación, en adelante "el arrendador" o "la parte arrendadora".');
   }
@@ -12774,7 +12774,7 @@ async function generarPDF() {
     for (let i = 1; i <= tp; i++) {
       doc.setPage(i);
       // Rúbrica de cada hoja: solo Patrimer y Patricio (persona física) — en
-      // Industrias la firma es mancomunada (Patricio + Mercedes), así que un
+      // Industrias la firma es mancomunada (Patricio + Javier), así que un
       // "Fdo." con un solo nombre no representaría bien a la empresa.
       if (arrendadorActivo !== 'industrias') {
         doc.setFont('helvetica', 'italic');
@@ -21927,7 +21927,7 @@ function generarContratoRescision(doc, datos, arr, margin, pageW, maxW, addText,
   addTitle('REUNIDOS');
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
-      addParty('De una parte, ', 'D. Patricio Gómez García', ', con DNI ' + _priv('dniPatricio') + ', y Dña. Mercedes Gómez García, con DNI ' + _priv('dniMercedes') + ', actuando como administradores mancomunados de INDUSTRIAS GÓMEZ Y CAYUELA S.L., con CIF B30137418 (en adelante, el ARRENDADOR).');
+      addParty('De una parte, ', 'D. Patricio Gómez García', ', con DNI ' + _priv('dniPatricio') + ', y D. Francisco Javier Fabregat Periago, con DNI ' + _priv('dniJavier') + ', actuando como administradores mancomunados de INDUSTRIAS GÓMEZ Y CAYUELA S.L., con CIF B30137418 (en adelante, el ARRENDADOR).');
     } else {
       addParty('De una parte, ', 'D. Patricio Gómez García', ', con DNI ' + _priv('dniPatricio') + ', actuando en nombre y representación de PATRIMER LEVANTE, S.L., con CIF B-73110009 (en adelante, el ARRENDADOR).');
     }
@@ -21975,7 +21975,7 @@ function generarContratoRescision(doc, datos, arr, margin, pageW, maxW, addText,
 function _reunidosEstandar(arr, addParty) {
   if (arr.tipo === 'juridica') {
     if (arrendadorActivo === 'industrias') {
-      addParty('De una parte, ', 'D. Patricio Gómez García', ', con DNI ' + _priv('dniPatricio') + ', y Dña. Mercedes Gómez García, con DNI ' + _priv('dniMercedes') + ', actuando como administradores mancomunados de INDUSTRIAS GÓMEZ Y CAYUELA S.L., con CIF B30137418 (en adelante, el ARRENDADOR).');
+      addParty('De una parte, ', 'D. Patricio Gómez García', ', con DNI ' + _priv('dniPatricio') + ', y D. Francisco Javier Fabregat Periago, con DNI ' + _priv('dniJavier') + ', actuando como administradores mancomunados de INDUSTRIAS GÓMEZ Y CAYUELA S.L., con CIF B30137418 (en adelante, el ARRENDADOR).');
     } else {
       addParty('De una parte, ', 'D. Patricio Gómez García', ', con DNI ' + _priv('dniPatricio') + ', actuando en nombre y representación de PATRIMER LEVANTE, S.L., con CIF B-73110009 (en adelante, el ARRENDADOR).');
     }
