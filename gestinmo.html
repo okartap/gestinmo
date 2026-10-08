@@ -2249,7 +2249,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_04';
+const BUILD_ID = '261008_07';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2551,8 +2551,16 @@ function _registroMerge(localJSON, remoteJSON) {
     const mapa = {};
     (locales || []).forEach(function(e) { if (e && e.id) mapa[e.id] = e; });
     (remotas || []).forEach(function(e) { if (e && e.id && !mapa[e.id]) mapa[e.id] = e; });
+    // 08/10/2026: "Borrar historial" (solo Patricio) deja una marca '_vaciado'
+    // con la fecha hasta la que se borró; se queda la más reciente de las dos
+    // copias y se descarta todo lo anterior, para que otro aparato no lo
+    // vuelva a traer en la fusión.
+    let hasta = '';
+    [locales || [], remotas || []].forEach(function(arr) { arr.forEach(function(e) { if (e && e.id === '_vaciado' && String(e.hasta || '') > hasta) hasta = String(e.hasta || ''); }); });
+    if (hasta) mapa['_vaciado'] = { id: '_vaciado', tipo: 'vaciado', ts: hasta, hasta: hasta };
     const limite = Date.now() - (90 * 24 * 60 * 60 * 1000);
     const lista = Object.keys(mapa).map(function(k) { return mapa[k]; })
+      .filter(function(e) { return !hasta || e.id === '_vaciado' || String(e.ts || '') > hasta; })
       .filter(function(e) { const t = Date.parse(e.ts || ''); return isNaN(t) || t >= limite; })
       .sort(function(a, b) { return String(b.ts || '').localeCompare(String(a.ts || '')); });
     return JSON.stringify(lista);
@@ -6993,7 +7001,8 @@ con editar/borrar en cada línea. -->
     <div class="mtitle">Registro de actividad<span class="mclose" onclick="closeModalById('registro-modal')">&#10005;</span></div>
     <div style="font-size:11px;color:var(--silver-dim);margin:-6px 0 8px;">Entradas en la app (👤) e intentos de crear/editar/borrar (🔒) de los usuarios en modo Visualización, de los últimos 90 días. No lo ve Mercedes, solo tú.</div>
     <div id="registro-lista" style="overflow-y:auto;flex:1;"></div>
-    <button class="btn2" onclick="closeModalById('registro-modal')" style="margin-top:12px;">Cerrar</button>
+    <button id="registro-borrar" onclick="registro_borrar()" style="margin-top:12px;background:transparent;border:1px solid rgba(255,90,90,.5);border-radius:12px;color:#ff7b7b;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;padding:10px;cursor:pointer;">🗑️ Borrar historial</button>
+    <button class="btn2" onclick="closeModalById('registro-modal')" style="margin-top:8px;">Cerrar</button>
   </div>
 </div>
 
@@ -11574,6 +11583,7 @@ function padron_generarJustificanteBaja(contratoId, historialIdx) {
     if (!esPersonaFisica) {
       sp(4);
       doc.text(emp.rep, col2, y);
+      if (arrKey === 'industrias') { sp(4); doc.text('D. Francisco Javier Fabregat Periago', col2, y); } // 08/10/2026
     }
 
     const fechaArchivo = _fechaHoyLocal();
@@ -11734,6 +11744,39 @@ function _listaConY(textos) {
   return textos.slice(0, -1).join(', ') + ' y ' + textos[textos.length - 1];
 }
 
+// 08/10/2026 (pedido por Patry): el texto del contrato se adapta al género del
+// arrendatario (D. / Dña. elegido en el asistente): "el/la ARRENDATARIO/A" pasa
+// a "el ARRENDATARIO" o "la ARRENDATARIA", etc. Una empresa va en masculino
+// ("el ARRENDATARIO"). Con varios firmantes se adaptan solo las formas en
+// plural ("los/las ARRENDATARIOS/AS"): las de singular se dejan tal cual para
+// no romper la concordancia de las frases.
+function _arrtVarios(datos) { return !!(datos && datos.todosFirmantes && datos.todosFirmantes.length > 1); }
+function _generoTxt(t, datos) {
+  if (typeof t !== 'string' || !datos || t.indexOf('/') < 0) return t;
+  if (!_arrtVarios(datos)) {
+    const fem = !datos.inqEsEmpresa && datos.inqGenero === 'Dña.';
+    return t
+      .replace(/al\/a la ARRENDATARIO\/A/g, fem ? 'a la ARRENDATARIA' : 'al ARRENDATARIO')
+      .replace(/del\/de la ARRENDATARIO\/A/g, fem ? 'de la ARRENDATARIA' : 'del ARRENDATARIO')
+      .replace(/EL\/LA ARRENDATARIO\/A/g, fem ? 'LA ARRENDATARIA' : 'EL ARRENDATARIO')
+      .replace(/El\/la ARRENDATARIO\/A/g, fem ? 'La ARRENDATARIA' : 'El ARRENDATARIO')
+      .replace(/el\/la ARRENDATARIO\/A/g, fem ? 'la ARRENDATARIA' : 'el ARRENDATARIO')
+      .replace(/ARRENDATARIO\/A/g, fem ? 'ARRENDATARIA' : 'ARRENDATARIO')
+      .replace(/\b(interesad|domiciliad|obligad)o\/a\b/g, function(m, r) { return r + (fem ? 'a' : 'o'); });
+  }
+  const todasFem = datos.todosFirmantes.every(function(f) { return f && !f.esEmpresa && f.genero === 'Dña.'; });
+  return t
+    .replace(/LOS\/LAS ARRENDATARIOS\/AS/g, todasFem ? 'LAS ARRENDATARIAS' : 'LOS ARRENDATARIOS')
+    .replace(/los\/las ARRENDATARIOS\/AS/g, todasFem ? 'las ARRENDATARIAS' : 'los ARRENDATARIOS')
+    .replace(/Los\/las ARRENDATARIOS\/AS/g, todasFem ? 'Las ARRENDATARIAS' : 'Los ARRENDATARIOS')
+    .replace(/los\/las arrendatarios\/as/g, todasFem ? 'las arrendatarias' : 'los arrendatarios')
+    .replace(/\binteresados\/as\b/g, todasFem ? 'interesadas' : 'interesados');
+}
+// EXPONEN II: ya no repite el nombre (en REUNIDOS ya queda "en adelante, el ARRENDATARIO")
+function _arrtSujeto(datos) { return _arrtVarios(datos) ? 'los/las ARRENDATARIOS/AS' : 'el/la ARRENDATARIO/A'; }
+function _arrtEstaInteresado(datos) { return _arrtVarios(datos) ? 'están interesados/as' : 'está interesado/a'; }
+function _arrtInteresado(datos) { return _arrtVarios(datos) ? 'interesados/as' : 'interesado/a'; }
+
 function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma, addParty) {
   const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
   const fStr = datos.fin ? formatFechaLarga(datos.fin) : '—';
@@ -11799,7 +11842,7 @@ function generarContratoVivienda(doc, datos, arr, margin, pageW, maxW, addText, 
   const tipoFincaLabel = {viv:'VIVIENDA',vac:'VIVIENDA',local:'LOCAL COMERCIAL',garaje:'PLAZA DE GARAJE'}[datos.tipo] || 'INMUEBLE';
   addTitle('EXPONEN');
   addBlock('I. – Que el ARRENDADOR es propietario en pleno dominio, de la siguiente finca urbana, que manifiesta libre de cargas:\n' + tipoFincaLabel + ' EN ' + (datos.dir || '—').toUpperCase() + (datos.catastral ? '\nReferencia Catastral: ' + datos.catastral : '') + '');
-  addBlock('II. – Que ' + (datos.inqNombre ? (datos.inqEsEmpresa ? datos.inqNombre : (datos.inqGenero||'D.') + ' ' + datos.inqNombre) : (datos.inqGenero||'D.') + ' —') + ' está interesado/a en arrendar la vivienda descrita para que constituya su vivienda habitual.');
+  addBlock('II. – Que ' + _arrtSujeto(datos) + ' ' + _arrtEstaInteresado(datos) + ' en arrendar la vivienda descrita para que constituya su vivienda habitual.');
   addBlock('Ambas partes han convenido formalizar el presente contrato de arrendamiento con base en las siguientes,');
   addLine();
 
@@ -11930,7 +11973,7 @@ function generarContratoLocal(doc, datos, arr, margin, pageW, maxW, addText, add
 
   addTitle('EXPONEN');
   addBlock('I. – Que el ARRENDADOR es propietario en pleno dominio del siguiente LOCAL COMERCIAL, libre de cargas:\nLOCAL COMERCIAL EN ' + (datos.dir || '—').toUpperCase() + (datos.catastral ? '\nReferencia Catastral: ' + datos.catastral : ''));
-  addBlock('II. – Que estando interesado/a ' + (datos.inqEsEmpresa ? datos.inqNombre : (datos.inqGenero||'D.') + ' ' + (datos.inqNombre||'—')) + ' en el arrendamiento del local descrito para uso distinto del de vivienda, ambas partes han convenido formalizar el presente contrato con base en las siguientes,');
+  addBlock('II. – Que estando ' + _arrtInteresado(datos) + ' ' + _arrtSujeto(datos) + ' en el arrendamiento del local descrito para uso distinto del de vivienda, ambas partes han convenido formalizar el presente contrato con base en las siguientes,');
   addLine();
 
   chk(60);
@@ -12042,7 +12085,7 @@ function generarContratoGaraje(doc, datos, arr, margin, pageW, maxW, addText, ad
 
   addTitle('EXPONEN');
   addBlock('I. – Que el ARRENDADOR es propietario en pleno dominio de la siguiente finca urbana, libre de cargas:\nPLAZA DE GARAJE EN ' + (datos.dir || '—').toUpperCase() + (datos.catastral ? '\nReferencia Catastral: ' + datos.catastral : ''));
-  addBlock('II. – Que estando interesado/a ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre||'—') + ' en el arrendamiento de la plaza de garaje descrita y el ARRENDADOR en concedérselo, ambas partes han convenido formalizar el presente contrato con base en las siguientes,');
+  addBlock('II. – Que estando ' + _arrtInteresado(datos) + ' ' + _arrtSujeto(datos) + ' en el arrendamiento de la plaza de garaje descrita y el ARRENDADOR en concedérselo, ambas partes han convenido formalizar el presente contrato con base en las siguientes,');
   addLine();
 
   chk(60);
@@ -12132,7 +12175,7 @@ function generarContratoRustico(doc, datos, arr, margin, pageW, maxW, addText, a
 
   addTitle('EXPONEN');
   addBlock('I. – Que la sociedad mercantil ' + arr.label + ' es propietaria de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
-  addBlock('II. – Que estando interesado/a ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' en el arrendamiento de la finca antes descrita y ' + arr.label + ' en concedérselo, ambas partes han convenido en formalizar el presente contrato de arrendamiento de finca rústica con base en las siguientes,');
+  addBlock('II. – Que estando ' + _arrtInteresado(datos) + ' ' + _arrtSujeto(datos) + ' en el arrendamiento de la finca antes descrita y ' + arr.label + ' en concedérselo, ambas partes han convenido en formalizar el presente contrato de arrendamiento de finca rústica con base en las siguientes,');
   addLine();
 
   chk(60);
@@ -12217,7 +12260,7 @@ function generarContratoTemporada(doc, datos, arr, margin, pageW, maxW, addText,
 
   addTitle('EXPONEN');
   addBlock('I. – Que la sociedad mercantil ' + arr.label + ', es propietaria de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
-  addBlock('II. – Que ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' está interesado/a en arrendar la vivienda descrita para satisfacer una necesidad temporal de vivienda, pues por motivos laborales necesita habitarla durante un periodo cierto de tiempo.\n\nAmbas partes han convenido formalizar el presente contrato de arrendamiento de vivienda por temporada, con base en las siguientes,');
+  addBlock('II. – Que ' + _arrtSujeto(datos) + ' ' + _arrtEstaInteresado(datos) + ' en arrendar la vivienda descrita para satisfacer una necesidad temporal de vivienda, pues por motivos laborales necesita habitarla durante un periodo cierto de tiempo.\n\nAmbas partes han convenido formalizar el presente contrato de arrendamiento de vivienda por temporada, con base en las siguientes,');
   addLine();
 
   chk(60);
@@ -12310,7 +12353,7 @@ function generarContratoRusticoTemporada(doc, datos, arr, margin, pageW, maxW, a
 
   addTitle('EXPONEN');
   addBlock('I. – Que la sociedad mercantil ' + arr.label + ' es propietaria de:\n' + (datos.dir || '—') + (datos.catastral ? '\nRef. Catastral: ' + datos.catastral : ''));
-  addBlock('II. – Que ' + (datos.inqGenero||'D.') + ' ' + (datos.inqNombre || '—') + ' está interesado/a en el arrendamiento de la finca antes descrita por una sola temporada y por un tiempo inferior a un año agrícola, y ' + arr.label + ' en concedérselo. Ambas partes han convenido formalizar el presente contrato de arrendamiento de finca rústica por una sola temporada y por un tiempo inferior a un año, con base en las siguientes,');
+  addBlock('II. – Que ' + _arrtSujeto(datos) + ' ' + _arrtEstaInteresado(datos) + ' en el arrendamiento de la finca antes descrita por una sola temporada y por un tiempo inferior a un año agrícola, y ' + arr.label + ' en concedérselo. Ambas partes han convenido formalizar el presente contrato de arrendamiento de finca rústica por una sola temporada y por un tiempo inferior a un año, con base en las siguientes,');
   addLine();
 
   chk(60);
@@ -12579,6 +12622,7 @@ async function generarPDF() {
 
     // Helpers de tipografía
     const addText = (text, x, fs = 10, style = 'normal', color = [0, 0, 0]) => {
+      text = _generoTxt(text, datos);
       doc.setFontSize(fs); doc.setFont('helvetica', style); doc.setTextColor(...color);
       const lines = doc.splitTextToSize(text, maxW);
       doc.text(lines, x, y);
@@ -12587,6 +12631,7 @@ async function generarPDF() {
 
     // Párrafo con indent de 8mm (estilo notarial)
     const addBlock = (text, bold = false) => {
+      text = _generoTxt(text, datos);
       doc.setFontSize(10);
       doc.setFont('helvetica', bold ? 'bold' : 'normal');
       doc.setTextColor(20, 20, 40);
@@ -12598,6 +12643,7 @@ async function generarPDF() {
 
     // Título de sección (centrado, mayúsculas, espaciado)
     const addTitle = (text) => {
+      text = _generoTxt(text, datos);
       if (y + 12 > 272) { doc.addPage(); y = margin; }
       y += 4;
       doc.setFontSize(11);
@@ -12620,6 +12666,7 @@ async function generarPDF() {
     // Helper para párrafos donde el nombre de la parte va en negrita
     // Uso: addParty('D. ', 'Patricio Gómez García', ', mayor de edad...')
     const addParty = (prefix, boldName, suffix) => {
+      prefix = _generoTxt(prefix, datos); suffix = _generoTxt(suffix, datos);
       doc.setFontSize(10);
       doc.setTextColor(20, 20, 40);
       const indentX = margin + 8;
@@ -12738,7 +12785,43 @@ async function generarPDF() {
     }
 
     // ---- CIERRE Y FIRMAS ----
-    chk(55);
+    // 08/10/2026 (pedido por Patry): TODAS las firmas (arrendador/es y todos
+    // los arrendatarios) van juntas en el mismo folio y nunca se cortan: se
+    // calcula antes el alto que ocupan y, si no caben, pasan enteras al folio
+    // siguiente. En IGC firman los dos administradores (Patricio y Javier).
+    const c1 = margin + 5, c2 = pageW / 2 + 10;
+    const _firmantesFirma = _firmantesParaPDF(datos);
+    const _arrFirmas = arrendadorActivo === 'industrias'
+      ? ['D. Patricio Gómez García', 'D. Francisco Javier Fabregat Periago']
+      : ['D. Patricio Gómez García'];
+    const _arrtFirmas = _firmantesFirma.length > 1
+      ? _firmantesFirma.map(f => _nombreFirmaPersona(f))
+      : [(datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—')];
+    const _SEP_FIRMA = 22; // hueco entre una firma y la siguiente en la misma columna
+    // Alto del bloque desde el título ("EL ARRENDADOR") hasta el último nombre
+    const _altoFirmas = 38 + _SEP_FIRMA * (Math.max(_arrFirmas.length, _arrtFirmas.length) - 1) + 2;
+    const _dibujarFirmas = (yTop) => {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 50, 120);
+      doc.text(_arrFirmas.length > 1 ? 'LA PARTE ARRENDADORA' : 'EL ARRENDADOR', c1, yTop);
+      doc.text(_generoTxt(_arrtFirmas.length > 1 ? 'LOS/LAS ARRENDATARIOS/AS' : 'EL/LA ARRENDATARIO/A', datos), c2, yTop);
+      const col = (x, nombres) => nombres.forEach((n, i) => {
+        const yl = yTop + 33 + _SEP_FIRMA * i;
+        doc.setDrawColor(100, 120, 180);
+        doc.setLineWidth(0.4);
+        doc.line(x, yl, x + 75, yl);
+        doc.setLineWidth(0.2);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(120, 130, 160);
+        doc.text('Firma: ' + n, x, yl + 5);
+      });
+      col(c1, _arrFirmas);
+      col(c2, _arrtFirmas);
+    };
+
+    chk(22 + _altoFirmas); // frase de cierre + todas las firmas, en el mismo folio
     y += 6;
     addLine();
     doc.setFontSize(10);
@@ -12746,52 +12829,8 @@ async function generarPDF() {
     doc.setTextColor(80, 80, 100);
     doc.text('Y para que conste, lo firman las partes por duplicado en el lugar y fecha al principio indicados.', margin, y, { maxWidth: maxW });
     y += 10;
-
-    const c1 = margin + 5, c2 = pageW / 2 + 10;
-    // PUNTO 184 (17/09/2026): con varios firmantes, cada uno necesita su
-    // propio hueco de firma — antes solo había uno para "EL/LA
-    // ARRENDATARIO/A". Con 1 solo firmante el resultado es idéntico al de
-    // siempre (misma posición, mismo texto).
-    const _firmantesFirma = _firmantesParaPDF(datos);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 50, 120);
-    doc.text('EL ARRENDADOR', c1, y);
-    doc.text(_firmantesFirma.length > 1 ? 'LOS/LAS ARRENDATARIOS/AS' : 'EL/LA ARRENDATARIO/A', c2, y);
-    y += 5;
-
-    y += 28;
-    doc.setDrawColor(100, 120, 180);
-    doc.setLineWidth(0.4);
-    doc.line(c1, y, c1 + 75, y);
-    if (_firmantesFirma.length <= 1) doc.line(c2, y, c2 + 75, y);
-    doc.setLineWidth(0.2);
-    y += 5;
-
-    doc.setFontSize(8);
-    doc.setTextColor(120, 130, 160);
-    doc.text('Firma: D. Patricio Gómez García', c1, y);
-    if (_firmantesFirma.length <= 1) {
-      doc.text('Firma: ' + (datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—'), c2, y);
-    } else {
-      // Una línea de firma por cada firmante, apiladas en la columna del
-      // arrendatario, empezando en la misma altura que el arrendador. Si no
-      // caben todas en la página, se continúa en una nueva.
-      let yArr = y - 5;
-      _firmantesFirma.forEach((f, idx) => {
-        if (idx > 0) {
-          yArr += 20;
-          if (yArr + 5 > 272) { doc.addPage(); yArr = margin + 15; }
-        }
-        doc.setDrawColor(100, 120, 180);
-        doc.setLineWidth(0.4);
-        doc.line(c2, yArr, c2 + 75, yArr);
-        doc.setLineWidth(0.2);
-        doc.setFontSize(8);
-        doc.setTextColor(120, 130, 160);
-        doc.text('Firma: ' + _nombreFirmaPersona(f), c2, yArr + 5);
-      });
-    }
+    _dibujarFirmas(y);
+    y += _altoFirmas;
 
     // ---- ANEXO PADRÓN con texto legal real ----
     // (si tipo==='padron' ya se ha generado como contenido PRINCIPAL más
@@ -12805,43 +12844,15 @@ async function generarPDF() {
         if (n) personas.push({ num: i, nombre: n, dni: d, rel: r });
       }
       if (personas.length > 0) {
-        generarAnexoPadron(doc, datos, arr, margin, pageW, maxW, addText, null, null, addLine, chk, ciudad, fechaFirma, personas);
-
-        // Firmas del anexo
-        const totalPagesNow = doc.getNumberOfPages();
-        doc.setPage(totalPagesNow);
-        const yF = 255;
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 50, 120);
-        doc.text('EL ARRENDADOR', c1, yF);
-        doc.text(_firmantesFirma.length > 1 ? 'LOS/LAS ARRENDATARIOS/AS' : 'EL/LA ARRENDATARIO/A', c2, yF);
-        doc.setDrawColor(100, 120, 180);
-        doc.line(c1, yF + 17, c1 + 75, yF + 17);
-        if (_firmantesFirma.length <= 1) doc.line(c2, yF + 17, c2 + 75, yF + 17);
-        doc.setFontSize(8);
-        doc.setTextColor(120, 130, 160);
-        doc.text('Firma: D. Patricio Gómez García', c1, yF + 22);
-        if (_firmantesFirma.length <= 1) {
-          doc.text('Firma: ' + (datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—'), c2, yF + 22);
-        } else {
-          // PUNTO 184 (17/09/2026): mismo criterio que en el bloque de firmas
-          // principal, adaptado al poco espacio fijo que tiene este anexo.
-          let yArrF = yF + 17;
-          _firmantesFirma.forEach((f, idx) => {
-            if (idx > 0) {
-              yArrF += 12;
-              if (yArrF + 5 > 285) { doc.addPage(); yArrF = margin + 15; }
-            }
-            doc.setDrawColor(100, 120, 180);
-            doc.line(c2, yArrF, c2 + 75, yArrF);
-            doc.setFontSize(8);
-            doc.setTextColor(120, 130, 160);
-            doc.text('Firma: ' + _nombreFirmaPersona(f), c2, yArrF + 5);
-          });
-        }
+        const _yFinAnexo = generarAnexoPadron(doc, datos, arr, margin, pageW, maxW, addText, null, null, addLine, chk, ciudad, fechaFirma, personas);
+        // Firmas del anexo: justo debajo de su texto; si no caben enteras, al folio siguiente.
+        doc.setPage(doc.getNumberOfPages());
+        let yF = (typeof _yFinAnexo === 'number' ? _yFinAnexo : 230) + 10;
+        if (yF + _altoFirmas > 278) { doc.addPage(); yF = margin + 10; }
+        _dibujarFirmas(yF);
       }
     }
+
 
     // ---- PIE DE PÁGINA en todas las páginas ----
     const tp = doc.getNumberOfPages();
@@ -15489,7 +15500,12 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
     if (esPersonaFisica) {
       lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, actuando en su propio nombre y derecho, en calidad de ARRENDADOR.`);
     } else {
+      if (arrKey === 'industrias') {
+        // 08/10/2026: IGC actúa por sus dos administradores mancomunados
+        lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, y D. Francisco Javier Fabregat Periago, con NIF ${_priv('dniJavier')}, actuando como administradores mancomunados en nombre y representación de ${emp.legalName}${emp.cif?', con CIF '+emp.cif:''},  en calidad de ARRENDADOR.`);
+      } else {
       lnW(`De una parte, ${emp.rep}, con NIF ${emp.repDNI}, actuando en nombre y representación de ${emp.legalName}${emp.cif?', con CIF '+emp.cif:''},  en calidad de ARRENDADOR.`);
+      }
     }
     sp(3);
     const inqTratamiento=(c.inqGenero||'D.')+' ';
@@ -15537,6 +15553,7 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
     if (!esPersonaFisica) {
       sp(4);
       doc.text(emp.rep,col1,y);
+      if (arrKey === 'industrias') { sp(4); doc.text('D. Francisco Javier Fabregat Periago',col1,y); } // 08/10/2026
     }
 
     const fecha=_fechaHoyLocal();
@@ -22988,7 +23005,8 @@ function pend_gestionar(i) {
 function registro_render() {
   var lista = document.getElementById('registro-lista');
   if (!lista) return;
-  var reg = _registroLoad().slice().sort(function(a, b) { return String(b.ts || '').localeCompare(String(a.ts || '')); });
+  var reg = _registroLoad().filter(function(e) { return e && e.tipo !== 'vaciado'; }).slice().sort(function(a, b) { return String(b.ts || '').localeCompare(String(a.ts || '')); });
+  var btnB = document.getElementById('registro-borrar'); if (btnB) btnB.style.display = (reg.length && getRol() === 'admin') ? '' : 'none';
   if (reg.length === 0) {
     lista.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:16px 0;">Sin actividad registrada en los últimos 90 días.</div>';
     return;
@@ -23010,6 +23028,21 @@ function registro_render() {
       '</div>' +
     '</div>';
   }).join('');
+}
+// 08/10/2026 (pedido por Patry): borrar todo el historial, solo Patricio, con confirmación.
+function registro_borrar() {
+  if (getRol() !== 'admin') return;
+  showConfirm('🗑️', 'Borrar el registro de actividad', '¿Seguro que quieres borrar todo el historial? Se borra también en los demás aparatos y no se puede deshacer.', [
+    { label: 'Borrar', cls: 'danger', fn: function() {
+      var ahora = new Date().toISOString();
+      localStorage.setItem('app:registro_actividad', JSON.stringify([{ id: '_vaciado', tipo: 'vaciado', ts: ahora, hasta: ahora }]));
+      localStorage.setItem('app:registro_visto_hasta', ahora);
+      registro_render();
+      if (typeof pend_render === 'function') pend_render();
+      showToast('🗑️ Registro de actividad borrado', 'success');
+    } },
+    { label: 'Cancelar', cls: 'g', fn: function() {} }
+  ]);
 }
 function registro_abrir() {
   registro_render();
