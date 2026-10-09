@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261009_01';
+const BUILD_ID = '261009_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -3256,7 +3256,48 @@ function _kurraDedupe(json) {
   } catch (e) { return json; }
 }
 window._kurraDedupe = _kurraDedupe;
+// 09/10/2026 — BUG REAL (la firma desaparecía): 'app:datos_privados' se
+// sincronizaba "todo o nada"; si otro aparato que aún no tenía la firma
+// guardaba cualquier dato privado (o reenviaba su copia), la nube se quedaba
+// SIN firma y todos los aparatos la perdían. Ahora se juntan campo a campo:
+// un campo vacío nunca borra uno relleno, y la firma solo desaparece si se
+// pulsa "Quitar" (marca firmaQuitadaAt más reciente que la subida, firmaAt).
+function _privMerge(localValue, remoteValue) {
+  var L = null, R = null;
+  try { L = JSON.parse(localValue); } catch (e) {}
+  try { R = JSON.parse(remoteValue); } catch (e) {}
+  if (!L || typeof L !== 'object') L = null;
+  if (!R || typeof R !== 'object') R = null;
+  if (!L && !R) return remoteValue;
+  L = L || {}; R = R || {};
+  var lNew = String(L.updatedAt || '') >= String(R.updatedAt || '');
+  var base = lNew ? L : R, otro = lNew ? R : L, res = {};
+  Object.keys(base).forEach(function(k) { res[k] = base[k]; });
+  Object.keys(otro).forEach(function(k) {
+    if (k === 'firmaPatricio' || k === 'firmaAt' || k === 'firmaQuitadaAt' || k === 'updatedAt') return;
+    if (!res[k] && otro[k]) res[k] = otro[k];
+  });
+  // Firma: gana el último evento (subida o "Quitar"); sin fechas, gana tenerla.
+  var ev = [];
+  [L, R].forEach(function(o) {
+    if (o.firmaPatricio) ev.push({ t: String(o.firmaAt || ''), img: o.firmaPatricio, at: o.firmaAt });
+    if (o.firmaQuitadaAt) ev.push({ t: String(o.firmaQuitadaAt), quitar: true, at: o.firmaQuitadaAt });
+  });
+  ev.sort(function(a, b) { return a.t < b.t ? 1 : (a.t > b.t ? -1 : (a.quitar ? 1 : -1)); });
+  delete res.firmaPatricio; delete res.firmaAt; delete res.firmaQuitadaAt;
+  if (ev.length) {
+    var g = ev[0];
+    if (g.quitar) res.firmaQuitadaAt = g.at;
+    else { res.firmaPatricio = g.img; if (g.at) res.firmaAt = g.at; }
+  }
+  var u1 = String(L.updatedAt || ''), u2 = String(R.updatedAt || '');
+  if (u1 || u2) res.updatedAt = u1 > u2 ? u1 : u2;
+  var ord = {}; Object.keys(res).sort().forEach(function(k) { ord[k] = res[k]; });
+  return JSON.stringify(ord);
+}
+window._privMerge = _privMerge;
 function _fusionParaClave(key, localValue, remoteValue) {
+  if (key === 'app:datos_privados') return _privMerge(localValue, remoteValue);
   if (_esBorradosClave(key)) return _borradosMerge(localValue, remoteValue);
   if (key === 'app:notas_mejoras') return _notasMerge(localValue, remoteValue);
   if (key === 'app:registro_actividad') return _registroMerge(localValue, remoteValue);
@@ -3434,6 +3475,11 @@ window.loadFromFirestore = async function() {
             const fusionado = _registroMerge(actual, data.value);
             if (fusionado !== actual) _guardarDesdeNube(key, fusionado);
             loaded++;
+          } else if (key === 'app:datos_privados') { // 09/10/2026: campo a campo (firma)
+            const actual = localStorage.getItem(key);
+            const fusionado = _privMerge(actual, data.value);
+            if (fusionado !== actual) _guardarDesdeNube(key, fusionado);
+            loaded++;
           } else if (key === 'inmuebles:lista') {
             // PUNTO 67: fusión inmueble a inmueble, nunca sustitución en bloque.
             const actual = localStorage.getItem(key);
@@ -3576,6 +3622,15 @@ window.startFirebaseSync = function() {
           // por id, nunca sustitución en bloque.
           const actual = localStorage.getItem(key);
           const fusionado = _registroMerge(actual, data.value);
+          if (fusionado !== actual) {
+            _guardarDesdeNube(key, fusionado);
+            window._refreshCurrentModule && window._refreshCurrentModule(key);
+          }
+          return;
+        }
+        if (key === 'app:datos_privados') { // 09/10/2026: campo a campo (firma)
+          const actual = localStorage.getItem(key);
+          const fusionado = _privMerge(actual, data.value);
           if (fusionado !== actual) {
             _guardarDesdeNube(key, fusionado);
             window._refreshCurrentModule && window._refreshCurrentModule(key);
@@ -10203,7 +10258,19 @@ function priv_firmaElegida(input) {
         var m = 6; x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(w - 1, x1 + m); y1 = Math.min(h - 1, y1 + m);
         var out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
         out.getContext('2d').drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
-        window._privFirmaTmp = out.toDataURL('image/png');
+        // 09/10/2026: firma más ligera (máx. 600 px de ancho y ~200 KB) para que suba siempre a la nube
+        var fin = out, url = '';
+        for (var it = 0; it < 6; it++) {
+          var esc = Math.min(1, 600 / fin.width);
+          if (it > 0) esc = 0.75;
+          if (esc < 1) {
+            var c2 = document.createElement('canvas'); c2.width = Math.max(1, Math.round(fin.width * esc)); c2.height = Math.max(1, Math.round(fin.height * esc));
+            c2.getContext('2d').drawImage(fin, 0, 0, c2.width, c2.height); fin = c2;
+          }
+          url = fin.toDataURL('image/png');
+          if (url.length < 200000) break;
+        }
+        window._privFirmaTmp = url;
         priv_firmaPintar(window._privFirmaTmp);
       } catch (e) { alert('No se pudo procesar la imagen: ' + e.message); }
     };
@@ -10220,7 +10287,11 @@ function priv_guardar() {
     var el = document.getElementById('priv-in-' + c[0]);
     if (el) d[c[0]] = el.value.trim();
   });
-  if (window._privFirmaTmp !== undefined) { if (window._privFirmaTmp) d.firmaPatricio = window._privFirmaTmp; else delete d.firmaPatricio; } // 08/10/2026
+  if (window._privFirmaTmp !== undefined) { // 08/10/2026; 09/10: con fecha, para que otro aparato no la borre
+    var _ahoraF = new Date().toISOString();
+    if (window._privFirmaTmp) { d.firmaPatricio = window._privFirmaTmp; d.firmaAt = _ahoraF; delete d.firmaQuitadaAt; }
+    else { delete d.firmaPatricio; delete d.firmaAt; d.firmaQuitadaAt = _ahoraF; }
+  }
   d.updatedAt = new Date().toISOString();
   localStorage.setItem('app:datos_privados', JSON.stringify(d));
   _privPintar();
