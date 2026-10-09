@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261008_13';
+const BUILD_ID = '261009_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -11645,7 +11645,9 @@ function _padron_generarJustificanteBajaPDF(contratoId, historialIdx) {
 
     const margin = 20; const pw = 170;
     let y = 25;
+    const _g = _generoContrato(c); // 09/10/2026: género del arrendatario
     const ln = (txt, sz, bold, center, color) => {
+      txt = _g(txt);
       doc.setFontSize(sz || 10);
       doc.setFont('helvetica', bold ? 'bold' : 'normal');
       if (color) doc.setTextColor(...color); else doc.setTextColor(30, 30, 30);
@@ -11653,6 +11655,7 @@ function _padron_generarJustificanteBajaPDF(contratoId, historialIdx) {
       doc.text(txt, x, y);
     };
     const lnW = (txt, sz) => {
+      txt = _g(txt);
       doc.setFontSize(sz || 10); doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
       const lines = doc.splitTextToSize(txt, pw);
       doc.text(lines, margin, y);
@@ -11668,7 +11671,7 @@ function _padron_generarJustificanteBajaPDF(contratoId, historialIdx) {
     sp(10);
 
     ln('COMPARECE', 11, true); sp(5);
-    const inqTratamiento = (c.inqGenero || 'D.') + ' ';
+    const inqTratamiento = c.inqEsEmpresa ? '' : ((c.inqGenero || 'D.') + ' ');
     lnW(`${inqTratamiento}${c.inqNombre || '—'}, con DNI ${c.inqDNI || '—'}, en calidad de ARRENDATARIO/A del inmueble sito en ${c.dir || '—'}, en virtud de contrato de arrendamiento suscrito con fecha ${fechaInicioD ? fmtFechaLarga(fechaInicioD) : '—'} con ${esPersonaFisica ? emp.rep : emp.legalName}, en calidad de ARRENDADOR.`);
     sp(8);
 
@@ -11682,7 +11685,7 @@ function _padron_generarJustificanteBajaPDF(contratoId, historialIdx) {
 
     const col1 = margin; const col2 = 130;
     doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
-    doc.text('EL/LA ARRENDATARIO/A', col1, y);
+    doc.text(_g('EL/LA ARRENDATARIO/A'), col1, y);
     doc.text('RECIBÍ (EL ARRENDADOR)', col2, y);
     sp(window._docFirmado ? 20 : 12);
     doc.setFont('helvetica', 'normal');
@@ -11862,6 +11865,11 @@ function _listaConY(textos) {
 // ("el ARRENDATARIO"). Con varios firmantes se adaptan solo las formas en
 // plural ("los/las ARRENDATARIOS/AS"): las de singular se dejan tal cual para
 // no romper la concordancia de las frases.
+// 09/10/2026: mismo ajuste de género para documentos que parten de un contrato GUARDADO
+function _generoContrato(c) {
+  const d = { inqEsEmpresa: !!(c && c.inqEsEmpresa), inqGenero: (c && c.inqGenero) || 'D.', todosFirmantes: [{}].concat((c && c.cotitulares) || []) };
+  return function(t) { return _generoTxt(t, d); };
+}
 function _arrtVarios(datos) { return !!(datos && datos.todosFirmantes && datos.todosFirmantes.length > 1); }
 function _generoTxt(t, datos) {
   if (typeof t !== 'string' || !datos || t.indexOf('/') < 0) return t;
@@ -12538,7 +12546,7 @@ function generarAnexoPadron(doc, datos, arr, margin, pageW, maxW, addText, addBl
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
     doc.setTextColor(30, 30, 60);
     const lines = doc.splitTextToSize(text, maxW);
-    if (y + lines.length * 5 > 270) { doc.addPage(); y = margin; }
+    if (y + lines.length * 5 > (window._limPag || 272) - 2) { doc.addPage(); y = margin; }
     doc.text(lines, margin, y);
     y += lines.length * 5 + 3;
   };
@@ -12546,7 +12554,7 @@ function generarAnexoPadron(doc, datos, arr, margin, pageW, maxW, addText, addBl
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 50, 100);
-    if (y + 10 > 270) { doc.addPage(); y = margin; }
+    if (y + 10 > (window._limPag || 272) - 2) { doc.addPage(); y = margin; }
     doc.text(text, margin, y);
     y += 8;
   };
@@ -12672,6 +12680,8 @@ async function generarPDF() {
   // tocarla, solo que ahora ese dato puede venir de cualquiera de los 1-5
   // firmantes, no siempre del primero. Con 1 solo firmante (el caso de
   // siempre) esto da exactamente el mismo resultado que antes.
+  // 08/10/2026: con "Firmado" se deja sitio abajo en cada hoja para la rúbrica (más grande)
+  window._limPag = (window._pdfFirmado && _privDatos().firmaPatricio) ? 262 : 272;
   const _numFirmantesPDF = (typeof wizardNumFirmantes === 'number' && wizardNumFirmantes >= 1) ? wizardNumFirmantes : 1;
   const _respIdxPDF = (typeof wizardResponsableIdx === 'number' && wizardResponsableIdx >= 1) ? wizardResponsableIdx : 1;
   const _todosFirmantesPDF = [];
@@ -12748,7 +12758,7 @@ async function generarPDF() {
       doc.setFont('helvetica', bold ? 'bold' : 'normal');
       doc.setTextColor(20, 20, 40);
       const lines = doc.splitTextToSize(text, maxW - 8);
-      if (y + lines.length * 4.8 > 272) { doc.addPage(); y = margin; }
+      if (y + lines.length * 4.8 > window._limPag) { doc.addPage(); y = margin; }
       doc.text(lines, margin + 8, y);
       y += lines.length * 4.8 + 4;
     };
@@ -12756,7 +12766,7 @@ async function generarPDF() {
     // Título de sección (centrado, mayúsculas, espaciado)
     const addTitle = (text) => {
       text = _generoTxt(text, datos);
-      if (y + 12 > 272) { doc.addPage(); y = margin; }
+      if (y + 12 > window._limPag) { doc.addPage(); y = margin; }
       y += 4;
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
@@ -12771,7 +12781,7 @@ async function generarPDF() {
       y += 6;
     };
 
-    const chk = (needed = 30) => { if (y + needed > 272) { doc.addPage(); y = margin; } };
+    const chk = (needed = 30) => { if (y + needed > window._limPag) { doc.addPage(); y = margin; } };
     // chkT: reserva espacio para título + primera línea de párrafo (evita títulos solos)
     chkT = () => chk(55);
 
@@ -12784,7 +12794,7 @@ async function generarPDF() {
       const indentX = margin + 8;
       const fullText = prefix + boldName + suffix;
       const allLines = doc.splitTextToSize(fullText, maxW - 8);
-      if (y + allLines.length * 4.8 > 272) { doc.addPage(); y = margin; }
+      if (y + allLines.length * 4.8 > window._limPag) { doc.addPage(); y = margin; }
       // Renderizar línea a línea buscando el nombre en negrita en la primera línea
       allLines.forEach((line, idx) => {
         if (idx === 0) {
@@ -12910,6 +12920,7 @@ async function generarPDF() {
       ? _firmantesFirma.map(f => _nombreFirmaPersona(f))
       : [(datos.inqEsEmpresa ? '' : ((datos.inqGenero || 'D.') + ' ')) + (datos.inqNombre || '—')];
     const _firmaImg = (window._pdfFirmado && _privDatos().firmaPatricio) ? _privDatos().firmaPatricio : ''; // 08/10/2026
+    const _paginasFirmaGrande = {}; // 08/10/2026: en esas hojas no se pone la rúbrica pequeña
     const _SEP_FIRMA = 33; // hueco entre una firma y la siguiente en la misma columna (08/10/2026: mismo sitio para firmar que la primera)
     // Alto del bloque desde el título ("EL ARRENDADOR") hasta el último nombre
     const _altoFirmas = 38 + _SEP_FIRMA * (Math.max(_arrFirmas.length, _arrtFirmas.length) - 1) + 2;
@@ -12935,6 +12946,7 @@ async function generarPDF() {
       col(c2, _arrtFirmas);
       // 08/10/2026: imagen de la firma de Patricio encima de SU raya (la primera del arrendador)
       if (_firmaImg) {
+        try { _paginasFirmaGrande[doc.getCurrentPageInfo().pageNumber] = true; } catch (e) {}
         try {
           const pr = doc.getImageProperties(_firmaImg);
           let fw = 55, fh = fw * pr.height / pr.width;
@@ -12986,14 +12998,15 @@ async function generarPDF() {
       // Industrias la firma es mancomunada (Patricio + Javier), así que un
       // "Fdo." con un solo nombre no representaría bien a la empresa.
       // 08/10/2026: con "Firmado", rúbrica (firma pequeña) de Patricio en cada hoja, también en IGC
-      if (_firmaImg) {
+      // (08/10/2026, pedido por Patry: ~3/4 del tamaño de la firma grande, y no en la hoja que ya lleva la firma grande)
+      if (_firmaImg && !_paginasFirmaGrande[i]) {
         try {
           const prR = doc.getImageProperties(_firmaImg);
-          let rh = 7, rw = rh * prR.width / prR.height;
-          if (rw > 24) { rw = 24; rh = rw * prR.height / prR.width; }
+          let rw = 41, rh = rw * prR.height / prR.width;
+          if (rh > 18) { rh = 18; rw = rh * prR.width / prR.height; }
           doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
           const xR = arrendadorActivo !== 'industrias' ? margin + doc.getTextWidth('Fdo.: Patricio Gómez García') + 2 : margin;
-          doc.addImage(_firmaImg, 'PNG', xR, 284.5 - rh, rw, rh);
+          doc.addImage(_firmaImg, 'PNG', xR, 285.5 - rh, rw, rh);
         } catch (e) { console.warn('[rúbrica]', e.message); }
       }
       if (arrendadorActivo !== 'industrias') {
@@ -13393,13 +13406,18 @@ function descargarPDF() {
 
 function abrirPDFDirecto() {
   if (!pdfDoc) return;
-  // Abrir data URI en nueva pestaña
-  if (window._pdfDataUri) {
-    const win = window.open(window._pdfDataUri, '_blank');
-    if (!win) { pdfDoc.save(getPdfFilename()); }
-  } else {
-    pdfDoc.save(getPdfFilename());
-  }
+  // 08/10/2026 — BUG (reportado por Patry): en el iPhone abría una pantalla en
+  // blanco (Safari no muestra un PDF "data:" en otra pestaña). En iPhone/iPad se
+  // abre el visor de PDF del sistema (igual que "Descargar"); en el resto, el
+  // PDF se abre en otra pestaña con un enlace temporal que sí funciona.
+  const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (esIOS) { pdfDoc.save(getPdfFilename()); return; }
+  try {
+    const url = URL.createObjectURL(pdfDoc.output('blob'));
+    const win = window.open(url, '_blank');
+    if (!win) pdfDoc.save(getPdfFilename());
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { pdfDoc.save(getPdfFilename()); }
 }
 async function compartirPDF() {
   if (!pdfDoc) return;
@@ -13459,6 +13477,150 @@ function wiz_setFirmado(si) {
   var on = function(el, act) { if (!el) return; el.style.borderColor = act ? 'var(--accent-gold)' : 'var(--border)'; el.style.background = act ? 'rgba(201,168,76,.12)' : 'var(--navy-card)'; el.style.color = act ? 'var(--accent-gold)' : 'var(--silver-dim)'; el.style.fontWeight = act ? '700' : '600'; };
   on(no, !si); on(elSi, !!si);
 }
+
+// ═══ 09/10/2026 — ENVÍO DIRECTO POR GMAIL (decidido con Patry) ═══
+// Los botones "Mail" y "Enviar a Javier" abren una ventana con Para, Asunto,
+// Texto y el PDF adjunto; al pulsar Enviar, el correo sale directamente desde
+// la cuenta de Google conectada (patrimerlevantesl@gmail.com) con la API de
+// Gmail, y queda en Enviados. Usa el mismo sistema de acceso de Google que
+// Drive, pero con su propio permiso ("enviar correo") y su propio token.
+// Requisito de una vez: Gmail API activada y el permiso gmail.send añadido en
+// Google Cloud (mismo proyecto que Drive). Si falla, se ofrece el método de
+// siempre (menú Compartir).
+var GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
+var GMAIL_TOKEN_KEY = 'gestinmo_gmail_token';
+var _gmToken = null, _gmAlternativa = null;
+function _gmTokenValido() {
+  if (_gmToken) return true;
+  try {
+    var d = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || 'null');
+    if (d && d.token && d.expiraEn > Date.now()) { _gmToken = d.token; return true; }
+  } catch (e) {}
+  return false;
+}
+function _gmGuardarToken(t, exp) {
+  _gmToken = t;
+  try { localStorage.setItem(GMAIL_TOKEN_KEY, JSON.stringify({ token: t, expiraEn: Date.now() + Math.max(0, (exp || 3600) - 120) * 1000 })); } catch (e) {}
+}
+function _gmOlvidarToken() { _gmToken = null; try { localStorage.removeItem(GMAIL_TOKEN_KEY); } catch (e) {} }
+function _gmEsc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function gm_abrir(para, asunto, cuerpo, alternativa) {
+  if (bloqueaSiViewer('Enviar un correo')) return;
+  if (!pdfDoc) return;
+  _gmAlternativa = alternativa || null;
+  var viejo = document.getElementById('gm-modal'); if (viejo) viejo.remove();
+  var kb = 0; try { kb = Math.round(pdfDoc.output('arraybuffer').byteLength / 1024); } catch (e) {}
+  var inp = 'width:100%;box-sizing:border-box;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);padding:10px 12px;font-size:15px;font-family:inherit;';
+  var lab = 'font-size:11px;color:var(--silver-dim);margin:10px 0 4px;';
+  var ov = document.createElement('div');
+  ov.id = 'gm-modal';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;';
+  ov.innerHTML = '<div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:16px;padding:16px;width:100%;max-width:440px;max-height:92vh;overflow:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:15px;font-weight:700;color:var(--silver-bright);">✉️ Enviar por correo</div><div onclick="gm_cerrar()" style="cursor:pointer;font-size:18px;color:var(--silver-dim);">✕</div></div>'
+    + '<div style="' + lab + '">Para</div><input id="gm-para" type="email" style="' + inp + '" value="' + _gmEsc(para) + '" placeholder="email@ejemplo.com">'
+    + '<div style="' + lab + '">Asunto</div><input id="gm-asunto" style="' + inp + '" value="' + _gmEsc(asunto) + '">'
+    + '<div style="' + lab + '">Texto</div><textarea id="gm-cuerpo" style="' + inp + 'min-height:170px;resize:vertical;line-height:1.4;">' + _gmEsc(cuerpo) + '</textarea>'
+    + '<div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;background:var(--navy-card);border:1px solid var(--border);border-radius:10px;padding:7px 10px;font-size:12.5px;color:var(--silver-bright);">📎 ' + _gmEsc(getPdfFilename()) + (kb ? ' <span style="color:var(--silver-dim);">(' + (kb >= 1024 ? (kb / 1024).toFixed(1).replace('.', ',') + ' MB' : kb + ' KB') + ')</span>' : '') + '</div>'
+    + '<div id="gm-estado" style="font-size:12px;margin-top:10px;min-height:16px;color:var(--silver-dim);"></div>'
+    + '<button id="gm-enviar" onclick="gm_enviar()" style="display:block;width:100%;margin-top:6px;padding:13px;border:none;border-radius:12px;background:var(--accent-gold);color:#111;font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;cursor:pointer;">Enviar</button>'
+    + '<div style="text-align:center;margin-top:10px;"><span onclick="gm_otroMetodo()" style="font-size:11.5px;color:var(--silver-dim);text-decoration:underline;cursor:pointer;">Usar otro método (Compartir)</span></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+function gm_cerrar() { var m = document.getElementById('gm-modal'); if (m) m.remove(); }
+function gm_otroMetodo() { var f = _gmAlternativa; gm_cerrar(); if (f) f(); }
+function _gmEstado(txt, color) { var e = document.getElementById('gm-estado'); if (e) { e.textContent = txt; e.style.color = color || 'var(--silver-dim)'; } }
+function _gmB64Utf8(t) { return btoa(unescape(encodeURIComponent(t))); }
+function _gmB64Bytes(buf) {
+  var b = new Uint8Array(buf), s = '', CH = 0x8000;
+  for (var i = 0; i < b.length; i += CH) s += String.fromCharCode.apply(null, b.subarray(i, i + CH));
+  return btoa(s);
+}
+function _gmPartir(b64) { return b64.replace(/(.{76})/g, '$1\r\n'); }
+function _gmMime(para, asunto, cuerpo, nombre, pdfBuf) {
+  var bnd = 'gestinmo_' + Date.now().toString(36);
+  var nombreH = '=?UTF-8?B?' + _gmB64Utf8(nombre) + '?=';
+  return [
+    'To: ' + para,
+    'Subject: =?UTF-8?B?' + _gmB64Utf8(asunto) + '?=',
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/mixed; boundary="' + bnd + '"',
+    '',
+    '--' + bnd,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    _gmPartir(_gmB64Utf8(cuerpo)),
+    '--' + bnd,
+    'Content-Type: application/pdf; name="' + nombreH + '"',
+    'Content-Disposition: attachment; filename="' + nombreH + '"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    _gmPartir(_gmB64Bytes(pdfBuf)),
+    '--' + bnd + '--',
+    ''
+  ].join('\r\n');
+}
+function _gmPedirPermiso(cb) {
+  if (!window.google || !google.accounts || !google.accounts.oauth2) { cb('La conexión con Google aún se está cargando. Espera unos segundos y vuelve a pulsar Enviar.'); return; }
+  try {
+    var client = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: GMAIL_SCOPE,
+      login_hint: 'patrimerlevantesl@gmail.com',
+      callback: function(resp) {
+        if (resp.error || !resp.access_token) { cb('Google no ha dado permiso para enviar (' + (resp.error || 'sin respuesta') + ').'); return; }
+        _gmGuardarToken(resp.access_token, resp.expires_in); cb(null);
+      },
+      error_callback: function(err) { cb('Se cerró la ventana de Google sin dar permiso.'); }
+    });
+    client.requestAccessToken();
+  } catch (e) { cb('No se pudo abrir el acceso de Google: ' + e.message); }
+}
+async function _gmEnviarYa(para, asunto, cuerpo, reintento) {
+  var mime = _gmMime(para, asunto, cuerpo, getPdfFilename(), pdfDoc.output('arraybuffer'));
+  var r = await fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + _gmToken, 'Content-Type': 'message/rfc822' }, body: mime
+  });
+  if (r.status === 401 && !reintento) { _gmOlvidarToken(); return 'reautorizar'; }
+  if (!r.ok) {
+    var t = ''; try { t = await r.text(); } catch (e) {}
+    if (/has not been used|is disabled|accessNotConfigured/i.test(t)) throw new Error('Falta activar Gmail en Google Cloud (Gmail API).');
+    if (/insufficient|scope/i.test(t)) { _gmOlvidarToken(); throw new Error('Falta el permiso de enviar correo. Vuelve a pulsar Enviar y acepta el permiso.'); }
+    throw new Error('Gmail respondió ' + r.status + '.');
+  }
+  return 'ok';
+}
+function gm_enviar() {
+  var para = (document.getElementById('gm-para').value || '').trim();
+  var asunto = (document.getElementById('gm-asunto').value || '').trim();
+  var cuerpo = document.getElementById('gm-cuerpo').value || '';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(para)) { _gmEstado('⚠️ Pon un email válido en "Para".', '#ffb74d'); return; }
+  var btn = document.getElementById('gm-enviar');
+  var hacer = async function() {
+    btn.disabled = true; btn.style.opacity = '.6'; btn.textContent = 'Enviando…'; _gmEstado('');
+    try {
+      var res = await _gmEnviarYa(para, asunto, cuerpo, false);
+      if (res === 'reautorizar') {
+        btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Enviar';
+        _gmEstado('El permiso de Google ha caducado: vuelve a pulsar Enviar.', '#ffb74d');
+        return;
+      }
+      gm_cerrar();
+      showToast('✅ Correo enviado a ' + para, 'success');
+    } catch (e) {
+      btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Enviar';
+      _gmEstado('❌ ' + e.message + ' Puedes usar "otro método" de abajo.', '#ff7b7b');
+    }
+  };
+  if (_gmTokenValido()) { hacer(); return; }
+  // Primera vez (o permiso caducado): Google pide permiso en una ventana; hay que pulsar desde aquí.
+  _gmEstado('Abriendo Google para dar permiso de envío…');
+  _gmPedirPermiso(function(err) {
+    if (err) { _gmEstado('❌ ' + err, '#ff7b7b'); return; }
+    hacer();
+  });
+}
 async function emailJavierPDF() {
   if (!pdfDoc) return;
   const inq = getInqNombreActual();
@@ -13476,6 +13638,8 @@ async function emailJavierPDF() {
   const asuntoTxt = 'Contrato ' + ref + ' - ' + inq + ' - Para firmar';
   const cuerpoTxt = 'Hola Javier,\n\nTe adjunto' + (firmado ? ', ya firmado por mí,' : '') + ' el contrato de arrendamiento del inmueble situado en ' + dir + (conGaraje ? ' con la plaza de garaje incluida' : '') + ', con el nuevo inquilino ' + genero + inq + '. Empieza el ' + iniTxt + ' y la renta es de ' + rentaTxt + ' al mes.\n\nUna cosa nueva: cuando esté firmado por todos, escanéalo y mándamelo por correo, que lo firmaré electrónicamente para el archivo.\n\nUn saludo,\nPatricio';
   const emailJ = (_privDatos().emailJavier || '').trim();
+  // 09/10/2026: por defecto se envía directamente por Gmail desde la app
+  if (!window._modoCompartir) { gm_abrir(emailJ, asuntoTxt, cuerpoTxt, function() { window._modoCompartir = true; emailJavierPDF().finally(function() { window._modoCompartir = false; }); }); return; }
   // El menú Compartir no permite poner el destinatario: se copia el email de Javier para pegarlo en "Para".
   try { if (emailJ && navigator.clipboard) await navigator.clipboard.writeText(emailJ); } catch (e) {}
   try {
@@ -13511,6 +13675,8 @@ async function emailPDF() {
   const dir = (document.getElementById('f-dir').value || '').trim() || ref;
   const asuntoTxt = 'Contrato ' + ref + ' - ' + inq; // en el asunto sí va la referencia (pedido por Patry)
   const cuerpoTxt = saludo + ',\n\nLe adjunto el contrato de arrendamiento del inmueble situado en ' + dir + '.\n\nPor favor, revíselo y confirme su conformidad.\n\nUn saludo,\n' + arr.label;
+  // 09/10/2026: por defecto se envía directamente por Gmail desde la app
+  if (!window._modoCompartir) { gm_abrir(_emailInqActual(), asuntoTxt, cuerpoTxt, function() { window._modoCompartir = true; emailPDF().finally(function() { window._modoCompartir = false; }); }); return; }
   // 1) Menú Compartir del sistema con el PDF adjunto
   try {
     const blob = pdfDoc.output('blob');
@@ -15725,7 +15891,9 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
 
     const margin=20;const pw=170;
     let y=20;
+    const _g=_generoContrato(c); // 09/10/2026: género del arrendatario
     const ln=(txt,sz,bold,center,color)=>{
+      txt=_g(txt);
       doc.setFontSize(sz||10);
       doc.setFont('helvetica',bold?'bold':'normal');
       if(color) doc.setTextColor(...color); else doc.setTextColor(30,30,30);
@@ -15733,6 +15901,7 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
       doc.text(txt,x,y);
     };
     const lnW=(txt,sz,justify)=>{
+      txt=_g(txt);
       doc.setFontSize(sz||10);doc.setFont('helvetica','normal');doc.setTextColor(30,30,30);
       const lines=doc.splitTextToSize(txt,pw);
       doc.text(lines,margin,y);
@@ -15765,7 +15934,7 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
       }
     }
     sp(3);
-    const inqTratamiento=(c.inqGenero||'D.')+' ';
+    const inqTratamiento=c.inqEsEmpresa?'':((c.inqGenero||'D.')+' ');
     lnW(`De otra parte, ${inqTratamiento}${c.inqNombre||'—'}, con DNI ${c.inqDNI||'—'}, en calidad de ARRENDATARIO/A.`);
     sp(3);
     lnW('Ambas partes se reconocen mutuamente la capacidad legal necesaria para suscribir la presente adenda, y');
@@ -15794,7 +15963,7 @@ function ipc_generarAdendaPDF(c,rentaAnterior,nuevaRenta,pct){
     const col1=margin;const col2=130;
     doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
     doc.text('EL ARRENDADOR',col1,y);
-    doc.text('EL/LA ARRENDATARIO/A',col2,y);
+    doc.text(_g('EL/LA ARRENDATARIO/A'),col2,y);
     sp(window._docFirmado ? 20 : 12);
     doc.setFont('helvetica','normal');
     doc.text('________________________',col1,y);
