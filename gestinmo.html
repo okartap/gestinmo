@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261009_02';
+const BUILD_ID = '261009_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -13650,9 +13650,17 @@ function _gmPedirPermiso(cb) {
 }
 async function _gmEnviarYa(para, asunto, cuerpo, reintento) {
   var mime = _gmMime(para, asunto, cuerpo, getPdfFilename(), pdfDoc.output('arraybuffer'));
-  var r = await fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media', {
-    method: 'POST', headers: { 'Authorization': 'Bearer ' + _gmToken, 'Content-Type': 'message/rfc822' }, body: mime
-  });
+  // 09/10/2026 — BUG REAL: la dirección de "subida" (upload/...?uploadType=media)
+  // la bloquea el navegador (CORS: "Load failed" en el iPhone). Comprobado en
+  // Chrome: la dirección normal sí responde. Se manda el correo entero dentro
+  // de "raw" (el MIME ya es todo ASCII: base64url directo).
+  var raw = btoa(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  var r;
+  try {
+    r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + _gmToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: raw })
+    });
+  } catch (eRed) { throw new Error('No se pudo conectar con Gmail (sin conexión o bloqueado). Prueba de nuevo en unos segundos.'); }
   if (r.status === 401 && !reintento) { _gmOlvidarToken(); return 'reautorizar'; }
   if (!r.ok) {
     var t = ''; try { t = await r.text(); } catch (e) {}
