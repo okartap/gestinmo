@@ -2250,7 +2250,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261009_03';
+const BUILD_ID = '261009_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -13543,8 +13543,19 @@ function wiz_setFirmado(si) {
     showConfirm('✍️', 'Falta tu firma', 'Antes tienes que subir tu firma en Contratos → ＋ → "🔒 Editar DNI, domicilios e IBAN" → "Subir mi firma".', [{ label: 'Entendido', cls: 'g', fn: function() {} }]);
     si = false;
   }
+  var _cambia = (!!window._pdfFirmado !== !!si);
   window._pdfFirmado = !!si;
   var no = document.getElementById('firma-opt-no'), elSi = document.getElementById('firma-opt-si');
+  // 09/10/2026 (pedido por Patry): si el PDF ya está generado y cambias
+  // "Sin firmar"/"Firmado", se vuelve a generar solo con la opción nueva
+  // (misma ficha de contrato: no se duplica).
+  var _hecho = document.getElementById('pdf-done'), _btnG = document.getElementById('btn-gen-pdf');
+  if (_cambia && _hecho && _hecho.style.display === 'block' && _btnG && !_btnG.classList.contains('generating')) {
+    _hecho.style.display = 'none';
+    _btnG.style.display = 'flex';
+    setTimeout(function() { generarPDF(); }, 0);
+    if (typeof showToast === 'function') showToast(si ? '✍️ Generando de nuevo con tu firma…' : 'Generando de nuevo sin firmar…', 'success');
+  }
   var on = function(el, act) { if (!el) return; el.style.borderColor = act ? 'var(--accent-gold)' : 'var(--border)'; el.style.background = act ? 'rgba(201,168,76,.12)' : 'var(--navy-card)'; el.style.color = act ? 'var(--accent-gold)' : 'var(--silver-dim)'; el.style.fontWeight = act ? '700' : '600'; };
   on(no, !si); on(elSi, !!si);
 }
