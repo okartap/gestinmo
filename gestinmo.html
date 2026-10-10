@@ -1987,7 +1987,7 @@ import { getFirestore, doc, getDoc, getDocFromServer, setDoc, onSnapshot, collec
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDxtqNsvRhVl4yL9-FdPwQeIokQGhXdR0U",
+  apiKey: "AIzaSyBWUl0vNl4JSgpJgbyXa34E6GhDmDNyPdo", // 10/10/2026: clave nueva, solo okartap.github.io y 4 APIs (Auth, Token, Firestore, Installations)
   authDomain: "gestinmo-13c65.firebaseapp.com",
   projectId: "gestinmo-13c65",
   storageBucket: "gestinmo-13c65.firebasestorage.app",
@@ -2253,7 +2253,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261010_02';
+const BUILD_ID = '261010_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
