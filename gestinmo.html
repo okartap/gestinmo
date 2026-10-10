@@ -928,10 +928,12 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .fin-action-btn.green{background:rgba(76,175,130,.1);border-color:rgba(76,175,130,.3);color:var(--accent-green);}
 .caja-toggle{margin-top:10px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--silver-dim);cursor:pointer;padding:4px 0;}
 .caja-tbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px;table-layout:fixed;}
-.caja-tbl th{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);padding:5px 3px;border-bottom:1px solid var(--border);text-align:left;}
-.caja-tbl td{padding:6px 3px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--silver-bright);vertical-align:middle;word-wrap:break-word;}
+.caja-tbl th{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);padding:5px 2px;border-bottom:1px solid var(--border);text-align:left;}
+.caja-tbl td{padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--silver-bright);vertical-align:middle;word-wrap:break-word;}
 .caja-tbl .num{text-align:right;white-space:nowrap;}
-.caja-tbl .ico{width:30px;text-align:center;white-space:nowrap;color:var(--silver-dim);}
+.caja-tbl .fch{white-space:nowrap;}
+.caja-tbl .cpt{padding-left:6px;word-break:normal;overflow-wrap:break-word;}
+.caja-tbl .ico{width:30px;padding-left:0;padding-right:0;text-align:center;white-space:nowrap;color:var(--silver-dim);}
 .caja-tbl .ico span{cursor:pointer;padding:2px 3px;}
 .caja-tipo{display:flex;gap:6px;margin-bottom:12px;}
 .caja-tipo div{flex:1;text-align:center;padding:8px;border-radius:10px;border:1px solid var(--border);font-weight:700;font-size:13px;cursor:pointer;color:var(--silver-dim);}
@@ -2250,7 +2252,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261009_05';
+const BUILD_ID = '261010_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -19319,6 +19321,17 @@ function caja_fmtFecha(f) {
   var M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return parseInt(p[2], 10) + '-' + M[parseInt(p[1], 10) - 1] + '-' + p[0].slice(2);
 }
+// 10/10/2026 (261010_01, pedido por Patry): en la tabla, fecha corta "10 oct"
+// e importes sin decimales con punto de miles (nunca habrá ≥ 99.999).
+function caja_fmtFechaCorta(f) {
+  var p = String(f || '').split('-');
+  if (p.length < 3) return f || '';
+  var M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return parseInt(p[2], 10) + ' ' + M[parseInt(p[1], 10) - 1];
+}
+function caja_fmtEntero(n) {
+  return String(Math.round(Math.abs(parseFloat(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
 function caja_esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function caja_htmlCuenta(c) {
   var movs = caja_movsDe(c.id).sort(caja_ordenAsc);
@@ -19339,15 +19352,16 @@ function caja_htmlCuenta(c) {
     if (!movs.length) {
       h += '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:8px 0;">Sin movimientos todavía.</div>';
     } else {
-      h += '<table class="caja-tbl"><colgroup><col style="width:62px"><col><col style="width:78px"><col style="width:80px"><col style="width:40px"></colgroup>';
-      h += '<tr><th>FECHA</th><th>CONCEPTO</th><th class="num">IMPORTE</th><th class="num">SALDO</th><th></th></tr>';
+      // 10/10/2026 (261010_01): sin columna SALDO (el saldo es el verde de arriba);
+      // todo el espacio sobrante va al concepto.
+      h += '<table class="caja-tbl"><colgroup><col style="width:44px"><col><col style="width:50px"><col style="width:46px"></colgroup>';
+      h += '<tr><th>FECHA</th><th class="cpt">CONCEPTO</th><th class="num">IMPORTE</th><th></th></tr>';
       // Lo más reciente arriba (decidido con Patry)
       for (var i = movs.length - 1; i >= 0; i--) {
         var m = movs[i], imp = parseFloat(m.importe) || 0;
-        h += '<tr><td>' + caja_fmtFecha(m.fecha) + '</td>';
-        h += '<td>' + caja_esc(m.concepto) + '</td>';
-        h += '<td class="num" style="color:' + (imp < 0 ? '#e05c5c' : 'var(--accent-green)') + ';">' + (imp < 0 ? '-' : '') + ingotros_fmt2(Math.abs(imp)) + '</td>';
-        h += '<td class="num">' + ingotros_fmt2(m._saldo) + '</td>';
+        h += '<tr><td class="fch">' + caja_fmtFechaCorta(m.fecha) + '</td>';
+        h += '<td class="cpt">' + caja_esc(m.concepto) + '</td>';
+        h += '<td class="num" style="color:' + (imp < 0 ? '#e05c5c' : 'var(--accent-green)') + ';">' + (imp < 0 ? '-' : '') + caja_fmtEntero(imp) + '</td>';
         h += '<td class="ico"><span onclick="caja_editar(\'' + m.id + '\')">✎</span>' + (m.inicial ? '' : '<span onclick="caja_borrar(\'' + m.id + '\')">✕</span>') + '</td></tr>';
       }
       h += '</table>';
