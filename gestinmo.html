@@ -1121,6 +1121,7 @@ select option{background-color:var(--navy-dark);color:var(--silver-bright);}
 .cbtn.a{background:var(--amber);border-color:var(--amber);color:white;}
 .cbtn.r{background:rgba(224,85,85,.15);border-color:var(--red);color:var(--red);}
 .cbtn.c{background:var(--navy-card);color:var(--silver-dim);}
+.cbtn.danger{background:rgba(224,85,85,.15);border-color:var(--red);color:var(--red);}
 /* BOTTOM NAV */
 
 
@@ -2252,7 +2253,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261010_01';
+const BUILD_ID = '261010_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -13455,7 +13456,7 @@ function _preguntarFirmado(cb) {
   showConfirm('✍️', '¿Con tu firma?', '¿Quieres este documento firmado por ti?', [
     { label: 'Sin firmar', cls: 'g', fn: function() { cb(false); } },
     { label: '✍️ Firmado', cls: 'g', fn: function() { cb(true); } }
-  ]);
+  ], { sinCancelar: true }); // hay que elegir: en la adenda de IPC la subida ya está aplicada
 }
 // Firma de Patricio encima de la raya de "______" (x = inicio de la raya, y = su línea base)
 function _dibujarFirmaSobreRaya(doc, x, y) {
@@ -13796,7 +13797,18 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){conso
 let ctaInmuebleIdx=null;
 
 // ─── CONFIRM MODAL ────────────────────────────────────────────
-function showConfirm(icon,title,sub,btns){
+// 10/10/2026 (261010_02, pedido por Patry): si un aviso pide una acción
+// (Borrar, elegir una opción…) y no trae forma de salir, se añade solo un
+// botón "Cancelar" que cierra sin hacer nada. No se añade en los avisos
+// informativos de un solo botón (Aceptar / Entendido) ni cuando se pasa
+// opts.sinCancelar (cuando hay que elegir sí o sí, p. ej. "¿Con tu firma?").
+function _cmEsSalida(l){ l=String(l||'').toLowerCase().trim(); return l==='cancelar'||l==='no'||l==='volver'||l==='cerrar'||l==='revisar'||l.indexOf('cancel')>=0; }
+function _cmEsInformativo(btns){ if(btns.length!==1) return false; var l=String(btns[0].label||'').toLowerCase().replace(/[^a-záéíóúñ ]/g,'').trim(); return l==='aceptar'||l==='entendido'||l==='ok'||l==='vale'; }
+function showConfirm(icon,title,sub,btns,opts){
+  btns=(btns||[]).slice();
+  if(!(opts&&opts.sinCancelar) && !_cmEsInformativo(btns) && !btns.some(function(b){return _cmEsSalida(b.label);})){
+    btns.unshift({label:'Cancelar',cls:'c',fn:function(){}});
+  }
   document.getElementById('cm-i').textContent=icon;
   document.getElementById('cm-t').textContent=title;
   document.getElementById('cm-s').textContent=sub;
