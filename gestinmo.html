@@ -400,9 +400,10 @@ pasan a mostrar el dato de verdad de cada inmueble. */
 .semaforo-row { display: contents; }
 .semaforo-row-label { font-size: 12px; color: var(--text-secondary); text-align: right; }
 .semaforo-row-value { font-size: 12px; font-weight: 600; color: var(--silver-mid); text-align: left; }
-.detail-tabs { display: flex; justify-content: center; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
+/* 13/10/2026: las 5 pestañas se reparten el ancho y caben en el iPhone (antes "INFO" se cortaba por la izquierda) */
+.detail-tabs { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; padding: 0 8px; }
 .detail-tabs::-webkit-scrollbar { display: none; }
-.detail-tab { flex-shrink: 0; padding: 10px 16px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.detail-tab { flex: 1 1 auto; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .5px; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
 .detail-tab.active { color: var(--silver-bright); border-bottom-color: var(--silver-bright); }
 .tab-content { display: none; padding: 0 16px; }
 .tab-content.active { display: block; }
@@ -2264,7 +2265,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261013_01';
+const BUILD_ID = '261013_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -7831,7 +7832,11 @@ function parseFmtGlobal(s){
 function parseRentaMixta(v){
   if (typeof v === 'number') return v;
   if (v === undefined || v === null || v === '') return 0;
-  return parseFloat(String(v).replace(/\./g,'').replace(',','.')) || 0;
+  var t = String(v).trim().replace(/[€\s]/g, '');
+  // 13/10/2026 (revisión de rentas guardadas como texto): "730.1" o "730.10"
+  // (punto decimal, sin coma) es un decimal, no un millar — antes salía 7301.
+  if (t.indexOf(',') < 0 && /^-?\d+\.\d{1,2}$/.test(t)) return parseFloat(t) || 0;
+  return parseFloat(t.replace(/\./g,'').replace(',','.')) || 0;
 }
 function fmtGlobal(n){
   const v = parseFloat(n) || 0;
@@ -24028,18 +24033,29 @@ function pend_calcular() {
       items.push({ icon: '📈', t: 'Subida de renta pactada: ' + s.nombre + ' sube a ' + fmtE(parseFloat(s.importe) || 0), s: (s.ref ? s.ref + ' · ' : '') + 'Pactada para el ' + fmtDate(s.fecha) + ' (' + cuando + ')', accion: 'subida', id: s.contratoId, empresa: s.empresa });
     });
   } catch (e) {}
-  // 12/10/2026 — pedido por Patry: UN SOLO aviso (no uno por contrato) con
-  // los contratos activos que no tienen la fianza apuntada. Las fincas
-  // rústicas no cuentan (no llevan fianza). Solo para el administrador. Se
-  // quita solo en cuanto se rellenan todas las fianzas.
+  // 13/10/2026 (mejora F, pedido por Patry): UN SOLO aviso de contratos
+  // incompletos — sustituye al de fianzas del 12/10. Contratos activos a los
+  // que les falta la fianza, la fecha de inicio o el DNI/NIE del inquilino.
+  // Las fincas rústicas no cuentan para fianza ni DNI (no llevan). Solo para
+  // el administrador; desaparece solo al completarlos.
   try {
     if (getRol() === 'admin') {
-      var _sinFianza = JSON.parse(localStorage.getItem('contratos:lista') || '[]').filter(function(c) {
-        if (!c || c.estado !== 'activo' || c.tipo === 'rustica' || c.tipo === 'rusticatemp') return false;
-        return !((typeof parseRentaMixta === 'function' ? parseRentaMixta(c.fianza) : parseFloat(c.fianza)) > 0);
-      }).map(function(c) { return c.ref || c.inqNombre || 'contrato'; }).sort();
-      if (_sinFianza.length) {
-        items.push({ icon: '🔐', t: 'Faltan ' + _sinFianza.length + ' fianza' + (_sinFianza.length === 1 ? '' : 's') + ' por meter', s: _sinFianza.join(', ') + ' · se rellena en cada contrato' });
+      var _inc = { fianza: [], inicio: [], dni: [] }, _incRefs = {};
+      JSON.parse(localStorage.getItem('contratos:lista') || '[]').forEach(function(c) {
+        if (!c || c.deleted || c.estado !== 'activo') return;
+        var rus = c.tipo === 'rustica' || c.tipo === 'rusticatemp', ref = c.ref || c.inqNombre || 'contrato';
+        var fz = typeof parseRentaMixta === 'function' ? parseRentaMixta(c.fianza) : parseFloat(c.fianza);
+        if (!rus && !(fz > 0)) { _inc.fianza.push(ref); _incRefs[ref] = 1; }
+        if (!c.inicio) { _inc.inicio.push(ref); _incRefs[ref] = 1; }
+        if (!rus && !String(c.inqDNI || '').trim()) { _inc.dni.push(ref); _incRefs[ref] = 1; }
+      });
+      var _nInc = Object.keys(_incRefs).length;
+      if (_nInc) {
+        var _det = [];
+        if (_inc.fianza.length) _det.push('sin fianza ' + _inc.fianza.length + ' (' + _inc.fianza.sort().join(', ') + ')');
+        if (_inc.inicio.length) _det.push('sin fecha de inicio ' + _inc.inicio.length + ' (' + _inc.inicio.sort().join(', ') + ')');
+        if (_inc.dni.length) _det.push('sin DNI/NIE ' + _inc.dni.length + ' (' + _inc.dni.sort().join(', ') + ')');
+        items.push({ icon: '📋', t: 'Faltan datos en ' + _nInc + ' contrato' + (_nInc === 1 ? '' : 's'), s: _det.join(' · '), accion: 'contratos_lista' });
       }
     }
   } catch (e) {}
@@ -24668,6 +24684,8 @@ function pend_gestionar(i) {
     pend_gestionarNube(); // PUNTO 232
   } else if (it.accion === 'copia_drive') {
     bkd_gestionar(); // 12/10/2026
+  } else if (it.accion === 'contratos_lista') {
+    showModule('contratos'); // 13/10/2026: aviso de contratos incompletos
   } else if (it.accion === 'vc') {
     sib_irInmueble(it.idx, it.anio); // 12/10/2026: ficha del inmueble → Gastos
   } else if (it.accion === 'registro') {
