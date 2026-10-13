@@ -2136,6 +2136,8 @@ const DATA_KEYS = [
   'app:fix_nombre_aziati_v1',
   // 13/10/2026: bandera del paso de los gastos anuales manuales a "Otros gastos"
   'app:fix_gastos_anuales_v1',
+  // 13/10/2026: banderas de las correcciones únicas de la 261013_04
+  'app:fix_garajes_incluidos_v1', 'app:fix_urb_vivaldi_v1',
   // PUNTO 216 (24/09/2026): DNI, domicilios e IBAN — ya no van escritos en el archivo público de GitHub
   'app:datos_privados'
 ];
@@ -2265,7 +2267,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261013_03';
+const BUILD_ID = '261013_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4702,8 +4704,13 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="tab-contratos-list"></div>
   </div>
   <div class="tab-content" id="tab-fotos">
-    <div class="info-section-title" style="margin-bottom:14px">Fotos</div>
-    <div class="empty-state">Aún no hay fotos añadidas.</div>
+    <!-- 13/10/2026: fotos del inmueble en Drive, por motivo (inmfoto_*) -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="info-section-title" style="margin:0;">Fotos</div>
+      <span onclick="inmfoto_info()" style="font-size:12px;color:#5b8dee;cursor:pointer;border:1px solid rgba(91,141,238,.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">i</span>
+    </div>
+    <div id="tab-fotos-lista" style="margin-bottom:16px;"></div>
+    <button onclick="inmfoto_abrirModal()" style="width:100%;background:rgba(91,141,238,0.12);border:1px dashed rgba(91,141,238,0.4);border-radius:12px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;padding:14px;cursor:pointer;text-align:center;">＋ AÑADIR FOTOS</button>
   </div>
   <div style="height:100px"></div>
 </div>
@@ -4858,7 +4865,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
         <div class="form-row" id="f-garaje-incluido-row" style="display:none;">
           <div class="form-group">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" id="f-garaje-incluido" style="width:16px;height:16px;accent-color:var(--accent-green);cursor:pointer;flex-shrink:0;">
+              <input type="checkbox" id="f-garaje-incluido" onchange="recalcPreview()" style="width:16px;height:16px;accent-color:var(--accent-green);cursor:pointer;flex-shrink:0;">
               <span style="font-size:12.5px;color:var(--silver-mid);">Incluida en el alquiler del piso (un solo pago con el inquilino)</span>
             </label>
             <div class="form-hint">Si no la marcas, la plaza se considera alquilada aparte y sigue estando disponible para su propio contrato</div>
@@ -5015,6 +5022,36 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div id="sib-modal-cuerpo"></div>
     <button onclick="sib_guardarModal()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:12px;cursor:pointer;margin:6px 0 10px;">GUARDAR</button>
     <button onclick="sib_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
+  </div>
+</div>
+<!-- 13/10/2026: modal "Añadir fotos" del inmueble (inmfoto_*) -->
+<div id="inmfoto-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;max-height:90dvh;overflow-y:auto;">
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">📷 AÑADIR FOTOS</div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">MOTIVO</div>
+      <select id="inmfoto-motivo" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;"></select>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">FECHA</div>
+      <input id="inmfoto-fecha" type="date" style="-webkit-appearance:none;appearance:none;width:100%;max-width:100%;min-width:0;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;">
+    </div>
+    <div id="inmfoto-drive-estado" style="font-size:11px;margin-bottom:8px;color:var(--text-secondary);text-align:center;">⚪ No conectado a Drive</div>
+    <div id="inmfoto-noauth" style="display:block;">
+      <button onclick="renta_conectarDrive()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:10px;cursor:pointer;margin-bottom:10px;">🔗 Conectar Google Drive</button>
+    </div>
+    <div id="inmfoto-auth" style="display:none;">
+      <input type="file" id="inmfoto-camara" accept="image/*" capture="environment" style="display:none;" onchange="inmfoto_elegidas(this)">
+      <input type="file" id="inmfoto-galeria" accept="image/*" multiple style="display:none;" onchange="inmfoto_elegidas(this)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <button onclick="document.getElementById('inmfoto-camara').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;">📷<br>Hacer foto</button>
+        <button onclick="document.getElementById('inmfoto-galeria').click()" style="background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:10px 4px;cursor:pointer;">🖼️<br>Elegir de la galería</button>
+      </div>
+      <div id="inmfoto-sel" style="font-size:12px;color:var(--accent-green);text-align:center;margin-bottom:10px;"></div>
+      <button id="inmfoto-btn" onclick="inmfoto_guardar()" style="width:100%;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:12px;cursor:pointer;margin-bottom:10px;">SUBIR FOTOS</button>
+    </div>
+    <button onclick="inmfoto_cerrarModal()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:'Rajdhani',sans-serif;font-size:14px;padding:12px;cursor:pointer;">Cancelar</button>
   </div>
 </div>
 <div id="inmdoc-modal-form" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
@@ -8520,7 +8557,7 @@ function calcRent(inm) {
   // rentabilidad de cada finca rústica — por eso salían cifras como 51,6% o
   // 77,6%, y además descuadradas entre fincas sin relación real con su coste.
   const ingresoAnual = inm.tipo === 'rustico' ? renta : renta * 12;
-  const costeTotal = precio + gastosCompra + reforma;
+  const costeTotal = precio + gastosCompra + reforma + inm_costeGarajeIncluido(inm); // 13/10/2026: + plaza incluida
   const bruta = (ingresoAnual / costeTotal) * 100;
   const neta = ((ingresoAnual - gastosAnuales) / costeTotal) * 100;
   return { bruta, neta, ingresoAnual, costeTotal, gastosAnuales };
@@ -8725,10 +8762,28 @@ function inm_ingresosTotales(idx, inm) {
 function inm_costeTotalInversion(inm) {
   return (parseFloat(inm.precio) || 0) + (parseFloat(inm.gastosCompra) || 0) + (parseFloat(inm.reforma) || 0);
 }
+// 13/10/2026 (Patry): plaza de garaje INCLUIDA en el alquiler de un piso.
+// Para la rentabilidad y la amortización del piso se suma también lo que
+// costó la plaza (precio + gastos de compra + reforma). Sus gastos NO se
+// suman: el seguro, el IBI y la comunidad del piso ya cubren el conjunto.
+// OJO: inm_costeTotalInversion NO cambia (los totales de patrimonio suman
+// cada inmueble una sola vez).
+function inm_costeGarajeIncluido(inm, todosOpt) {
+  if (!inm || !inm.garajeRef || inm.garajeIncluido !== true || inm.tipo === 'garaje') return 0;
+  var todos = todosOpt || loadInmuebles();
+  var g = todos.find(function(x) { return x && x.ref === inm.garajeRef && x.ref !== inm.ref; });
+  return g ? inm_costeTotalInversion(g) : 0;
+}
+function inm_costeConGaraje(inm, todosOpt) {
+  return inm_costeTotalInversion(inm) + inm_costeGarajeIncluido(inm, todosOpt);
+}
 // Devuelve el estado de amortización de un inmueble, o null si no hay datos
 // suficientes (hace falta al menos el precio de compra).
 function inm_amortizacion(idx, inm) {
-  const costeTotal = inm_costeTotalInversion(inm);
+  // 13/10/2026: una plaza incluida en el alquiler de un piso se amortiza con
+  // el piso (su coste ya va sumado allí) — no tiene amortización propia.
+  if (inm && inm.tipo === 'garaje' && typeof inm_garajeIncluidoEn === 'function' && inm_garajeIncluidoEn(inm.ref)) return null;
+  const costeTotal = inm_costeConGaraje(inm);
   if (!costeTotal) return null;
   const ingresosTotales = inm_ingresosTotales(idx, inm);
   const rent = calcRent(inm); // solo para estimar años restantes al ritmo actual, si hay renta activa
@@ -9270,7 +9325,7 @@ function inm_showDetail(idx) {
   const _rentaMensualDetalle = (inm.tipo === 'rustico' && _rentaActivaDetalle) ? (_rentaActivaDetalle / 12) : _rentaActivaDetalle;
   const kpiRenta = _rentaActivaDetalle ? fmt(_rentaMensualDetalle)+' €' : (inm.rentaEst ? 'Est. '+fmt(inm.rentaEst)+' €' : '—');
   const kpiPrecio = inm.precio ? fmt(inm.precio)+' €' : '—';
-  const costeTotal = (parseFloat(inm.precio)||0) + (parseFloat(inm.gastosCompra)||0) + (parseFloat(inm.reforma)||0);
+  const costeTotal = inm_costeConGaraje(inm, inmuebles); // 13/10/2026: incluye la plaza de garaje incluida
   const kpiCoste = inm.precio ? fmt(costeTotal)+' €' : '—';
   document.getElementById('kpi-renta').textContent = kpiRenta;
   document.getElementById('kpi-precio').textContent = kpiPrecio;
@@ -9336,7 +9391,10 @@ function inm_showDetail(idx) {
         ${amortTxt}
       </div>`;
     } else {
-      semBox.innerHTML = `<div style="color:var(--silver-dim);font-size:13px;padding:8px 0">Sin datos de inversión — introduce precio de compra y renta para calcular rentabilidad.</div>`;
+      const _pisoInc = inm.tipo === 'garaje' ? inm_garajeIncluidoEn(inm.ref, inmuebles) : '';
+      semBox.innerHTML = _pisoInc
+        ? `<div style="color:var(--silver-dim);font-size:13px;padding:8px 0">🚗 Plaza incluida en el alquiler de <b>${_pisoInc}</b>: su coste se suma a la rentabilidad y la amortización de ese piso.</div>`
+        : `<div style="color:var(--silver-dim);font-size:13px;padding:8px 0">Sin datos de inversión — introduce precio de compra y renta para calcular rentabilidad.</div>`;
     }
   }
 
@@ -9366,7 +9424,7 @@ function inm_showDetail(idx) {
   document.getElementById('info-precio').textContent = inm.precio ? fmt(inm.precio)+' €' : '—';
   document.getElementById('info-gastos-compra').textContent = inm.gastosCompra ? fmt(inm.gastosCompra)+' €' : '—';
   document.getElementById('info-reforma').textContent = inm.reforma ? fmt(inm.reforma)+' €' : '—';
-  document.getElementById('info-coste-total').textContent = inm.precio ? fmt(costeTotal)+' €' : '—';
+  document.getElementById('info-coste-total').textContent = inm.precio ? fmt(costeTotal)+' €' + (inm_costeGarajeIncluido(inm, inmuebles) > 0 ? ' (con la plaza ' + inm.garajeRef + ')' : '') : '—';
   document.getElementById('info-precio-actual').textContent = inm.precioActual ? fmt(inm.precioActual)+' €' : '—';
   // PUNTO 35 (25/08/2026): punto de partida (a mano) + cobros reales registrados
   const ingresosTotalesInfo = inm_ingresosTotales(idx, inm);
@@ -9381,6 +9439,7 @@ function inm_showDetail(idx) {
   // PUNTO 166 (14/09/2026): pestaña Documentos — documentos ya subidos de
   // este inmueble (escritura de compra/venta, etc.).
   if (typeof inmdoc_render === 'function') inmdoc_render(idx);
+  if (typeof inmfoto_render === 'function') inmfoto_render(idx); // 13/10/2026: pestaña Fotos
   // 12/10/2026: pestaña Gastos → Seguro e IBI (siempre se abre en el año actual)
   if (typeof sib_render === 'function') { sib_anio = new Date().getFullYear(); sib_render(idx); }
 
@@ -9610,12 +9669,139 @@ var INMDOC_ORDEN_TIPO = { 'Escritura compra': 0, 'Escritura venta': 1 };
 function _inmdocPrioridadTipo(tipo) {
   return INMDOC_ORDEN_TIPO.hasOwnProperty(tipo) ? INMDOC_ORDEN_TIPO[tipo] : 2;
 }
+// ═══════════════════════════════════════════════════════════════════════
+// 13/10/2026 — PESTAÑA "FOTOS" DE LA FICHA DEL INMUEBLE (pedido por Patry)
+// Fotos del inmueble en Google Drive (misma carpeta Inmuebles/<inmueble>/ y
+// mismo sistema que Docs), con fecha y motivo. Se guardan en la misma lista
+// que los documentos ('inmuebles:documentos') marcadas con foto:true — así
+// viajan por la nube y la copia de seguridad sin tocar nada más. Docs y el
+// informe del asesor las ignoran. Miniaturas: se descargan de Drive con la
+// conexión activa; sin conexión se ve un icono y al pulsar se abre en Drive.
+// ═══════════════════════════════════════════════════════════════════════
+var INMFOTO_MOTIVOS = ['Entrega de llaves', 'Devolución de llaves', 'Desperfectos/averías', 'Anuncio', 'Otras'];
+var _inmfotoArchivos = [], _inmfotoSubiendo = false, _inmfotoMiniCache = {};
+function inmfoto_idDrive(url) { var m = /\/d\/([a-zA-Z0-9_-]+)/.exec(url || '') || /[?&]id=([a-zA-Z0-9_-]+)/.exec(url || ''); return m ? m[1] : ''; }
+function inmfoto_lista(idx) {
+  return inmdoc_load().filter(function(d) { return d && !d.deleted && d.foto && d.inmuebleIdx === idx; })
+    .sort(function(a, b) { return String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')); });
+}
+function inmfoto_render(idx) {
+  if (idx == null) idx = currentDetailIdx;
+  var cont = document.getElementById('tab-fotos-lista');
+  if (!cont || idx == null) return;
+  var fotos = inmfoto_lista(idx);
+  if (!fotos.length) { cont.innerHTML = '<div class="empty-state">Aún no hay fotos de este inmueble.</div>'; return; }
+  var html = '';
+  INMFOTO_MOTIVOS.forEach(function(mot) {
+    var grupo = fotos.filter(function(f) { return (f.motivo || 'Otras') === mot; });
+    if (!grupo.length) return;
+    html += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--silver-mid);text-transform:uppercase;margin:12px 0 6px;">' + mot + ' <span style="color:var(--silver-dim);font-weight:600;">(' + grupo.length + ')</span></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+    grupo.forEach(function(f) {
+      var p = String(f.fecha || '').split('-');
+      var fc = p.length === 3 ? parseInt(p[2], 10) + '/' + parseInt(p[1], 10) + '/' + p[0].slice(2) : '';
+      html += '<div style="position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.05);border:1px solid var(--border);">'
+        + '<a href="' + f.url + '" target="_blank" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;text-decoration:none;font-size:26px;">'
+        + '<img data-foto-id="' + f.id + '" alt="" style="width:100%;height:100%;object-fit:cover;display:none;"><span data-foto-ph="' + f.id + '">🖼️</span></a>'
+        + '<div style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.75));font-size:10px;color:#fff;padding:10px 5px 3px;pointer-events:none;">' + fc + '</div>'
+        + '<button onclick="inmfoto_borrar(\'' + f.id + '\')" title="Quitar" style="position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:12px;cursor:pointer;line-height:22px;padding:0;">✕</button>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+  cont.innerHTML = html;
+  fotos.forEach(function(f) { inmfoto_cargarMini(f); });
+}
+function inmfoto_pintarMini(id, src) {
+  var img = document.querySelector('img[data-foto-id="' + id + '"]'), ph = document.querySelector('[data-foto-ph="' + id + '"]');
+  if (img && src) { img.src = src; img.style.display = 'block'; if (ph) ph.style.display = 'none'; }
+}
+function inmfoto_cargarMini(f) {
+  if (_inmfotoMiniCache[f.id]) { inmfoto_pintarMini(f.id, _inmfotoMiniCache[f.id]); return; }
+  var idD = inmfoto_idDrive(f.url);
+  if (!_driveToken || !idD) return;
+  fetch('https://www.googleapis.com/drive/v3/files/' + idD + '?alt=media', { headers: { 'Authorization': 'Bearer ' + _driveToken } })
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(function(b) { var u = URL.createObjectURL(b); _inmfotoMiniCache[f.id] = u; inmfoto_pintarMini(f.id, u); })
+    .catch(function() {});
+}
+function inmfoto_info() {
+  _nubeMsg('📷', 'Fotos del inmueble', 'Guarda fotos de cada inmueble en tu Google Drive (misma carpeta que sus documentos), con fecha y motivo:\n\n🔑 Entrega de llaves y devolución de llaves: el estado del piso al entrar y al salir el inquilino — sirven de prueba para devolver (o no) la fianza.\n🔧 Desperfectos/averías.\n📢 Anuncio: las fotos para alquilarlo o venderlo.\n\nPulsa "＋ AÑADIR FOTOS", elige motivo y fecha, y haz la foto o elige varias de la galería. Con Drive conectado se ven en miniatura; pulsa una para verla en grande. "✕" la quita de la ficha (la foto sigue en tu Drive).');
+}
+function inmfoto_abrirModal() {
+  if (bloqueaSiViewer('Añadir fotos del inmueble')) return;
+  _inmfotoArchivos = [];
+  var m = document.getElementById('inmfoto-modal');
+  if (m.parentNode !== document.body) document.body.appendChild(m);
+  var f = document.getElementById('inmfoto-fecha'); if (f) f.value = _fechaHoyLocal();
+  var sel = document.getElementById('inmfoto-motivo');
+  if (sel && !sel.options.length) INMFOTO_MOTIVOS.forEach(function(x) { var o = document.createElement('option'); o.value = x; o.textContent = x; sel.appendChild(o); });
+  document.getElementById('inmfoto-sel').textContent = '';
+  inmfoto_estadoDrive();
+  m.style.display = 'flex';
+}
+function inmfoto_cerrarModal() { var m = document.getElementById('inmfoto-modal'); if (m) m.style.display = 'none'; }
+function inmfoto_estadoDrive() {
+  var ok = !!_driveToken;
+  var a = document.getElementById('inmfoto-noauth'), b = document.getElementById('inmfoto-auth'), e = document.getElementById('inmfoto-drive-estado');
+  if (a) a.style.display = ok ? 'none' : 'block';
+  if (b) b.style.display = ok ? 'block' : 'none';
+  if (e) { e.textContent = ok ? '🟢 Drive conectado' : '⚪ No conectado a Drive'; e.style.color = ok ? 'var(--accent-green)' : 'var(--text-secondary)'; }
+}
+function inmfoto_elegidas(input) {
+  _inmfotoArchivos = Array.from(input.files || []).filter(function(f) { return (f.type || '').indexOf('image/') === 0; });
+  input.value = '';
+  var s = document.getElementById('inmfoto-sel');
+  if (s) s.textContent = _inmfotoArchivos.length ? ('🖼️ ' + _inmfotoArchivos.length + ' foto' + (_inmfotoArchivos.length === 1 ? '' : 's') + ' lista' + (_inmfotoArchivos.length === 1 ? '' : 's') + ' para subir') : '';
+}
+function inmfoto_guardar() {
+  if (bloqueaSiViewer('Subir fotos del inmueble')) return;
+  if (_inmfotoSubiendo) return;
+  if (currentDetailIdx === null || currentDetailIdx === undefined) return;
+  if (!_inmfotoArchivos.length) { avisar('Haz una foto o elige alguna de la galería.'); return; }
+  if (!_driveToken) { avisar('Conecta Google Drive primero.'); return; }
+  var inm = loadInmuebles()[currentDetailIdx]; if (!inm) return;
+  var idxG = currentDetailIdx, motivo = document.getElementById('inmfoto-motivo').value || 'Otras';
+  var fecha = document.getElementById('inmfoto-fecha').value || _fechaHoyLocal();
+  var nombreInm = inm.direccion || inm.ref || ('Inmueble ' + (idxG + 1));
+  var btn = document.getElementById('inmfoto-btn'), total = _inmfotoArchivos.length, hechas = 0, fallos = 0;
+  _inmfotoSubiendo = true;
+  var archivos = _inmfotoArchivos.slice();
+  var siguiente = function(n) {
+    if (btn) btn.textContent = 'Subiendo ' + (n + 1) + ' de ' + total + '…';
+    if (n >= total) {
+      _inmfotoSubiendo = false; _inmfotoArchivos = [];
+      if (btn) btn.textContent = 'SUBIR FOTOS';
+      inmfoto_cerrarModal(); inmfoto_render(idxG);
+      if (fallos) avisar('Se han subido ' + hechas + ' de ' + total + ' fotos. ' + fallos + ' no se han podido subir: vuelve a intentarlo.');
+      else showToast('✅ ' + hechas + ' foto' + (hechas === 1 ? '' : 's') + ' subida' + (hechas === 1 ? '' : 's') + ' a Drive', 'success');
+      return;
+    }
+    inmdoc_subirArchivo(archivos[n], nombreInm, 'Foto ' + motivo, function(err, url) {
+      if (err || !url) { fallos++; siguiente(n + 1); return; }
+      var arr = inmdoc_load();
+      arr.push({ id: 'ifoto_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), inmuebleIdx: idxG, foto: true, tipo: 'Foto', motivo: motivo,
+        nombre: archivos[n].name || '', url: url, fecha: fecha, updatedAt: new Date().toISOString() });
+      inmdoc_save(arr); hechas++;
+      siguiente(n + 1);
+    });
+  };
+  siguiente(0);
+}
+function inmfoto_borrar(id) {
+  if (bloqueaSiViewer('Quitar una foto del inmueble')) return;
+  showConfirm('🗑️', 'Quitar foto', '¿Quitar esta foto de la ficha?\n\nLa foto seguirá guardada en tu Google Drive.', [{ label: 'Quitar', cls: 'danger', fn: function() {
+    inmdoc_save(inmdoc_load().filter(function(d) { return d.id !== id; }));
+    inmfoto_render(currentDetailIdx);
+  } }]);
+}
+
 function inmdoc_render(idx) {
   var cont = document.getElementById('tab-docs-lista');
   var fechaEl = document.getElementById('inmdoc-fecha');
   if (fechaEl && !fechaEl.value) fechaEl.value = _fechaHoyLocal();
   if (!cont) return;
-  var docs = inmdoc_load().filter(function(d) { return d.inmuebleIdx === idx; })
+  var docs = inmdoc_load().filter(function(d) { return d.inmuebleIdx === idx && !d.foto; }) // 13/10/2026: las fotos van en su pestaña
     .sort(function(a, b) {
       var pa = _inmdocPrioridadTipo(a.tipo), pb = _inmdocPrioridadTipo(b.tipo);
       if (pa !== pb) return pa - pb;
@@ -10038,7 +10224,10 @@ function recalcPreview() {
   // inflada x12, igual que pasaba en la lista de Inmuebles.
   const tipoPreview = document.getElementById('f-tipo').value;
   const ingresoAnual = tipoPreview === 'rustico' ? renta : renta * 12;
-  const costeTotal = precio + gastosCompra + reforma;
+  // 13/10/2026: + coste de la plaza de garaje si va incluida en el alquiler
+  const _gRefPrev = document.getElementById('f-garaje-ref') ? document.getElementById('f-garaje-ref').value : '';
+  const _gIncPrev = document.getElementById('f-garaje-incluido') ? document.getElementById('f-garaje-incluido').checked : false;
+  const costeTotal = precio + gastosCompra + reforma + ((tipoPreview !== 'garaje' && _gRefPrev && _gIncPrev) ? inm_costeGarajeIncluido({ garajeRef: _gRefPrev, garajeIncluido: true, tipo: tipoPreview, ref: '' }) : 0);
   const bruta = (ingresoAnual / costeTotal) * 100;
   const neta = ((ingresoAnual - gastosAnuales) / costeTotal) * 100;
   const cls = semaforoClass(neta);
@@ -11926,30 +12115,62 @@ function triggerAddAnexo() {
   document.getElementById('anexo-file-input').click();
 }
 
+// 13/10/2026 — Ventana propia para escribir un texto (sustituye a la ventanita
+// gris del navegador, prompt()). onOk(texto) al pulsar Guardar; onCancel() al
+// cancelar. Mismo estilo que el resto de ventanas de la app.
+function pedirTexto(icono, titulo, sub, valor, onOk, onCancel) {
+  var prev = document.getElementById('ptx-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div');
+  capa.id = 'ptx-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var esc = function(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  capa.innerHTML = '<div style="background:var(--navy-dark);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;max-width:420px;box-sizing:border-box;">'
+    + '<div style="text-align:center;font-size:26px;">' + esc(icono) + '</div>'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;color:var(--silver-bright);margin:4px 0 4px;">' + esc(titulo) + '</div>'
+    + (sub ? '<div style="text-align:center;font-size:12px;color:var(--silver-dim);margin-bottom:10px;line-height:1.4;">' + esc(sub) + '</div>' : '')
+    + '<input id="ptx-input" type="text" value="' + esc(valor) + '" style="width:100%;box-sizing:border-box;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:15px;padding:11px 12px;margin:6px 0 14px;">'
+    + '<div style="display:flex;gap:8px;"><button id="ptx-cancel" style="flex:1;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:11px;cursor:pointer;">Cancelar</button>'
+    + '<button id="ptx-ok" style="flex:1;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;">Guardar</button></div></div>';
+  document.body.appendChild(capa);
+  var inp = document.getElementById('ptx-input');
+  var cerrar = function() { capa.remove(); };
+  document.getElementById('ptx-ok').onclick = function() { var v = inp.value; cerrar(); if (onOk) onOk(v); };
+  document.getElementById('ptx-cancel').onclick = function() { cerrar(); if (onCancel) onCancel(); };
+  inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('ptx-ok').click(); });
+  setTimeout(function() { try { inp.focus(); inp.select(); } catch (e) {} }, 50);
+}
+
 function handleAnexosUpload(input) {
   const files = Array.from(input.files);
-  files.forEach(file => {
+  input.value = ''; // reset para permitir subir el mismo archivo otra vez
+  // 13/10/2026: se pregunta el nombre de cada archivo uno detrás de otro, en
+  // una ventana de la app (antes, la del navegador). Cancelar = nombre original.
+  const siguiente = (n) => {
+    if (n >= files.length) return;
+    const file = files[n];
     const reader = new FileReader();
     reader.onload = e => {
       const ext = file.name.split('.').pop().toLowerCase();
       const icono = ext === 'pdf' ? '📄' : ['jpg','jpeg','png','heic'].includes(ext) ? '🖼️' : '📎';
-      // Pedir nombre personalizado
       const nombreSugerido = file.name.replace(/\.[^.]+$/, ''); // sin extensión
-      const nombreFinal = prompt('Nombre del anexo:', nombreSugerido) || nombreSugerido;
-      const sizeKB = Math.round(file.size / 1024);
-      anexosLibres.push({
-        nombre: nombreFinal,
-        tipo: ext.toUpperCase(),
-        size: sizeKB > 1024 ? (sizeKB/1024).toFixed(1) + ' MB' : sizeKB + ' KB',
-        dataUrl: e.target.result,
-        icono,
-        fecha: fmtDate(_fechaHoyLocal())
-      });
-      renderAnexosLista();
+      const anadir = (nombreFinal) => {
+        const sizeKB = Math.round(file.size / 1024);
+        anexosLibres.push({
+          nombre: (nombreFinal || '').trim() || nombreSugerido,
+          tipo: ext.toUpperCase(),
+          size: sizeKB > 1024 ? (sizeKB/1024).toFixed(1) + ' MB' : sizeKB + ' KB',
+          dataUrl: e.target.result,
+          icono,
+          fecha: fmtDate(_fechaHoyLocal())
+        });
+        renderAnexosLista();
+        siguiente(n + 1);
+      };
+      pedirTexto(icono, 'Nombre del anexo', files.length > 1 ? 'Archivo ' + (n + 1) + ' de ' + files.length : '', nombreSugerido, anadir, () => anadir(nombreSugerido));
     };
     reader.readAsDataURL(file);
-  });
-  input.value = ''; // reset para permitir subir el mismo archivo otra vez
+  };
+  siguiente(0);
 }
 
 function renderAnexosLista() {
@@ -16511,6 +16732,42 @@ document.addEventListener('firebaseLoaded', function() {
       console.log('[Nombre Aziati] ' + n + ' corrección(es)');
     } catch (e) { console.error('Error al corregir el nombre de Aziati', e); }
   })();
+  // 13/10/2026 — CORRECCIÓN ÚNICA pedida por Patry: las plazas de garaje que
+  // se alquilan junto con el piso, incluidas en su renta, se enlazan a su piso
+  // ("Incluida en el alquiler de…"). IGC02 tenía un enlace consigo misma
+  // (dato erróneo) → se limpia y queda incluida en IGC01.
+  (function _fixGarajesIncluidosV1() {
+    try {
+      if (localStorage.getItem('app:fix_garajes_incluidos_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var PARES = { VIV05: 'PG05', VIV07: 'PG06', VIV12: 'PG07', VIV13: 'PG08', VIV14: 'PG09', VIV16: 'PG10', VIV17: 'PG11', VIV18: 'PG12', IGC01: 'IGC02' };
+      var lista = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'), ahora = new Date().toISOString(), n = 0;
+      var refs = {}; lista.forEach(function(i) { if (i && i.ref) refs[i.ref] = i; });
+      lista.forEach(function(i) {
+        if (!i) return;
+        if (i.tipo === 'garaje' && i.garajeRef === i.ref) { i.garajeRef = ''; i.garajeIncluido = false; i.updatedAt = ahora; n++; }
+        var g = PARES[i.ref];
+        if (g && refs[g] && !(i.garajeRef === g && i.garajeIncluido === true)) { i.garajeRef = g; i.garajeIncluido = true; i.updatedAt = ahora; n++; }
+      });
+      if (n) localStorage.setItem('inmuebles:lista', JSON.stringify(lista));
+      localStorage.setItem('app:fix_garajes_incluidos_v1', '1');
+      console.log('[Garajes incluidos] ' + n + ' cambio(s)');
+    } catch (e) { console.error('Error al enlazar los garajes', e); }
+  })();
+  // 13/10/2026 — Urbanitae: Vivaldi Project tiene en su ficha "vencimiento
+  // estimado 4º trimestre 2027" → fecha prevista 31/12/2027 (pedido por Patry).
+  (function _fixUrbVivaldiV1() {
+    try {
+      if (localStorage.getItem('app:fix_urb_vivaldi_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var k = 'fin:urbanitae:patricio', l = JSON.parse(localStorage.getItem(k) || '[]'), n = 0;
+      l.forEach(function(u) {
+        if (u && !u.deleted && /vivaldi/i.test(u.nombre || '') && !u.vencUrb) { u.vencUrb = '2027-12-31'; u.updatedAt = new Date().toISOString(); n++; }
+      });
+      if (n) localStorage.setItem(k, JSON.stringify(l));
+      localStorage.setItem('app:fix_urb_vivaldi_v1', '1');
+    } catch (e) { console.error('Error en la fecha de Vivaldi', e); }
+  })();
   (function _fixFichasClientesV1() {
     try {
       if (localStorage.getItem('app:fix_fichas_clientes_v1')) return;
@@ -16687,7 +16944,7 @@ document.addEventListener('firebaseLoaded', function() {
     var huboDuplicados = false;
     arr.forEach(function(it) {
       if (!it) return;
-      var h = _finHuella('urbanitae', it);
+      var h = (window._finHuella ? window._finHuella('urbanitae', it) : JSON.stringify([it.nombre, it.fecha])); // 13/10/2026: sin romper si la nube aún no ha cargado
       var previo = vistos[h];
       if (!previo) { vistos[h] = it; limpio.push(it); return; }
       huboDuplicados = true;
@@ -18280,7 +18537,9 @@ function descargarDoc() {
 
 function renombrarDoc() {
   if (bloqueaSiViewer('Renombrar un documento')) return;
-  const nuevoNombre = prompt('Nuevo nombre:', docSeleccionado.nombre);
+  pedirTexto('✏️', 'Renombrar documento', '', docSeleccionado.nombre, function(nuevoNombre) { renombrarDoc_aplicar(nuevoNombre); });
+}
+function renombrarDoc_aplicar(nuevoNombre) { // 13/10/2026: antes con la ventana del navegador
   if (!nuevoNombre || nuevoNombre.trim() === docSeleccionado.nombre) return;
   const nombre = nuevoNombre.trim();
   const existe = docs.find(d => d.id !== docSeleccionado.id && d.nombre.toLowerCase() === nombre.toLowerCase());
@@ -20153,7 +20412,7 @@ function fin_tipoChange() {
 function fin_nuevaAccionElegirModo() {
   if (bloqueaSiViewer('Añadir una acción')) return;
   showConfirm('📈', '¿Modo simple o detallado?',
-    'Simple: solo 3 campos (Coste, Nº acciones, Valor actual) — rápido de mantener, ideal si no vas a apuntar cada compra. Detallado: registro completo de compras/ventas/dividendos, como ya llevas la cartera heredada de Patrimer.',
+    'Simple: como un fondo — solo lo invertido y el valor actual, en euros. Rápido de mantener, sin dividendos. Detallado: registro completo de compras, ventas, dividendos y scrip, con cotización automática; sus dividendos salen en el Calendario y en la Renta (como la cartera de Patrimer).',
     [
       { label: '⚡ Simple', cls: 'g', fn: fin_nuevaAccionSimple },
       { label: '📋 Detallado', cls: '', fn: fin_nuevaAccion }
@@ -21609,12 +21868,12 @@ function fin_patHist_editarNota(id) {
   var lista = fin_patHist_load();
   var row = lista.find(function(r) { return r.id === id; });
   if (!row) return;
-  var nueva = prompt('Nota para ' + fin_patHist_nombreMes(id) + ' (ej: "Venta de acciones ACS", "Compra piso VIV21")— déjalo en blanco para quitarla:', row.nota || '');
-  if (nueva === null) return;
-  row.nota = nueva.trim();
-  row.updatedAt = new Date().toISOString();
-  fin_patHist_save(lista);
-  fin_patHist_render();
+  pedirTexto('📝', 'Nota de ' + fin_patHist_nombreMes(id), 'Ej.: "Venta de acciones ACS", "Compra piso VIV21". Déjala en blanco para quitarla.', row.nota || '', function(nueva) {
+    row.nota = String(nueva || '').trim();
+    row.updatedAt = new Date().toISOString();
+    fin_patHist_save(lista);
+    fin_patHist_render();
+  });
 }
 function fin_patHist_borrar(id) {
   if (bloqueaSiViewer('Borrar una fila del histórico de patrimonio')) return;
@@ -25008,6 +25267,7 @@ window._refreshCurrentModule = function(key) {
         && document.getElementById('inm-view-detalle') && document.getElementById('inm-view-detalle').classList.contains('active')
         && typeof inmdoc_render === 'function') {
       inmdoc_render(currentDetailIdx);
+      if (typeof inmfoto_render === 'function') inmfoto_render(currentDetailIdx); // 13/10/2026
     }
     if (module === 'cobros' && typeof renderMain === 'function') { fac_loadHistorico(); renderMain(); }
     if (module === 'analisis' && typeof cal_renderLista === 'function') cal_renderLista();
@@ -26047,6 +26307,7 @@ function renta_driveConectado() {
   // este mismo botón "Conectar", se actualiza igual, sin que haga falta
   // conectar dos veces en la misma sesión.
   if (typeof inmdoc_driveConectado === 'function') inmdoc_driveConectado();
+  try { if (typeof inmfoto_estadoDrive === 'function') { inmfoto_estadoDrive(); inmfoto_render(); } } catch (eF) {} // 13/10/2026
 }
 
 // PUNTO 166 (14/09/2026): ahora que "Seleccionar archivo" permite elegir
@@ -28260,7 +28521,7 @@ function rinf_datos(anio) {
       transm: g ? rinf_num(g.valorTransmision) : 0, ganancia: g ? rinf_num(g.ganancia) : 0, completo: !!g,
       inicioAlquiler: inm.ventaAnioInicioAlquiler || '',
       // Escrituras y demás documentos guardados en la ficha del inmueble
-      docs: docsInm.filter(function(x) { return x.inmuebleIdx === idxV; })
+      docs: docsInm.filter(function(x) { return x.inmuebleIdx === idxV && !x.foto; }) // 13/10/2026: sin las fotos
         .sort(function(a, b) { return String(a.tipo || '').localeCompare(String(b.tipo || '')); })
         .map(function(x) { return { tipo: x.tipo || 'Documento', nombre: x.nombre || '', url: x.url || '' }; })
     });
