@@ -2138,6 +2138,8 @@ const DATA_KEYS = [
   'app:fix_gastos_anuales_v1',
   // 13/10/2026: banderas de las correcciones únicas de la 261013_04
   'app:fix_garajes_incluidos_v1', 'app:fix_urb_vivaldi_v1',
+  // 13/10/2026: bandera de la migración de registros a la referencia del inmueble
+  'app:fix_registros_ref_v1',
   // PUNTO 216 (24/09/2026): DNI, domicilios e IBAN — ya no van escritos en el archivo público de GitHub
   'app:datos_privados'
 ];
@@ -2267,7 +2269,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261013_04';
+const BUILD_ID = '261013_05';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -8567,8 +8569,91 @@ function calcRent(inm) {
 // ─────────────────────────────────────────────────────────
 // Suma de todos los cobros reales registrados en la app (pestaña "Cuenta"
 // de cada inquilino) para un inmueble concreto, por su índice en la lista.
+// ═══════════════════════════════════════════════════════════════════════
+// 13/10/2026 — REGISTROS ATADOS A LA REFERENCIA DEL INMUEBLE (no a su posición)
+// Antes, alquileres mensuales, seguro/IBI/gastos, documentos/fotos, cobros,
+// notas y los datos de Renta de cada inmueble se guardaban con la POSICIÓN
+// del inmueble en la lista (inmuebleIdx). Si el orden de la lista cambiaba
+// (p. ej. dos aparatos dando de alta inmuebles a la vez), los datos acababan
+// en el inmueble equivocado. Ahora cada registro lleva la REFERENCIA del
+// inmueble (inmuebleRef: "VIV05"…), que es lo que ya usan los contratos y la
+// sincronización de inmuebles (el id interno cambia en cada edición, no
+// sirve). Se sigue guardando también inmuebleIdx, solo para que un aparato
+// con una versión anterior de la app no se pierda mientras se actualiza.
+// Regla de lectura: si el registro tiene inmuebleRef manda la referencia; si
+// no (registro antiguo aún sin migrar), se usa la posición como antes.
+// ═══════════════════════════════════════════════════════════════════════
+var _inmRefCacheRaw = null, _inmRefPorIdx = [], _inmIdxPorRef = {};
+function _inmRefActualizar() {
+  var raw = localStorage.getItem('inmuebles:lista') || '[]';
+  if (raw === _inmRefCacheRaw) return;
+  _inmRefCacheRaw = raw; _inmRefPorIdx = []; _inmIdxPorRef = {};
+  try {
+    (JSON.parse(raw) || []).forEach(function(i, n) {
+      var r = i && i.ref ? String(i.ref) : '';
+      _inmRefPorIdx[n] = r;
+      if (r && !(r in _inmIdxPorRef)) _inmIdxPorRef[r] = n;
+    });
+  } catch (e) {}
+}
+function inm_refDeIdx(idx) { _inmRefActualizar(); return (idx != null && idx >= 0) ? (_inmRefPorIdx[idx] || '') : ''; }
+function inm_idxDeRef(ref) { _inmRefActualizar(); return (ref && ref in _inmIdxPorRef) ? _inmIdxPorRef[ref] : -1; }
+// Posición ACTUAL del inmueble al que pertenece un registro.
+function inm_recIdx(r) {
+  if (!r) return -1;
+  if (r.inmuebleRef) return inm_idxDeRef(r.inmuebleRef);
+  return (typeof r.inmuebleIdx === 'number') ? r.inmuebleIdx : -1;
+}
+// ¿Este registro es del inmueble que está en la posición idx?
+function inm_recEs(r, idx) {
+  if (!r || idx == null || idx < 0) return false;
+  if (r.inmuebleRef) return r.inmuebleRef === inm_refDeIdx(idx);
+  return r.inmuebleIdx === idx;
+}
+// Marca un registro (nuevo o editado) con la referencia y la posición actuales.
+function inm_recMarcar(r, idx) { if (r) { r.inmuebleIdx = idx; var ref = inm_refDeIdx(idx); if (ref) r.inmuebleRef = ref; } return r; }
+// Id de un registro nuevo por mes/año: con la referencia (antes "posición_mes").
+function inm_recIdNuevo(idx, sufijo) { var ref = inm_refDeIdx(idx); return (ref ? 'r:' + ref : String(idx)) + '_' + sufijo; }
+// Si por la transición quedasen dos registros del mismo inmueble y el mismo
+// mes/año (uno creado por una versión antigua y otro por la nueva), se queda
+// el modificado más recientemente.
+function inm_recUnicos(lista, campo) {
+  var mejor = {}, orden = [];
+  var borrados = [];
+  (lista || []).forEach(function(r) {
+    if (!r) return;
+    if (r.deleted) { borrados.push(r); return; }
+    var ix = inm_recIdx(r), k = (ix >= 0 ? 'i' + ix : 'x' + (r.inmuebleRef || r.inmuebleIdx)) + '|' + r[campo];
+    if (!(k in mejor)) { orden.push(k); mejor[k] = r; }
+    else if (String(r.updatedAt || '') > String(mejor[k].updatedAt || '')) mejor[k] = r;
+  });
+  return orden.map(function(k) { return mejor[k]; }).concat(borrados);
+}
+// Cambio de referencia de un inmueble: sus registros pasan a la nueva.
+function inm_renombrarRefRegistros(refAnt, refNueva) {
+  var ahora = new Date().toISOString();
+  ['inmuebles:alquileres_mensuales', 'inmuebles:seguro_ibi', 'inmuebles:documentos', 'facturacion:cobros', 'facturacion:notas'].forEach(function(k) {
+    var arr; try { arr = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return; }
+    if (!Array.isArray(arr)) return;
+    var n = 0;
+    arr.forEach(function(r) { if (r && r.inmuebleRef === refAnt) { r.inmuebleRef = refNueva; r.updatedAt = ahora; n++; } });
+    if (n) localStorage.setItem(k, JSON.stringify(arr));
+  });
+  var datos = JSON.parse(localStorage.getItem('renta:inm_datos') || '{}');
+  if (datos['ref_' + refAnt]) { datos['ref_' + refNueva] = datos['ref_' + refAnt]; delete datos['ref_' + refAnt]; localStorage.setItem('renta:inm_datos', JSON.stringify(datos)); }
+}
+// Datos de Renta por inmueble (renta:inm_datos): clave nueva 'ref_<REF>',
+// con la antigua 'inm_<posición>' como respaldo.
+function renta_inmDatosClave(idx) { var ref = inm_refDeIdx(idx); return ref ? 'ref_' + ref : 'inm_' + idx; }
+function renta_inmDatosDe(datos, idx) {
+  datos = datos || {};
+  var ref = inm_refDeIdx(idx);
+  if (ref && datos['ref_' + ref]) return datos['ref_' + ref];
+  return datos['inm_' + idx] || {};
+}
+
 function inm_cobrosAcumulados(idx) {
-  const cobros = load(KEYS.cobros).filter(c => c.inmuebleIdx === idx);
+  const cobros = load(KEYS.cobros).filter(c => inm_recEs(c, idx)); // 13/10/2026: por referencia
   return cobros.reduce((s, c) => s + (parseFloat(c.importe) || 0), 0);
 }
 // PUNTO 97 (05/09/2026) — ALQUILERES MENSUALES POR INMUEBLE
@@ -8578,7 +8663,7 @@ function inm_cobrosAcumulados(idx) {
 // Patricio. Guardada como lista plana con id = idx + "_" + "YYYY-MM" para
 // que la fusión entre dispositivos sea fila a fila (ver _esInmRegistroClave).
 function inm_alqMenLoad() {
-  return load('inmuebles:alquileres_mensuales');
+  return inm_recUnicos(load('inmuebles:alquileres_mensuales'), 'mes'); // 13/10/2026: sin duplicados de la transición
 }
 function inm_alqMenSave(lista) {
   save('inmuebles:alquileres_mensuales', lista);
@@ -8607,7 +8692,7 @@ function fac_sincronizarHistoricoPatricio() {
   var porMes = {};
   for (var j = 0; j < registros.length; j++) {
     var r = registros[j];
-    if (idxsPat.indexOf(r.inmuebleIdx) < 0) continue;
+    if (idxsPat.indexOf(inm_recIdx(r)) < 0) continue; // 13/10/2026: por referencia
     porMes[r.mes] = (porMes[r.mes] || 0) + (parseFloat(r.alquiler) || 0);
   }
   var raw = localStorage.getItem('facturacion:historico:patricio');
@@ -8634,7 +8719,7 @@ function fac_sincronizarHistoricoPatricio() {
   if (window.syncToFirestore) window.syncToFirestore('facturacion:historico:patricio', JSON.stringify(data));
 }
 function inm_alqMenAcumulado(idx) {
-  return inm_alqMenLoad().filter(function(r) { return r.inmuebleIdx === idx; })
+  return inm_alqMenLoad().filter(function(r) { return inm_recEs(r, idx); })
     .reduce(function(s, r) { return s + (parseFloat(r.alquiler) || 0); }, 0);
 }
 // PUNTO 121 (06/09/2026): único punto de verdad para "cuánto alquiler real
@@ -8652,10 +8737,11 @@ function inm_alqMenTotalAnioPorInm(idxsPermitidos, year) {
   var mesActualYm = year + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
   for (var i = 0; i < registros.length; i++) {
     var r = registros[i];
-    if (!r.mes || idxsPermitidos.indexOf(r.inmuebleIdx) < 0) continue;
+    var ixR = inm_recIdx(r); // 13/10/2026: posición actual según su referencia
+    if (!r.mes || idxsPermitidos.indexOf(ixR) < 0) continue;
     var imp = parseFloat(r.alquiler) || 0;
     if (parseInt(r.mes.split('-')[0], 10) === year) {
-      porInm[r.inmuebleIdx] = (porInm[r.inmuebleIdx] || 0) + imp;
+      porInm[ixR] = (porInm[ixR] || 0) + imp;
       total += imp;
     }
     if (r.mes === mesActualYm) totalMesActual += imp;
@@ -8668,7 +8754,7 @@ function inm_alqMenTotalAnioPorInm(idxsPermitidos, year) {
 // anteriores consultable — no afecta a la amortización (que es en bruto,
 // solo alquiler), es solo para llevar seguimiento de estos dos gastos fijos.
 function inm_seguroIbiLoad() {
-  return load('inmuebles:seguro_ibi');
+  return inm_recUnicos(load('inmuebles:seguro_ibi'), 'anio'); // 13/10/2026: sin duplicados de la transición
 }
 function inm_seguroIbiSave(lista) {
   save('inmuebles:seguro_ibi', lista);
@@ -9588,6 +9674,7 @@ function inmdoc_guardar() {
     arr.push({
       id: 'idoc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       inmuebleIdx: idxGuardado,
+      inmuebleRef: inm_refDeIdx(idxGuardado), // 13/10/2026
       tipo: tipo,
       nombre: _inmdocArchivo ? _inmdocArchivo.name : '',
       url: url,
@@ -9682,7 +9769,7 @@ var INMFOTO_MOTIVOS = ['Entrega de llaves', 'Devolución de llaves', 'Desperfect
 var _inmfotoArchivos = [], _inmfotoSubiendo = false, _inmfotoMiniCache = {};
 function inmfoto_idDrive(url) { var m = /\/d\/([a-zA-Z0-9_-]+)/.exec(url || '') || /[?&]id=([a-zA-Z0-9_-]+)/.exec(url || ''); return m ? m[1] : ''; }
 function inmfoto_lista(idx) {
-  return inmdoc_load().filter(function(d) { return d && !d.deleted && d.foto && d.inmuebleIdx === idx; })
+  return inmdoc_load().filter(function(d) { return d && !d.deleted && d.foto && inm_recEs(d, idx); })
     .sort(function(a, b) { return String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')); });
 }
 function inmfoto_render(idx) {
@@ -9780,7 +9867,7 @@ function inmfoto_guardar() {
     inmdoc_subirArchivo(archivos[n], nombreInm, 'Foto ' + motivo, function(err, url) {
       if (err || !url) { fallos++; siguiente(n + 1); return; }
       var arr = inmdoc_load();
-      arr.push({ id: 'ifoto_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), inmuebleIdx: idxG, foto: true, tipo: 'Foto', motivo: motivo,
+      arr.push({ id: 'ifoto_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), inmuebleIdx: idxG, inmuebleRef: inm_refDeIdx(idxG), foto: true, tipo: 'Foto', motivo: motivo,
         nombre: archivos[n].name || '', url: url, fecha: fecha, updatedAt: new Date().toISOString() });
       inmdoc_save(arr); hechas++;
       siguiente(n + 1);
@@ -9801,7 +9888,7 @@ function inmdoc_render(idx) {
   var fechaEl = document.getElementById('inmdoc-fecha');
   if (fechaEl && !fechaEl.value) fechaEl.value = _fechaHoyLocal();
   if (!cont) return;
-  var docs = inmdoc_load().filter(function(d) { return d.inmuebleIdx === idx && !d.foto; }) // 13/10/2026: las fotos van en su pestaña
+  var docs = inmdoc_load().filter(function(d) { return inm_recEs(d, idx) && !d.foto; }) // 13/10/2026: las fotos van en su pestaña
     .sort(function(a, b) {
       var pa = _inmdocPrioridadTipo(a.tipo), pb = _inmdocPrioridadTipo(b.tipo);
       if (pa !== pb) return pa - pb;
@@ -10307,6 +10394,9 @@ function saveInmueble() {
   const modal = document.getElementById('inm-modal-inmueble');
   const arr = loadInmuebles();
   if (modal.dataset.editIdx !== undefined) {
+    // 13/10/2026: si se cambia la referencia del inmueble, sus registros
+    // (alquileres, gastos, documentos, fotos, cobros, notas, Renta) la siguen.
+    try { var _refAnt = (arr[parseInt(modal.dataset.editIdx)] || {}).ref; if (_refAnt && inm.ref && _refAnt !== inm.ref) inm_renombrarRefRegistros(_refAnt, inm.ref); } catch (eRr) { console.warn('Cambio de referencia:', eRr.message); }
     arr[parseInt(modal.dataset.editIdx)] = { ...arr[parseInt(modal.dataset.editIdx)], ...inm };
   } else {
     arr.push(inm);
@@ -15331,7 +15421,7 @@ function renderCobros(){
   const deudores=[];
   inmuebles.forEach(function(x){
     const inm=x.inm, idx=x.idx;
-    const cobradoTotal=cobros.filter(c=>c.inmuebleIdx===idx).reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
+    const cobradoTotal=cobros.filter(c=>inm_recEs(c,idx)).reduce((s,c)=>s+(parseFloat(c.importe)||0),0);
     const facturadoTotal=facturas.filter(f=>f.items&&f.items.some(it=>it.idx===idx)).reduce((s,f)=>{
       const it=f.items.find(it=>it.idx===idx);return s+(it?it.precio:0);
     },0);
@@ -15747,7 +15837,7 @@ function showCuenta(idx, nombreOverride){
   document.getElementById('cta-nombre').textContent=nombreFinal;
   document.getElementById('cta-sub').textContent=(TIPO_LABELS[inm.tipo]||'')+' · '+(inm.direccion||'—');
 
-  const cobros=load(KEYS.cobros).filter(c=>c.inmuebleIdx===idx);
+  const cobros=load(KEYS.cobros).filter(c=>inm_recEs(c,idx));
   const facturas=load(KEYS.facturas);
 
   // Reconstruir movimientos desde facturas y cobros
@@ -15801,7 +15891,7 @@ function showCuenta(idx, nombreOverride){
 }
 
 function renderNotasCuenta(idx){
-  const notas=load(KEYS.notas).filter(n=>n.inmuebleIdx===idx);
+  const notas=load(KEYS.notas).filter(n=>inm_recEs(n,idx));
   const el=document.getElementById('cta-notas');
   if(notas.length===0){el.innerHTML='<div style="font-size:12px;color:var(--silver-dim);padding:8px 0;">Sin tareas.</div>';return;}
   // PUNTO 224 (01/10/2026): lo más reciente primero. (índice local real conservado para marcar hecha)
@@ -15819,7 +15909,7 @@ function renderNotasCuenta(idx){
 function tickNota(localIdx){
   if (bloqueaSiViewer('Marcar una nota de cobro')) return;
   const notas=load(KEYS.notas);
-  const propias=notas.filter(n=>n.inmuebleIdx===ctaInmuebleIdx);
+  const propias=notas.filter(n=>inm_recEs(n,ctaInmuebleIdx));
   if(!propias[localIdx])return;
   const globalIdx=notas.indexOf(propias[localIdx]);
   notas[globalIdx].done=!notas[globalIdx].done;
@@ -16075,7 +16165,7 @@ function facCobro_guardar(){
     const cobros=load(KEYS.cobros);
     // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
     // sincronización de Cobros — mismo motivo que Contratos.
-    cobros.push({inmuebleIdx:it.idx,fecha:hoy(),importe:cobrado,concepto:'Cobro '+mesNombre(mesActual()),updatedAt:new Date().toISOString()});
+    cobros.push({id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),inmuebleIdx:it.idx,inmuebleRef:inm_refDeIdx(it.idx),fecha:hoy(),importe:cobrado,concepto:'Cobro '+mesNombre(mesActual()),updatedAt:new Date().toISOString()});
     save(KEYS.cobros,cobros);
     renderAnalisis();
     renderCobros();
@@ -16537,7 +16627,7 @@ function guardarCobro(){
   if(_cobTipoApunte==='cob'){
     // Cobro normal
     const cobros=load(KEYS.cobros);
-    cobros.push({inmuebleIdx:ctaInmuebleIdx,fecha,importe,concepto:concepto||'Cobro'});
+    cobros.push({id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),inmuebleIdx:ctaInmuebleIdx,inmuebleRef:inm_refDeIdx(ctaInmuebleIdx),fecha,importe,concepto:concepto||'Cobro'});
     save(KEYS.cobros,cobros);
   } else {
     // Cargo / factura manual
@@ -16582,7 +16672,7 @@ function guardarNota(){
   const limite=document.getElementById('nota-limite').value;
   if(!texto){info('Escribe una descripción para la tarea.');return;}
   const notas=load(KEYS.notas);
-  notas.push({inmuebleIdx:ctaInmuebleIdx,texto,limite,fecha:hoy(),done:false});
+  notas.push({id:'n'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),inmuebleIdx:ctaInmuebleIdx,inmuebleRef:inm_refDeIdx(ctaInmuebleIdx),texto,limite,fecha:hoy(),done:false});
   save(KEYS.notas,notas);
   closeModalById('cob-modal-nota');
   renderNotasCuenta(ctaInmuebleIdx);
@@ -16736,6 +16826,42 @@ document.addEventListener('firebaseLoaded', function() {
   // se alquilan junto con el piso, incluidas en su renta, se enlazan a su piso
   // ("Incluida en el alquiler de…"). IGC02 tenía un enlace consigo misma
   // (dato erróneo) → se limpia y queda incluida en IGC01.
+  // 13/10/2026 — MIGRACIÓN ÚNICA: cada registro de inmueble (alquileres
+  // mensuales, seguro/IBI/gastos, documentos/fotos, cobros, notas y datos de
+  // Renta) recibe la REFERENCIA del inmueble al que pertenece hoy según su
+  // posición. A partir de aquí la app los busca por referencia, así que ya no
+  // importa el orden de la lista. No cambia ningún id ni ningún importe.
+  (function _fixRegistrosRefV1() {
+    try {
+      if (localStorage.getItem('app:fix_registros_ref_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var lista = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
+      var refDe = function(ix) { return (typeof ix === 'number' && lista[ix] && lista[ix].ref) ? String(lista[ix].ref) : ''; };
+      var ahora = new Date().toISOString(), resumen = [];
+      ['inmuebles:alquileres_mensuales', 'inmuebles:seguro_ibi', 'inmuebles:documentos', 'facturacion:cobros', 'facturacion:notas'].forEach(function(k) {
+        var arr; try { arr = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return; }
+        if (!Array.isArray(arr)) return;
+        var n = 0;
+        arr.forEach(function(r) {
+          if (!r || r.inmuebleRef) return;
+          var ref = refDe(r.inmuebleIdx);
+          if (!ref) return;
+          r.inmuebleRef = ref; r.updatedAt = ahora; n++;
+        });
+        if (n) { localStorage.setItem(k, JSON.stringify(arr)); resumen.push(k + ': ' + n); }
+      });
+      // Datos de Renta por inmueble: se copia 'inm_<posición>' a 'ref_<REF>' (se deja la antigua)
+      var datos = JSON.parse(localStorage.getItem('renta:inm_datos') || '{}'), nd = 0;
+      Object.keys(datos).forEach(function(k) {
+        var m = /^inm_(\d+)$/.exec(k); if (!m) return;
+        var ref = refDe(parseInt(m[1], 10));
+        if (ref && !datos['ref_' + ref]) { datos['ref_' + ref] = JSON.parse(JSON.stringify(datos[k])); nd++; }
+      });
+      if (nd) { localStorage.setItem('renta:inm_datos', JSON.stringify(datos)); resumen.push('renta:inm_datos: ' + nd); }
+      localStorage.setItem('app:fix_registros_ref_v1', '1');
+      console.log('[Registros por referencia] ' + (resumen.join(' · ') || 'nada que migrar'));
+    } catch (e) { console.error('Error en la migración de registros por referencia', e); }
+  })();
   (function _fixGarajesIncluidosV1() {
     try {
       if (localStorage.getItem('app:fix_garajes_incluidos_v1')) return;
@@ -24449,12 +24575,14 @@ function sib_proximaAnual(ymd) {
 }
 function sib_dias(ymd) { return Math.round((new Date(ymd + 'T00:00:00') - sib_hoy()) / 86400000); }
 function sib_registro(idx, anio) {
-  return inm_seguroIbiLoad().filter(function(r) { return r && !r.deleted && r.inmuebleIdx === idx && parseInt(r.anio, 10) === anio; })[0] || null;
+  return inm_seguroIbiLoad().filter(function(r) { return r && !r.deleted && inm_recEs(r, idx) && parseInt(r.anio, 10) === anio; })[0] || null;
 }
 function sib_guardarRegistro(idx, anio, campos) {
-  var regs = inm_seguroIbiLoad(), id = idx + '_' + anio, ahora = new Date().toISOString();
-  var r = regs.filter(function(x) { return x && x.id === id; })[0];
-  if (!r) { r = { id: id, inmuebleIdx: idx, anio: anio, seguro: 0, ibi: 0 }; regs.push(r); }
+  var regs = inm_seguroIbiLoad(), ahora = new Date().toISOString();
+  // 13/10/2026: se busca por inmueble (referencia) y año, no por id
+  var r = regs.filter(function(x) { return x && !x.deleted && inm_recEs(x, idx) && parseInt(x.anio, 10) === anio; })[0];
+  if (!r) { r = { id: inm_recIdNuevo(idx, anio), anio: anio, seguro: 0, ibi: 0 }; regs.push(r); }
+  inm_recMarcar(r, idx);
   Object.keys(campos).forEach(function(k) { r[k] = campos[k]; });
   r.updatedAt = ahora;
   inm_seguroIbiSave(regs);
@@ -24512,7 +24640,7 @@ function sib_render(idx) {
     html += '<div style="font-size:11px;color:var(--accent-amber);margin-top:6px;">⚠️ Falta el valor catastral de ' + sib_anio + ' para la Renta (viene en el recibo del IBI).</div>';
   }
   html += '<div style="display:flex;margin-top:10px;">' + btn('✎ Editar ' + sib_anio, 'sib_editarIbi()') + '</div>';
-  var otros = inm_seguroIbiLoad().filter(function(x) { return x && !x.deleted && x.inmuebleIdx === sib_idx && parseInt(x.anio, 10) !== sib_anio && (sib_num(x.ibi) > 0 || sib_num(x.vcTotal) > 0); })
+  var otros = inm_seguroIbiLoad().filter(function(x) { return x && !x.deleted && inm_recEs(x, sib_idx) && parseInt(x.anio, 10) !== sib_anio && (sib_num(x.ibi) > 0 || sib_num(x.vcTotal) > 0); })
     .sort(function(a, b) { return b.anio - a.anio; });
   if (otros.length) {
     html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">' + otros.map(function(x) {
@@ -24631,7 +24759,7 @@ function sib_faltanVC() {
       if (primero === null) { primero = idx; anioPrimero = a; }
     });
   });
-  var txt = Object.keys(falta).sort().map(function(a) { return a + ': ' + falta[a].join(', '); }).join(' · ');
+  var txt = Object.keys(falta).sort().map(function(a) { return a + ': ' + falta[a].slice().sort().join(', '); }).join(' · ');
   return { n: n, txt: txt, idx: primero, anio: anioPrimero };
 }
 function sib_irInmueble(idx, anio) {
@@ -24681,10 +24809,10 @@ function agenda_calcular() {
     var emp = normEmpresa(String(inm.propietario || 'patrimer').toLowerCase()), nom = inm.ref || inm.direccion || 'inmueble';
     var sg = inm.seguro || {}, pr = sib_proximaAnual(sg.renovacion);
     if (dentro(pr)) ev.push({ f: pr, icon: '🛡️', t: 'Renueva el seguro de ' + nom, s: [sg.compania, sg.poliza ? 'póliza ' + sg.poliza : ''].filter(Boolean).join(' · ') || 'seguro del inmueble', emp: emp, tipo: 'inm', idx: idx });
-    var ult = regs.filter(function(r) { return r && !r.deleted && r.inmuebleIdx === idx && r.ibiFecha; }).sort(function(a, b) { return b.anio - a.anio; })[0];
+    var ult = regs.filter(function(r) { return r && !r.deleted && inm_recEs(r, idx) && r.ibiFecha; }).sort(function(a, b) { return b.anio - a.anio; })[0];
     if (ult) {
       var pi = sib_proximaAnual(ult.ibiFecha);
-      var yaEste = regs.some(function(r) { return r && !r.deleted && r.inmuebleIdx === idx && parseInt(r.anio, 10) === parseInt(pi.slice(0, 4), 10) && r.ibiFecha && r.ibiFecha < hoyS; });
+      var yaEste = regs.some(function(r) { return r && !r.deleted && inm_recEs(r, idx) && parseInt(r.anio, 10) === parseInt(pi.slice(0, 4), 10) && r.ibiFecha && r.ibiFecha < hoyS; });
       if (dentro(pi) && !yaEste) ev.push({ f: pi, icon: '🏛️', t: 'Recibo del IBI de ' + nom, s: sib_num(ult.ibi) > 0 ? '~' + sib_eur(ult.ibi) + ' (como en ' + ult.anio + ')' : 'IBI anual', emp: emp, tipo: 'inm', idx: idx });
     }
   });
@@ -24783,7 +24911,7 @@ function inm_gastosAnuales(inm, idx) {
     }
     if (idx < 0) return res;
     var Y = new Date().getFullYear();
-    var regs = inm_seguroIbiLoad().filter(function(r) { return r && !r.deleted && r.inmuebleIdx === idx && parseInt(r.anio, 10) <= Y; })
+    var regs = inm_seguroIbiLoad().filter(function(r) { return r && !r.deleted && inm_recEs(r, idx) && parseInt(r.anio, 10) <= Y; })
       .sort(function(a, b) { return b.anio - a.anio; });
     var ultimo = function(campo) { for (var i = 0; i < regs.length; i++) { if (sib_num(regs[i][campo]) > 0) return regs[i]; } return null; };
     var rS = ultimo('seguro'), rI = ultimo('ibi'), rC = ultimo('comunidadMes'), rO = ultimo('otros');
@@ -24794,7 +24922,7 @@ function inm_gastosAnuales(inm, idx) {
       // Últimos 12 meses apuntados en Renta → Alquileres mensuales
       var hoy = new Date(), desde = new Date(hoy.getFullYear() - 1, hoy.getMonth(), 1);
       var desdeS = desde.getFullYear() + '-' + ('0' + (desde.getMonth() + 1)).slice(-2);
-      var filas = inm_alqMenLoad().filter(function(r) { return r && !r.deleted && r.inmuebleIdx === idx && r.mes && r.mes >= desdeS && sib_num(r.comunidad) > 0; });
+      var filas = inm_alqMenLoad().filter(function(r) { return r && !r.deleted && inm_recEs(r, idx) && r.mes && r.mes >= desdeS && sib_num(r.comunidad) > 0; });
       if (filas.length) {
         var suma = filas.reduce(function(s, r) { return s + sib_num(r.comunidad); }, 0);
         res.comunidad = suma / filas.length * 12;
@@ -26626,7 +26754,7 @@ function renta_datosMesPendientes() {
     if (inms.length) {
       var regs = (typeof inm_alqMenLoad === 'function') ? inm_alqMenLoad() : [];
       var faltan = inms.filter(function(x) {
-        return !regs.some(function(r) { return r.inmuebleIdx === x.idx && r.mes === ym; });
+        return !regs.some(function(r) { return inm_recEs(r, x.idx) && r.mes === ym; });
       }).length;
       if (faltan > 0) res.alquileres = { mes: RENTA_MESES_NOMBRE[hoyD.getMonth()], anio: hoyD.getFullYear(), ym: ym, faltan: faltan, total: inms.length };
     }
@@ -26895,7 +27023,12 @@ function renta_saveInmDatos(obj) {
 function renta_setInmCampo(inmId, campo, valor) {
   if (bloqueaSiViewer('Editar un dato de un inmueble en Renta')) return;
   var datos = renta_getInmDatos();
-  if (!datos[inmId]) datos[inmId] = {};
+  if (!datos[inmId]) {
+    // 13/10/2026: al pasar a la clave por referencia, se parte de lo que ya
+    // hubiera guardado con la clave antigua (por posición).
+    var mRef = /^ref_(.+)$/.exec(inmId), ixOld = mRef ? inm_idxDeRef(mRef[1]) : -1;
+    datos[inmId] = (ixOld >= 0 && datos['inm_' + ixOld]) ? JSON.parse(JSON.stringify(datos['inm_' + ixOld])) : {};
+  }
   datos[inmId][campo] = valor;
   renta_saveInmDatos(datos);
   renta_calcPrevision();
@@ -26931,7 +27064,8 @@ function renta_renderAlquileres() {
     var r = registrosAlq[j];
     if (!r.mes || parseInt(r.mes.split('-')[0]) !== renta_anio) continue;
     var importe = parseFloat(r.alquiler) || 0;
-    if (importe > 0) ingresosPorInm[r.inmuebleIdx] = (ingresosPorInm[r.inmuebleIdx] || 0) + importe;
+    var ixQ = inm_recIdx(r); // 13/10/2026
+    if (importe > 0) ingresosPorInm[ixQ] = (ingresosPorInm[ixQ] || 0) + importe;
   }
 
   var datos = renta_getInmDatos();
@@ -26943,8 +27077,8 @@ function renta_renderAlquileres() {
     var inm = inmPatricio[m].inm;
     var ingreso = ingresosPorInm[idx] || 0;
     totalAlq += ingreso;
-    var inmId = 'inm_' + idx;
-    var d = datos[inmId] || {};
+    var inmId = renta_inmDatosClave(idx); // 13/10/2026: por referencia ('ref_VIV-P01')
+    var d = renta_inmDatosDe(datos, idx);
     var tipoVal = d.tipo || 'otro';
     var amorBase = d.amorBase || '';
 
@@ -27052,14 +27186,14 @@ function alqmen_render() {
   var hayCopiados = false;
   var html = '';
   inmuebles.forEach(function(x) {
-    var reg = registros.find(function(r) { return r.inmuebleIdx === x.idx && r.mes === alqmen_mes; });
+    var reg = registros.find(function(r) { return inm_recEs(r, x.idx) && r.mes === alqmen_mes; });
     var esCopia = false;
     var alquilerVal = '', comunidadVal = '';
     if (reg) {
       alquilerVal = reg.alquiler || reg.alquiler === 0 ? fmtGlobal(reg.alquiler) : '';
       comunidadVal = reg.comunidad || reg.comunidad === 0 ? fmtGlobal(reg.comunidad) : '';
     } else {
-      var regAnt = registros.find(function(r) { return r.inmuebleIdx === x.idx && r.mes === mesAnteriorYm; });
+      var regAnt = registros.find(function(r) { return inm_recEs(r, x.idx) && r.mes === mesAnteriorYm; });
       if (regAnt) {
         alquilerVal = regAnt.alquiler || regAnt.alquiler === 0 ? fmtGlobal(regAnt.alquiler) : '';
         comunidadVal = regAnt.comunidad || regAnt.comunidad === 0 ? fmtGlobal(regAnt.comunidad) : '';
@@ -27124,14 +27258,15 @@ function alqmen_guardarMes(forzar) {
     var idx = parseInt(fila.dataset.alqmenIdx, 10);
     var alquiler = parseFmtGlobal(fila.querySelector('.alqmen-input-alquiler').value) || 0;
     var comunidad = parseFmtGlobal(fila.querySelector('.alqmen-input-comunidad').value) || 0;
-    var id = idx + '_' + alqmen_mes;
-    var existente = registros.find(function(r) { return r.id === id; });
+    // 13/10/2026: se busca por inmueble (referencia) y mes, no por id
+    var existente = registros.find(function(r) { return !r.deleted && inm_recEs(r, idx) && r.mes === alqmen_mes; });
     if (existente) {
       existente.alquiler = alquiler;
       existente.comunidad = comunidad;
       existente.updatedAt = ahora;
+      inm_recMarcar(existente, idx);
     } else {
-      registros.push({ id: id, inmuebleIdx: idx, mes: alqmen_mes, alquiler: alquiler, comunidad: comunidad, updatedAt: ahora });
+      registros.push(inm_recMarcar({ id: inm_recIdNuevo(idx, alqmen_mes), mes: alqmen_mes, alquiler: alquiler, comunidad: comunidad, updatedAt: ahora }, idx));
     }
   });
   inm_alqMenSave(registros);
@@ -27204,7 +27339,7 @@ function correccion247() {
       var faltan = [];
       for (var m = 1; m <= 12; m++) {
         var ym = '2025-' + String(m).padStart(2, '0');
-        var r = regs.find(function(x) { return x.inmuebleIdx === idx && x.mes === ym; });
+        var r = regs.find(function(x) { return inm_recEs(x, idx) && x.mes === ym; });
         if (!r) { faltan.push(RENTA_MESES_NOMBRE[m - 1].slice(0, 3).toLowerCase()); continue; }
         var debe = cfg.cobros2025(m);
         if (Math.abs((parseFloat(r.alquiler) || 0) - debe) > 0.005) { r.alquiler = debe; r.updatedAt = ahora; cambiosCob++; }
@@ -27255,11 +27390,11 @@ function segibi_render() {
   var registros = inm_seguroIbiLoad();
   var html = '';
   inmuebles.forEach(function(x) {
-    var reg = registros.find(function(r) { return r.inmuebleIdx === x.idx && r.anio === segibi_anio; });
+    var reg = registros.find(function(r) { return inm_recEs(r, x.idx) && r.anio === segibi_anio; });
     var seguroVal = reg && (reg.seguro || reg.seguro === 0) ? fmtGlobal(reg.seguro) : '';
     var ibiVal = reg && (reg.ibi || reg.ibi === 0) ? fmtGlobal(reg.ibi) : '';
     var label = x.inm.direccion || x.inm.ref || ('Inmueble ' + (x.idx + 1));
-    var historicos = registros.filter(function(r) { return r.inmuebleIdx === x.idx && r.anio !== segibi_anio; }).sort(function(a, b) { return b.anio - a.anio; });
+    var historicos = registros.filter(function(r) { return inm_recEs(r, x.idx) && r.anio !== segibi_anio; }).sort(function(a, b) { return b.anio - a.anio; });
     var histHtml = '';
     if (historicos.length > 0) {
       histHtml = '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">'
@@ -27293,14 +27428,15 @@ function segibi_guardarAnio() {
     var idx = parseInt(fila.dataset.segibiIdx, 10);
     var seguro = parseFmtGlobal(fila.querySelector('.segibi-input-seguro').value) || 0;
     var ibi = parseFmtGlobal(fila.querySelector('.segibi-input-ibi').value) || 0;
-    var id = idx + '_' + segibi_anio;
-    var existente = registros.find(function(r) { return r.id === id; });
+    // 13/10/2026: se busca por inmueble (referencia) y año, no por id
+    var existente = registros.find(function(r) { return !r.deleted && inm_recEs(r, idx) && parseInt(r.anio, 10) === segibi_anio; });
     if (existente) {
       existente.seguro = seguro;
       existente.ibi = ibi;
       existente.updatedAt = ahora;
+      inm_recMarcar(existente, idx);
     } else {
-      registros.push({ id: id, inmuebleIdx: idx, anio: segibi_anio, seguro: seguro, ibi: ibi, updatedAt: ahora });
+      registros.push(inm_recMarcar({ id: inm_recIdNuevo(idx, segibi_anio), anio: segibi_anio, seguro: seguro, ibi: ibi, updatedAt: ahora }, idx));
     }
   });
   inm_seguroIbiSave(registros);
@@ -28218,10 +28354,11 @@ function renta_calcPrevisionDatos(proy) {
   inmPatricio.forEach(function(ix) { porInm[ix] = { ingreso: 0, comunidad: 0, meses: 0, ultimo: 0, segibi: 0 }; });
   var hayComunidad = false;
   (typeof inm_alqMenLoad === 'function' ? inm_alqMenLoad() : []).forEach(function(reg) {
-    if (!reg || reg.deleted || !reg.mes || !porInm[reg.inmuebleIdx]) return;
+    var ixP = inm_recIdx(reg); // 13/10/2026: por referencia
+    if (!reg || reg.deleted || !reg.mes || !porInm[ixP]) return;
     var p = reg.mes.split('-');
     if (parseInt(p[0], 10) !== renta_anio) return;
-    var o = porInm[reg.inmuebleIdx];
+    var o = porInm[ixP];
     var alq = parseFloat(reg.alquiler) || 0, com = parseFloat(reg.comunidad) || 0;
     o.ingreso += alq; o.comunidad += com;
     if (com > 0) hayComunidad = true;
@@ -28241,9 +28378,10 @@ function renta_calcPrevisionDatos(proy) {
   // Seguro e IBI del año (dato anual por piso)
   var haySegIbi = false;
   (typeof inm_seguroIbiLoad === 'function' ? inm_seguroIbiLoad() : []).forEach(function(reg) {
-    if (!reg || reg.deleted || parseInt(reg.anio, 10) !== renta_anio || !porInm[reg.inmuebleIdx]) return;
+    var ixS = inm_recIdx(reg); // 13/10/2026: por referencia
+    if (!reg || reg.deleted || parseInt(reg.anio, 10) !== renta_anio || !porInm[ixS]) return;
     var v = (parseFloat(reg.seguro) || 0) + (parseFloat(reg.ibi) || 0);
-    porInm[reg.inmuebleIdx].segibi += v;
+    porInm[ixS].segibi += v;
     if (v > 0) haySegIbi = true;
   });
 
@@ -28272,7 +28410,7 @@ function renta_calcPrevisionDatos(proy) {
   var baseAlquilerTotal = 0;
   for (var mi = 0; mi < inmPatricio.length; mi++) {
     var idx = inmPatricio[mi];
-    var d = datos['inm_' + idx] || {};
+    var d = renta_inmDatosDe(datos, idx); // 13/10/2026
     var o2 = porInm[idx];
     var gastoAsignado = ingresoAlquilerTotal > 0 ? gastosDeducibles * (o2.ingreso / ingresoAlquilerTotal) : gastosDeducibles / inmPatricio.length;
     var amorAnual = (parseFloat(d.amorBase) || 0) * 0.03;
@@ -28444,16 +28582,16 @@ function rinf_datos(anio) {
     if (!inm || (inm.propietario || '').toLowerCase() !== 'patricio') return;
     var o = { ref: inm.ref || '', dir: inm.direccionCalle || inm.direccion || '', catastral: inm.catastral || '', ingreso: 0, meses: 0, comunidad: 0, seguro: 0, ibi: 0 };
     alq.forEach(function(r) {
-      if (!r || r.deleted || r.inmuebleIdx !== idx || !r.mes || parseInt(r.mes.slice(0, 4), 10) !== anio) return;
+      if (!r || r.deleted || !inm_recEs(r, idx) || !r.mes || parseInt(r.mes.slice(0, 4), 10) !== anio) return;
       var a = rinf_num(r.alquiler); o.ingreso += a; o.comunidad += rinf_num(r.comunidad); if (a > 0) o.meses++;
     });
     segibi.forEach(function(r) {
-      if (!r || r.deleted || r.inmuebleIdx !== idx || parseInt(r.anio, 10) !== anio) return;
+      if (!r || r.deleted || !inm_recEs(r, idx) || parseInt(r.anio, 10) !== anio) return;
       o.seguro += rinf_num(r.seguro); o.ibi += rinf_num(r.ibi);
       if (rinf_num(r.vcTotal) > 0) o.vcTotal = rinf_num(r.vcTotal); // 12/10/2026
       if (rinf_num(r.vcConstruccion) > 0) o.vcConstruccion = rinf_num(r.vcConstruccion);
     });
-    var d = datosInm['inm_' + idx] || {};
+    var d = renta_inmDatosDe(datosInm, idx); // 13/10/2026
     o.amort = rinf_num((parseFloat(d.amorBase) || 0) * 0.03);
     // Contrato del año: el activo, o el último que estuvo vigente ese año
     var cs = ctrs.filter(function(c) { return c.ref === inm.ref && (c.tipo || 'contrato') !== 'rescision'; })
@@ -28521,7 +28659,7 @@ function rinf_datos(anio) {
       transm: g ? rinf_num(g.valorTransmision) : 0, ganancia: g ? rinf_num(g.ganancia) : 0, completo: !!g,
       inicioAlquiler: inm.ventaAnioInicioAlquiler || '',
       // Escrituras y demás documentos guardados en la ficha del inmueble
-      docs: docsInm.filter(function(x) { return x.inmuebleIdx === idxV && !x.foto; }) // 13/10/2026: sin las fotos
+      docs: docsInm.filter(function(x) { return inm_recEs(x, idxV) && !x.foto; }) // 13/10/2026: sin las fotos
         .sort(function(a, b) { return String(a.tipo || '').localeCompare(String(b.tipo || '')); })
         .map(function(x) { return { tipo: x.tipo || 'Documento', nombre: x.nombre || '', url: x.url || '' }; })
     });
