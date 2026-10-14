@@ -2269,7 +2269,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261013_05';
+const BUILD_ID = '261014_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -5911,6 +5911,8 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
         <div class="csitem"><div class="csitem-l">Saldo</div><div class="csitem-v" id="cta-saldo">0€</div></div>
       </div>
     </div>
+    <!-- 14/10/2026: botón arriba, antes de la lista (mismo criterio que KURRA) -->
+    <button class="btn1" onclick="openModalCobro()" style="margin:0 0 14px;">＋ Registrar cobro</button>
     <div class="slabel" style="margin-bottom:10px">Movimientos · Toca ✎ para editar</div>
     <div class="ttable">
       <div class="thead">
@@ -5918,7 +5920,6 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       </div>
       <div id="cta-movimientos"><div class="empty-state">Sin movimientos registrados.</div></div>
     </div>
-    <button class="btn1" onclick="openModalCobro()">＋ Registrar cobro</button>
     <div class="nsection">
       <div class="ntitle">Tareas y notas<div class="nadd" onclick="openModalNota()">＋</div></div>
       <div id="cta-notas"><div style="font-size:12px;color:var(--silver-dim);padding:8px 0;">Sin tareas.</div></div>
@@ -5985,6 +5986,8 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
         <div class="csitem"><div class="csitem-l">Saldo</div><div class="csitem-v" id="kurra-saldo">0€</div></div>
       </div>
     </div>
+    <!-- 14/10/2026: botón arriba, antes de la lista (pedido por Patry) -->
+    <button class="btn1" onclick="kurra_abrirModalNuevo()" style="margin:0 0 14px;">＋ Nuevo apunte</button>
     <div class="slabel" style="margin-bottom:10px">Movimientos · Toca ✎ para editar</div>
     <div class="ttable">
       <div class="thead">
@@ -5992,7 +5995,6 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       </div>
       <div id="kurra-movimientos"><div class="empty-state">Sin movimientos registrados.</div></div>
     </div>
-    <button class="btn1" onclick="kurra_abrirModalNuevo()">＋ Nuevo apunte</button>
   </main>
 </div>
 
@@ -6015,8 +6017,8 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
         <button type="button" id="kurra-otro-tipo-haber" class="cob-tipo-btn" onclick="kurra_setOtroTipo('haber')">Haber</button>
       </div>
     </div>
-    <div class="mfield"><div class="mflabel">Mes</div><select class="minput" id="kurra-mes"></select></div>
-    <div class="mfield"><div class="mflabel">Día</div><select class="minput" id="kurra-dia"></select></div>
+    <!-- 14/10/2026: un solo campo de fecha (calendario del iPhone), como en el resto de la app -->
+    <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" type="date" id="kurra-fecha"></div>
     <div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" type="number" inputmode="decimal" step="0.01" id="kurra-importe"></div>
     <button class="btn1" onclick="kurra_guardarApunte()">Guardar apunte</button>
     <button class="btn2" id="kurra-btn-borrar" style="display:none;color:var(--red);" onclick="kurra_borrarApunte()">Eliminar apunte</button>
@@ -15566,15 +15568,11 @@ function kurra_render(){
   }).join('');
 }
 
-function kurra_poblarSelectFechas(mesSel,diaSel){
-  const mesEl=document.getElementById('kurra-mes');
-  mesEl.innerHTML=RUS_MESES_NOMBRE.slice(1).map((n,i)=>`<option value="${i+1}">${n}</option>`).join('');
-  mesEl.value=mesSel;
-  const diaEl=document.getElementById('kurra-dia');
-  let diaHtml='';
-  for(let dd=1;dd<=31;dd++) diaHtml+=`<option value="${dd}">${dd}</option>`;
-  diaEl.innerHTML=diaHtml;
-  diaEl.value=diaSel;
+// 14/10/2026: la fecha se elige con un solo campo de fecha (antes, Mes + Día
+// y el año siempre el actual — al editar un apunte de otro año se le cambiaba).
+function kurra_ponerFecha(ymd){
+  const el=document.getElementById('kurra-fecha');
+  if(el) el.value=/^\d{4}-\d{2}-\d{2}$/.test(ymd||'')?ymd:_fechaHoyLocal();
 }
 
 function kurra_setOtroTipo(tipo){
@@ -15598,8 +15596,7 @@ function kurra_abrirModalNuevo(){
   document.getElementById('kurra-otro-texto').value='';
   kurra_setOtroTipo('debe');
   kurra_onConceptoChange();
-  const now=new Date();
-  kurra_poblarSelectFechas(now.getMonth()+1,now.getDate());
+  kurra_ponerFecha(_fechaHoyLocal());
   document.getElementById('kurra-importe').value='';
   document.getElementById('kurra-btn-borrar').style.display='none';
   document.getElementById('kurra-modal-apunte').classList.add('open');
@@ -15623,9 +15620,7 @@ function kurra_editarApunte(id){
   }
   kurra_setOtroTipo(m.tipo==='haber'?'haber':'debe');
   kurra_onConceptoChange();
-  const partes=(m.fecha||'').split('-'); // [AAAA, MM, DD]
-  const now=new Date();
-  kurra_poblarSelectFechas(partes[1]?parseInt(partes[1],10):now.getMonth()+1, partes[2]?parseInt(partes[2],10):now.getDate());
+  kurra_ponerFecha(m.fecha);
   document.getElementById('kurra-importe').value=m.importe!=null?m.importe:'';
   document.getElementById('kurra-btn-borrar').style.display='';
   document.getElementById('kurra-modal-apunte').classList.add('open');
@@ -15639,18 +15634,16 @@ function kurra_guardarApunte(){
   let conceptoTexto,tipo;
   if(esOtro){
     conceptoTexto=document.getElementById('kurra-otro-texto').value.trim();
-    if(!conceptoTexto){ info('Escribe una descripción para "Otro".'); return; }
+    if(!conceptoTexto){ avisar('⚠️ Escribe una descripción para "Otro".'); return; }
     tipo=_kurraOtroTipo;
   } else {
     conceptoTexto=conceptoDef.label;
     tipo=conceptoDef.tipo;
   }
   const importe=parseFloat(document.getElementById('kurra-importe').value)||0;
-  if(importe<=0){ info('Introduce un importe válido.'); return; }
-  const mes=parseInt(document.getElementById('kurra-mes').value,10);
-  const dia=parseInt(document.getElementById('kurra-dia').value,10);
-  const anio=new Date().getFullYear();
-  const fecha=anio+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+  if(importe<=0){ avisar('⚠️ Introduce un importe válido.'); return; }
+  const fecha=(document.getElementById('kurra-fecha').value||'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)){ avisar('⚠️ Elige la fecha del apunte.'); return; }
 
   const lista=kurra_load();
   // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
@@ -23257,7 +23250,9 @@ function divcal_datos() {
     var real12 = pagos.filter(function(o) { return o.ticker === t && o.fecha >= baseIniS && o.fecha < mes0S; }).reduce(function(s, o) { return s + divcal_valorOp(o); }, 0);
     return { ticker: t, nombre: FIN_NOMBRES[t] || t, color: divcal_color(t, i), total: tot, pagos: e.length, scrip: e.some(function(x) { return x.scrip; }),
       efectivo: e.some(function(x) { return !x.scrip; }), real12: real12, rent: valorPor[t] ? tot / valorPor[t] : null,
-      corto: !!(primeraCompra[t] && primeraCompra[t] > baseIniS), acciones: accionesHoy[t] };
+      // 14/10/2026: si ya hay apuntado algún cobro de ese valor anterior a su primera compra dentro de
+      // los últimos 12 meses (p. ej. Enagás dic 2025, metido a mano por Patry), el año está completo: sin aviso.
+      corto: !!(primeraCompra[t] && primeraCompra[t] > baseIniS && !pagos.some(function(o) { return o.ticker === t && o.fecha >= baseIniS && o.fecha < primeraCompra[t]; })), acciones: accionesHoy[t] };
   }).filter(function(p) { return p.total > 0 || p.real12 > 0; }).sort(function(a, b) { return b.total - a.total; });
   var colorDe = {}; porEmp.forEach(function(p) { colorDe[p.ticker] = p.color; });
   var proximo = ev.filter(function(e) { return (e.estado === 'previsto' || e.estado === 'confirmado') && e.fecha >= hoyS; })[0] || null;
@@ -27664,7 +27659,7 @@ function rint_htmlBloque(anio) {
       + '<div style="font-size:16px;font-weight:700;color:' + (color || 'var(--accent-green)') + ';margin-top:2px;">' + valor + '</div>'
       + '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:1px;">' + sub + '</div></div>';
   };
-  var h = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Trade Republic</div>';
+  var h = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;text-align:center;">Trade Republic</div>';
   h += '<div style="display:flex;gap:8px;">'
     + tile('Intereses cuenta', ingotros_fmt2(totB) + ' €', 'retención ' + ingotros_fmt2(totR) + ' €')
     + tile('Saveback tarjeta', ingotros_fmt2(sv.total) + ' €', fSave ? (sv.meses + ' mes' + (sv.meses === 1 ? '' : 'es')) : 'sin activar en Finanzas', fSave ? null : 'var(--text-secondary)')
@@ -27816,7 +27811,7 @@ function renta_renderCapital() {
 
   var _rint = rint_htmlBloque(renta_anio); // PUNTO 250
   if (divs.length === 0 && manuales.length === 0) {
-    cont.innerHTML = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:10px 0 8px;">Dividendos</div><div style="font-size:12px;color:var(--text-secondary);padding:4px 0;">Sin dividendos en ' + renta_anio + '.</div>' + _rint.html;
+    cont.innerHTML = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:10px 0 8px;text-align:center;">Dividendos</div><div style="font-size:12px;color:var(--text-secondary);padding:4px 0;text-align:center;">Sin dividendos en ' + renta_anio + '.</div>' + _rint.html;
     var _totSolo = _rint.bruto + _rint.saveback;
     document.getElementById('renta-total-capital').textContent = _totSolo ? (ingotros_fmt2(_totSolo) + ' €') : '— €';
     return;
@@ -27853,10 +27848,12 @@ function renta_renderCapital() {
   }
   // PUNTO 253: dividendos en un desplegable, como el histórico de Trade Republic.
   var _divAb = !!window._rdivAbierto;
-  var _cab = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:10px 0 8px;">Dividendos</div>'
-    + '<div onclick="window._rdivAbierto=!window._rdivAbierto;renta_renderCapital();" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:' + (_divAb ? '8px' : '0') + ';">'
+  var _cab = '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:10px 0 8px;text-align:center;">Dividendos</div>'
+    + '<div onclick="window._rdivAbierto=!window._rdivAbierto;renta_renderCapital();" style="cursor:pointer;position:relative;text-align:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 32px;margin-bottom:' + (_divAb ? '8px' : '0') + ';">'
+    // 14/10/2026: centrado como "Histórico" de Trade Republic (flecha a la derecha, sin descentrar el texto)
     + '<span style="font-size:12.5px;font-weight:700;color:var(--silver-bright);">' + filas.length + ' dividendo' + (filas.length === 1 ? '' : 's') + ' en ' + renta_anio + '</span>'
-    + '<span style="display:flex;align-items:center;gap:10px;"><span style="font-size:13px;font-weight:700;color:var(--accent-green);">' + ingotros_fmt2(total) + ' €</span><span style="color:var(--text-secondary);font-size:16px;">' + (_divAb ? '⌄' : '›') + '</span></span></div>';
+    + '<span style="font-size:12.5px;font-weight:700;color:var(--accent-green);margin-left:8px;white-space:nowrap;">' + ingotros_fmt2(total) + ' €</span>'
+    + '<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:16px;">' + (_divAb ? '⌄' : '›') + '</span></div>';
   cont.innerHTML = _cab + (_divAb ? html : '') + _rint.html;
   total += _rint.bruto + _rint.saveback; // PUNTO 250
   document.getElementById('renta-total-capital').textContent = ingotros_fmt2(total) + ' €';
