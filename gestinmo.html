@@ -921,7 +921,7 @@ body[data-profile="industrias"] .header-company-name{color:#c9a84c!important;}
 .fin-meta-val{font-weight:700;color:var(--silver-mid);}
 .fin-plus{color:var(--accent-green)!important;}
 .fin-minus{color:#e05c5c!important;}
-.fin-card-actions{display:flex;gap:6px;margin-top:10px;}
+.fin-card-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;} /* 18/10/2026: si los botones no caben en el móvil, pasan a una segunda fila en vez de salirse de la tarjeta */
 .fin-action-btn{flex:1;padding:6px;background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.25);border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--accent-blue);cursor:pointer;text-align:center;}
 .fin-action-btn:active{transform:scale(.95);}
 .fin-action-btn.red{background:rgba(224,80,80,.1);border-color:rgba(224,80,80,.25);color:#e05050;}
@@ -1101,6 +1101,12 @@ body:has(.baja-modal.open) #global-bottom-nav.gnav-show { display:none !importan
    los de Finanzas). "color-scheme:dark" ya arregla la mayoría de casos en
    Chrome/Safari; el estilo de "option" de abajo es el respaldo para el resto. */
 select{color-scheme:dark;}
+/* 18/10/2026 (pedido por Patry): el icono del calendario de los campos de fecha salía
+   oscuro sobre el fondo oscuro y no se veía. Se dibuja nuestro propio icono en color claro
+   (Chrome/Edge en el ordenador; en el iPhone Safari no enseña icono) y color-scheme:dark
+   para que el calendario que se abre vaya a juego con la app. */
+input[type="date"],input[type="month"],input[type="time"],input[type="datetime-local"]{color-scheme:dark;}
+input[type="date"]::-webkit-calendar-picker-indicator,input[type="month"]::-webkit-calendar-picker-indicator{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9d3ea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4.5' width='18' height='17' rx='2.5'/%3E%3Cpath d='M3 9.5h18M8 2.5v4M16 2.5v4'/%3E%3C/svg%3E") center/17px 17px no-repeat;opacity:.95;cursor:pointer;}
 select option{background-color:var(--navy-dark);color:var(--silver-bright);}
 /* PUNTO 124 (21/09/2026): el "Cuenta/Broker" de cada acción, con la misma
    pinta de texto pequeño que usa Fondos para su broker (.fin-card-sub) —
@@ -2056,6 +2062,7 @@ const DATA_KEYS = [
   // guarda a qué cuenta/broker pertenece cada acción (por ticker).
   'fin:patrimonio_financiero_actual:patricio',
   'fin:acciones_cuenta:patricio',
+  'fin:acciones_dca', // 18/10/2026: aportación automática de acciones en modo detallado
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
@@ -2269,7 +2276,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261014_02';
+const BUILD_ID = '261018_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -7032,6 +7039,25 @@ cálculo a mano. -->
   </div>
 </div>
 
+<!-- 18/10/2026: APORTACIÓN AUTOMÁTICA DE UNA ACCIÓN EN MODO DETALLADO -->
+<div class="moverlay" id="fin-modal-acc-dca">
+  <div class="modal">
+    <div class="mtitle"><span id="fin-accdca-titulo">Aportación automática</span><span class="mclose" onclick="closeModalById('fin-modal-acc-dca')">&#10005;</span></div>
+    <div class="form-hint" style="margin:0 2px 12px;">ℹ️ Para planes de ahorro (p. ej. Trade Republic). Cada día elegido se apunta sola una <b>compra</b> por ese importe, al precio de la última cotización. El nº de acciones es aproximado (el broker compra a su precio): de vez en cuando cuádralo con el broker editando la compra en <b>Histórico</b>. Se empieza a contar desde hoy.</div>
+    <div class="mfield" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="fin-accdca-activo" onchange="fin_accDcaToggle()" style="width:18px;height:18px;flex-shrink:0;">
+      <label for="fin-accdca-activo" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Aportación automática</label>
+    </div>
+    <div id="fin-accdca-campos" style="display:none;">
+      <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-accdca-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="mfield"><div class="mflabel">Días del mes</div><input class="minput" id="fin-accdca-dias" type="text" inputmode="numeric" placeholder="1, 15"></div>
+    </div>
+    <input type="hidden" id="fin-accdca-ticker" value="">
+    <button class="btn1" onclick="fin_accDcaGuardar()">Guardar</button>
+    <button class="btn2" onclick="closeModalById('fin-modal-acc-dca')" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
 <!-- MODAL URBANITAE (PUNTO 89, 03/09/2026) -->
 <div class="moverlay" id="fin-modal-urbanitae">
   <div class="modal">
@@ -8035,6 +8061,7 @@ const BACKUP_KEYS = [
   // PUNTO 114 (06/09/2026): Panel Patrimonio Financiero — estado actual.
   'fin:patrimonio_financiero_actual:patricio',
   'fin:acciones_cuenta:patricio',
+  'fin:acciones_dca', // 18/10/2026: aportación automática de acciones en modo detallado
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 166 (14/09/2026): documentos por inmueble (enlaces a Drive).
@@ -20325,6 +20352,9 @@ function fin_renderAcciones() {
       if (dpa !== null && pm > 0) html += '<div class="fin-meta-item">Coste neto/acc.: <span class="fin-meta-val">' + fin_fmt(pm - dpa).replace(' \u20ac', ' \u20ac/acc') + '</span></div>';
       if (yoc !== null) html += '<div class="fin-meta-item">Yield on Cost: <span class="fin-meta-val fin-plus">' + fin_fmtPct(yoc) + '</span></div>';
     }
+    // 18/10/2026: aportación automática (modo detallado)
+    var _dcaAcc = fin_accDcaDe(fin_emp(), p.ticker);
+    if (_dcaAcc) html += '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">' + fin_dcaTextoTarjeta({ dcaImporte: _dcaAcc.importe, dcaDias: _dcaAcc.dias }) + '</div>';
     html += '</div>';
     // PUNTO 124 (21/09/2026): antes esto era una caja aparte con su propia
     // etiqueta "Cuenta / Broker" — mucho más llamativa que en Fondos, donde
@@ -20343,6 +20373,7 @@ function fin_renderAcciones() {
     html += '<div class="fin-action-btn red" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'venta\')">- Venta</div>';
     html += '<div class="fin-action-btn green" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'dividendo\')">Dividendo</div>';
     html += '<div class="fin-action-btn" onclick="fin_verHistorico(\'' + p.ticker + '\')">Historico</div>';
+    html += '<div class="fin-action-btn" onclick="fin_accDcaAbrir(\'' + p.ticker + '\')">' + (_dcaAcc ? '🔄 ' : '') + 'Aport. auto</div>'; // 18/10/2026
     // PUNTO 148 (08/09/2026): pasar esta posición a modo simple — se le pasan
     // los datos actuales ya calculados (num/coste/valor) para precargar el
     // registro simple, sin que tengas que volver a escribirlos.
@@ -21296,6 +21327,8 @@ function fin_dcaAutoAplicar() {
       });
       if (cambA) localStorage.setItem(kA, JSON.stringify(accs));
     });
+    // 18/10/2026: acciones en modo detallado (compras automáticas)
+    try { fin_accDcaAplicar(hoy, resumen); } catch (eA) { console.warn('[DCA acciones detallado]', eA.message); }
     if (resumen.length) {
       if (typeof showToast === 'function') showToast('🔄 Aportaciones automáticas sumadas — ' + resumen.join(' · '), 'success');
       window._finDcaUltimoResumen = resumen;
@@ -21313,6 +21346,100 @@ function fin_toggleDcaCamposAcc() {
   if (chk && chk.checked && d && !d.value) d.value = '1, 15';
 }
 document.addEventListener('firebaseLoaded', function() { setTimeout(fin_dcaAutoAplicar, 5000); });
+
+// ─── 18/10/2026 (pedido por Patry): APORTACIÓN AUTOMÁTICA EN ACCIONES EN MODO DETALLADO ───
+// Caso Hermès: plan de ahorro en Trade Republic, pero la acción va en modo
+// detallado (compra a compra), donde no había aportación automática, así que
+// las compras del plan no se apuntaban nunca. Ahora cada valor puede tener su
+// aportación automática, guardada en 'fin:acciones_dca' como
+// { 'empresa|TICKER': { activo, importe, dias, aplicadoHasta, updatedAt } }.
+// Cada día que toca se apunta sola una COMPRA por ese importe al precio de la
+// última cotización guardada (el nº de acciones es aproximado: el broker
+// compra a su precio; se cuadra editando la compra en Histórico). Id fijo
+// 'dca_<empresa>_<TICKER>_<fecha>' para que dos aparatos no la dupliquen y
+// para que, si se borra a mano, no vuelva a aparecer. Sin cotización no se
+// apunta nada y se reintenta la próxima vez. Se empieza a contar desde el día
+// en que se activa (nunca suma de golpe nada antiguo).
+function fin_accDcaLoad() {
+  try { var m = JSON.parse(localStorage.getItem('fin:acciones_dca') || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; } catch (e) { return {}; }
+}
+function fin_accDcaSave(m) { localStorage.setItem('fin:acciones_dca', JSON.stringify(m)); }
+function fin_accDcaDe(emp, ticker) {
+  var c = fin_accDcaLoad()[emp + '|' + ticker];
+  return (c && c.activo && (parseFloat(c.importe) || 0) > 0) ? c : null;
+}
+function fin_accDcaAplicar(hoy, resumen) {
+  var mapa = fin_accDcaLoad(), cambM = false;
+  var cot = {}; try { cot = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}') || {}; } catch (e) { cot = {}; }
+  Object.keys(mapa).forEach(function(clave) {
+    var c = mapa[clave];
+    if (!c || !c.activo) return;
+    var imp = parseFloat(c.importe) || 0;
+    if (imp <= 0) return;
+    var pos = clave.indexOf('|'); if (pos < 1) return;
+    var emp = clave.slice(0, pos), tk = clave.slice(pos + 1);
+    var ahora = new Date().toISOString();
+    if (!c.aplicadoHasta) { c.aplicadoHasta = hoy; c.updatedAt = ahora; cambM = true; return; }
+    var fechas = fin_dcaFechasEntre((c.dias && c.dias.length) ? c.dias : [1, 15], c.aplicadoHasta, hoy);
+    if (!fechas.length) return;
+    var precio = (cot[tk] && parseFloat(cot[tk].precio) > 0) ? parseFloat(cot[tk].precio) : (parseFloat(_finCotizaciones[tk]) || 0);
+    if (!(precio > 0)) return; // sin cotización: se reintenta más tarde
+    var kO = 'fin:acciones:' + emp;
+    var ops = []; try { ops = JSON.parse(localStorage.getItem(kO) || '[]') || []; } catch (e) { ops = []; }
+    var conNombre = ops.filter(function(o) { return o && o.ticker === tk && o.nombre; })[0];
+    var nombre = (conNombre && conNombre.nombre) || FIN_NOMBRES[tk] || tk;
+    var n = 0;
+    fechas.forEach(function(fe) {
+      var id = 'dca_' + emp + '_' + tk + '_' + fe;
+      if (ops.some(function(o) { return o && o.id === id; })) return;
+      var cant = Math.round(imp / precio * 1e6) / 1e6;
+      if (!(cant > 0)) return;
+      ops.push({ ticker: tk, nombre: nombre, cantidad: cant, precio: Math.round(imp / cant * 10000) / 10000, tipo: 'compra', fecha: fe, dcaAuto: true, id: id, updatedAt: ahora });
+      n++;
+    });
+    if (n) localStorage.setItem(kO, JSON.stringify(ops));
+    c.aplicadoHasta = hoy; c.updatedAt = ahora; cambM = true;
+    if (n) resumen.push(nombre + ': ' + n + ' × ' + fin_fmt(imp));
+  });
+  if (cambM) fin_accDcaSave(mapa);
+}
+function fin_accDcaAbrir(ticker) {
+  if (bloqueaSiViewer('Cambiar la aportación automática')) return;
+  var c = fin_accDcaLoad()[fin_emp() + '|' + ticker] || {};
+  document.getElementById('fin-accdca-ticker').value = ticker;
+  document.getElementById('fin-accdca-titulo').textContent = 'Aportación automática · ' + (FIN_NOMBRES[ticker] || ticker);
+  document.getElementById('fin-accdca-activo').checked = !!c.activo;
+  document.getElementById('fin-accdca-importe').value = c.importe ? numMiles_fmtDinero(c.importe) : '';
+  document.getElementById('fin-accdca-dias').value = fin_dcaDiasTexto(c.dias);
+  fin_accDcaToggle();
+  var m = document.getElementById('fin-modal-acc-dca');
+  if (m.parentNode !== document.body) document.body.appendChild(m);
+  m.classList.add('open');
+}
+function fin_accDcaToggle() {
+  var on = document.getElementById('fin-accdca-activo').checked;
+  document.getElementById('fin-accdca-campos').style.display = on ? 'block' : 'none';
+}
+function fin_accDcaGuardar() {
+  if (bloqueaSiViewer('Cambiar la aportación automática')) return;
+  var tk = document.getElementById('fin-accdca-ticker').value;
+  if (!tk) return;
+  var mapa = fin_accDcaLoad(), clave = fin_emp() + '|' + tk, ant = mapa[clave] || {};
+  var ahora = new Date().toISOString();
+  if (document.getElementById('fin-accdca-activo').checked) {
+    var imp = parseImporteFlexible(document.getElementById('fin-accdca-importe').value);
+    if (!(imp > 0)) { avisar('⚠️ Introduce el importe de cada aportación.'); return; }
+    var dias = fin_dcaParseDias(document.getElementById('fin-accdca-dias').value);
+    mapa[clave] = { activo: true, importe: imp, dias: dias, aplicadoHasta: (ant.activo && ant.aplicadoHasta) ? ant.aplicadoHasta : _fechaHoyLocal(), updatedAt: ahora };
+  } else {
+    if (!ant.activo) { closeModalById('fin-modal-acc-dca'); return; }
+    mapa[clave] = Object.assign({}, ant, { activo: false, updatedAt: ahora });
+  }
+  fin_accDcaSave(mapa);
+  closeModalById('fin-modal-acc-dca');
+  fin_renderAcciones();
+  if (typeof showToast === 'function') showToast(mapa[clave].activo ? '🔄 Aportación automática guardada' : 'Aportación automática desactivada', 'success');
+}
 
 // ─── PUNTO 86 (30/08/2026): DCA AUTOMÁTICO EN FONDOS ────────────────────
 // Al entrar en Finanzas, se comprueba si algún fondo con DCA activo tiene
@@ -25341,6 +25468,7 @@ window._refreshCurrentModule = function(key) {
     // (mod-finperdash), no la de Finanzas.
     'fin:patrimonio_financiero_actual:patricio': 'finperdash',
     'fin:acciones_cuenta:patricio': 'finanzas',
+    'fin:acciones_dca': 'finanzas', // 18/10/2026
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
