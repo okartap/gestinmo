@@ -2276,7 +2276,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261018_01';
+const BUILD_ID = '261018_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -7055,6 +7055,20 @@ cálculo a mano. -->
     <input type="hidden" id="fin-accdca-ticker" value="">
     <button class="btn1" onclick="fin_accDcaGuardar()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-acc-dca')" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
+<!-- 18/10/2026 (261018_02): CUADRAR UNA ACCIÓN CON LO QUE DICE EL BROKER -->
+<div class="moverlay" id="fin-modal-acc-cuadrar">
+  <div class="modal">
+    <div class="mtitle"><span id="fin-cuad-titulo">Cuadrar con el broker</span><span class="mclose" onclick="closeModalById('fin-modal-acc-cuadrar')">&#10005;</span></div>
+    <div class="form-hint" style="margin:0 2px 10px;">ℹ️ Copia lo que te marca el broker en "Posición". La app corrige las <b>compras automáticas</b> desde el último cuadre (si no hay ninguna, añade una compra de ajuste con fecha de hoy). Si pones también el precio medio, cuadra además lo invertido.</div>
+    <div id="fin-cuad-actual" style="font-size:12px;color:var(--silver-dim);margin:0 2px 10px;"></div>
+    <div class="mfield"><div class="mflabel">Acciones totales reales</div><input class="minput" id="fin-cuad-acciones" type="text" inputmode="decimal" placeholder="0,662159"></div>
+    <div class="mfield"><div class="mflabel">Precio medio de compra (opcional)</div><input class="minput" id="fin-cuad-pm" type="text" inputmode="decimal" placeholder="1.705,78"></div>
+    <input type="hidden" id="fin-cuad-ticker" value="">
+    <button class="btn1" onclick="fin_accCuadrarRevisar()">Cuadrar</button>
+    <button class="btn2" onclick="closeModalById('fin-modal-acc-cuadrar')" style="margin-top:8px;">Cancelar</button>
   </div>
 </div>
 
@@ -20374,6 +20388,7 @@ function fin_renderAcciones() {
     html += '<div class="fin-action-btn green" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'dividendo\')">Dividendo</div>';
     html += '<div class="fin-action-btn" onclick="fin_verHistorico(\'' + p.ticker + '\')">Historico</div>';
     html += '<div class="fin-action-btn" onclick="fin_accDcaAbrir(\'' + p.ticker + '\')">' + (_dcaAcc ? '🔄 ' : '') + 'Aport. auto</div>'; // 18/10/2026
+    if (_dcaAcc) html += '<div class="fin-action-btn" onclick="fin_accCuadrarAbrir(\'' + p.ticker + '\')">⚖️ Cuadrar</div>'; // 18/10/2026 (261018_02)
     // PUNTO 148 (08/09/2026): pasar esta posición a modo simple — se le pasan
     // los datos actuales ya calculados (num/coste/valor) para precargar el
     // registro simple, sin que tengas que volver a escribirlos.
@@ -21415,6 +21430,111 @@ function fin_accDcaAbrir(ticker) {
   var m = document.getElementById('fin-modal-acc-dca');
   if (m.parentNode !== document.body) document.body.appendChild(m);
   m.classList.add('open');
+}
+// ─── 18/10/2026 (261018_02, pedido por Patry): CUADRAR CON EL BROKER ───
+// En las acciones con aportación automática, el nº de acciones de cada compra
+// automática es aproximado. Aquí se escribe lo que dice el broker (acciones
+// totales y, si se quiere, precio medio) y la app corrige:
+//  · Las compras automáticas desde el último cuadre (las marcadas sin
+//    "cuadrado"): la diferencia de acciones se reparte entre ellas en
+//    proporción a su tamaño; sin precio medio, lo invertido no cambia.
+//  · Si no hay ninguna pendiente, se añade una compra de ajuste con fecha de
+//    hoy (precio: el que cuadra con el precio medio, o la cotización).
+//  · Con precio medio, también se reparte la diferencia de lo invertido.
+// Antes de tocar nada se enseña un resumen y hay que confirmarlo. Las compras
+// corregidas quedan marcadas "cuadrado" para no volver a moverlas.
+function fin_parseAccionesLibre(t) {
+  t = String(t == null ? '' : t).replace(/[\s€]/g, '');
+  if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+  var n = parseFloat(t);
+  return isFinite(n) ? n : 0;
+}
+function fin_fmtAcc6(v) { return (Math.round((parseFloat(v) || 0) * 1e6) / 1e6).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 6 }); }
+function fin_accPosicion(ops, ticker) {
+  var n = 0, c = 0;
+  ops.forEach(function(o) {
+    if (!o || o.deleted || o.ticker !== ticker) return;
+    if (o.tipo === 'compra') { n += parseFloat(o.cantidad) || 0; c += (parseFloat(o.cantidad) || 0) * (parseFloat(o.precio) || 0); }
+    else if (o.tipo === 'venta') n -= parseFloat(o.cantidad) || 0;
+    else if (o.tipo === 'scrip') n += parseFloat(o.scripAcciones) || 0;
+  });
+  return { n: n, c: c };
+}
+function fin_accCuadrarAbrir(ticker) {
+  if (bloqueaSiViewer('Cuadrar acciones con el broker')) return;
+  var pos = fin_accPosicion(fin_load('fin:acciones'), ticker);
+  document.getElementById('fin-cuad-ticker').value = ticker;
+  document.getElementById('fin-cuad-titulo').textContent = 'Cuadrar · ' + (FIN_NOMBRES[ticker] || ticker);
+  document.getElementById('fin-cuad-actual').textContent = 'Ahora en la app: ' + fin_fmtAcc6(pos.n) + ' acc · P.M. ' + fin_fmt(pos.n > 0 ? pos.c / pos.n : 0) + ' · invertido ' + fin_fmt(pos.c);
+  document.getElementById('fin-cuad-acciones').value = '';
+  document.getElementById('fin-cuad-pm').value = '';
+  var m = document.getElementById('fin-modal-acc-cuadrar');
+  if (m.parentNode !== document.body) document.body.appendChild(m);
+  m.classList.add('open');
+}
+// Calcula el ajuste sin guardar nada. Devuelve { error } o { ops, resumen }.
+function fin_accCuadrarCalcular(opsOrig, ticker, N, PM) {
+  var ops = JSON.parse(JSON.stringify(opsOrig));
+  var pos = fin_accPosicion(ops, ticker);
+  var dN = Math.round((N - pos.n) * 1e6) / 1e6;
+  var C = PM > 0 ? N * PM : null;
+  var dC = C !== null ? Math.round((C - pos.c) * 100) / 100 : 0;
+  if (Math.abs(dN) < 1e-6 && Math.abs(dC) < 0.01) return { error: 'Ya cuadra: la app tiene las mismas acciones' + (C !== null ? ' y lo mismo invertido' : '') + ' que el broker.' };
+  var S = ops.filter(function(o) { return o && !o.deleted && o.ticker === ticker && o.tipo === 'compra' && o.dcaAuto && !o.cuadrado; });
+  var nuevo = null;
+  if (!S.length) {
+    if (!(dN > 0)) return { error: 'El broker marca menos acciones que la app y no hay compras automáticas pendientes que corregir. Revísalo en Histórico (¿falta apuntar una venta?).' };
+    var precioAj = 0;
+    if (C !== null) precioAj = dC / dN;
+    else {
+      var cache = {}; try { cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}') || {}; } catch (e) {}
+      precioAj = (cache[ticker] && parseFloat(cache[ticker].precio) > 0) ? parseFloat(cache[ticker].precio) : (parseFloat(_finCotizaciones[ticker]) || 0);
+    }
+    if (!(precioAj > 0)) return { error: C !== null ? 'Con ese precio medio la compra de ajuste saldría a precio negativo. Revisa los datos.' : 'Pon también el precio medio de compra (no hay cotización para calcular la compra de ajuste).' };
+    var conNombre = ops.filter(function(o) { return o && o.ticker === ticker && o.nombre; })[0];
+    nuevo = { ticker: ticker, nombre: (conNombre && conNombre.nombre) || FIN_NOMBRES[ticker] || ticker, cantidad: dN, precio: Math.round(precioAj * 1e6) / 1e6, tipo: 'compra', fecha: _fechaHoyLocal(), ajusteBroker: true, cuadrado: true, id: _finGenId(), updatedAt: new Date().toISOString() };
+    ops.push(nuevo);
+  } else {
+    var qS = S.reduce(function(s, o) { return s + (parseFloat(o.cantidad) || 0); }, 0);
+    var cS = S.reduce(function(s, o) { return s + (parseFloat(o.cantidad) || 0) * (parseFloat(o.precio) || 0); }, 0);
+    if (!(qS + dN > 0)) return { error: 'La diferencia es mayor que las compras automáticas pendientes. Revísalo en Histórico.' };
+    if (C !== null && !(cS + dC > 0)) return { error: 'Con ese precio medio lo invertido en las compras automáticas saldría negativo. Revisa los datos.' };
+    var ahora = new Date().toISOString(), acumQ = 0;
+    S.forEach(function(o, i) {
+      var q0 = parseFloat(o.cantidad) || 0, coste0 = q0 * (parseFloat(o.precio) || 0);
+      var q1 = i < S.length - 1 ? Math.round((q0 + dN * (q0 / qS)) * 1e6) / 1e6 : Math.round((qS + dN - acumQ) * 1e6) / 1e6;
+      acumQ += q1;
+      var coste1 = C !== null ? coste0 + dC * (cS > 0 ? coste0 / cS : 1 / S.length) : coste0;
+      o.cantidad = q1;
+      o.precio = q1 > 0 ? Math.round(coste1 / q1 * 1e6) / 1e6 : 0;
+      o.cuadrado = true;
+      o.updatedAt = ahora;
+    });
+    if (S.some(function(o) { return !(o.cantidad > 0) || !(o.precio > 0); })) return { error: 'Alguna compra automática quedaría a cero o negativa. Revísalo en Histórico.' };
+  }
+  var fin = fin_accPosicion(ops, ticker);
+  var txt = 'Acciones: ' + fin_fmtAcc6(pos.n) + ' → ' + fin_fmtAcc6(fin.n) + '\n'
+    + 'Invertido: ' + fin_fmt(pos.c) + ' → ' + fin_fmt(fin.c) + '\n'
+    + 'P.M.: ' + fin_fmt(pos.n > 0 ? pos.c / pos.n : 0) + ' → ' + fin_fmt(fin.n > 0 ? fin.c / fin.n : 0) + '\n\n'
+    + (nuevo ? 'Se añade una compra de ajuste con fecha de hoy.' : ('Se corrigen ' + S.length + ' compra' + (S.length === 1 ? '' : 's') + ' automática' + (S.length === 1 ? '' : 's') + '.'));
+  return { ops: ops, resumen: txt };
+}
+function fin_accCuadrarRevisar() {
+  if (bloqueaSiViewer('Cuadrar acciones con el broker')) return;
+  var tk = document.getElementById('fin-cuad-ticker').value;
+  var N = fin_parseAccionesLibre(document.getElementById('fin-cuad-acciones').value);
+  if (!(N > 0)) { avisar('⚠️ Escribe las acciones totales que te marca el broker.'); return; }
+  var pmTxt = (document.getElementById('fin-cuad-pm').value || '').trim();
+  var PM = pmTxt ? parseImporteFlexible(pmTxt) : 0;
+  if (pmTxt && !(PM > 0)) { avisar('⚠️ El precio medio no es válido.'); return; }
+  var res = fin_accCuadrarCalcular(fin_load('fin:acciones'), tk, N, PM);
+  if (res.error) { avisar('⚠️ ' + res.error); return; }
+  closeModalById('fin-modal-acc-cuadrar');
+  showConfirm('⚖️', 'Cuadrar ' + (FIN_NOMBRES[tk] || tk), res.resumen, [{ label: 'Cuadrar', cls: 'g', fn: function() {
+    fin_save('fin:acciones', res.ops);
+    fin_renderAcciones();
+    if (typeof showToast === 'function') showToast('⚖️ ' + (FIN_NOMBRES[tk] || tk) + ' cuadrada con el broker', 'success');
+  } }]);
 }
 function fin_accDcaToggle() {
   var on = document.getElementById('fin-accdca-activo').checked;
