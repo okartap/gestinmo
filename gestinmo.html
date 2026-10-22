@@ -2290,7 +2290,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261022_08';
+const BUILD_ID = '261022_10';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -22952,6 +22952,12 @@ function fin_patHist_rellenarHuecos() {
 var PH_COL = { liquidez: '#3987e5', invertido: '#d95926', inmobiliario: '#199e70' };
 var PH_BANCO_COL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 var _phSel = null, _phSoloFin = false, _phN = 0;
+// 22/10/2026 (261022_09, pedido por Patry): en Patricio, las fotos anteriores
+// a la del 1 de diciembre de 2026 son aproximadas (cobro de Sierra Nevada en
+// varios meses, huecos estimados, boda) → la línea va en gris hasta ahí y en
+// blanco desde esa foto. Patrimer no lleva tramo gris.
+var PH_FIABLE_DESDE = { patricio: '2026-12' };
+var PH_GRIS = '#5d6b86', PH_ORO = '#d4af37';
 function _phK(v) { var a = Math.abs(v); return (a >= 1e6 ? (Math.round(v / 1e5) / 10).toString().replace('.', ',') + ' M' : a >= 1e3 ? Math.round(v / 1e3) + ' k' : Math.round(v) + ''); }
 function fin_patHist_grafico(ordenada) {
   var el = document.getElementById('fin-pathist-graf'); if (!el) return;
@@ -22978,14 +22984,20 @@ function fin_patHist_grafico(ordenada) {
   // 1) total
   var mn = Math.min.apply(null, totales), mx = Math.max.apply(null, totales); var pad = (mx - mn) * 0.15 || mx * 0.02 || 1; mn -= pad; mx += pad;
   var ys = function(v) { return pt + ih - ih * (v - mn) / (mx - mn); };
+  var fiable = PH_FIABLE_DESDE[fin_emp()] || '';
+  var gris = function(r) { return !!fiable && String(r.id) < fiable; };
+  var hayGris = L.some(gris);
   var seg = '';
-  for (var i = 1; i < n; i++) seg += '<line x1="' + xs(i - 1) + '" y1="' + ys(totales[i - 1]) + '" x2="' + xs(i) + '" y2="' + ys(totales[i]) + '" stroke="#c8d4e8" stroke-width="2" stroke-linecap="round"' + ((L[i].estimada || L[i - 1].estimada) ? ' stroke-dasharray="4 4"' : '') + '/>';
-  var pts = L.map(function(r, i) { return '<circle cx="' + xs(i) + '" cy="' + ys(totales[i]) + '" r="' + (i === _phSel ? 5 : 3.5) + '" fill="' + (r.estimada ? '#1a2440' : '#c8d4e8') + '" stroke="#c8d4e8" stroke-width="2"/>'; }).join('');
+  for (var i = 1; i < n; i++) seg += '<line x1="' + xs(i - 1) + '" y1="' + ys(totales[i - 1]) + '" x2="' + xs(i) + '" y2="' + ys(totales[i]) + '" stroke="' + (gris(L[i - 1]) ? PH_GRIS : '#c8d4e8') + '" stroke-width="2" stroke-linecap="round"' + ((L[i].estimada || L[i - 1].estimada) ? ' stroke-dasharray="4 4"' : '') + '/>';
+  // meses con nota (p. ej. "Boda"): un círculo amarillo alrededor del punto (261022_10: sin el segundo aro)
+  var anillos = L.map(function(r, i) { if (!String(r.nota || '').trim() || r.estimada) return ''; var cx = xs(i), cy = ys(totales[i]); return '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="none" stroke="' + PH_ORO + '" stroke-width="1.6"/>'; }).join('');
+  var hayNotas = !!anillos;
+  var pts = L.map(function(r, i) { var c = gris(r) ? PH_GRIS : '#c8d4e8'; return '<circle cx="' + xs(i) + '" cy="' + ys(totales[i]) + '" r="' + (i === _phSel ? 5 : 3.5) + '" fill="' + (r.estimada ? '#1a2440' : c) + '" stroke="' + c + '" stroke-width="2"/>'; }).join('') + anillos;
   var hit = function(hh) { return L.map(function(r, i) { var w = (iw - 2 * ins) / Math.max(1, n - 1); return '<rect x="' + (xs(i) - w / 2) + '" y="0" width="' + w + '" height="' + hh + '" fill="transparent" style="cursor:pointer" onclick="_phSel=' + i + ';fin_patHist_render()"/>'; }).join(''); };
   var selLine = function(hh) { return '<line x1="' + xs(_phSel) + '" x2="' + xs(_phSel) + '" y1="' + pt + '" y2="' + (hh - pb) + '" stroke="rgba(200,212,232,0.35)" stroke-dasharray="2 3"/>'; };
   var caja = function(t, svg) { return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:8px 6px 4px;margin-bottom:10px;"><div style="font-size:10.5px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;text-align:center;margin-bottom:2px;">' + t + '</div>' + svg + '</div>'; };
   h += caja((_phSoloFin ? 'Patrimonio financiero' : 'Patrimonio total') + ' · evolución', '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;">' + grid(mn, mx, H, ih) + selLine(H) + seg + pts + ejeX(H) + hit(H) + '</svg>'
-    + '<div style="font-size:9.5px;color:var(--text-secondary);text-align:center;">— real · - - - estimado</div>');
+    + '<div style="font-size:9.5px;color:var(--text-secondary);text-align:center;">— real · - - - estimado' + (hayGris ? ' · <span style="color:' + PH_GRIS + ';font-weight:700;">━</span> aproximado' : '') + (hayNotas ? ' · <span style="color:' + PH_ORO + ';">○</span> con nota' : '') + '</div>');
   // 2) composición (barras apiladas desde 0)
   var partes = _phSoloFin ? ['liquidez', 'invertido'] : ['liquidez', 'invertido', 'inmobiliario'];
   var H2 = 160, ih2 = H2 - pt - pb, mx2 = Math.max.apply(null, L.map(function(r) { return partes.reduce(function(s2, c) { return s2 + Math.max(0, numES(r[c])); }, 0); })) * 1.05 || 1;
@@ -23023,6 +23035,8 @@ function fin_patHist_grafico(ordenada) {
     + '<div style="font-size:20px;font-weight:700;font-family:\'Rajdhani\',sans-serif;color:var(--accent-gold);white-space:nowrap;">' + fin_fmt(tS) + '</div>'
     + (dS !== null ? '<div style="font-size:11.5px;font-weight:700;color:' + (dS >= 0 ? '#4caf82' : '#e57373') + ';">' + (dS >= 0 ? '+' : '') + fin_fmt(dS) + ' frente a la foto anterior</div>' : '')
     + '<div style="font-size:11px;color:var(--silver-mid);margin-top:4px;line-height:1.5;">' + partes.map(function(c) { return '<span style="color:' + PH_COL[c] + ';">■</span> ' + c.charAt(0).toUpperCase() + c.slice(1) + ' ' + fin_fmt(numES(S[c])); }).join(' · ') + '</div>'
+    + (String(S.nota || '').trim() ? '<div style="font-size:12px;font-weight:700;color:#f0d878;margin-top:5px;">' + notas_esc(S.nota) + '</div>' : '')
+    + (fiable && String(S.id) < fiable ? '<div style="font-size:10px;color:' + PH_GRIS + ';margin-top:2px;">Dato aproximado (antes del 1 dic 2026)</div>' : '')
     + (S.bancos && S.bancos.length ? '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">🏦 ' + S.bancos.filter(function(b) { return numES(b.liquidez) + numES(b.invertido) > 0; }).map(function(b) { return notas_esc(b.nombre) + ' ' + fin_fmt(numES(b.liquidez) + numES(b.invertido)); }).join(' · ') + '</div>' : '')
     + '<div style="font-size:9.5px;color:var(--text-secondary);margin-top:4px;">Toca un mes en los gráficos para ver su detalle</div></div>';
   el.innerHTML = h;
