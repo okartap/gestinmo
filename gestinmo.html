@@ -2276,7 +2276,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261022_02';
+const BUILD_ID = '261022_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -8004,6 +8004,7 @@ function applyProfile(key) {
 }
 
 function selectProfile(key) {
+  try { _agendaAbierta = false; } catch (eAg) {} // 22/10/2026 (pedido por Patry): "Próximos 90 días" cerrado al entrar en cada empresa
   saveProfile(key); applyProfile(key);
   const splash=document.getElementById('splash'), app=document.getElementById('appShell');
   // CORRECCIÓN 27/08/2026 — BUG REAL ENCONTRADO, mismo motivo que ya se
@@ -25018,7 +25019,7 @@ function sib_irInmueble(idx, anio) {
 }
 
 // ── AGENDA "PRÓXIMOS 90 DÍAS" (Inicio) ───────────────────────────────────
-var _agendaItems = [], _agendaAbierta = true, _agendaTodo = false, AGENDA_DIAS = 90, AGENDA_VISIBLES = 8;
+var _agendaItems = [], _agendaAbierta = false, _agendaTodo = false, AGENDA_DIAS = 90, AGENDA_VISIBLES = 8;
 function agenda_calcular() {
   var hoy = sib_hoy(), hoyS = sib_ymd(hoy), finS = sib_ymd(new Date(hoy.getTime() + AGENDA_DIAS * 86400000));
   var dentro = function(f) { return !!f && f >= hoyS && f <= finS; };
