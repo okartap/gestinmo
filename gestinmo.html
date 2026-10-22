@@ -2147,6 +2147,8 @@ const DATA_KEYS = [
   'app:fix_garajes_incluidos_v1', 'app:fix_urb_vivaldi_v1',
   // 13/10/2026: bandera de la migración de registros a la referencia del inmueble
   'app:fix_registros_ref_v1',
+  // 22/10/2026: bandera de la corrección de bases de amortización ×100
+  'app:fix_amorbase_x100_v1',
   // PUNTO 216 (24/09/2026): DNI, domicilios e IBAN — ya no van escritos en el archivo público de GitHub
   'app:datos_privados'
 ];
@@ -2276,7 +2278,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261022_03';
+const BUILD_ID = '261022_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -16917,6 +16919,33 @@ document.addEventListener('firebaseLoaded', function() {
   })();
   // 13/10/2026 — Urbanitae: Vivaldi Project tiene en su ficha "vencimiento
   // estimado 4º trimestre 2027" → fecha prevista 31/12/2027 (pedido por Patry).
+  // 22/10/2026 — CORRECCIÓN ÚNICA: bases de amortización de Renta guardadas
+  // ×100 (o ×10.000) por el fallo del campo. Si una base es más de 5 veces el
+  // precio de compra del inmueble (o pasa de 1.000.000 € sin precio), se
+  // divide entre 100 hasta quedar razonable.
+  (function _fixAmorBaseX100V1() {
+    try {
+      if (localStorage.getItem('app:fix_amorbase_x100_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var k = 'renta:inm_datos', m = JSON.parse(localStorage.getItem(k) || '{}') || {}, n = 0;
+      var inms = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]') || [];
+      Object.keys(m).forEach(function(clave) {
+        var d = m[clave]; if (!d || d.amorBase === '' || d.amorBase == null) return;
+        var v = parseFloat(d.amorBase); if (!(v > 0)) return;
+        var inm = null, mr = /^ref_(.+)$/.exec(clave), mi = /^inm_(\d+)$/.exec(clave);
+        if (mr) inm = inms.filter(function(x) { return x && x.ref === mr[1]; })[0] || null;
+        else if (mi) inm = inms[parseInt(mi[1], 10)] || null;
+        var precio = inm ? (parseFloat(inm.precio) || 0) : 0;
+        var tope = precio > 0 ? precio * 5 : 1000000;
+        var v0 = v;
+        while (v > tope && v / 100 >= 100) v = v / 100;
+        if (v !== v0) { d.amorBase = Math.round(v * 100) / 100; n++; }
+      });
+      if (n) localStorage.setItem(k, JSON.stringify(m));
+      localStorage.setItem('app:fix_amorbase_x100_v1', '1');
+      if (n) console.log('[Base amortización] ' + n + ' corregida(s)');
+    } catch (e) { console.error('Error al corregir las bases de amortización', e); }
+  })();
   (function _fixUrbVivaldiV1() {
     try {
       if (localStorage.getItem('app:fix_urb_vivaldi_v1')) return;
@@ -27368,8 +27397,12 @@ function renta_renderAlquileres() {
     html += '<div>'
       + '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:0.5px;">BASE AMORTIZACIÓN (€)</div>'
       + '<input type="text" inputmode="decimal" value="' + (amorBase ? fmtGlobal(parseFloat(amorBase)) : '') + '"'
-      + ' onfocus="this.value=this.value.replace(/[.]/g,\'\').replace(/,/g,\'.\').replace(/[^0-9.]/g,\'\')"'
-      + ' onblur="var v=parseFmtGlobal(this.value);this.value=v?fmtGlobal(v):\'\';renta_setInmCampo(\'' + inmId + '\',\'amorBase\',v||\'\')"'
+      // 22/10/2026 — BUG: al entrar el campo pasaba "19.354,52" a "19354.52" y al
+      // salir lo leía con el punto como de miles → guardaba 1.935.452 (×100).
+      // Ahora al entrar solo se quitan los puntos de miles ("19354,52") y al
+      // salir se lee con parseImporteFlexible, que entiende los dos formatos.
+      + ' onfocus="this.value=this.value.replace(/[.]/g,\'\').replace(/[^0-9,]/g,\'\')"'
+      + ' onblur="var v=parseImporteFlexible(this.value.replace(/,(?=.*,)/g,\'\'));this.value=v?fmtGlobal(v):\'\';renta_setInmCampo(\'' + inmId + '\',\'amorBase\',v||\'\')"'
       + ' style="width:100%;box-sizing:border-box;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:\'Rajdhani\',sans-serif;">'
       + '</div>';
 
