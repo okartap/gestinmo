@@ -2278,7 +2278,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261022_04';
+const BUILD_ID = '261022_05';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -7374,9 +7374,11 @@ con editar/borrar en cada línea. -->
     <div style="font-size:12px;color:var(--silver-mid);margin-bottom:8px;" id="renta-venta-detalle">—</div>
     <div style="font-size:12px;color:var(--silver-mid);margin-bottom:10px;" id="renta-venta-cuota">—</div>
     <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
-      <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">Total con la venta incluida</div>
-      <div style="font-size:24px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-venta-total">— €</div>
+      <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;" id="renta-venta-total-titulo">Total con la venta incluida</div>
+      <div style="font-size:30px;font-weight:700;font-family:'Rajdhani',sans-serif;" id="renta-venta-total">— €</div>
       <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;" id="renta-venta-total-nota">—</div>
+      <!-- 22/10/2026: en el año en curso, debajo y en pequeño, la cifra con los datos de hoy -->
+      <div style="display:none;font-size:11px;color:var(--text-secondary);margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;" id="renta-venta-hoy"></div>
     </div>
   </div>
 
@@ -28828,12 +28830,30 @@ function renta_calcPrevision() {
       var nombresVenta = detalleVentas.map(function(d) { return d.nombre; }).join(', ');
       document.getElementById('renta-venta-detalle').textContent = nombresVenta + ' \u2014 ' + (gananciaTotalVenta >= 0 ? 'ganancia' : 'p\u00e9rdida') + ' patrimonial estimada: ' + fmtGlobal(gananciaTotalVenta.toFixed(0)) + ' \u20ac';
       document.getElementById('renta-venta-cuota').textContent = (cuotaVentaSola >= 0 ? 'Cuota adicional por la venta (base del ahorro): ' : 'Ahorro de cuota por la p\u00e9rdida (compensa hasta el 25% de los dividendos): ') + fmtGlobal(cuotaVentaSola.toFixed(0)) + ' \u20ac';
+      // 22/10/2026 (pedido por Patry): en el año en curso, la cifra grande es
+      // el AÑO COMPLETO con la venta (nóminas y alquileres proyectados hasta
+      // diciembre); la de "hasta hoy" pasa a una línea pequeña debajo.
+      var _esAnioActual = renta_anio === new Date().getFullYear();
+      var _cifraGrande = resultadoConVenta;
+      var elVentaHoy = document.getElementById('renta-venta-hoy');
+      if (_esAnioActual) {
+        var EV = renta_calcPrevisionDatos(true);
+        if (!EV.sinDatos) {
+          var _baseAhE = gananciaTotalVenta >= 0 ? EV.capitalMobiliario + gananciaTotalVenta : EV.capitalMobiliario - Math.min(-gananciaTotalVenta, EV.capitalMobiliario * 0.25);
+          _cifraGrande = EV.cuotaGeneral + renta_calcAhorroTramos(_baseAhE) - EV.retencionAcum;
+        }
+      }
+      document.getElementById('renta-venta-total-titulo').textContent = _esAnioActual ? 'Año completo con la venta incluida' : 'Total con la venta incluida';
       var elVentaTotal = document.getElementById('renta-venta-total');
-      elVentaTotal.textContent = (resultadoConVenta >= 0 ? '+' : '') + fmtGlobal(resultadoConVenta.toFixed(0)) + ' \u20ac';
-      elVentaTotal.style.color = resultadoConVenta > 0 ? '#e07070' : '#4caf82';
-      document.getElementById('renta-venta-total-nota').textContent = resultadoConVenta > 0
-        ? 'Renta normal + venta: a PAGAR'
-        : 'Renta normal + venta: a DEVOLVER';
+      elVentaTotal.textContent = (_cifraGrande >= 0 ? '+' : '') + fmtGlobal(_cifraGrande.toFixed(0)) + ' \u20ac';
+      elVentaTotal.style.color = _cifraGrande > 0 ? '#ff7a7a' : '#4caf82';
+      document.getElementById('renta-venta-total-nota').textContent = (_cifraGrande > 0 ? 'Renta normal + venta: a PAGAR' : 'Renta normal + venta: a DEVOLVER') + (_esAnioActual ? ' (estimación a 31 de diciembre)' : '');
+      if (elVentaHoy) {
+        if (_esAnioActual) {
+          elVentaHoy.style.display = '';
+          elVentaHoy.innerHTML = 'Con los datos de hoy: <b style="color:' + (resultadoConVenta > 0 ? '#e07070' : '#4caf82') + ';">' + (resultadoConVenta >= 0 ? '+' : '') + fmtGlobal(resultadoConVenta.toFixed(0)) + ' \u20ac</b>';
+        } else elVentaHoy.style.display = 'none';
+      }
     } else {
       elVentaCard.style.display = 'none';
     }
