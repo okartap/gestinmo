@@ -1106,6 +1106,15 @@ select{color-scheme:dark;}
    (Chrome/Edge en el ordenador; en el iPhone Safari no enseña icono) y color-scheme:dark
    para que el calendario que se abre vaya a juego con la app. */
 input[type="date"],input[type="month"],input[type="time"],input[type="datetime-local"]{color-scheme:dark;}
+/* 22/10/2026 (A4 de la revisión): un importe nunca se parte en dos líneas
+   ("167.851,74" arriba y "€" abajo). En la tarjeta Reparto de Inicio la letra
+   se ajusta al ancho del móvil para que quepa. */
+#dash-reparto-empresa span[id]{white-space:nowrap;font-size:clamp(12px,3.7vw,17px) !important;}
+#dash-reparto-empresa > div{gap:6px;}
+[id^="renta-total-"],#dash-urbano-val,#dash-rustico-val,#dash-dividendos-val,.fin-card-saldo{white-space:nowrap;}
+#dash-pat-rows .row{gap:6px;}
+#dash-pat-rows .row span:last-child{white-space:nowrap;font-size:clamp(11px,3.4vw,15px);}
+.kpi{min-width:0;}
 input[type="date"]::-webkit-calendar-picker-indicator,input[type="month"]::-webkit-calendar-picker-indicator{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9d3ea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4.5' width='18' height='17' rx='2.5'/%3E%3Cpath d='M3 9.5h18M8 2.5v4M16 2.5v4'/%3E%3C/svg%3E") center/17px 17px no-repeat;opacity:.95;cursor:pointer;}
 select option{background-color:var(--navy-dark);color:var(--silver-bright);}
 /* PUNTO 124 (21/09/2026): el "Cuenta/Broker" de cada acción, con la misma
@@ -2079,6 +2088,7 @@ const DATA_KEYS = [
   'trading:capital_inicial', // PUNTO 225
   'renta:dividendos_manuales', // PUNTO 228
   'renta:certificados', // 12/10/2026: certificados fiscales de los bancos (los carga Claude; salen en el informe del asesor)
+  'renta:resultado', // 22/10/2026 (C2): resultado real de cada declaración de la Renta
   'fin:divcal_ajustes', // 12/10/2026: fechas/importes confirmados y cobros añadidos del Calendario de dividendos
   'renta:intereses_cuenta', // PUNTO 250 (05/10/2026): intereses de la cuenta (Trade Republic)
   'fin:caja_movs', // PUNTO 256 (06/10/2026): movimientos del libro de caja (cuenta Efectivo)
@@ -2149,6 +2159,8 @@ const DATA_KEYS = [
   'app:fix_registros_ref_v1',
   // 22/10/2026: bandera de la corrección de bases de amortización ×100
   'app:fix_amorbase_x100_v1',
+  'app:fix_snev_venta_v1', 'app:fix_contratos_num_v1', // 22/10/2026 (261022_06)
+  'app:fix_pathist_huecos_v1', // 22/10/2026 (261022_08)
   // PUNTO 216 (24/09/2026): DNI, domicilios e IBAN — ya no van escritos en el archivo público de GitHub
   'app:datos_privados'
 ];
@@ -2278,7 +2290,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261022_05';
+const BUILD_ID = '261022_08';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4698,6 +4710,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
          nada real detrás. Reutiliza la conexión de Google Drive ya
          construida en Renta Patricio (mismo _driveToken compartido — si ya
          la conectaste ahí en esta sesión, aquí no hace falta reconectar). -->
+    <div id="inm-cee-box"></div><!-- 22/10/2026 (C1): certificado energético -->
     <div id="tab-docs-lista" style="margin-bottom:16px;"></div>
     <!-- PUNTO 170 (14/09/2026): a petición tuya, el formulario completo ya
     no va siempre visible en la pestaña — solo una tarjeta pequeña que abre
@@ -4991,6 +5004,13 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
             <input class="form-input" id="f-venta-meses-ultimo-anio" type="text" inputmode="numeric">
           </div>
         </div>
+        <!-- 22/10/2026: la reforma solo se amortiza desde el año en que se hizo -->
+        <div class="form-row two">
+          <div class="form-group">
+            <div class="form-label">Año de la reforma <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(vacío = desde el inicio del alquiler)</span></div>
+            <input class="form-input" id="f-venta-anio-reforma" type="text" inputmode="numeric">
+          </div>
+        </div>
         <div class="form-hint">Con esto, Renta Patricio puede calcular aparte la ganancia patrimonial de la venta y mostrarte el resultado del IRPF de ese año contando también la venta. La plusvalía municipal se puede dejar en 0 y rellenar más adelante en cuanto llegue — el cálculo se actualiza solo.</div>
       </div>
 
@@ -5074,6 +5094,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <select id="inmdoc-tipo" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;">
         <option value="Escritura compra">Escritura de compra</option>
         <option value="Escritura venta">Escritura de venta</option>
+        <option value="Certificado energético">Certificado energético</option>
         <option value="Otros">Otros</option>
       </select>
     </div>
@@ -5870,7 +5891,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
   <div class="modal">
     <div class="mtitle">Registro histórico<span class="mclose" onclick="closeModalById('fac-modal-historico')">&#10005;</span></div>
     <div class="mfield"><div class="mflabel">Mes</div><input class="minput" id="fac-hist-mes" type="month"></div>
-    <div class="mfield"><div class="mflabel">Importe total (euros)</div><input class="minput" id="fac-hist-importe" type="number" inputmode="decimal" step="0.01"></div>
+    <div class="mfield"><div class="mflabel">Importe total (euros)</div><input class="minput" id="fac-hist-importe" type="text" inputmode="decimal"></div>
     <button class="btn1" onclick="fac_guardarHistorico()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fac-modal-historico')" style="margin-top:8px;">Cancelar</button>
   </div>
@@ -5892,7 +5913,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     <div id="fac-cobro-info" style="font-size:12px;color:var(--silver-mid);margin-bottom:14px;line-height:1.5;padding:10px 12px;background:rgba(76,175,130,.08);border-radius:10px;border:1px solid rgba(76,175,130,.2);"></div>
     <div class="mfield">
       <div class="mflabel">Importe cobrado (€)</div>
-      <input class="minput" type="number" inputmode="decimal" step="0.01" id="fac-cobro-importe" oninput="facCobro_calcSaldo()">
+      <input class="minput" type="text" inputmode="decimal" id="fac-cobro-importe" oninput="facCobro_calcSaldo()">
     </div>
     <div id="fac-cobro-saldo-preview" style="display:none;margin:10px 0;padding:10px 12px;border-radius:10px;font-size:13px;"></div>
     <button class="btn1" onclick="facCobro_guardar()">Guardar</button>
@@ -5948,7 +5969,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       </div>
     </div>
     <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" type="date" id="cobro-fecha"></div>
-    <div class="mfield"><div class="mflabel">Importe</div><input class="minput" type="number" inputmode="decimal" id="cobro-importe" step="0.01"></div>
+    <div class="mfield"><div class="mflabel">Importe</div><input class="minput" type="text" inputmode="decimal" id="cobro-importe"></div>
     <div class="mfield"><div class="mflabel">Concepto (opcional)</div><input class="minput" id="cobro-concepto"></div>
     <button class="btn1" onclick="guardarCobro()">Guardar apunte</button>
   </div>
@@ -6028,7 +6049,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     </div>
     <!-- 14/10/2026: un solo campo de fecha (calendario del iPhone), como en el resto de la app -->
     <div class="mfield"><div class="mflabel">Fecha</div><input class="minput" type="date" id="kurra-fecha"></div>
-    <div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" type="number" inputmode="decimal" step="0.01" id="kurra-importe"></div>
+    <div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" type="text" inputmode="decimal" id="kurra-importe"></div>
     <button class="btn1" onclick="kurra_guardarApunte()">Guardar apunte</button>
     <button class="btn2" id="kurra-btn-borrar" style="display:none;color:var(--red);" onclick="kurra_borrarApunte()">Eliminar apunte</button>
   </div>
@@ -6666,6 +6687,7 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     </div>
     <div id="fin-pathist-body">
     <div id="fin-pathist-aviso" style="display:none;"></div>
+    <div id="fin-pathist-graf"></div><!-- 22/10/2026 (D2): gráficos de evolución -->
     <div id="fin-pathist-lista"></div>
     <div id="fin-pathist-faltan-inmob" style="display:none;font-size:10.5px;color:var(--silver-dim);margin-top:8px;"></div>
     </div>
@@ -7365,6 +7387,9 @@ con editar/borrar en cada línea. -->
     <div style="display:none;font-size:10.5px;color:var(--text-secondary);margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;" id="renta-prevision-estim"></div>
   </div>
 
+  <!-- 22/10/2026 (C2): resultado REAL de la declaración (lo mete Patry al presentarla) -->
+  <div id="renta-resultado-real"></div>
+
   <!-- PUNTO 125 (06/09/2026): tarjeta aparte para el impacto de una venta de
        inmueble ese mismo año — solo aparece si hay una venta con ganancia
        patrimonial en el año que estás viendo. La tarjeta de arriba (previsión
@@ -7812,7 +7837,7 @@ con editar/borrar en cada línea. -->
     <div class="mfield">
       <div class="mflabel">% IPC (variación anual)</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <input class="minput" type="number" inputmode="decimal" step="0.01" id="ipc-pct" oninput="ipc_calcular()" style="flex:1;">
+        <input class="minput" type="text" inputmode="decimal" id="ipc-pct" oninput="ipc_calcular()" style="flex:1;">
         <span style="color:var(--silver-dim);font-size:13px;flex-shrink:0;">%</span>
       </div>
     </div>
@@ -7902,10 +7927,37 @@ const PROFILES = {
 
 
 // ── UTILIDADES NUMÉRICAS GLOBALES ────────────────────────────
-function parseFmtGlobal(s){
-  if (s === undefined || s === null || s === '') return 0;
-  return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
+// 22/10/2026 (revisión de decimales, pedido por Patry): UN SOLO LECTOR DE
+// NÚMEROS para toda la app. Antes había cuatro (parseFmtGlobal, parseFmt,
+// parseImporteFlexible y parseRentaMixta) con reglas distintas, y cada vez que
+// un dato pasaba por el que no tocaba salía multiplicado por 100 o sin céntimos
+// (base de amortización, precio de compra, IPC, renovaciones…). Ahora todos
+// llaman a numES(), que entiende:
+//   · números ya guardados (494.7)        → 494,70 (nunca los toca)
+//   · "494,70", "1.234,56", "1234,56"      → coma = decimales, punto = miles
+//   · "1,234,56" (punto del teclado → coma) → la ÚLTIMA coma es la de decimales
+//   · "494.70", "730.1", "90624.76"        → un punto con 1-2 (o 4+) cifras = decimales
+//   · "1.234", "12.500", "1.234.567"       → grupos de 3 = miles
+function numES(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  if (v === undefined || v === null) return 0;
+  var t = String(v).trim().replace(/[€\s\u00a0]/g, '');
+  if (!t) return 0;
+  var c = t.lastIndexOf(',');
+  if (c >= 0) {
+    t = t.slice(0, c).replace(/[.,]/g, '') + '.' + t.slice(c + 1).replace(/[.,]/g, '');
+  } else if (t.indexOf('.') >= 0) {
+    var partes = t.split('.');
+    var primero = partes[0].replace(/^-/, '');
+    var esMiles = primero.length >= 1 && primero.length <= 3 && partes.slice(1).every(function(p) { return p.length === 3; });
+    if (esMiles) t = partes.join('');
+    else t = partes.slice(0, -1).join('') + '.' + partes[partes.length - 1];
+  }
+  var n = parseFloat(t);
+  return isFinite(n) ? n : 0;
 }
+window.numES = numES;
+function parseFmtGlobal(s) { return numES(s); }
 // PUNTO 138 (07/09/2026): parseFmtGlobal/parseFmt asumen SIEMPRE un texto
 // con formato español (punto de miles, coma decimal) — si se les pasa un
 // número real de JS con decimales (ej: 455.83, guardado así tras aplicar un
@@ -7914,17 +7966,9 @@ function parseFmtGlobal(s){
 // como texto español (al crearlo) o como número limpio (tras un IPC) —
 // esta función es la única segura para los dos casos: un número, se
 // devuelve tal cual; un texto, se interpreta como español.
-function parseRentaMixta(v){
-  if (typeof v === 'number') return v;
-  if (v === undefined || v === null || v === '') return 0;
-  var t = String(v).trim().replace(/[€\s]/g, '');
-  // 13/10/2026 (revisión de rentas guardadas como texto): "730.1" o "730.10"
-  // (punto decimal, sin coma) es un decimal, no un millar — antes salía 7301.
-  if (t.indexOf(',') < 0 && /^-?\d+\.\d{1,2}$/.test(t)) return parseFloat(t) || 0;
-  return parseFloat(t.replace(/\./g,'').replace(',','.')) || 0;
-}
+function parseRentaMixta(v) { return numES(v); } // 22/10/2026: lector único
 function fmtGlobal(n){
-  const v = parseFloat(n) || 0;
+  const v = numES(n); // 22/10/2026: antes parseFloat ("567,29" → 567, perdía céntimos)
   if (v === 0) return '0';
   if (v % 1 === 0) {
     return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -8089,6 +8133,7 @@ const BACKUP_KEYS = [
   'trading:capital_inicial', // PUNTO 225
   'renta:dividendos_manuales', // PUNTO 228
   'renta:certificados', // 12/10/2026: certificados fiscales de los bancos (los carga Claude; salen en el informe del asesor)
+  'renta:resultado', // 22/10/2026 (C2): resultado real de cada declaración de la Renta
   'fin:divcal_ajustes', // 12/10/2026: fechas/importes confirmados y cobros añadidos del Calendario de dividendos
   'renta:intereses_cuenta', // PUNTO 250
   'fin:caja_movs', // PUNTO 256
@@ -8591,9 +8636,9 @@ function inm_rentaActiva(inm) {
 // ─── RENTABILIDAD ──────────────────────────────────────────────────────────
 function calcRent(inm) {
   const renta = inm_rentaActiva(inm);
-  const precio = parseFloat(inm.precio) || 0;
-  const gastosCompra = parseFloat(inm.gastosCompra) || 0;
-  const reforma = parseFloat(inm.reforma) || 0;
+  const precio = numES(inm.precio);
+  const gastosCompra = numES(inm.gastosCompra);
+  const reforma = numES(inm.reforma);
   // 13/10/2026 (Patry): los gastos anuales ya no se escriben a mano — se
   // calculan solos con lo apuntado en la pestaña Gastos de la ficha
   // (seguro + IBI + comunidad + otros gastos). Ver inm_gastosAnuales().
@@ -8855,14 +8900,20 @@ function inm_gananciaPatrimonialVenta(inm) {
   var reforma = parseFloat(inm.reforma) || 0;
   var valorAdquisicion = precio + gastosCompra + reforma;
   if (!valorAdquisicion) return null;
-  var pctConstruccion = (parseFloat(inm.ventaPctConstruccion) || 70) / 100;
+  // 22/10/2026: el % se lee con numES ("43,35" con parseFloat se quedaba en 43).
+  var pctConstruccion = (numES(inm.ventaPctConstruccion) || 70) / 100;
   var baseAmortizable = (precio + gastosCompra) * pctConstruccion + reforma;
   var cuotaAnual3pc = baseAmortizable * 0.03;
   var anioInicio = parseInt(inm.ventaAnioInicioAlquiler) || 0;
   var anioVenta = parseInt(inm.ventaAnio) || 0;
   var aniosCompletos = (anioInicio && anioVenta > anioInicio) ? (anioVenta - anioInicio) : 0;
   var mesesUltimoAnio = Math.max(0, Math.min(12, parseFloat(inm.ventaMesesUltimoAnio) || 0));
-  var amortizacionAcumulada = cuotaAnual3pc * aniosCompletos + cuotaAnual3pc * (mesesUltimoAnio / 12);
+  // 22/10/2026 (Patry): la reforma solo se amortiza desde el año en que se
+  // hizo (Sierra Nevada: 2018), no desde el inicio del alquiler.
+  var anioReforma = parseInt(inm.ventaAnioReforma) || 0;
+  var aniosReforma = anioReforma ? ((anioVenta > Math.max(anioReforma, anioInicio || anioReforma)) ? anioVenta - Math.max(anioReforma, anioInicio || anioReforma) : 0) : aniosCompletos;
+  var cuotaCompra = (precio + gastosCompra) * pctConstruccion * 0.03, cuotaReforma = reforma * 0.03;
+  var amortizacionAcumulada = cuotaCompra * aniosCompletos + cuotaReforma * aniosReforma + cuotaAnual3pc * (mesesUltimoAnio / 12);
   var valorAdquisicionActualizado = Math.max(0, valorAdquisicion - amortizacionAcumulada);
   var ventaDeclarada = parseFloat(inm.ventaDeclarado) || 0;
   var gastosVenta = parseFloat(inm.ventaGastos) || 0;
@@ -9163,6 +9214,12 @@ function renderLista() {
   const filterTabsEl = document.getElementById('filter-tabs-inmuebles');
   if (filterTabsEl) filterTabsEl.innerHTML = tabsHtml;
 
+  // 22/10/2026 (D3): ranking de rentabilidad neta, plegado por defecto.
+  // Respeta la pestaña elegida; no entran los vendidos ni las plazas que van
+  // incluidas en el alquiler de un piso (ya cuentan dentro de ese piso).
+  if (currentFilter !== 'vendido') {
+    try { const rk = inm_rankingHtml(inmueblesActivos.filter(i => currentFilter === 'todos' || i.tipo === currentFilter)); if (rk) { const d = document.createElement('div'); d.innerHTML = rk; container.appendChild(d); } } catch (eRk) { console.warn('[Ranking]', eRk.message); }
+  }
   inmuebles.forEach((inm, idx) => {
     // PUNTO 100 (06/09/2026): un inmueble vendido solo aparece bajo el
     // filtro "Vendidos" — nunca en "Todos" ni mezclado con los de su tipo,
@@ -9397,6 +9454,50 @@ function renderLista() {
   }
 }
 
+// 22/10/2026 (D3): RANKING DE RENTABILIDAD NETA — barras horizontales de
+// mayor a menor, con la media. Verde ≥ 8 %, ámbar 5–8 %, rojo < 5 %.
+// Tocar una barra abre la ficha. Solo inmuebles con renta y precio.
+var _inmRankAbierto = false;
+function inm_rankColor(v) { return v >= 8 ? '#4caf82' : v >= 5 ? '#e0a030' : '#e57373'; }
+function inm_rankingHtml(lista) {
+  const todosR = loadInmuebles();
+  const filas = [];
+  lista.forEach(inm => {
+    if (inm.tipo === 'garaje' && inm_garajeIncluidoEn(inm.ref, todosR)) return;
+    const r = calcRent(inm); if (!r || !isFinite(r.neta)) return;
+    filas.push({ ref: inm.ref || '—', dir: inm.direccion || '', v: r.neta, idx: todosR.findIndex(t => t.id === inm.id) });
+  });
+  if (filas.length < 2) return '';
+  filas.sort((a, b) => b.v - a.v);
+  const media = filas.reduce((s2, f) => s2 + f.v, 0) / filas.length;
+  const max = Math.max(10, Math.ceil(Math.max.apply(null, filas.map(f => f.v)) / 2) * 2), min = Math.min(0, Math.floor(Math.min.apply(null, filas.map(f => f.v))));
+  const pos = v => ((v - min) / (max - min) * 100);
+  const pct = v => v.toFixed(1).replace('.', ',') + ' %';
+  let h = `<div style="background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:12px;">
+    <div onclick="_inmRankAbierto=!_inmRankAbierto;renderLista()" style="display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
+      <span style="font-size:12px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">📊 RANKING RENT. NETA</span>
+      <span style="font-size:11px;color:var(--text-secondary);">media ${pct(media)}</span>
+      <span style="font-size:12px;color:var(--text-secondary);">${_inmRankAbierto ? '▴' : '▾'}</span></div>`;
+  if (_inmRankAbierto) {
+    h += `<div style="position:relative;margin-top:10px;">`;
+    h += `<div style="position:absolute;top:0;bottom:0;left:calc(64px + (100% - 64px - 52px) * ${pos(media) / 100});border-left:1.5px dashed #c8d4e8;opacity:.55;pointer-events:none;"></div>`;
+    filas.forEach(f => {
+      const w = Math.max(1.5, pos(Math.max(f.v, min)) - pos(Math.max(0, min)));
+      h += `<div onclick="inm_showDetail(${f.idx})" title="${notas_esc(f.dir)}" style="display:flex;align-items:center;gap:6px;height:22px;cursor:pointer;">
+        <span style="width:58px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--silver-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${notas_esc(f.ref)}</span>
+        <div style="flex:1;position:relative;height:12px;"><div style="position:absolute;left:${pos(Math.max(0, min))}%;width:${f.v >= 0 ? w : 1.5}%;top:0;bottom:0;background:${inm_rankColor(f.v)};border-radius:0 4px 4px 0;"></div></div>
+        <span style="width:46px;flex-shrink:0;text-align:right;font-size:11px;font-weight:700;color:var(--silver-bright);white-space:nowrap;">${pct(f.v)}</span></div>`;
+    });
+    h += `</div><div style="display:flex;justify-content:center;gap:12px;font-size:10px;color:var(--silver-mid);margin-top:8px;flex-wrap:wrap;">
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#4caf82;margin-right:4px;"></span>≥ 8 %</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#e0a030;margin-right:4px;"></span>5–8 %</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#e57373;margin-right:4px;"></span>&lt; 5 %</span>
+      <span>┆ media</span></div>
+      <div style="font-size:9.5px;color:var(--text-secondary);text-align:center;margin-top:3px;">Toca un inmueble para abrir su ficha</div>`;
+  }
+  return h + `</div>`;
+}
+
 // ─── RENDER DETALLE ────────────────────────────────────────────────────────
 let currentDetailIdx = null;
 
@@ -9478,7 +9579,7 @@ function inm_showDetail(idx) {
     let amortRowsHtml = '';
     if (amort) {
       if (amort.pendiente <= 0) {
-        amortRowsHtml = `<div class="semaforo-row"><div class="semaforo-row-label">Amortización</div><div class="semaforo-row-value" style="color:var(--accent-green)">✅ Recuperada${amort.superavit > 0 ? ' (+' + fmt(amort.superavit) + ' €)' : ''}</div></div>`;
+        amortRowsHtml = `<div class="semaforo-row"><div class="semaforo-row-label">Amortización</div><div class="semaforo-row-value" style="color:var(--accent-green)">✅ Recuperada${amort.superavit > 0 ? '<br><span style="font-size:11px;">(+' + fmt(amort.superavit) + ' €)</span>' : ''}</div></div>`;
       } else {
         amortRowsHtml = `
         <div class="semaforo-row"><div class="semaforo-row-label">Falta por amortizar</div><div class="semaforo-row-value">${fmt(amort.pendiente)} €</div></div>
@@ -9800,9 +9901,77 @@ function inmdoc_subirArchivo(archivo, nombreInmueble, tipo, cb) {
 // PUNTO 168 (14/09/2026): orden fijo — escritura de compra primero, de
 // venta después (si la hay), y el resto por fecha del documento (la más
 // reciente arriba), en vez de solo por orden de subida.
-var INMDOC_ORDEN_TIPO = { 'Escritura compra': 0, 'Escritura venta': 1 };
+var INMDOC_ORDEN_TIPO = { 'Escritura compra': 0, 'Escritura venta': 1, 'Certificado energético': 2 };
 function _inmdocPrioridadTipo(tipo) {
-  return INMDOC_ORDEN_TIPO.hasOwnProperty(tipo) ? INMDOC_ORDEN_TIPO[tipo] : 2;
+  return INMDOC_ORDEN_TIPO.hasOwnProperty(tipo) ? INMDOC_ORDEN_TIPO[tipo] : 3;
+}
+
+// ─── 22/10/2026 (C1, pedido por Patry): CERTIFICADO ENERGÉTICO ───────────
+// Por inmueble, en inm.cee = { letra, emision, caduca } (caduca a los 10
+// años de la emisión; se puede corregir). El PDF se sube como documento de
+// tipo "Certificado energético" (Drive) y la tarjeta enlaza el último.
+// Aviso SOLO de caducidad: en "Próximos 90 días" cuando le quedan ≤ 90 días
+// y en "Pendiente de gestionar" si ya ha caducado (nada si no está puesto).
+var CEE_COLORES = { A: '#1a9850', B: '#66bd63', C: '#a6d96a', D: '#d9ef8b', E: '#fdae61', F: '#f46d43', G: '#d73027' };
+function cee_mas10(ymd) {
+  var p = String(ymd || '').split('-'); if (p.length < 3) return '';
+  return (parseInt(p[0], 10) + 10) + '-' + p[1] + '-' + p[2];
+}
+function cee_render(idx) {
+  var box = document.getElementById('inm-cee-box'); if (!box) return;
+  var inm = loadInmuebles()[idx]; if (!inm) { box.innerHTML = ''; return; }
+  var c = inm.cee || {};
+  var doc = inmdoc_load().filter(function(d) { return d && !d.deleted && inm_recEs(d, idx) && d.tipo === 'Certificado energético'; })
+    .sort(function(a, b) { return String(b.fecha || '').localeCompare(String(a.fecha || '')); })[0];
+  var caja = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;';
+  var h = '<div style="' + caja + '"><div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);text-align:center;margin-bottom:8px;">⚡ CERTIFICADO ENERGÉTICO</div>';
+  if (c.letra || c.emision) {
+    var col = CEE_COLORES[c.letra] || 'var(--silver-dim)';
+    var caduca = c.caduca || cee_mas10(c.emision), dias = caduca ? sib_dias(caduca) : null;
+    var est = dias === null ? '' : (dias < 0 ? '<span style="color:#e57373;font-weight:700;">caducado hace ' + (-dias) + ' días</span>' : (dias <= 90 ? '<span style="color:var(--accent-amber);font-weight:700;">caduca en ' + dias + ' días</span>' : '<span style="color:var(--silver-dim);">en ' + Math.round(dias / 365 * 10) / 10 + ' años</span>'));
+    h += '<div style="display:flex;align-items:center;justify-content:center;gap:14px;">'
+      + (c.letra ? '<div style="width:44px;height:44px;border-radius:10px;background:' + col + ';color:#111;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + c.letra + '</div>' : '')
+      + '<div style="font-size:12px;color:var(--silver-mid);line-height:1.6;">Emisión: <b>' + (c.emision ? sib_fechaLarga(c.emision) : '—') + '</b><br>Caduca: <b>' + (caduca ? sib_fechaLarga(caduca) : '—') + '</b>' + (est ? '<br>' + est : '') + '</div></div>';
+  } else {
+    h += '<div style="font-size:12px;color:var(--silver-dim);text-align:center;margin-bottom:4px;">Sin datos del certificado.</div>';
+  }
+  h += '<div style="display:flex;gap:8px;margin-top:10px;">'
+    + '<button onclick="cee_editar(' + idx + ')" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:700;padding:9px;cursor:pointer;">' + (c.letra || c.emision ? '✎ Editar' : '＋ Añadir') + '</button>'
+    + (doc ? '<a href="' + doc.url + '" target="_blank" style="flex:1;text-align:center;background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.4);border-radius:10px;color:#5b8dee;font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:700;padding:9px;text-decoration:none;">📎 Ver certificado</a>' : '')
+    + '</div>';
+  if (!doc) h += '<div style="font-size:10.5px;color:var(--silver-dim);text-align:center;margin-top:6px;">Sube el PDF abajo con "Añadir documento" → tipo "Certificado energético".</div>';
+  box.innerHTML = h + '</div>';
+}
+function cee_editar(idx) {
+  if (bloqueaSiViewer('Editar el certificado energético')) return;
+  var inm = loadInmuebles()[idx]; if (!inm) return;
+  var c = inm.cee || {};
+  var prev = document.getElementById('cee-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div');
+  capa.id = 'cee-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var est = 'width:100%;box-sizing:border-box;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;padding:10px;margin-bottom:12px;-webkit-appearance:none;appearance:none;max-width:100%;min-width:0;';
+  var lab = function(t) { return '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">' + t + '</div>'; };
+  capa.innerHTML = '<div style="background:var(--navy-dark);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;max-width:420px;box-sizing:border-box;">'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;color:var(--silver-bright);margin-bottom:12px;">⚡ Certificado energético · ' + sib_esc(inm.ref || '') + '</div>'
+    + lab('LETRA (CALIFICACIÓN)') + '<select id="cee-letra" style="' + est + '"><option value="">—</option>' + ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(function(l) { return '<option' + (c.letra === l ? ' selected' : '') + '>' + l + '</option>'; }).join('') + '</select>'
+    + lab('FECHA DE EMISIÓN') + '<input id="cee-emision" type="date" value="' + (c.emision || '') + '" onchange="var cd=document.getElementById(\'cee-caduca\');if(cd)cd.value=cee_mas10(this.value);" style="' + est + '">'
+    + lab('CADUCA (10 AÑOS DESPUÉS, SE CALCULA SOLA)') + '<input id="cee-caduca" type="date" value="' + (c.caduca || cee_mas10(c.emision) || '') + '" style="' + est + '">'
+    + '<div style="display:flex;gap:8px;margin-top:4px;"><button onclick="document.getElementById(\'cee-capa\').remove()" style="flex:1;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;">Cancelar</button>'
+    + '<button onclick="cee_guardar(' + idx + ')" style="flex:1;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;">Guardar</button></div></div>';
+  document.body.appendChild(capa);
+}
+function cee_guardar(idx) {
+  if (bloqueaSiViewer('Editar el certificado energético')) return;
+  var lista = loadInmuebles(), inm = lista[idx]; if (!inm) return;
+  var letra = document.getElementById('cee-letra').value, em = document.getElementById('cee-emision').value, cad = document.getElementById('cee-caduca').value;
+  if (!letra && !em) { delete inm.cee; }
+  else inm.cee = { letra: letra, emision: em, caduca: cad || cee_mas10(em) };
+  inm.updatedAt = new Date().toISOString();
+  saveInmuebles(lista);
+  var capa = document.getElementById('cee-capa'); if (capa) capa.remove();
+  cee_render(idx);
+  if (typeof showToast === 'function') showToast('⚡ Certificado energético guardado', 'success');
 }
 // ═══════════════════════════════════════════════════════════════════════
 // 13/10/2026 — PESTAÑA "FOTOS" DE LA FICHA DEL INMUEBLE (pedido por Patry)
@@ -9932,6 +10101,7 @@ function inmfoto_borrar(id) {
 }
 
 function inmdoc_render(idx) {
+  try { cee_render(idx); } catch (eCee) { console.warn('[CEE]', eCee.message); } // 22/10/2026 (C1)
   var cont = document.getElementById('tab-docs-lista');
   var fechaEl = document.getElementById('inmdoc-fecha');
   if (fechaEl && !fechaEl.value) fechaEl.value = _fechaHoyLocal();
@@ -10269,6 +10439,7 @@ function openModal(editIdx) {
     document.getElementById('f-venta-gastos').value = inm.ventaGastos ? fmt(inm.ventaGastos) : '';
     document.getElementById('f-venta-plusvalia').value = inm.ventaPlusvalia ? fmt(inm.ventaPlusvalia) : '';
     document.getElementById('f-venta-anio-inicio').value = inm.ventaAnioInicioAlquiler || '';
+    if (document.getElementById('f-venta-anio-reforma')) document.getElementById('f-venta-anio-reforma').value = inm.ventaAnioReforma || ''; // 22/10/2026
     document.getElementById('f-venta-pct-construccion').value = (inm.ventaPctConstruccion || inm.ventaPctConstruccion === 0) ? inm.ventaPctConstruccion : '';
     document.getElementById('f-venta-meses-ultimo-anio').value = (inm.ventaMesesUltimoAnio || inm.ventaMesesUltimoAnio === 0) ? inm.ventaMesesUltimoAnio : '';
     document.getElementById('f-notas').value = inm.notas || '';
@@ -10327,7 +10498,7 @@ function closeModal() {
 }
 
 function clearForm() {
-  ['f-ref-inm','f-direccion','f-edificio','f-catastral-inm','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-venta-anio','f-venta-gastos','f-venta-plusvalia','f-venta-anio-inicio','f-venta-pct-construccion','f-venta-meses-ultimo-anio','f-notas'].forEach(id => {
+  ['f-ref-inm','f-direccion','f-edificio','f-catastral-inm','f-piso','f-letra','f-cp','f-localidad','f-tipo','f-propietario','f-m2','f-estado','f-hab','f-banos','f-renta','f-renta-est','f-precio','f-precio-actual','f-gastos-compra','f-reforma','f-gastos-anuales','f-ingresos-acum','f-venta-declarado','f-venta-efectivo','f-venta-anio','f-venta-gastos','f-venta-plusvalia','f-venta-anio-inicio','f-venta-pct-construccion','f-venta-meses-ultimo-anio','f-venta-anio-reforma','f-notas'].forEach(id => {
     const el = document.getElementById(id);
     if (el.tagName === 'SELECT') el.selectedIndex = 0;
     else el.value = '';
@@ -10427,6 +10598,7 @@ function saveInmueble() {
     ventaAnioInicioAlquiler: document.getElementById('f-venta-anio-inicio').value.trim() || '',
     ventaPctConstruccion: document.getElementById('f-venta-pct-construccion').value.trim() || '',
     ventaMesesUltimoAnio: document.getElementById('f-venta-meses-ultimo-anio').value.trim() || '',
+    ventaAnioReforma: (document.getElementById('f-venta-anio-reforma') ? document.getElementById('f-venta-anio-reforma').value.trim() : '') || '', // 22/10/2026
     notas: document.getElementById('f-notas').value.trim(),
     inquilino: _inquilinoNombre,
     // PUNTO 32: plaza de garaje asociada a este piso (solo tiene sentido si
@@ -12360,7 +12532,10 @@ function actualizarPreview() {
   document.getElementById('prev-arrendador').textContent = arr.label;
   document.getElementById('prev-inm').textContent = ref + (dir ? ' · ' + dir.substring(0,25) : '');
   document.getElementById('prev-inq').textContent = inq;
-  document.getElementById('prev-renta').textContent = formatEurPrev(renta) + '/mes · Fianza ' + formatEurPrev(fianza);
+  // 22/10/2026: las rústicas se pagan por año (A3 de la revisión)
+  document.getElementById('prev-renta').textContent = ((tipoSelected === 'rustica' || tipoSelected === 'rusticatemp')
+    ? formatEurPrev(renta) + '/año' + (tipoSelected === 'rustica' && numES(renta) > 0 ? ' (' + formatEurPrev(Math.round(numES(renta) / 12 * 100) / 100) + '/mes)' : '')
+    : formatEurPrev(renta) + '/mes') + ' · Fianza ' + formatEurPrev(fianza);
   document.getElementById('prev-dur').textContent = dur + ' año' + (dur != 1 ? 's' : '');
   document.getElementById('prev-padron').textContent = padronOn ? (padronCount + ' persona' + (padronCount != 1 ? 's' : '')) : 'No';
   // Mostrar count de anexos si los hay
@@ -14328,7 +14503,29 @@ function formatEurPrev(v){
   }
   return formatEur(v);
 }
-function formatEurLetras(v){const n=parseInt(v||0);const u=['','UN','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE'],d=['','','VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];if(n===0)return'CERO EUROS';if(n<20)return u[n]+' EUROS';if(n<100){const a=Math.floor(n/10),b=n%10;return(b===0?d[a]:d[a]+' Y '+u[b])+' EUROS';}if(n<1000){const c=Math.floor(n/100),r=n%100;const cs=c===1?'CIEN':[,'CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'][c];return(r===0?cs:cs+' '+formatEurLetras(r).replace(' EUROS',''))+' EUROS';}const m=Math.floor(n/1000),r=n%1000;const ms=m===1?'MIL':formatEurLetras(m).replace(' EUROS','')+' MIL';return(r===0?ms:ms+' '+formatEurLetras(r).replace(' EUROS',''))+' EUROS';}
+// 22/10/2026: importe en letras reescrito. Antes: sin céntimos, "CIEN CINCUENTA"
+// (150), "VEINTE Y UN" (21), "MIL MIL" (1.000.000). Ahora: "… EUROS CON …
+// CÉNTIMOS" cuando hay céntimos (decidido con Patry).
+function _numLetras(n) {
+  var U = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE', 'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+  var V = ['VEINTE', 'VEINTIÚN', 'VEINTIDÓS', 'VEINTITRÉS', 'VEINTICUATRO', 'VEINTICINCO', 'VEINTISÉIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE'];
+  var D = ['', '', '', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+  var C = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+  function m100(x) { if (x < 20) return U[x]; if (x < 30) return V[x - 20]; var a = Math.floor(x / 10), b = x % 10; return D[a] + (b ? ' Y ' + U[b] : ''); }
+  function m1000(x) { if (x === 100) return 'CIEN'; var c = Math.floor(x / 100), r = x % 100; return (c ? C[c] : '') + (c && r ? ' ' : '') + (r ? m100(r) : ''); }
+  if (n === 0) return 'CERO';
+  var mill = Math.floor(n / 1000000), miles = Math.floor((n % 1000000) / 1000), resto = n % 1000, out = [];
+  if (mill) out.push(mill === 1 ? 'UN MILLÓN' : m1000(mill) + ' MILLONES');
+  if (miles) out.push(miles === 1 ? 'MIL' : m1000(miles) + ' MIL');
+  if (resto) out.push(m1000(resto));
+  return out.join(' ');
+}
+function formatEurLetras(v) {
+  var tot = Math.round(Math.abs(numES(v)) * 100), e = Math.floor(tot / 100), cts = tot % 100;
+  var s = _numLetras(e) + ((e > 0 && e % 1000000 === 0) ? ' DE EUROS' : (e === 1 ? ' EURO' : ' EUROS'));
+  if (cts) s += ' CON ' + _numLetras(cts) + (cts === 1 ? ' CÉNTIMO' : ' CÉNTIMOS');
+  return s;
+}
 function fmtDate(iso){if(!iso)return'—';const[y,m,d]=iso.split('-');return d+'/'+m+'/'+y;}
 function formatFechaLarga(iso){if(!iso)return'—';const[y,m,d]=iso.split('-'),mes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];const anyo=parseInt(y).toLocaleString('es-ES');return parseInt(d)+' de '+mes[parseInt(m)-1]+' de '+anyo;}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
@@ -14822,7 +15019,7 @@ function rus_renderModalContent() {
   html += '<option value="">-- Selecciona --</option>';
   for (var mm = 1; mm <= 12; mm++) { html += '<option value="' + mm + '">' + RUS_MESES_NOMBRE[mm] + '</option>'; }
   html += '</select></div>';
-  html += '<div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" id="rus-form-importe" type="number" inputmode="decimal" step="0.01"></div>';
+  html += '<div class="mfield"><div class="mflabel">Importe (€)</div><input class="minput" id="rus-form-importe" type="text" inputmode="decimal"></div>';
   html += '<button class="btn1" onclick="rus_guardarAnio()">Guardar</button>';
   html += '</div>';
   document.getElementById('rus-hist-content').innerHTML = html;
@@ -14830,7 +15027,7 @@ function rus_renderModalContent() {
 
 function rus_prepararEdicion(anio, importe, mes) {
   document.getElementById('rus-form-anio').value = anio;
-  document.getElementById('rus-form-importe').value = importe;
+  document.getElementById('rus-form-importe').value = importe === '' || importe == null ? '' : String(importe).replace('.', ','); // 22/10/2026
   var selMes = document.getElementById('rus-form-mes');
   if (selMes) selMes.value = mes || '';
 }
@@ -14841,7 +15038,7 @@ function rus_guardarAnio() {
   var impEl = document.getElementById('rus-form-importe');
   var mesEl = document.getElementById('rus-form-mes');
   var anio = anioEl ? String(anioEl.value || '').trim() : '';
-  var importe = parseFloat(impEl ? impEl.value : '') || 0;
+  var importe = numES(impEl ? impEl.value : ''); // 22/10/2026
   var mes = mesEl && mesEl.value ? parseInt(mesEl.value) : null;
   if (!anio) { avisar('Indica el año.'); return; }
   if (importe <= 0) { avisar('Indica el importe.'); return; }
@@ -14969,7 +15166,7 @@ function fac_abrirNuevoHistorico() {
 }
 function fac_editarMes(mes, importe) {
   document.getElementById('fac-hist-mes').value = mes;
-  document.getElementById('fac-hist-importe').value = importe;
+  document.getElementById('fac-hist-importe').value = importe === '' || importe == null ? '' : String(importe).replace('.', ','); // 22/10/2026
   document.getElementById('fac-modal-historico').classList.add('open');
 }
 // PUNTO 37 (25/08/2026): antes no había forma de borrar un mes del histórico
@@ -14994,7 +15191,7 @@ function fac_eliminarMes(mes) {
 function fac_guardarHistorico() {
   if (bloqueaSiViewer('Guardar un mes en el histórico de facturación')) return;
   var mes = document.getElementById('fac-hist-mes').value;
-  var imp = parseFloat(document.getElementById('fac-hist-importe').value) || 0;
+  var imp = numES(document.getElementById('fac-hist-importe').value) || 0;
   if (!mes) { avisar('Selecciona el mes.'); return; }
   if (imp <= 0) { avisar('Introduce el importe.'); return; }
   // PUNTO 37 (25/08/2026): si ese mes ya está facturado por inmueble (desglosado,
@@ -15667,7 +15864,7 @@ function kurra_editarApunte(id){
   kurra_setOtroTipo(m.tipo==='haber'?'haber':'debe');
   kurra_onConceptoChange();
   kurra_ponerFecha(m.fecha);
-  document.getElementById('kurra-importe').value=m.importe!=null?m.importe:'';
+  document.getElementById('kurra-importe').value=m.importe!=null?String(m.importe).replace('.', ','):''; // 22/10/2026
   document.getElementById('kurra-btn-borrar').style.display='';
   document.getElementById('kurra-modal-apunte').classList.add('open');
 }
@@ -15686,7 +15883,7 @@ function kurra_guardarApunte(){
     conceptoTexto=conceptoDef.label;
     tipo=conceptoDef.tipo;
   }
-  const importe=parseFloat(document.getElementById('kurra-importe').value)||0;
+  const importe=numES(document.getElementById('kurra-importe').value)||0;
   if(importe<=0){ avisar('⚠️ Introduce un importe válido.'); return; }
   const fecha=(document.getElementById('kurra-fecha').value||'').trim();
   if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)){ avisar('⚠️ Elige la fecha del apunte.'); return; }
@@ -16170,7 +16367,7 @@ function facCobro_mostrarSiguiente(){
 function facCobro_calcSaldo(){
   const it=_facCobroItems[_facCobroIdx];
   if(!it) return;
-  const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
+  const cobrado=numES(document.getElementById('fac-cobro-importe').value)||0;
   const facturado=it.precio;
   const diferencia=cobrado-facturado;
   const prev=document.getElementById('fac-cobro-saldo-preview');
@@ -16199,7 +16396,7 @@ function facCobro_guardar(){
   if (bloqueaSiViewer('Guardar un cobro')) return;
   const it=_facCobroItems[_facCobroIdx];
   if(!it){ closeModalById('fac-cobro-modal'); return; }
-  const cobrado=parseFloat(document.getElementById('fac-cobro-importe').value)||0;
+  const cobrado=numES(document.getElementById('fac-cobro-importe').value)||0;
   if(cobrado>0){
     const cobros=load(KEYS.cobros);
     // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
@@ -16371,7 +16568,7 @@ function ipc_abrirModal(contratoId){
 function ipc_calcular(){
   if(!_ipcContratoActual) return;
   const renta=parseRentaMixta(_ipcContratoActual.renta);
-  const pct=parseFloat(document.getElementById('ipc-pct').value)||0;
+  const pct=numES(document.getElementById('ipc-pct').value)||0;
   const nuevaRenta=Math.round((renta*(1+pct/100))*100)/100;
   const _esRusticaCalc = _ipcContratoActual && _ipcContratoActual.tipo === 'rustica';
   const _unidadCalc = _esRusticaCalc ? '/año' : '/mes';
@@ -16390,7 +16587,7 @@ function ipc_aplicar(){
     info('Este contrato ya alcanzó el límite legal de adendas — no se ha aplicado ningún cambio. Toca redactar un contrato nuevo.');
     return;
   }
-  const pct=parseFloat(document.getElementById('ipc-pct').value);
+  const pct=numES(document.getElementById('ipc-pct').value);
   if(!pct||isNaN(pct)){info('Introduce el % de IPC para continuar.');return;}
   const rentaAnterior=parseRentaMixta(_ipcContratoActual.renta);
   const nuevaRenta=Math.round((rentaAnterior*(1+pct/100))*100)/100;
@@ -16659,7 +16856,7 @@ function openModalCobro(){
 function guardarCobro(){
   if (bloqueaSiViewer('Guardar un cobro')) return;
   const fecha=document.getElementById('cobro-fecha').value;
-  const importe=parseFloat(document.getElementById('cobro-importe').value)||0;
+  const importe=numES(document.getElementById('cobro-importe').value)||0;
   const concepto=document.getElementById('cobro-concepto').value.trim();
   if(!fecha||importe<=0){info('Introduce fecha e importe válidos.');return;}
 
@@ -16761,12 +16958,9 @@ function semColorClass(neta){
   return 'color-rojo';
 }
 
-function parseFmt(s){
-  if (s === undefined || s === null || s === '') return 0;
-  return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
-}
+function parseFmt(s) { return numES(s); } // 22/10/2026: lector único
 function fmt(n){
-  const v = parseFloat(n) || 0;
+  const v = numES(n); // 22/10/2026: antes parseFloat ("567,29" → 567)
   if (v === 0) return '0';
   if (v % 1 === 0) {
     // Entero: añadir puntos de miles manualmente (robusto en Safari iOS)
@@ -16925,6 +17119,44 @@ document.addEventListener('firebaseLoaded', function() {
   // ×100 (o ×10.000) por el fallo del campo. Si una base es más de 5 veces el
   // precio de compra del inmueble (o pasa de 1.000.000 € sin precio), se
   // divide entre 100 hasta quedar razonable.
+  // 22/10/2026 — Sierra Nevada (SNEV01): % de construcción de la Renta 2025
+  // (43,35 %) y reforma de 2018, decidido con Patry. Solo si siguen en blanco/70.
+  (function _fixSnevVentaV1() {
+    try {
+      if (localStorage.getItem('app:fix_snev_venta_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var l = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'), n = 0;
+      l.forEach(function(i) {
+        if (!i || i.ref !== 'SNEV01') return;
+        var pct = String(i.ventaPctConstruccion || '').trim();
+        if (pct === '' || pct === '70') { i.ventaPctConstruccion = '43,35'; n++; }
+        if (!i.ventaAnioReforma) { i.ventaAnioReforma = '2018'; n++; }
+        if (n) i.updatedAt = new Date().toISOString();
+      });
+      if (n) localStorage.setItem('inmuebles:lista', JSON.stringify(l));
+      localStorage.setItem('app:fix_snev_venta_v1', '1');
+    } catch (e) { console.error('Error en los datos de venta de Sierra Nevada', e); }
+  })();
+  // 22/10/2026 — rentas y fianzas de contratos guardadas como TEXTO ("946,48")
+  // pasan a número (946.48). Se leían bien, pero eran una fuente de errores.
+  (function _fixContratosNumV1() {
+    try {
+      if (localStorage.getItem('app:fix_contratos_num_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var l = JSON.parse(localStorage.getItem('contratos:lista') || '[]'), n = 0, ahora = new Date().toISOString();
+      l.forEach(function(c) {
+        if (!c || c.deleted) return;
+        var t = false;
+        ['renta', 'fianza', 'rentaAnterior'].forEach(function(k) {
+          if (typeof c[k] === 'string' && c[k].trim() !== '' && /\d/.test(c[k])) { c[k] = Math.round(numES(c[k]) * 100) / 100; t = true; }
+        });
+        if (t) { c.updatedAt = ahora; n++; }
+      });
+      if (n) localStorage.setItem('contratos:lista', JSON.stringify(l));
+      localStorage.setItem('app:fix_contratos_num_v1', '1');
+      if (n) console.log('[Contratos] ' + n + ' importe(s) de texto a número');
+    } catch (e) { console.error('Error al convertir importes de contratos', e); }
+  })();
   (function _fixAmorBaseX100V1() {
     try {
       if (localStorage.getItem('app:fix_amorbase_x100_v1')) return;
@@ -19335,7 +19567,7 @@ function fin_asiGuardarPaso(paso, valor) {
   if (bloqueaSiViewer('Guardar un paso del asistente de Finanzas')) return;
   if (paso.tipo === 'cuenta') {
     var data = fin_load('fin:cuentas');
-    if (data[paso.idx]) { data[paso.idx].saldo = valor; data[paso.idx].updatedAt = new Date().toISOString(); fin_save('fin:cuentas', data); }
+    if (data[paso.idx]) { data[paso.idx].saldo = valor; data[paso.idx].updatedAt = data[paso.idx].saldoFecha = new Date().toISOString(); fin_save('fin:cuentas', data); }
   } else if (paso.tipo === 'accion') {
     // CAMBIO 1 (21/09/2026): mismo camino interno que fin_setCotizacion() y
     // que las cotizaciones automáticas, ver fin_guardarCotizacion() más
@@ -19343,14 +19575,15 @@ function fin_asiGuardarPaso(paso, valor) {
     fin_guardarCotizacion(paso.ticker, valor);
   } else if (paso.tipo === 'fondo') {
     var fondos = fin_load('fin:fondos');
-    if (fondos[paso.idx]) { fondos[paso.idx].valor = valor; fondos[paso.idx].updatedAt = new Date().toISOString(); fin_save('fin:fondos', fondos); }
+    if (fondos[paso.idx]) { fondos[paso.idx].valor = valor; fondos[paso.idx].updatedAt = fondos[paso.idx].valorFecha = new Date().toISOString(); fin_save('fin:fondos', fondos); }
   }
 }
 
 function fin_asiSiguiente() {
   var paso = _finAsiPasos[_finAsiIdx];
-  var raw = document.getElementById('fin-asi-input').value.replace(',', '.').trim();
-  var valor = parseFloat(raw);
+  // 22/10/2026: antes replace(',', '.') + parseFloat → "5.538,02" se guardaba como 5,54
+  var raw = document.getElementById('fin-asi-input').value.trim();
+  var valor = raw === '' ? NaN : numES(raw);
   if (!isNaN(valor) && valor >= 0) {
     fin_asiGuardarPaso(paso, valor);
   }
@@ -19399,6 +19632,16 @@ function fin_load(base) {
     }
     return JSON.parse(raw || '[]');
   } catch(e) { return []; }
+}
+// 22/10/2026 (D4): "actualizado hace X días" en cuentas, fondos y Urbanitae
+// (gris < 30 días, ámbar 30–60, rojo > 60). El cierre del mes lo pone a cero.
+function fin_haceDias(iso) {
+  if (!iso) return '';
+  var t = Date.parse(iso); if (!isFinite(t)) return '';
+  var d = Math.max(0, Math.floor((Date.now() - t) / 86400000));
+  var col = d > 60 ? '#e57373' : d >= 30 ? '#e0a030' : 'var(--text-secondary)';
+  var txt = d === 0 ? 'actualizado hoy' : d === 1 ? 'actualizado ayer' : 'actualizado hace ' + d + ' días';
+  return '<div style="font-size:10px;color:' + col + ';margin-top:1px;">🕒 ' + txt + '</div>';
 }
 function fin_save(base, data) {
   localStorage.setItem(fin_key(base), JSON.stringify(data));
@@ -19466,20 +19709,7 @@ function fin_fmtEnteroSinSimbolo(v) {
 // "1.234.567"), se tratan como puntos de miles y se quitan; si no (como
 // "2500.75", con 2 cifras tras el punto), el punto sigue siendo decimal,
 // igual que siempre.
-function parseImporteFlexible(s) {
-  if (s === undefined || s === null || s === '') return 0;
-  s = String(s).trim();
-  var lastComma = s.lastIndexOf(',');
-  var lastDot = s.lastIndexOf('.');
-  if (lastComma > lastDot) {
-    s = s.replace(/\./g, '').replace(',', '.');
-  } else if (lastDot > lastComma) {
-    var partes = s.split('.');
-    var esDeMiles = partes.length > 1 && partes.slice(1).every(function (p) { return p.length === 3; });
-    s = esDeMiles ? partes.join('') : s;
-  }
-  return parseFloat(s) || 0;
-}
+function parseImporteFlexible(s) { return numES(s); } // 22/10/2026: lector único
 // PUNTO 123 (21/09/2026): puntuación de miles en los campos de dinero y
 // cantidad de Finanzas (Cuentas, Fondos, Acciones) — pedido varias veces.
 // Antes se veían "en bruto" al editar (ej. "22071.88" o "17827.05"), sin el
@@ -19970,7 +20200,7 @@ function fin_renderCuentas() {
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top">';
     html += '<div><div class="fin-card-nombre">' + (c.nombre || 'Cuenta') + '</div>';
-    html += '<div class="fin-card-sub">' + (c.iban ? 'IBAN \u00b7\u00b7\u00b7\u00b7 ' + c.iban : '') + '</div></div>';
+    html += '<div class="fin-card-sub">' + (c.iban ? 'IBAN \u00b7\u00b7\u00b7\u00b7 ' + c.iban : '') + '</div>' + fin_haceDias(c.saldoFecha || c.updatedAt) + '</div>';
     html += '<div class="fin-card-saldo">' + fin_fmt(c.saldo) + '</div></div>';
     html += '<div class="fin-card-actions">';
     html += '<div class="fin-action-btn" onclick="fin_editarCuenta(' + i + ')">Actualizar saldo</div>';
@@ -20038,6 +20268,7 @@ function fin_guardarCuenta() {
     obj.id = _finGenId();
   }
   obj.updatedAt = new Date().toISOString();
+  { var _pc = (idx !== '' && data[parseInt(idx)]) ? data[parseInt(idx)] : null; obj.saldoFecha = (_pc && Math.abs(numES(_pc.saldo) - numES(obj.saldo)) < 0.005) ? (_pc.saldoFecha || _pc.updatedAt || obj.updatedAt) : obj.updatedAt; } // 22/10/2026 (D4)
   if (idx !== '' && data[parseInt(idx)] && data[parseInt(idx)].libroCaja) obj.libroCaja = true; // PUNTO 256: no perder la marca
   if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
   fin_save('fin:cuentas', data);
@@ -20234,7 +20465,7 @@ function caja_borrar(id) {
   ]);
 }
 // Puesta en marcha (una sola vez, decidido con Patry): la cuenta "Efectivo" de
-// Patricio pasa a libro de caja con un saldo inicial de 40.000 € a 1/09/2026.
+// Patricio pasa a libro de caja (el saldo inicial se creó en sus datos el 01/10/2026).
 function caja_migrar256() {
   try {
     if (localStorage.getItem('app:migracion_caja_256')) return;
@@ -20247,11 +20478,10 @@ function caja_migrar256() {
     if (!c.id) c.id = 'leg_cuentas_' + window._finHuella('cuentas', c);
     var idIni = 'caja_ini_' + c.id;
     var todos = caja_loadTodo();
-    if (!todos.some(function(x) { return x && x.id === idIni; })) {
-      var ahora = new Date().toISOString();
-      todos.push({ id: idIni, cuentaId: c.id, fecha: '2026-09-01', concepto: 'Saldo inicial', importe: 40000, inicial: true, creado: '2026-09-01T00:00:00.000Z', updatedAt: ahora });
-      localStorage.setItem(CAJA_KEY, JSON.stringify(todos));
-    }
+    // 22/10/2026 (seguridad): el saldo inicial (importe real de Patry) estaba
+    // escrito aquí; ya se creó en sus datos el 01/10, así que se quita del
+    // archivo público. Si faltara, no se inventa: se mete a mano en Efectivo.
+    void idIni; void todos;
     if (!c.libroCaja) { c.libroCaja = true; c.updatedAt = new Date().toISOString(); localStorage.setItem(k, JSON.stringify(lista)); }
     localStorage.setItem('app:migracion_caja_256', new Date().toISOString());
     caja_syncSaldos();
@@ -20940,7 +21170,7 @@ function fin_renderFondos() {
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top"><div>';
     html += '<div class="fin-card-nombre">' + (f.nombre || 'Fondo') + '</div>';
-    html += '<div class="fin-card-sub">' + [f.gestora, FIN_CUENTA_LABEL[f.cuenta] || ''].filter(Boolean).join(' · ') + '</div>';
+    html += '<div class="fin-card-sub">' + [f.gestora, FIN_CUENTA_LABEL[f.cuenta] || ''].filter(Boolean).join(' · ') + '</div>' + fin_haceDias(f.valorFecha || f.updatedAt);
     html += '</div><div class="fin-card-saldo">' + fin_fmt(val) + '</div></div>';
     html += '<div class="fin-card-meta">';
     html += '<div class="fin-meta-item">Aportado: <span class="fin-meta-val">' + fin_fmt(ap) + '</span></div>';
@@ -21074,6 +21304,7 @@ function fin_guardarFondo() {
     obj.id = _finGenId();
   }
   obj.updatedAt = new Date().toISOString();
+  obj.valorFecha = (_prevF && Math.abs(numES(_prevF.valor) - numES(obj.valor)) < 0.005) ? (_prevF.valorFecha || _prevF.updatedAt || obj.updatedAt) : obj.updatedAt; // 22/10/2026 (D4)
   if (idx !== '') data[parseInt(idx)] = obj; else data.push(obj);
   fin_save('fin:fondos', data);
   closeModalById('fin-modal-fondo');
@@ -21789,7 +22020,7 @@ function fin_renderUrbanitae() {
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top"><div>';
     html += '<div class="fin-card-nombre">' + (u.nombre || 'Proyecto') + '</div>';
-    html += '<div class="fin-card-sub">' + (u.fecha ? fin_urbanitaeFechaCorta(u.fecha) : '') + '</div>';
+    html += '<div class="fin-card-sub">' + (u.fecha ? fin_urbanitaeFechaCorta(u.fecha) : '') + '</div>' + (cobrado ? '' : fin_haceDias(u.updatedAt));
     html += '</div><div class="fin-card-saldo">' + fin_fmt(capital) + '</div></div>';
     html += '<div class="fin-card-meta">';
     html += '<div class="fin-meta-item">Interés: <span class="fin-meta-val">' + fin_fmtPct(u.interes) + '</span></div>';
@@ -22214,8 +22445,8 @@ function fin_patHist_calcularActual() {
   var emp = fin_emp();
   // PUNTO 165 (22/09/2026): totales calculados con fin_visibles() — sin los
   // elementos "tachados" (borrados) — mismo motivo que fin_calcPatrimonio.
-  var cuentas = fin_visibles('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
-  var fondos = fin_visibles('fin:fondos').reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
+  var cuentas = fin_visibles('fin:cuentas').reduce(function(s, c) { return s + numES(c.saldo); }, 0);
+  var fondos = fin_visibles('fin:fondos').reduce(function(s, f) { return s + numES(f.valor); }, 0);
   var opsAcc = fin_visibles('fin:acciones');
   // PUNTO 148 (08/09/2026): mismo criterio que fin_calcPatrimonio — las
   // posiciones en modo simple suman su "Valor actual" directo, y su ticker
@@ -22225,7 +22456,7 @@ function fin_patHist_calcularActual() {
   var acciones = 0;
   for (var sh = 0; sh < simplesHist.length; sh++) {
     if (simplesHist[sh].deleted) continue; // PUNTO 165 (22/09/2026): posición simple borrada, se salta
-    acciones += parseFloat(simplesHist[sh].valorActual) || 0;
+    acciones += numES(simplesHist[sh].valorActual);
     if (simplesHist[sh].origenTicker) tickersOrigenSimpleHist[simplesHist[sh].origenTicker] = true;
   }
   var posAcc = {};
@@ -22234,9 +22465,9 @@ function fin_patHist_calcularActual() {
     var t = op.ticker;
     if (tickersOrigenSimpleHist[t]) continue;
     if (!posAcc[t]) posAcc[t] = 0;
-    if (op.tipo === 'compra') posAcc[t] += parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'venta') posAcc[t] -= parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'scrip') posAcc[t] += parseFloat(op.scripAcciones) || 0;
+    if (op.tipo === 'compra') posAcc[t] += numES(op.cantidad);
+    else if (op.tipo === 'venta') posAcc[t] -= numES(op.cantidad);
+    else if (op.tipo === 'scrip') posAcc[t] += numES(op.scripAcciones);
   }
   Object.keys(posAcc).forEach(function(tk) {
     if (posAcc[tk] <= 0) return;
@@ -22244,7 +22475,7 @@ function fin_patHist_calcularActual() {
     if (cot) acciones += cot * posAcc[tk];
   });
   var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) {
-    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
+    return s + (u.estado === 'cobrado' ? 0 : numES(u.capital));
   }, 0);
   var inmob = inm_patrimonioInmobiliario(emp);
   return {
@@ -22291,6 +22522,7 @@ function fin_patHist_render() {
   }
   if (sec) sec.style.display = '';
   if (emp === 'patricio') fin_patHist_migrarFinper(); // PUNTO 220
+  if (emp === 'patricio') fin_patHist_rellenarHuecos(); // 22/10/2026 (B2)
   fin_patHist_corregirExcel(); // PUNTO 222
   var lista = fin_patHist_load();
   var mesActual = fin_patHist_mesActual();
@@ -22319,6 +22551,7 @@ function fin_patHist_render() {
   var listaEl = document.getElementById('fin-pathist-lista');
   if (!listaEl) return;
   if (lista.length === 0) {
+    var _gEl = document.getElementById('fin-pathist-graf'); if (_gEl) _gEl.innerHTML = '';
     listaEl.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin snapshots guardados todavía. Pulsa + para guardar el de este mes.</div>';
     return;
   }
@@ -22343,7 +22576,7 @@ function fin_patHist_render() {
       : '<span style="color:var(--silver-dim);">—</span>';
     html += '<div class="fin-card">';
     html += '<div class="fin-card-top">';
-    html += '<div><div class="fin-card-nombre">' + fin_patHist_nombreMes(r.id) + '</div>';
+    html += '<div><div class="fin-card-nombre">' + fin_patHist_fechaCorta(r) + (r.estimada ? ' <span style="font-size:10px;color:var(--accent-amber);border:1px solid var(--accent-amber);border-radius:6px;padding:0 5px;">estimada</span>' : '') + '</div>';
     html += '<div class="fin-card-sub">Liquidez ' + fin_fmt(r.liquidez) + ' · Invertido ' + fin_fmt(r.invertido) + ' · Inmobiliario ' + fin_fmt(r.inmobiliario) + '</div></div>';
     html += '<div class="fin-card-saldo">' + fin_fmt(r.total) + '</div></div>';
     // PUNTO 220: desglose por banco (si la foto lo tiene).
@@ -22363,6 +22596,7 @@ function fin_patHist_render() {
     html += '</div></div>';
   });
   listaEl.innerHTML = html;
+  try { fin_patHist_grafico(ordenada); } catch (eG) { console.warn('[Gráfico patrimonio]', eG.message); } // 22/10/2026 (D2)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -22393,12 +22627,12 @@ function fin_patHist_desglose() {
   fin_visibles('fin:cuentas').forEach(function(c) {
     var clave = fin_asiClaveBrokerCuenta(c.nombre);
     var nombre = FIN_CUENTA_LABEL[clave] || (c.nombre || 'Cuenta');
-    _linea(clave, nombre).liquidez += parseFloat(c.saldo) || 0;
+    _linea(clave, nombre).liquidez += numES(c.saldo);
   });
   // Invertido: fondos por su "Cuenta/Broker".
   var SIN = 'sin_asignar';
   fin_visibles('fin:fondos').forEach(function(f) {
-    var v = parseFloat(f.valor) || 0;
+    var v = numES(f.valor);
     if (f.cuenta) _linea(f.cuenta, _nombreClave(f.cuenta)).invertido += v;
     else if (f.gestora) _linea('g_' + String(f.gestora).toLowerCase().replace(/\s+/g, ''), f.gestora).invertido += v;
     else if (emp === 'patrimer') _linea('indexa', 'Indexa').invertido += v; // PUNTO 222: en Patrimer, los fondos son de Indexa
@@ -22412,7 +22646,7 @@ function fin_patHist_desglose() {
   var origenSimple = {};
   simples.forEach(function(s) {
     if (!s || s.deleted) return;
-    var v = parseFloat(s.valorActual) || 0;
+    var v = numES(s.valorActual);
     if (s.origenTicker) origenSimple[s.origenTicker] = true;
     var c = (s.origenTicker ? cuentaAcc[s.origenTicker] : '') || accPorDefecto;
     if (c) _linea(c, _nombreClave(c)).invertido += v;
@@ -22423,9 +22657,9 @@ function fin_patHist_desglose() {
     var t = op.ticker;
     if (!t || origenSimple[t]) return;
     if (!pos[t]) pos[t] = 0;
-    if (op.tipo === 'compra') pos[t] += parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'venta') pos[t] -= parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'scrip') pos[t] += parseFloat(op.scripAcciones) || 0;
+    if (op.tipo === 'compra') pos[t] += numES(op.cantidad);
+    else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad);
+    else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones);
   });
   Object.keys(pos).forEach(function(t) {
     if (pos[t] <= 0) return;
@@ -22444,7 +22678,7 @@ function fin_patHist_desglose() {
     return ia - ib;
   });
   var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) {
-    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
+    return s + (u.estado === 'cobrado' ? 0 : numES(u.capital));
   }, 0);
   return {
     bancos: orden.map(function(k) { return bancos[k]; }),
@@ -22456,6 +22690,10 @@ function fin_patHist_desglose() {
 // Paso 1: aviso de actualizar saldos antes de la foto.
 function fin_patHist_abrirFoto() {
   if (bloqueaSiViewer('Guardar un snapshot del histórico de patrimonio')) return;
+  if (typeof cierre_abrir === 'function') { cierre_abrir(); return; } // 22/10/2026 (B2): "Cierre del mes"
+  fin_patHist_abrirFotoAntigua();
+}
+function fin_patHist_abrirFotoAntigua() {
   var emp = fin_emp();
   if (emp !== 'patrimer' && emp !== 'patricio') return;
   var mesId = fin_patHist_mesActual();
@@ -22548,23 +22786,260 @@ function fin_patHist_guardarFoto() {
   else _hacer();
 }
 
+// ═══ 22/10/2026 (B2, pedido por Patry): "CIERRE DEL MES" — FOTO DEL DÍA 1 ═══
+// Una sola pantalla con todo lo que cambia de un mes a otro (saldos, valor
+// de los fondos, cotizaciones, acciones en modo simple), precargado con lo
+// último que tiene la app. Al guardar: 1) se actualizan esos datos en
+// Finanzas y 2) se guarda la foto con la FECHA elegida (por defecto el día 1
+// del mes). Urbanitae e inmobiliario se toman tal cual (cambian en sus fichas).
+var _cierre = null;
+var PH_MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function fin_patHist_fechaCorta(r) {
+  var f = (r && r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) ? r.fecha : (String(r && r.id || '') + '-01');
+  var p = f.split('-');
+  // las fotos guardadas antes (dentro del mes) se rotulan como día 1
+  return (r && r.id && f.slice(0, 7) === r.id ? '1' : parseInt(p[2], 10)) + ' ' + (PH_MES3[parseInt(p[1], 10) - 1] || p[1]) + ' ' + p[0];
+}
+function cierre_abrir() {
+  var emp = fin_emp();
+  if (emp !== 'patrimer' && emp !== 'patricio') { avisar('El cierre del mes es para Patrimer y Patricio.'); return; }
+  var hoy = new Date(), dia1 = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-01';
+  var cuentas = fin_visibles('fin:cuentas'), fondos = fin_visibles('fin:fondos');
+  var simples = fin_accSimpleLoad().filter(function(x) { return x && !x.deleted; });
+  var origen = {}; simples.forEach(function(x) { if (x.origenTicker) origen[x.origenTicker] = true; });
+  var pos = {};
+  fin_visibles('fin:acciones').forEach(function(o) {
+    if (!o || origen[o.ticker]) return;
+    if (!pos[o.ticker]) pos[o.ticker] = 0;
+    if (o.tipo === 'compra') pos[o.ticker] += numES(o.cantidad);
+    else if (o.tipo === 'venta') pos[o.ticker] -= numES(o.cantidad);
+    else if (o.tipo === 'scrip') pos[o.ticker] += numES(o.scripAcciones);
+  });
+  var tickers = Object.keys(pos).filter(function(t) { return pos[t] > 0.000001; }).sort();
+  var ins = fin_patHist_calcularActual();
+  var urb = fin_visibles('fin:urbanitae').reduce(function(s2, u) { return s2 + (u.estado === 'cobrado' ? 0 : numES(u.capital)); }, 0);
+  _cierre = { emp: emp, cuentas: cuentas, fondos: fondos, simples: simples, tickers: tickers, pos: pos, urb: urb, inm: ins.inmobiliario };
+  var est = 'width:118px;flex-shrink:0;background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;padding:6px 8px;text-align:right;box-sizing:border-box;';
+  var fila = function(nombre, sub, id, valor, soloLectura) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+      + '<div style="min-width:0;"><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + notas_esc(nombre) + '</div>' + (sub ? '<div style="font-size:10.5px;color:var(--text-secondary);">' + sub + '</div>' : '') + '</div>'
+      + (soloLectura ? '<div style="font-size:14px;font-weight:700;color:var(--silver-mid);white-space:nowrap;">' + fin_fmt(valor) + '</div>'
+        : '<input id="' + id + '" type="text" inputmode="decimal" value="' + fmtGlobal(valor) + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this);cierre_recalc()" oninput="cierre_recalc()" style="' + est + '">') + '</div>';
+  };
+  var tit = function(t) { return '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 4px;text-align:center;">' + t + '</div>'; };
+  var h = '';
+  h += tit('🏦 Cuentas · saldo');
+  cuentas.forEach(function(c, i) { h += fila(c.nombre || 'Cuenta', c.libroCaja ? 'libro de caja (se calcula con sus movimientos)' : '', 'cie-c' + i, numES(c.saldo), !!c.libroCaja); });
+  if (fondos.length) { h += tit('📊 Fondos · valor'); fondos.forEach(function(f, i) { h += fila(f.nombre || 'Fondo', f.gestora || '', 'cie-f' + i, numES(f.valor)); }); }
+  if (tickers.length || simples.length) {
+    h += tit('📈 Acciones');
+    tickers.forEach(function(t, i) { h += fila((FIN_NOMBRES[t] || t), (Math.round(pos[t] * 10000) / 10000).toLocaleString('es-ES') + ' acc · cotización', 'cie-t' + i, numES(_finCotizaciones[t])); });
+    simples.forEach(function(x, i) { h += fila(x.nombre || 'Acción', 'modo simple · valor actual', 'cie-s' + i, numES(x.valorActual)); });
+  }
+  h += tit('Sin cambios aquí');
+  if (urb) h += fila('🏗️ Urbanitae', 'capital vivo (cambia en cada proyecto)', '', urb, true);
+  h += fila('🏠 Inmobiliario', 'valor actual de los inmuebles (se cambia en su ficha)', '', ins.inmobiliario, true);
+  var prev = document.getElementById('cierre-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'cierre-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10050;display:flex;align-items:flex-end;justify-content:center;';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:16px 18px 28px;width:100%;max-width:480px;box-sizing:border-box;max-height:94dvh;overflow-y:auto;">'
+    + '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 12px;"></div>'
+    + '<div style="display:flex;align-items:center;justify-content:center;gap:8px;"><div style="font-family:\'Rajdhani\',sans-serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">📸 CIERRE DEL MES · ' + (emp === 'patrimer' ? 'PATRIMER' : 'PATRICIO') + '</div>'
+    + '<span onclick="_nubeMsg(\'📸\', \'Cierre del mes\', \'Una vez al mes, con los datos del día 1: corrige lo que haya cambiado mirando el banco y el bróker (viene rellenado con lo último que tiene la app) y pulsa Guardar.\\n\\nSe actualizan los saldos, fondos y cotizaciones de Finanzas y se guarda la foto del patrimonio con esa fecha, para comparar mes a mes.\\n\\nSi un mes se te pasa, hazla otro día: elige igualmente la fecha del día 1.\')" style="font-size:12px;color:#5b8dee;cursor:pointer;border:1px solid rgba(91,141,238,.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">i</span></div>'
+    + '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 2px;"><span style="font-size:12px;color:var(--text-secondary);">Fecha de la foto</span><input id="cie-fecha" type="date" value="' + dia1 + '" onchange="cierre_recalc()" style="background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;padding:5px 8px;-webkit-appearance:none;appearance:none;"></div>'
+    + h
+    + '<div id="cie-total" style="margin-top:14px;padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);text-align:center;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:12px;"><button onclick="cierre_cerrar()" style="flex:1;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:12px;cursor:pointer;">Cancelar</button>'
+    + '<button onclick="cierre_guardar()" style="flex:2;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;padding:12px;cursor:pointer;">📸 Guardar la foto</button></div></div>';
+  document.body.appendChild(capa);
+  cierre_recalc();
+}
+function cierre_cerrar() { var c = document.getElementById('cierre-capa'); if (c) c.remove(); _cierre = null; }
+function _cierreVal(id, def) { var el = document.getElementById(id); return el ? numES(el.value) : def; }
+function cierre_leer() {
+  var C = _cierre; if (!C) return null;
+  var liq = 0, inv = 0;
+  C.cuentas.forEach(function(c, i) { liq += c.libroCaja ? numES(c.saldo) : _cierreVal('cie-c' + i, numES(c.saldo)); });
+  C.fondos.forEach(function(f, i) { inv += _cierreVal('cie-f' + i, numES(f.valor)); });
+  C.tickers.forEach(function(t, i) { inv += _cierreVal('cie-t' + i, numES(_finCotizaciones[t])) * C.pos[t]; });
+  C.simples.forEach(function(x, i) { inv += _cierreVal('cie-s' + i, numES(x.valorActual)); });
+  inv += C.urb;
+  return { liquidez: liq, invertido: inv, inmobiliario: C.inm, total: liq + inv + C.inm };
+}
+function cierre_recalc() {
+  var R = cierre_leer(); var el = document.getElementById('cie-total'); if (!R || !el) return;
+  var f = (document.getElementById('cie-fecha') || {}).value || '';
+  var lista = fin_patHist_load().filter(function(x) { return x && !x.deleted && x.id < f.slice(0, 7); }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
+  var ant = lista[lista.length - 1];
+  var dif = ant ? R.total - numES(ant.total) : null;
+  el.innerHTML = '<div style="font-size:11px;color:var(--text-secondary);">Liquidez ' + fin_fmt(R.liquidez) + ' · Invertido ' + fin_fmt(R.invertido) + ' · Inmobiliario ' + fin_fmt(R.inmobiliario) + '</div>'
+    + '<div style="font-size:22px;font-weight:700;font-family:\'Rajdhani\',sans-serif;color:var(--accent-gold);margin-top:4px;white-space:nowrap;">' + fin_fmt(R.total) + '</div>'
+    + (dif !== null ? '<div style="font-size:12px;font-weight:700;color:' + (dif >= 0 ? '#4caf82' : '#e57373') + ';">' + (dif >= 0 ? '+' : '') + fin_fmt(dif) + (numES(ant.total) ? ' (' + (dif >= 0 ? '+' : '') + (dif / numES(ant.total) * 100).toFixed(2).replace('.', ',') + ' %)' : '') + ' frente a ' + fin_patHist_fechaCorta(ant) + '</div>' : '');
+}
+function cierre_guardar() {
+  if (bloqueaSiViewer('Guardar el cierre del mes')) return;
+  var C = _cierre; if (!C) return;
+  var fecha = (document.getElementById('cie-fecha') || {}).value || '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { avisar('⚠️ Elige la fecha de la foto.'); return; }
+  var id = fecha.slice(0, 7), ahora = new Date().toISOString();
+  var hacer = function() {
+    // 1) actualizar Finanzas con lo escrito
+    var cs = fin_load('fin:cuentas'), cam = false;
+    C.cuentas.forEach(function(c, i) { if (c.libroCaja) return; var v = _cierreVal('cie-c' + i, null); var o = cs.find(function(x) { return x && x.id === c.id; }) || cs.find(function(x) { return x && x.nombre === c.nombre && !x.deleted; }); if (o && v !== null) { o.saldo = v; o.updatedAt = o.saldoFecha = ahora; cam = true; } });
+    if (cam) fin_save('fin:cuentas', cs);
+    var fs = fin_load('fin:fondos'); cam = false;
+    C.fondos.forEach(function(f, i) { var v = _cierreVal('cie-f' + i, null); var o = fs.find(function(x) { return x && x.id === f.id; }) || fs.find(function(x) { return x && x.nombre === f.nombre && !x.deleted; }); if (o && v !== null) { o.valor = v; o.updatedAt = o.valorFecha = ahora; cam = true; } });
+    if (cam) fin_save('fin:fondos', fs);
+    C.tickers.forEach(function(t, i) { var v = _cierreVal('cie-t' + i, null); if (v !== null && v > 0 && Math.abs(numES(_finCotizaciones[t]) - v) > 0.00001) fin_guardarCotizacion(t, v); });
+    var ss = fin_accSimpleLoad(); cam = false;
+    C.simples.forEach(function(x, i) { var v = _cierreVal('cie-s' + i, null); var o = ss.find(function(y) { return y && y.id === x.id; }); if (o && v !== null && Math.abs(numES(o.valorActual) - v) > 0.004) { o.valorActual = v; o.updatedAt = ahora; cam = true; } });
+    if (cam) fin_accSimpleSave(ss);
+    // 2) foto con el desglose por banco ya actualizado
+    var d = fin_patHist_desglose();
+    var liq = d.bancos.reduce(function(s2, b) { return s2 + b.liquidez; }, 0);
+    var inv = d.bancos.reduce(function(s2, b) { return s2 + b.invertido; }, 0) + d.urbanitae;
+    var lista = fin_patHist_load().filter(function(x) { return x && x.id !== id; });
+    var ant = fin_patHist_load().find(function(x) { return x && x.id === id; });
+    lista.push({ id: id, fecha: fecha, liquidez: liq, invertido: inv, inmobiliario: d.inmobiliario, total: liq + inv + d.inmobiliario,
+      bancos: d.bancos.map(function(b) { return { nombre: b.nombre, liquidez: b.liquidez, invertido: b.invertido }; }), urbanitae: d.urbanitae,
+      nota: ant ? (ant.nota || '') : '', origen: 'cierre', updatedAt: ahora });
+    fin_patHist_save(lista);
+    cierre_cerrar();
+    try { fin_render(); } catch (e) {}
+    fin_patHist_render();
+    if (typeof showToast === 'function') showToast('📸 Foto del ' + fin_patHist_fechaCorta({ id: id, fecha: fecha }) + ' guardada: ' + fin_fmt(liq + inv + d.inmobiliario), 'success');
+  };
+  var existe = fin_patHist_load().some(function(x) { return x && x.id === id && !x.estimada; });
+  if (existe) showConfirm('📸', 'Ya hay foto de ese mes', '¿La sustituyo por esta?', [{ label: 'Sustituir', cls: 'g', fn: hacer }]);
+  else hacer();
+}
+
+// 22/10/2026 (B2): huecos de Patricio entre junio y la foto del 01/10/2026
+// (julio era una copia de junio; agosto y septiembre faltaban). Se rellenan
+// con un reparto lineal de cada parte, marcados como "estimada". Solo lee los
+// datos guardados: no lleva ningún importe escrito aquí.
+function fin_patHist_rellenarHuecos() {
+  try {
+    if (localStorage.getItem('app:fix_pathist_huecos_v1')) return;
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    if (!window._appEstable) return;
+    var lista = fin_patHist_load('patricio');
+    var por = {}; lista.forEach(function(x) { if (x && x.id) por[x.id] = x; });
+    var a = por['2026-06'], b = por['2026-10'];
+    if (!a || !b) return; // aún no ha llegado de la nube: se reintenta otro día
+    var julCopia = por['2026-07'] && Math.abs(numES(por['2026-07'].total) - numES(a.total)) < 0.01;
+    var ids = ['2026-07', '2026-08', '2026-09'].filter(function(id) { return !por[id] || (id === '2026-07' && julCopia); });
+    var campos = ['liquidez', 'invertido', 'inmobiliario', 'urbanitae'];
+    var ahora = new Date().toISOString();
+    ids.forEach(function(id) {
+      var k = parseInt(id.slice(5), 10) - 6; // 1, 2, 3 de 4 pasos
+      var row = { id: id, fecha: id + '-01', estimada: true, nota: 'Estimada: reparto lineal entre junio y octubre', origen: 'estimada', updatedAt: ahora };
+      campos.forEach(function(c) { row[c] = Math.round((numES(a[c]) + (numES(b[c]) - numES(a[c])) * k / 4) * 100) / 100; });
+      row.total = Math.round((row.liquidez + row.invertido + row.inmobiliario) * 100) / 100;
+      lista = lista.filter(function(x) { return !(x && x.id === id); });
+      lista.push(row);
+    });
+    if (ids.length) fin_patHist_save(lista, 'patricio');
+    localStorage.setItem('app:fix_pathist_huecos_v1', '1');
+  } catch (e) { console.warn('[Huecos patrimonio]', e.message); }
+}
+
+// ═══ 22/10/2026 (D2): GRÁFICOS DEL HISTÓRICO DE PATRIMONIO ═══
+// Tres gráficos (un solo eje cada uno): 1) evolución del total (línea; los
+// meses estimados en discontinua), 2) composición (barras apiladas liquidez /
+// invertido / inmobiliario), 3) por banco o bróker (las fotos que lo traen).
+// Tocar cualquier mes muestra su detalle debajo. Paleta validada (modo oscuro).
+var PH_COL = { liquidez: '#3987e5', invertido: '#d95926', inmobiliario: '#199e70' };
+var PH_BANCO_COL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+var _phSel = null, _phSoloFin = false, _phN = 0;
+function _phK(v) { var a = Math.abs(v); return (a >= 1e6 ? (Math.round(v / 1e5) / 10).toString().replace('.', ',') + ' M' : a >= 1e3 ? Math.round(v / 1e3) + ' k' : Math.round(v) + ''); }
+function fin_patHist_grafico(ordenada) {
+  var el = document.getElementById('fin-pathist-graf'); if (!el) return;
+  var L = (ordenada || []).filter(function(x) { return x && !x.deleted; });
+  if (L.length < 2) { el.innerHTML = ''; return; }
+  if (_phSel === null || _phSel >= L.length || L.length !== _phN) _phSel = L.length - 1; // al cambiar el nº de fotos, vuelve a la última
+  _phN = L.length;
+  var n = L.length, W = 340, H = 150, pl = 40, pr = 8, pt = 10, pb = 22, iw = W - pl - pr, ih = H - pt - pb;
+  var ins = 14; // margen para que las barras de los extremos no se salgan ni pisen las cifras del eje
+  var xs = function(i) { return pl + ins + (n === 1 ? (iw - 2 * ins) / 2 : (iw - 2 * ins) * i / (n - 1)); };
+  var lab = function(r) { var f = (r.fecha && r.fecha.slice(0, 7) === r.id) ? r.id + '-01' : (r.fecha || r.id + '-01'); var p = f.split('-'); return PH_MES3[parseInt(p[1], 10) - 1] + (p[1] === '01' || L.indexOf(r) === 0 ? ' ' + p[0].slice(2) : ''); };
+  var paso = Math.max(1, Math.ceil(n / 7));
+  var ejeX = function(hh) { return L.map(function(r, i) { return (i % paso === 0 || i === n - 1) ? '<text x="' + xs(i) + '" y="' + (hh - 6) + '" text-anchor="middle" font-size="9" fill="#96a8c8">' + lab(r) + '</text>' : ''; }).join(''); };
+  var grid = function(min, max, hh, ih2) { var g = ''; for (var k = 0; k <= 3; k++) { var v = min + (max - min) * k / 3, y = pt + ih2 - ih2 * k / 3; g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y + '" y2="' + y + '" stroke="rgba(255,255,255,0.07)"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#96a8c8">' + _phK(v) + '</text>'; } return g; };
+  var totales = L.map(function(r) { return _phSoloFin ? numES(r.liquidez) + numES(r.invertido) : numES(r.total); });
+  // resumen
+  var ult = totales[n - 1], ant = totales[n - 2], ini = totales[0];
+  var idx12 = -1; var ref12 = (function() { var r = L[n - 1]; var y = parseInt(r.id.slice(0, 4), 10) - 1; return y + r.id.slice(4); })();
+  L.forEach(function(r, i) { if (r.id <= ref12) idx12 = i; });
+  var chip = function(t, a, b) { if (b === undefined || b === null || !b) return ''; var d = a - b; return '<div style="flex:1;min-width:0;background:rgba(255,255,255,0.04);border-radius:10px;padding:6px 4px;text-align:center;"><div style="font-size:9.5px;color:var(--text-secondary);letter-spacing:.5px;">' + t + '</div><div style="font-size:13px;font-weight:700;white-space:nowrap;color:' + (d >= 0 ? '#4caf82' : '#e57373') + ';">' + (d >= 0 ? '+' : '') + _phK(d) + ' €</div><div style="font-size:10px;color:var(--text-secondary);">' + (d >= 0 ? '+' : '') + (d / b * 100).toFixed(1).replace('.', ',') + ' %</div></div>'; };
+  var h = '<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;">'
+    + ['Todo', 'Solo financiero'].map(function(t, i) { var act = (i === 1) === _phSoloFin; return '<span onclick="_phSoloFin=' + (i === 1) + ';fin_patHist_render()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid ' + (act ? '#5b8dee' : 'var(--border)') + ';color:' + (act ? '#5b8dee' : 'var(--text-secondary)') + ';">' + t + '</span>'; }).join('') + '</div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:10px;">' + chip('ÚLTIMO MES', ult, ant) + (idx12 >= 0 && idx12 < n - 1 ? chip('12 MESES', ult, totales[idx12]) : '') + chip('DESDE EL INICIO', ult, ini) + '</div>';
+  // 1) total
+  var mn = Math.min.apply(null, totales), mx = Math.max.apply(null, totales); var pad = (mx - mn) * 0.15 || mx * 0.02 || 1; mn -= pad; mx += pad;
+  var ys = function(v) { return pt + ih - ih * (v - mn) / (mx - mn); };
+  var seg = '';
+  for (var i = 1; i < n; i++) seg += '<line x1="' + xs(i - 1) + '" y1="' + ys(totales[i - 1]) + '" x2="' + xs(i) + '" y2="' + ys(totales[i]) + '" stroke="#c8d4e8" stroke-width="2" stroke-linecap="round"' + ((L[i].estimada || L[i - 1].estimada) ? ' stroke-dasharray="4 4"' : '') + '/>';
+  var pts = L.map(function(r, i) { return '<circle cx="' + xs(i) + '" cy="' + ys(totales[i]) + '" r="' + (i === _phSel ? 5 : 3.5) + '" fill="' + (r.estimada ? '#1a2440' : '#c8d4e8') + '" stroke="#c8d4e8" stroke-width="2"/>'; }).join('');
+  var hit = function(hh) { return L.map(function(r, i) { var w = (iw - 2 * ins) / Math.max(1, n - 1); return '<rect x="' + (xs(i) - w / 2) + '" y="0" width="' + w + '" height="' + hh + '" fill="transparent" style="cursor:pointer" onclick="_phSel=' + i + ';fin_patHist_render()"/>'; }).join(''); };
+  var selLine = function(hh) { return '<line x1="' + xs(_phSel) + '" x2="' + xs(_phSel) + '" y1="' + pt + '" y2="' + (hh - pb) + '" stroke="rgba(200,212,232,0.35)" stroke-dasharray="2 3"/>'; };
+  var caja = function(t, svg) { return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:8px 6px 4px;margin-bottom:10px;"><div style="font-size:10.5px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;text-align:center;margin-bottom:2px;">' + t + '</div>' + svg + '</div>'; };
+  h += caja((_phSoloFin ? 'Patrimonio financiero' : 'Patrimonio total') + ' · evolución', '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;">' + grid(mn, mx, H, ih) + selLine(H) + seg + pts + ejeX(H) + hit(H) + '</svg>'
+    + '<div style="font-size:9.5px;color:var(--text-secondary);text-align:center;">— real · - - - estimado</div>');
+  // 2) composición (barras apiladas desde 0)
+  var partes = _phSoloFin ? ['liquidez', 'invertido'] : ['liquidez', 'invertido', 'inmobiliario'];
+  var H2 = 160, ih2 = H2 - pt - pb, mx2 = Math.max.apply(null, L.map(function(r) { return partes.reduce(function(s2, c) { return s2 + Math.max(0, numES(r[c])); }, 0); })) * 1.05 || 1;
+  var bw = Math.max(6, Math.min(24, iw / n * 0.62));
+  var barras = L.map(function(r, i) {
+    var y0 = pt + ih2, out = '';
+    partes.forEach(function(c, k) {
+      var v = Math.max(0, numES(r[c])); if (!v) return;
+      var hgt = ih2 * v / mx2; var y = y0 - hgt;
+      out += '<rect x="' + (xs(i) - bw / 2) + '" y="' + y + '" width="' + bw + '" height="' + Math.max(0, hgt - (k < partes.length - 1 ? 2 : 0)) + '" rx="' + (k === partes.length - 1 ? 3 : 0) + '" fill="' + PH_COL[c] + '"' + (r.estimada ? ' fill-opacity="0.45"' : '') + (i === _phSel ? ' stroke="#c8d4e8" stroke-width="1"' : '') + '/>';
+      y0 = y;
+    });
+    return out;
+  }).join('');
+  var leyenda = '<div style="display:flex;justify-content:center;gap:12px;font-size:10.5px;color:var(--silver-mid);margin:2px 0 2px;">' + partes.map(function(c) { return '<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + PH_COL[c] + ';margin-right:4px;vertical-align:-1px;"></span>' + c.charAt(0).toUpperCase() + c.slice(1) + '</span>'; }).join('') + '</div>';
+  h += caja('Composición', '<svg viewBox="0 0 ' + W + ' ' + H2 + '" style="width:100%;display:block;">' + grid(0, mx2, H2, ih2) + barras + ejeX(H2) + hit(H2) + '</svg>' + leyenda);
+  // 3) por banco / bróker
+  var LB = L.filter(function(r) { return r.bancos && r.bancos.length; });
+  if (LB.length) {
+    var nombres = []; LB.forEach(function(r) { r.bancos.forEach(function(b) { if (numES(b.liquidez) + numES(b.invertido) > 0 && nombres.indexOf(b.nombre) < 0) nombres.push(b.nombre); }); if (numES(r.urbanitae) > 0 && nombres.indexOf('Urbanitae') < 0) nombres.push('Urbanitae'); });
+    nombres = nombres.slice(0, 8);
+    var valB = function(r, nm) { if (nm === 'Urbanitae') return numES(r.urbanitae); var b = (r.bancos || []).find(function(x) { return x.nombre === nm; }); return b ? numES(b.liquidez) + numES(b.invertido) : 0; };
+    var nb = LB.length, xsb = function(i) { return pl + ins + (nb === 1 ? (iw - 2 * ins) / 2 : (iw - 2 * ins) * i / (nb - 1)); };
+    var H3 = 150, ih3 = H3 - pt - pb, mx3 = Math.max.apply(null, LB.map(function(r) { return nombres.reduce(function(s2, nm) { return s2 + valB(r, nm); }, 0); })) * 1.05 || 1;
+    var bw3 = Math.max(8, Math.min(24, iw / nb * 0.55));
+    var b3 = LB.map(function(r, i) { var y0 = pt + ih3, out = ''; nombres.forEach(function(nm, k) { var v = valB(r, nm); if (!v) return; var hgt = ih3 * v / mx3, y = y0 - hgt; out += '<rect x="' + (xsb(i) - bw3 / 2) + '" y="' + y + '" width="' + bw3 + '" height="' + Math.max(0, hgt - 2) + '" fill="' + PH_BANCO_COL[k] + '"><title>' + nm + ': ' + fin_fmt(v) + '</title></rect>'; y0 = y; }); return out; }).join('');
+    var ejeB = LB.map(function(r, i) { return '<text x="' + xsb(i) + '" y="' + (H3 - 6) + '" text-anchor="middle" font-size="9" fill="#96a8c8">' + fin_patHist_fechaCorta(r).replace(/^1 /, '').replace(/ 20/, ' ') + '</text>'; }).join('');
+    var leyB = '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;font-size:10.5px;color:var(--silver-mid);margin-top:2px;">' + nombres.map(function(nm, k) { return '<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + PH_BANCO_COL[k] + ';margin-right:4px;vertical-align:-1px;"></span>' + notas_esc(nm) + '</span>'; }).join('') + '</div>';
+    h += caja('Financiero por banco o bróker', '<svg viewBox="0 0 ' + W + ' ' + H3 + '" style="width:100%;display:block;">' + grid(0, mx3, H3, ih3) + b3 + ejeB + '</svg>' + leyB);
+  }
+  // detalle del mes tocado
+  var S = L[_phSel], tS = totales[_phSel], dS = _phSel > 0 ? tS - totales[_phSel - 1] : null;
+  h += '<div style="background:rgba(91,141,238,0.08);border:1px solid rgba(91,141,238,0.35);border-radius:12px;padding:10px 12px;margin-bottom:12px;text-align:center;">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--silver-bright);">' + fin_patHist_fechaCorta(S) + (S.estimada ? ' · <span style="color:var(--accent-amber);">estimada</span>' : '') + '</div>'
+    + '<div style="font-size:20px;font-weight:700;font-family:\'Rajdhani\',sans-serif;color:var(--accent-gold);white-space:nowrap;">' + fin_fmt(tS) + '</div>'
+    + (dS !== null ? '<div style="font-size:11.5px;font-weight:700;color:' + (dS >= 0 ? '#4caf82' : '#e57373') + ';">' + (dS >= 0 ? '+' : '') + fin_fmt(dS) + ' frente a la foto anterior</div>' : '')
+    + '<div style="font-size:11px;color:var(--silver-mid);margin-top:4px;line-height:1.5;">' + partes.map(function(c) { return '<span style="color:' + PH_COL[c] + ';">■</span> ' + c.charAt(0).toUpperCase() + c.slice(1) + ' ' + fin_fmt(numES(S[c])); }).join(' · ') + '</div>'
+    + (S.bancos && S.bancos.length ? '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">🏦 ' + S.bancos.filter(function(b) { return numES(b.liquidez) + numES(b.invertido) > 0; }).map(function(b) { return notas_esc(b.nombre) + ' ' + fin_fmt(numES(b.liquidez) + numES(b.invertido)); }).join(' · ') + '</div>' : '')
+    + '<div style="font-size:9.5px;color:var(--text-secondary);margin-top:4px;">Toca un mes en los gráficos para ver su detalle</div></div>';
+  el.innerHTML = h;
+}
+
 // PUNTO 222 (01/10/2026): los 9 meses del Excel PERSONAL de Patry
 // (nov-25 → jul-26) se cargaron por error el 05/09/2026 en el histórico de
 // PATRIMER (y luego, vía "Patrimonio financiero", también en Patricio con el
 // inmobiliario de hoy). Decisión de Patry: borrarlos de Patrimer, y en
 // Patricio usar el inmobiliario REAL de cada mes (el de su Excel, con
 // Sierra Nevada todavía en cartera) en vez del valor actual.
-var PATHIST_EXCEL_PATRICIO = {
-  '2025-11': { liq: 31675.02, inv: 19128.53, inm: 540000.00 },
-  '2025-12': { liq: 43377.04, inv: 17122.98, inm: 530000.40 },
-  '2026-01': { liq: 47045.79, inv: 18754.77, inm: 530000.00 },
-  '2026-02': { liq: 47660.52, inv: 19157.62, inm: 535000.00 },
-  '2026-03': { liq: 48061.40, inv: 20414.23, inm: 535000.00 },
-  '2026-04': { liq: 47075.89, inv: 21070.93, inm: 535000.00 },
-  '2026-05': { liq: 49524.83, inv: 20720.57, inm: 535000.00 },
-  '2026-06': { liq: 51568.69, inv: 22005.47, inm: 535000.00 },
-  '2026-07': { liq: 51568.69, inv: 22005.47, inm: 535000.00 }
-};
+// 22/10/2026 (seguridad): aquí estaban escritos los importes del Excel
+// personal de Patry (patrimonio nov-25 → jul-26). Esa corrección ya se aplicó
+// en sus datos (01/10/2026) y su regla es no tener NUNCA datos financieros en
+// este archivo público, así que se quitan. Las dos funciones que la usaban
+// (corregirExcel / migrarFinper) quedan sin efecto, que es lo correcto.
+var PATHIST_EXCEL_PATRICIO = {};
 function _patHistEsFilaExcel(r) {
   var x = r && PATHIST_EXCEL_PATRICIO[r.id];
   return !!x && Math.abs((parseFloat(r.liquidez) || 0) - x.liq) < 0.01 && Math.abs((parseFloat(r.invertido) || 0) - x.inv) < 0.01;
@@ -23906,9 +24381,9 @@ function rescis_calcNeto() {
 function generarContratoRescision(doc, datos, arr, margin, pageW, maxW, addText, addBlock, addTitle, addLine, chk, ciudad, fechaFirma, addParty) {
   const iStr = datos.inicio ? formatFechaLarga(datos.inicio) : '—';
   const fianza = parseRentaMixta(datos.fianza);
-  const luz = parseFloat(String(datos.rescisLuz||0).replace(',','.')) || 0;
-  const agua = parseFloat(String(datos.rescisAgua||0).replace(',','.')) || 0;
-  const deuda = parseFloat(String(datos.rescisDeuda||0).replace(',','.')) || 0;
+  const luz = numES(datos.rescisLuz||0);
+  const agua = numES(datos.rescisAgua||0);
+  const deuda = numES(datos.rescisDeuda||0);
   const neto = fianza - luz - agua - deuda;
 
   addTitle('REUNIDOS');
@@ -23942,7 +24417,10 @@ function generarContratoRescision(doc, datos, arr, margin, pageW, maxW, addText,
     if (luz > 0) liquidacionTxt += '\n• Retención por suministro de luz: ' + formatEur(luz);
     if (agua > 0) liquidacionTxt += '\n• Retención por suministro de agua: ' + formatEur(agua);
     if (deuda > 0) liquidacionTxt += '\n• Deuda pendiente de renta: ' + formatEur(deuda);
-    liquidacionTxt += '\n\nNeto a devolver al/a la ARRENDATARIO/A en este acto: ' + formatEurLetras(neto) + ' (' + formatEur(neto) + ').';
+    // 22/10/2026: si lo descontado supera la fianza, el inquilino debe la diferencia
+    liquidacionTxt += neto >= 0
+      ? '\n\nNeto a devolver al/a la ARRENDATARIO/A en este acto: ' + formatEurLetras(neto) + ' (' + formatEur(neto) + ').'
+      : '\n\nAl superar los conceptos descontados el importe de la fianza, el/la ARRENDATARIO/A abona al ARRENDADOR en este acto la diferencia de ' + formatEurLetras(-neto) + ' (' + formatEur(-neto) + ').';
   } else {
     liquidacionTxt += ' Ambas partes acuerdan la devolución íntegra de la fianza por importe de ' + formatEurLetras(fianza) + ' (' + formatEur(fianza) + ').';
   }
@@ -24726,6 +25204,18 @@ function pend_calcular() {
       if (_vc.n) items.push({ icon: '🏛️', t: 'Falta' + (_vc.n === 1 ? '' : 'n') + ' ' + _vc.n + ' valor' + (_vc.n === 1 ? '' : 'es') + ' catastral' + (_vc.n === 1 ? '' : 'es') + ' para la Renta', s: _vc.txt + ' · vienen en el recibo del IBI', accion: 'vc', idx: _vc.idx, anio: _vc.anio, empresa: 'patricio' });
     }
   } catch (e) {}
+  // 22/10/2026 (C1): certificados energéticos YA caducados (un solo aviso)
+  try {
+    if (getRol() === 'admin' && typeof cee_mas10 === 'function') {
+      var _ceeCad = [], _ceePrimero = null;
+      loadInmuebles().forEach(function(inm, ix) {
+        if (!inm || inm.estado === 'vendido' || !inm.cee) return;
+        var cd = inm.cee.caduca || cee_mas10(inm.cee.emision);
+        if (cd && sib_dias(cd) < 0) { _ceeCad.push(inm.ref || inm.direccion); if (_ceePrimero === null) _ceePrimero = ix; }
+      });
+      if (_ceeCad.length) items.push({ icon: '⚡', t: (_ceeCad.length === 1 ? 'Certificado energético caducado' : _ceeCad.length + ' certificados energéticos caducados'), s: _ceeCad.join(', '), accion: 'cee', idx: _ceePrimero });
+    }
+  } catch (e) {}
   // PUNTO 90b (03/09/2026): aviso del registro de actividad — solo para el
   // admin, y solo si hay entradas más recientes que la última vez que lo
   // revisó (para que no salte siempre, tal y como pediste). Las "posible_fuga"
@@ -24785,7 +25275,7 @@ function pend_calcular() {
         try { listaChk = JSON.parse(localStorage.getItem('fin:patrimonio_historico:' + e.k) || '[]'); } catch (err) {}
         var yaEsteMes = listaChk.some(function(r) { return r.id === mesIdPat; });
         if (!yaEsteMes) {
-          items.push({ icon: '📅', t: 'Snapshot de patrimonio sin guardar este mes', s: 'Finanzas → Histórico de patrimonio → "＋" (actualiza antes saldos y valores)', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
+          items.push({ icon: '📸', t: 'Falta la foto del 1 de ' + fin_patHist_nombreMes(mesIdPat).split(' ')[0].toLowerCase(), s: 'Cierre del mes: saldos, fondos y cotizaciones en una sola pantalla', accion: 'patrimonio_snapshot', empresa: e.k, urgente: true });
         }
       });
     }
@@ -24890,7 +25380,11 @@ function sib_render(idx) {
     if (sg.whatsapp) html += fila('WhatsApp del seguro', sib_esc(sg.whatsapp));
     if (sg.mediador) html += fila('Mediador', sib_esc(sg.mediador));
     if (ren) html += fila('Renovación', sib_fechaLarga(ren) + ' <span style="color:var(--silver-dim);font-weight:600;">(en ' + sib_dias(ren) + ' días)</span>');
-    html += fila('Prima ' + anioAct, regAct && sib_num(regAct.seguro) > 0 ? sib_eur(regAct.seguro) : '—');
+    if (regAct && sib_num(regAct.seguro) > 0) html += fila('Prima ' + anioAct, sib_eur(regAct.seguro));
+    else { // 22/10/2026 (B1): sin prima del año → la del último año, provisional
+      var _rPrev = inm_seguroIbiLoad().filter(function(x) { return x && !x.deleted && inm_recEs(x, sib_idx) && parseInt(x.anio, 10) < anioAct && sib_num(x.seguro) > 0; }).sort(function(a, b) { return b.anio - a.anio; })[0];
+      html += fila('Prima ' + anioAct, _rPrev ? '<span style="color:var(--accent-amber);">' + sib_eur(_rPrev.seguro) + ' <span style="font-size:10.5px;font-weight:600;">(de ' + _rPrev.anio + ' · provisional)</span></span>' : '—');
+    }
     html += '<div style="display:flex;gap:8px;margin-top:10px;">' + btn('✎ Editar', 'sib_editarSeguro()') + btn('📲 WhatsApp', 'sib_whatsapp()', '#25d366') + btn('📋 Copiar', 'sib_copiar()') + '</div>';
   } else {
     html += '<div style="font-size:12px;color:var(--silver-dim);margin-bottom:10px;">Sin datos del seguro todavía.</div>'
@@ -24905,8 +25399,12 @@ function sib_render(idx) {
     + '<button onclick="sib_cambiarAnio(-1)" style="background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:16px;width:34px;height:32px;cursor:pointer;">‹</button>'
     + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;color:var(--silver-bright);letter-spacing:1px;">' + sib_anio + '</div>'
     + '<button onclick="sib_cambiarAnio(1)" style="background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:16px;width:34px;height:32px;cursor:pointer;">›</button></div>';
-  html += fila('Recibo del IBI', r && sib_num(r.ibi) > 0 ? sib_eur(r.ibi) : '—');
-  html += fila('Fecha de cargo', r && r.ibiFecha ? sib_fechaLarga(r.ibiFecha) : '—');
+  // 22/10/2026 (B1): sin recibo de ese año → el último anterior, en ámbar
+  // como provisional (solo IBI y fecha; el valor catastral no se arrastra).
+  var _rIbiPrev = (r && sib_num(r.ibi) > 0) ? null : inm_seguroIbiLoad().filter(function(x) { return x && !x.deleted && inm_recEs(x, sib_idx) && parseInt(x.anio, 10) < sib_anio && sib_num(x.ibi) > 0; }).sort(function(a, b) { return b.anio - a.anio; })[0];
+  var _provTxt = function(v, a) { return '<span style="color:var(--accent-amber);">' + v + ' <span style="font-size:10.5px;font-weight:600;">(de ' + a + ' · provisional)</span></span>'; };
+  html += fila('Recibo del IBI', r && sib_num(r.ibi) > 0 ? sib_eur(r.ibi) : (_rIbiPrev && sib_anio >= new Date().getFullYear() ? _provTxt(sib_eur(_rIbiPrev.ibi), _rIbiPrev.anio) : '—'));
+  html += fila('Fecha de cargo', r && r.ibiFecha ? sib_fechaLarga(r.ibiFecha) : (_rIbiPrev && _rIbiPrev.ibiFecha && sib_anio >= new Date().getFullYear() ? _provTxt(sib_fechaLarga(sib_anio + String(_rIbiPrev.ibiFecha).slice(4, 10)), _rIbiPrev.anio) : '—'));
   html += fila('Valor catastral total', r && sib_num(r.vcTotal) > 0 ? sib_eur(r.vcTotal) : '—');
   var pct = r && sib_num(r.vcTotal) > 0 && sib_num(r.vcConstruccion) > 0 ? ' <span style="color:var(--silver-dim);font-weight:600;">(' + (sib_num(r.vcConstruccion) / sib_num(r.vcTotal) * 100).toFixed(1).replace('.', ',') + ' %)</span>' : '';
   html += fila('V. catastral construcción', r && sib_num(r.vcConstruccion) > 0 ? sib_eur(r.vcConstruccion) + pct : '—');
@@ -25038,6 +25536,16 @@ function sib_faltanVC() {
   var txt = Object.keys(falta).sort().map(function(a) { return a + ': ' + falta[a].slice().sort().join(', '); }).join(' · ');
   return { n: n, txt: txt, idx: primero, anio: anioPrimero };
 }
+// 22/10/2026 (C1): abre la ficha del inmueble en la pestaña Documentos
+function cee_irInmueble(idx) {
+  showModule('inmuebles');
+  setTimeout(function() {
+    if (typeof inm_showDetail === 'function') inm_showDetail(idx);
+    var tab = document.querySelector('.detail-tab[onclick*="tab-docs"]');
+    if (tab) setDetailTab(tab, 'tab-docs');
+    if (typeof inmdoc_render === 'function') inmdoc_render(idx);
+  }, 250);
+}
 function sib_irInmueble(idx, anio) {
   showModule('inmuebles');
   setTimeout(function() {
@@ -25085,6 +25593,11 @@ function agenda_calcular() {
     var emp = normEmpresa(String(inm.propietario || 'patrimer').toLowerCase()), nom = inm.ref || inm.direccion || 'inmueble';
     var sg = inm.seguro || {}, pr = sib_proximaAnual(sg.renovacion);
     if (dentro(pr)) ev.push({ f: pr, icon: '🛡️', t: 'Renueva el seguro de ' + nom, s: [sg.compania, sg.poliza ? 'póliza ' + sg.poliza : ''].filter(Boolean).join(' · ') || 'seguro del inmueble', emp: emp, tipo: 'inm', idx: idx });
+    // 22/10/2026 (C1): caducidad del certificado energético
+    if (inm.cee && (inm.cee.caduca || inm.cee.emision)) {
+      var _cad = inm.cee.caduca || cee_mas10(inm.cee.emision);
+      if (dentro(_cad)) ev.push({ f: _cad, icon: '⚡', t: 'Caduca el certificado energético de ' + nom, s: 'renovarlo antes de alquilar o vender', emp: emp, tipo: 'cee', idx: idx });
+    }
     var ult = regs.filter(function(r) { return r && !r.deleted && inm_recEs(r, idx) && r.ibiFecha; }).sort(function(a, b) { return b.anio - a.anio; })[0];
     if (ult) {
       var pi = sib_proximaAnual(ult.ibiFecha);
@@ -25092,6 +25605,27 @@ function agenda_calcular() {
       if (dentro(pi) && !yaEste) ev.push({ f: pi, icon: '🏛️', t: 'Recibo del IBI de ' + nom, s: sib_num(ult.ibi) > 0 ? '~' + sib_eur(ult.ibi) + ' (como en ' + ult.anio + ')' : 'IBI anual', emp: emp, tipo: 'inm', idx: idx });
     }
   });
+  // 22/10/2026 (C2): pagos (o devolución) de la Renta de Patricio
+  try {
+    var Yh = hoy.getFullYear();
+    [Yh - 1, Yh].forEach(function(Y) {
+      var f1 = (Y + 1) + '-06-30', f2 = (Y + 1) + '-11-05';
+      if (!dentro(f1) && !dentro(f2)) return;
+      var real = renta_resReal(Y), imp = null, est = false;
+      if (real) imp = real.tipo === 'devolver' ? -numES(real.importe) : numES(real.importe);
+      else if (hoyS <= f1) { imp = renta_estimacionAnio(Y); est = true; }
+      var base = { emp: 'patricio', tipo: 'renta', anio: Y };
+      if (imp === null) {
+        if (dentro(f2)) ev.push(Object.assign({ f: f2, icon: '🧾', t: 'Renta ' + Y + ': 2.º plazo (40 %)', s: 'mete el resultado real en Renta para ver el importe' }, base));
+      } else if (imp > 0) {
+        var pl = renta_plazos(imp), suf = est ? ' (estimado)' : '';
+        if (dentro(f1)) ev.push(Object.assign({ f: f1, icon: '🧾', t: 'Renta ' + Y + ': 1.er plazo (60 %) ≈ ' + fmtGlobal(pl.p1) + ' €' + suf, s: 'cargo domiciliado' }, base));
+        if (dentro(f2)) ev.push(Object.assign({ f: f2, icon: '🧾', t: 'Renta ' + Y + ': 2.º plazo (40 %) ≈ ' + fmtGlobal(pl.p2) + ' €' + suf, s: 'cargo domiciliado' }, base));
+      } else if (imp < 0 && dentro(f1)) {
+        ev.push(Object.assign({ f: f1, icon: '🧾', t: 'Devolución Renta ' + Y + ' ≈ ' + fmtGlobal(-imp) + ' €' + (est ? ' (estimado)' : ''), s: 'pendiente de cobrar' }, base));
+      }
+    });
+  } catch (eRen) { console.warn('[Agenda Renta]', eRen.message); }
   // Dividendos previstos (Calendario de dividendos de cada empresa)
   ['patrimer', 'patricio', 'industrias'].forEach(function(emp) {
     if (typeof divcal_datos !== 'function') return;
@@ -25145,7 +25679,7 @@ function agenda_render() {
 function agenda_toggle() { _agendaAbierta = !_agendaAbierta; agenda_render(); }
 function agenda_verTodo() { _agendaTodo = !_agendaTodo; agenda_render(); }
 function agenda_info() {
-  _nubeMsg('🗓️', 'Próximos 90 días', 'Reúne, en orden de fecha, todo lo que toca en los próximos 3 meses en las tres empresas:\n\n📄 Vencimientos de contratos\n📈 Anualidades de IPC y subidas de renta pactadas\n🛡️ Renovaciones de seguros\n🏛️ Recibos del IBI\n💶 Dividendos previstos (del Calendario de dividendos)\n🏗️ Vencimientos de Urbanitae\n\nPulsa una línea para ir directamente a ella. Los seguros y el IBI solo salen si has apuntado su fecha en la ficha del inmueble (pestaña Gastos). Las fechas de dividendos y Urbanitae son estimadas.');
+  _nubeMsg('🗓️', 'Próximos 90 días', 'Reúne, en orden de fecha, todo lo que toca en los próximos 3 meses en las tres empresas:\n\n📄 Vencimientos de contratos\n📈 Anualidades de IPC y subidas de renta pactadas\n🛡️ Renovaciones de seguros\n🏛️ Recibos del IBI\n💶 Dividendos previstos (del Calendario de dividendos)\n🏗️ Vencimientos de Urbanitae\n⚡ Caducidad de certificados energéticos\n🧾 Pagos de tu Renta (60 % y 40 %)\n\nPulsa una línea para ir directamente a ella. Los seguros y el IBI solo salen si has apuntado su fecha en la ficha del inmueble (pestaña Gastos). Las fechas de dividendos y Urbanitae son estimadas.');
 }
 function agenda_ir(i) {
   var it = _agendaItems[i]; if (!it) return;
@@ -25159,6 +25693,11 @@ function agenda_ir(i) {
     setTimeout(function() { if (typeof showDetalle === 'function') showDetalle(it.id); }, 250);
   } else if (it.tipo === 'inm') {
     sib_irInmueble(it.idx, null);
+  } else if (it.tipo === 'renta') { // 22/10/2026 (C2)
+    showModule('renta');
+    setTimeout(function() { renta_anio = it.anio; renta_render(); var b = document.getElementById('renta-resultado-real'); if (b && b.scrollIntoView) b.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 250);
+  } else if (it.tipo === 'cee') {
+    cee_irInmueble(it.idx); // 22/10/2026 (C1)
   } else if (it.tipo === 'div') {
     if (typeof divcal_abrir === 'function') divcal_abrir();
   } else if (it.tipo === 'urb') {
@@ -25214,14 +25753,18 @@ function sib_htmlGastos(inm) {
   var G = inm_gastosAnuales(inm, sib_idx);
   var r = sib_registro(sib_idx, sib_anio) || {};
   var caja = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px;';
-  var fila = function(l, v, extra) { return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:var(--silver-dim);">' + l + (extra ? ' <span style="font-size:10.5px;opacity:.8;">' + extra + '</span>' : '') + '</span><span style="color:var(--silver-bright);font-weight:700;text-align:right;">' + v + '</span></div>'; };
-  var de = function(k) { return G.anio[k] ? '(' + G.anio[k] + ')' : ''; };
+  // 22/10/2026 (B1): si un gasto viene de un año anterior al actual, se
+  // marca en ámbar como "de 2026 · provisional" (se usa hasta que haya dato del año).
+  var _Yact = new Date().getFullYear();
+  var _prov = function(k) { return G.anio[k] && parseInt(G.anio[k], 10) < _Yact; };
+  var fila = function(l, v, extra, prov) { return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:var(--silver-dim);">' + l + (extra ? ' <span style="font-size:10.5px;opacity:.8;' + (prov ? 'color:var(--accent-amber);opacity:1;' : '') + '">' + extra + '</span>' : '') + '</span><span style="color:' + (prov ? 'var(--accent-amber)' : 'var(--silver-bright)') + ';font-weight:700;text-align:right;white-space:nowrap;">' + v + '</span></div>'; };
+  var de = function(k) { return G.anio[k] ? (_prov(k) ? '(de ' + G.anio[k] + ' · provisional)' : '(' + G.anio[k] + ')') : ''; };
   var h = '<div style="' + caja + '"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);">💶 GASTOS ANUALES</div>'
     + '<span onclick="sib_infoGastos()" style="font-size:12px;color:#5b8dee;cursor:pointer;border:1px solid rgba(91,141,238,.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">i</span></div>';
-  h += fila('Seguro', G.seguro ? sib_eur(G.seguro) : '—', de('seguro'));
-  h += fila('IBI', G.ibi ? sib_eur(G.ibi) : '—', de('ibi'));
-  h += fila('Comunidad', G.comunidad ? sib_eur(G.comunidad) : '—', G.comunidadDeRenta ? '(de Renta)' : (G.anio.comunidad ? '(' + fmtGlobal(G.comunidad / 12) + ' €/mes)' : ''));
-  h += fila('Otros gastos', G.otros ? sib_eur(G.otros) : '—', de('otros'));
+  h += fila('Seguro', G.seguro ? sib_eur(G.seguro) : '—', de('seguro'), _prov('seguro'));
+  h += fila('IBI', G.ibi ? sib_eur(G.ibi) : '—', de('ibi'), _prov('ibi'));
+  h += fila('Comunidad', G.comunidad ? sib_eur(G.comunidad) : '—', G.comunidadDeRenta ? '(de Renta)' : (G.anio.comunidad ? '(' + fmtGlobal(G.comunidad / 12) + ' €/mes' + (_prov('comunidad') ? ' · de ' + G.anio.comunidad + ' · provisional' : '') + ')' : ''), _prov('comunidad'));
+  h += fila('Otros gastos', G.otros ? sib_eur(G.otros) : '—', de('otros'), _prov('otros'));
   h += '<div style="display:flex;justify-content:space-between;padding:8px 0 2px;font-size:13.5px;"><span style="color:var(--silver-bright);font-weight:700;">Total al año</span><span style="color:#e07070;font-weight:800;">' + (G.total ? '− ' + sib_eur(G.total) : '0 €') + '</span></div>';
   h += '<div style="font-size:10.5px;color:var(--silver-dim);margin-bottom:8px;">Es lo que se resta para la rentabilidad neta.</div>';
   h += '<button onclick="sib_editarGastos()" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:700;padding:9px 4px;cursor:pointer;">✎ Comunidad y otros gastos ' + sib_anio + '</button>';
@@ -25349,6 +25892,8 @@ function pend_gestionar(i) {
     bkd_gestionar(); // 12/10/2026
   } else if (it.accion === 'contratos_lista') {
     showModule('contratos'); // 13/10/2026: aviso de contratos incompletos
+  } else if (it.accion === 'cee') {
+    cee_irInmueble(it.idx); // 22/10/2026 (C1)
   } else if (it.accion === 'vc') {
     sib_irInmueble(it.idx, it.anio); // 12/10/2026: ficha del inmueble → Gastos
   } else if (it.accion === 'registro') {
@@ -25614,6 +26159,7 @@ window._refreshCurrentModule = function(key) {
     'trading:capital_inicial': 'finanzas',
     'renta:dividendos_manuales': 'renta',
     'renta:certificados': 'renta',
+    'renta:resultado': 'renta', // 22/10/2026
     'fin:divcal_ajustes': 'divcal',
     'renta:intereses_cuenta': 'renta', // PUNTO 250
     'fin:caja_movs': 'finanzas', // PUNTO 256
@@ -25924,7 +26470,9 @@ function con_renderLista() {
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-secondary);">
         <span>📅 ${fechaInicio} → ${fechaFin}</span>
-        <span style="font-weight:700;color:var(--silver-bright);">${renta}/mes</span>
+        <span style="font-weight:700;color:var(--silver-bright);">${(c.tipo === 'rustica' || c.tipo === 'rusticatemp') && c.renta
+          ? renta + '/año' + (c.tipo === 'rustica' ? ' <span style="font-weight:600;color:var(--text-secondary);">· ' + fmtE(Math.round(parseRentaMixta(c.renta) / 12 * 100) / 100) + '/mes</span>' : '')
+          : renta + '/mes'}</span>
       </div>
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
         <button onclick="event.stopPropagation();con_regenerarPDF('${idSafe}')" style="width:100%;background:none;border:1px solid var(--border);border-radius:10px;color:var(--silver-mid);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:8px;cursor:pointer;letter-spacing:.5px;">📄 Ver · ✏️ Editar · ⬇️ Descargar</button>
@@ -27060,9 +27608,100 @@ function renta_render() {
   renta_renderGastos();
   ingotros_render();
   renta_calcPrevision();
+  try { renta_resReal_render(); } catch (eRR) { console.warn('[Renta resultado]', eRR.message); } // 22/10/2026 (C2)
   alqmen_render();
   segibi_render();
   renta_pintarAvisosMes(); // PUNTO 246
+}
+
+// ─── 22/10/2026 (C2, pedido por Patry): RESULTADO REAL DE LA DECLARACIÓN ──
+// 'renta:resultado' = { "2025": { importe, tipo: 'pagar'|'devolver', updatedAt } }.
+// Patry fracciona SIEMPRE en dos plazos: 60 % el 30/06 y 40 % el 05/11 del
+// año siguiente. En "Próximos 90 días": con dato real, ese importe; sin él,
+// la previsión ("estimado") solo hasta el 30/06; después, el aviso sin importe.
+function renta_resLoad() { try { var m = JSON.parse(localStorage.getItem('renta:resultado') || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; } catch (e) { return {}; } }
+function renta_resReal(anio) { var x = renta_resLoad()[String(anio)]; return (x && !x.deleted && numES(x.importe) > 0) ? x : null; }
+function renta_plazos(importe) { var p1 = Math.round(importe * 0.6 * 100) / 100; return { p1: p1, p2: Math.round((importe - p1) * 100) / 100 }; }
+// Previsión de un año, con la venta de inmuebles si la hubo (año en curso: proyectada a diciembre)
+function renta_estimacionAnio(anio) {
+  var guardado = renta_anio; renta_anio = anio;
+  try {
+    var D = renta_calcPrevisionDatos(anio === new Date().getFullYear());
+    if (!D || D.sinDatos) return null;
+    var gan = 0;
+    (D.inmPatricio || []).forEach(function(ix) {
+      var i = D.todosInm[ix]; if (!i || i.estado !== 'vendido' || parseInt(i.ventaAnio, 10) !== anio) return;
+      var g = inm_gananciaPatrimonialVenta(i); if (g) gan += g.ganancia;
+    });
+    var res = D.resultado;
+    if (gan) {
+      var base = gan >= 0 ? D.capitalMobiliario + gan : D.capitalMobiliario - Math.min(-gan, D.capitalMobiliario * 0.25);
+      res = D.cuotaGeneral + renta_calcAhorroTramos(base) - D.retencionAcum;
+    }
+    return Math.round(res * 100) / 100;
+  } catch (e) { return null; } finally { renta_anio = guardado; }
+}
+function renta_resReal_render() {
+  var box = document.getElementById('renta-resultado-real'); if (!box) return;
+  var Y = renta_anio, x = renta_resReal(Y), sig = Y + 1;
+  var h = '<div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:20px;text-align:center;">'
+    + '<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">🧾 Resultado real · Renta ' + Y + '</div>';
+  if (x) {
+    var imp = numES(x.importe), pagar = x.tipo !== 'devolver', pl = renta_plazos(imp);
+    h += '<div style="font-size:24px;font-weight:700;font-family:\'Rajdhani\',sans-serif;color:' + (pagar ? '#ff7a7a' : '#4caf82') + ';">' + (pagar ? 'A PAGAR ' : 'A DEVOLVER ') + fmtGlobal(imp) + ' €</div>'
+      + (pagar ? '<div style="font-size:11.5px;color:var(--silver-mid);margin-top:4px;line-height:1.6;">30/06/' + sig + ' · 1.er plazo (60 %): <b>' + fmtGlobal(pl.p1) + ' €</b><br>05/11/' + sig + ' · 2.º plazo (40 %): <b>' + fmtGlobal(pl.p2) + ' €</b></div>'
+               : '<div style="font-size:11.5px;color:var(--silver-mid);margin-top:4px;">Pendiente de cobrar</div>')
+      + '<div style="display:flex;gap:8px;margin-top:10px;"><button onclick="renta_resEditar()" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:700;padding:8px;cursor:pointer;">✎ Editar</button>'
+      + '<button onclick="renta_resBorrar()" style="flex:1;background:none;border:1px solid rgba(255,90,90,.4);border-radius:10px;color:#ff7b7b;font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:700;padding:8px;cursor:pointer;">Quitar</button></div>';
+  } else {
+    h += '<div style="font-size:11.5px;color:var(--silver-dim);line-height:1.5;margin-bottom:10px;">Cuando presentes la declaración, mete aquí el resultado.<br>Mientras tanto, "Próximos 90 días" usa la previsión.</div>'
+      + '<button onclick="renta_resEditar()" style="width:100%;background:rgba(91,141,238,.1);border:1px solid rgba(91,141,238,.4);border-radius:10px;color:#5b8dee;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;padding:9px;cursor:pointer;">＋ Meter el resultado real</button>';
+  }
+  box.innerHTML = h + '</div>';
+}
+function renta_resEditar() {
+  if (bloqueaSiViewer('Guardar el resultado de la Renta')) return;
+  var Y = renta_anio, x = renta_resLoad()[String(Y)] || {};
+  var prev = document.getElementById('rres-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'rres-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var est = 'width:100%;box-sizing:border-box;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:700;padding:10px;margin-bottom:12px;text-align:center;';
+  var dev = x.tipo === 'devolver';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;max-width:420px;box-sizing:border-box;">'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;color:var(--silver-bright);margin-bottom:12px;">🧾 Resultado de la Renta ' + Y + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;">'
+    + '<button id="rres-pagar" onclick="renta_resTipo(\'pagar\')" style="flex:1;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;border:1px solid ' + (dev ? 'var(--border)' : '#ff7a7a') + ';background:' + (dev ? 'var(--navy-mid)' : 'rgba(255,122,122,.12)') + ';color:' + (dev ? 'var(--silver-dim)' : '#ff7a7a') + ';">A pagar</button>'
+    + '<button id="rres-devolver" onclick="renta_resTipo(\'devolver\')" style="flex:1;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;border:1px solid ' + (dev ? '#4caf82' : 'var(--border)') + ';background:' + (dev ? 'rgba(76,175,130,.12)' : 'var(--navy-mid)') + ';color:' + (dev ? '#4caf82' : 'var(--silver-dim)') + ';">A devolver</button></div>'
+    + '<input id="rres-importe" type="text" inputmode="decimal" placeholder="Importe (€)" value="' + (x.importe ? fmtGlobal(numES(x.importe)) : '') + '" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" style="' + est + '">'
+    + '<input type="hidden" id="rres-tipo" value="' + (dev ? 'devolver' : 'pagar') + '">'
+    + '<div style="font-size:11px;color:var(--silver-dim);text-align:center;margin:-4px 0 12px;">Siempre en dos plazos: 60 % el 30 de junio y 40 % el 5 de noviembre.</div>'
+    + '<div style="display:flex;gap:8px;"><button onclick="document.getElementById(\'rres-capa\').remove()" style="flex:1;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;">Cancelar</button>'
+    + '<button onclick="renta_resGuardar()" style="flex:1;background:#5b8dee;border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;">Guardar</button></div></div>';
+  document.body.appendChild(capa);
+}
+function renta_resTipo(t) {
+  document.getElementById('rres-tipo').value = t;
+  var a = document.getElementById('rres-pagar'), b = document.getElementById('rres-devolver');
+  var on = function(el, col, act) { el.style.borderColor = act ? col : 'var(--border)'; el.style.background = act ? (col === '#ff7a7a' ? 'rgba(255,122,122,.12)' : 'rgba(76,175,130,.12)') : 'var(--navy-mid)'; el.style.color = act ? col : 'var(--silver-dim)'; };
+  on(a, '#ff7a7a', t === 'pagar'); on(b, '#4caf82', t === 'devolver');
+}
+function renta_resGuardar() {
+  if (bloqueaSiViewer('Guardar el resultado de la Renta')) return;
+  var imp = numES(document.getElementById('rres-importe').value);
+  if (!(imp > 0)) { avisar('⚠️ Escribe el importe del resultado.'); return; }
+  var m = renta_resLoad();
+  m[String(renta_anio)] = { importe: Math.round(imp * 100) / 100, tipo: document.getElementById('rres-tipo').value === 'devolver' ? 'devolver' : 'pagar', updatedAt: new Date().toISOString() };
+  localStorage.setItem('renta:resultado', JSON.stringify(m));
+  var capa = document.getElementById('rres-capa'); if (capa) capa.remove();
+  renta_resReal_render();
+  if (typeof showToast === 'function') showToast('🧾 Resultado de la Renta ' + renta_anio + ' guardado', 'success');
+}
+function renta_resBorrar() {
+  if (bloqueaSiViewer('Quitar el resultado de la Renta')) return;
+  showConfirm('🧾', 'Quitar el resultado', '¿Quitar el resultado real de la Renta ' + renta_anio + '? La agenda volverá a usar la previsión.', [{ label: 'Quitar', cls: 'r', fn: function() {
+    var m = renta_resLoad(); m[String(renta_anio)] = { deleted: true, updatedAt: new Date().toISOString() };
+    localStorage.setItem('renta:resultado', JSON.stringify(m)); renta_resReal_render();
+  } }]);
 }
 
 function renta_anioAnterior() {
@@ -28175,25 +28814,34 @@ function renta_renderGastos() {
   }
   var total = 0;
   var html = '';
+  var htmlVenta = '', totalVenta = 0; // 22/10/2026 (A5): gastos de la venta, aparte
   // PUNTO 224 (01/10/2026): lo más reciente primero. (índice real conservado para ver/compartir/borrar)
   var ordenG = gastos.map(function(_, k) { return k; }).sort(function(a, b) { return String(gastos[b].fecha || '').localeCompare(String(gastos[a].fecha || '')); });
   for (var oi = 0; oi < ordenG.length; oi++) {
     var i = ordenG[oi];
     var g = gastos[i];
-    total += parseFloat(g.importe) || 0;
+    var _esVenta = g.categoria === RENTA_CAT_GASTO_VENTA; // 22/10/2026 (A5)
+    if (_esVenta) totalVenta += numES(g.importe); else total += numES(g.importe);
     // PUNTO 167 (14/09/2026): además del "ver", un botón de compartir
     // (WhatsApp, correo...) con el archivo real, cuando hay foto/factura.
     var fotoLink = g.fotoUrl
       ? ' <a href="' + g.fotoUrl + '" target="_blank" style="color:#5b8dee;font-size:11px;">📎 ver</a>'
         + ' <button onclick="renta_compartirGasto(' + i + ')" title="Compartir" style="background:none;border:none;color:#5b8dee;font-size:11px;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">' + _svgCompartir(12) + ' compartir</button>'
       : '';
-    html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="font-size:13px;font-weight:700;color:var(--silver-bright);">' + g.concepto + fotoLink + '</div>'
-      + '<div style="font-size:11px;color:var(--text-secondary);">' + (g.fecha || '') + (g.categoria ? ' · ' + g.categoria : '') + '</div></div>'
+    var _fila = '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div><div style="font-size:13px;font-weight:700;color:' + (_esVenta ? 'var(--silver-mid)' : 'var(--silver-bright)') + ';">' + g.concepto + fotoLink + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + (g.fecha || '') + (g.categoria && !_esVenta ? ' · ' + g.categoria : '') + '</div></div>'
       + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<div style="font-size:13px;font-weight:700;color:#e07070;">-' + fmtGlobal(g.importe) + ' €</div>'
+      + '<div style="font-size:13px;font-weight:700;color:' + (_esVenta ? 'var(--silver-dim)' : '#e07070') + ';white-space:nowrap;">-' + fmtGlobal(g.importe) + ' €</div>'
       + '<button onclick="renta_borrarGasto(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
       + '</div></div>';
+    if (_esVenta) htmlVenta += _fila; else html += _fila;
+  }
+  if (!html) html = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin gastos deducibles del alquiler.</div>';
+  if (htmlVenta) {
+    html += '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 4px;text-align:center;">Gastos de la venta · ' + fmtGlobal(totalVenta) + ' €</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-bottom:8px;line-height:1.4;">Se restan en la ganancia de la venta, no del alquiler.</div>'
+      + htmlVenta;
   }
   cont.innerHTML = html;
   document.getElementById('renta-total-gastos').textContent = fmtGlobal(total) + ' €';
