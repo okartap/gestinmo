@@ -2276,7 +2276,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261018_02';
+const BUILD_ID = '261022_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -24990,7 +24990,9 @@ function sib_faltanVC() {
   var inms = loadInmuebles(), falta = {}, n = 0, primero = null, anioPrimero = null;
   inms.forEach(function(inm, idx) {
     if (!inm || String(inm.propietario || '').toLowerCase() !== 'patricio' || inm.estado === 'vendido') return;
-    var anios = [Y - 1];
+    // 22/10/2026 (pedido por Patry): el año anterior solo se pide hasta el fin
+    // de la campaña de la Renta (30/06); después esa declaración ya está hecha.
+    var anios = hoyS <= (Y + '-06-30') ? [Y - 1] : [];
     var rY = sib_registro(idx, Y), rY1 = sib_registro(idx, Y - 1);
     var cargo = (rY && rY.ibiFecha) ? rY.ibiFecha : ((rY1 && rY1.ibiFecha) ? Y + String(rY1.ibiFecha).slice(4, 10) : Y + '-07-01');
     if (hoyS >= cargo) anios.push(Y);
@@ -27263,6 +27265,13 @@ function renta_getInmDatos() {
 function renta_saveInmDatos(obj) {
   localStorage.setItem('renta:inm_datos', JSON.stringify(obj));
 }
+function renta_amortLineaHtml(amorAnual) {
+  if (!(amorAnual > 0)) return '';
+  return '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">'
+    + '<div style="font-size:12px;color:var(--text-secondary);">Amortización deducible (3% anual)</div>'
+    + '<div style="font-size:12px;font-weight:700;color:#e07070;">− ' + fmtGlobal(amorAnual.toFixed(0)) + ' €</div>'
+    + '</div>';
+}
 function renta_setInmCampo(inmId, campo, valor) {
   if (bloqueaSiViewer('Editar un dato de un inmueble en Renta')) return;
   var datos = renta_getInmDatos();
@@ -27275,6 +27284,10 @@ function renta_setInmCampo(inmId, campo, valor) {
   datos[inmId][campo] = valor;
   renta_saveInmDatos(datos);
   renta_calcPrevision();
+  if (campo === 'amorBase') { // 22/10/2026: se ve al momento
+    var elA = document.getElementById('renta-amort-' + inmId);
+    if (elA) elA.innerHTML = renta_amortLineaHtml((parseFloat(valor) || 0) * 0.03);
+  }
 }
 
 function renta_renderAlquileres() {
@@ -27314,6 +27327,10 @@ function renta_renderAlquileres() {
   var datos = renta_getInmDatos();
   var totalAlq = 0;
   var html = '';
+  // 22/10/2026: el desplegable decía siempre "reducción 50%", pero el cálculo
+  // (renta_calcPrevisionDatos) ya aplica 60% si el contrato activo empezó antes
+  // del 26/05/2023. Ahora la etiqueta enseña el % que de verdad se aplica.
+  var _ctrsEtiq = []; try { _ctrsEtiq = JSON.parse(localStorage.getItem('contratos:lista') || '[]'); } catch (eCE) {}
 
   for (var m = 0; m < inmPatricio.length; m++) {
     var idx = inmPatricio[m].idx;
@@ -27341,7 +27358,7 @@ function renta_renderAlquileres() {
     html += '<div style="margin-bottom:8px;">'
       + '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:0.5px;">TIPO DE ALQUILER</div>'
       + '<select onchange="renta_setInmCampo(\'' + inmId + '\',\'tipo\',this.value)" style="width:100%;background:var(--navy-dark);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-size:13px;padding:8px 10px;font-family:\'Rajdhani\',sans-serif;">'
-      + '<option value="vivienda"' + (tipoVal === 'vivienda' ? ' selected' : '') + '>Vivienda habitual del inquilino (reducción 50%)</option>'
+      + '<option value="vivienda"' + (tipoVal === 'vivienda' ? ' selected' : '') + '>Vivienda habitual del inquilino (reducción ' + (function() { var cv = _ctrsEtiq.filter(function(c) { return c && c.ref === inm.ref && c.estado === 'activo'; })[0]; return (cv && cv.inicio && cv.inicio < '2023-05-26') ? '60' : '50'; })() + '%)</option>'
       + '<option value="otro"' + (tipoVal === 'otro' ? ' selected' : '') + '>Otro uso (local, garaje, rústico, 2ª residencia...)</option>'
       + '</select>'
       + '</div>';
@@ -27371,12 +27388,9 @@ function renta_renderAlquileres() {
     } catch (eVc) {}
 
     // Resultado amortización si hay dato
-    if (amorAnual > 0) {
-      html += '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">'
-        + '<div style="font-size:12px;color:var(--text-secondary);">Amortización deducible (3% anual)</div>'
-        + '<div style="font-size:12px;font-weight:700;color:#e07070;">− ' + fmtGlobal(amorAnual.toFixed(0)) + ' €</div>'
-        + '</div>';
-    }
+    // 22/10/2026: hueco con id para refrescarlo al escribir la base (antes no
+    // aparecía hasta salir y volver a entrar en la pantalla).
+    html += '<div id="renta-amort-' + inmId + '">' + renta_amortLineaHtml(amorAnual) + '</div>';
 
     html += '</div>';
   }
