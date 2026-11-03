@@ -2290,7 +2290,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261022_10';
+const BUILD_ID = '261102_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -6760,8 +6760,8 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
       <div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">Previsto próximos 12 meses &#8250;</div></div>
       <div id="fin-divcal-total" style="font-size:20px;font-weight:700;color:#d4af4c;"></div>
     </div>
-    <div id="fin-divcal-mini" style="display:flex;align-items:flex-end;gap:2px;height:40px;margin:10px 0 6px;"></div>
-    <div id="fin-divcal-prox" style="font-size:11.5px;color:var(--silver-mid);text-align:center;"></div>
+    <div id="fin-divcal-mini" style="margin:8px 0 2px;"></div>
+    <div id="fin-divcal-prox" style="font-size:11px;color:#5b8dee;text-align:center;margin-top:4px;">Ver gráfico completo &#8250;</div>
   </div>
   <div id="fin-resumen-anual" style="display:none;margin-top:8px;">
     <div id="fin-resumen-anual-content" style="font-size:12px;color:var(--silver-dim);text-align:center;padding:10px 0;">Sin datos.</div>
@@ -7576,6 +7576,7 @@ con editar/borrar en cada línea. -->
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">MES</div>
       <select id="renta-nom-mes" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;"></select>
+      <div id="renta-nom-anio-aviso" style="display:none;font-size:11.5px;font-weight:700;color:var(--accent-amber);text-align:center;margin-top:5px;"></div>
     </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">SALARIO BRUTO (€)</div>
@@ -14702,7 +14703,7 @@ function fac_dibujarGrafica(containerId, labels, series) {
   for (var r = 0; r <= 4; r++) {
     var ry = PAD_T + gH - Math.round(gH * r / 4);
     var rv = Math.round(maxVal * r / 4);
-    var rvL = rv >= 1000 ? (rv/1000).toFixed(0)+'k' : rv;
+    var rvL = fmtGlobal(rv); // 02/11/2026: cifra completa
     svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
     svg += '<text x="' + (PAD_L-4) + '" y="' + (ry+4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.3)">' + rvL + '</text>';
   }
@@ -14756,7 +14757,7 @@ function fac_dibujarGraficaAnual(aniosSel, todosAnios, totAnio) {
   for (var r = 0; r <= 4; r++) {
     var ry = PAD_T + gH - Math.round(gH * r / 4);
     var rv = Math.round(maxVal * r / 4);
-    var rvL = rv >= 1000 ? (rv/1000).toFixed(0)+'k' : rv;
+    var rvL = fmtGlobal(rv); // 02/11/2026: cifra completa
     svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
     svg += '<text x="' + (PAD_L-4) + '" y="' + (ry+4) + '" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.3)">' + rvL + '</text>';
   }
@@ -14769,7 +14770,7 @@ function fac_dibujarGraficaAnual(aniosSel, todosAnios, totAnio) {
     var bx = cx - barW / 2;
     var by = PAD_T + gH - bh;
     svg += '<rect x="' + Math.round(bx) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" rx="3" fill="' + col + '" opacity="0.85"/>';
-    var totalLabel = (totAnio[yr]/1000).toFixed(1).replace('.', ',') + 'k';
+    var totalLabel = fmtGlobal(Math.round(totAnio[yr])); // 02/11/2026: cifra completa
     svg += '<text x="' + Math.round(cx) + '" y="' + (by - 5) + '" text-anchor="middle" font-size="9" font-weight="600" fill="rgba(255,255,255,0.85)">' + totalLabel + '</text>';
     svg += '<text x="' + Math.round(cx) + '" y="' + (H-4) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">' + yr + '</text>';
   }
@@ -22958,20 +22959,20 @@ var _phSel = null, _phSoloFin = false, _phN = 0;
 // blanco desde esa foto. Patrimer no lleva tramo gris.
 var PH_FIABLE_DESDE = { patricio: '2026-12' };
 var PH_GRIS = '#5d6b86', PH_ORO = '#d4af37';
-function _phK(v) { var a = Math.abs(v); return (a >= 1e6 ? (Math.round(v / 1e5) / 10).toString().replace('.', ',') + ' M' : a >= 1e3 ? Math.round(v / 1e3) + ' k' : Math.round(v) + ''); }
+function _phK(v) { return fmtGlobal(Math.round(v)); } // 261022_11 (Patry): cifras completas con punto de miles, nunca "13 k"
 function fin_patHist_grafico(ordenada) {
   var el = document.getElementById('fin-pathist-graf'); if (!el) return;
   var L = (ordenada || []).filter(function(x) { return x && !x.deleted; });
   if (L.length < 2) { el.innerHTML = ''; return; }
   if (_phSel === null || _phSel >= L.length || L.length !== _phN) _phSel = L.length - 1; // al cambiar el nº de fotos, vuelve a la última
   _phN = L.length;
-  var n = L.length, W = 340, H = 150, pl = 40, pr = 8, pt = 10, pb = 22, iw = W - pl - pr, ih = H - pt - pb;
+  var n = L.length, W = 340, H = 150, pl = 52, pr = 8, pt = 10, pb = 22, iw = W - pl - pr, ih = H - pt - pb;
   var ins = 14; // margen para que las barras de los extremos no se salgan ni pisen las cifras del eje
   var xs = function(i) { return pl + ins + (n === 1 ? (iw - 2 * ins) / 2 : (iw - 2 * ins) * i / (n - 1)); };
   var lab = function(r) { var f = (r.fecha && r.fecha.slice(0, 7) === r.id) ? r.id + '-01' : (r.fecha || r.id + '-01'); var p = f.split('-'); return PH_MES3[parseInt(p[1], 10) - 1] + (p[1] === '01' || L.indexOf(r) === 0 ? ' ' + p[0].slice(2) : ''); };
   var paso = Math.max(1, Math.ceil(n / 7));
   var ejeX = function(hh) { return L.map(function(r, i) { return (i % paso === 0 || i === n - 1) ? '<text x="' + xs(i) + '" y="' + (hh - 6) + '" text-anchor="middle" font-size="9" fill="#96a8c8">' + lab(r) + '</text>' : ''; }).join(''); };
-  var grid = function(min, max, hh, ih2) { var g = ''; for (var k = 0; k <= 3; k++) { var v = min + (max - min) * k / 3, y = pt + ih2 - ih2 * k / 3; g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y + '" y2="' + y + '" stroke="rgba(255,255,255,0.07)"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#96a8c8">' + _phK(v) + '</text>'; } return g; };
+  var grid = function(min, max, hh, ih2) { var g = ''; for (var k = 0; k <= 3; k++) { var v = min + (max - min) * k / 3, y = pt + ih2 - ih2 * k / 3; g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y + '" y2="' + y + '" stroke="rgba(255,255,255,0.07)"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#96a8c8">' + _phK(Math.abs(max - min) >= 3000 ? Math.round(v / 1000) * 1000 : v) + '</text>'; } return g; };
   var totales = L.map(function(r) { return _phSoloFin ? numES(r.liquidez) + numES(r.invertido) : numES(r.total); });
   // resumen
   var ult = totales[n - 1], ant = totales[n - 2], ini = totales[0];
@@ -23684,7 +23685,7 @@ function div_renderBarras(datos) {
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(60, contenedorAncho - 30);
   var H = 150;
-  var PAD_L = 24, PAD_R = 4, PAD_T = 14, PAD_B = 18;
+  var PAD_L = 36, PAD_R = 4, PAD_T = 14, PAD_B = 18; // 02/11/2026: más sitio para cifras completas
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var barW = Math.max(1, Math.floor(gW / n) - 1);
@@ -23693,7 +23694,7 @@ function div_renderBarras(datos) {
   for (var r = 0; r <= 3; r++) {
     var ry = PAD_T + gH - Math.round(gH * r / 3);
     var rv = Math.round(maxVal * r / 3);
-    var rvL = rv >= 1000 ? (rv / 1000).toFixed(0) + 'k' : rv;
+    var rvL = fmtGlobal(rv); // 02/11/2026: cifra completa
     svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W - PAD_R) + '" y2="' + ry + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
     svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry + 3) + '" text-anchor="end" font-size="8" fill="#96a8c8">' + rvL + '</text>';
   }
@@ -23739,7 +23740,7 @@ function div_renderLineas(datos) {
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(60, contenedorAncho - 30);
   var H = 150;
-  var PAD_L = 24, PAD_R = 4, PAD_T = 10, PAD_B = 18;
+  var PAD_L = 36, PAD_R = 4, PAD_T = 10, PAD_B = 18; // 02/11/2026: más sitio para cifras completas
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var paso = div_pasoEtiquetas(n, gW);
@@ -23752,7 +23753,7 @@ function div_renderLineas(datos) {
   for (var r2 = 0; r2 <= 3; r2++) {
     var ry2 = PAD_T + gH - Math.round(gH * r2 / 3);
     var rv2 = Math.round(maxVal * r2 / 3);
-    var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
+    var rvL2 = fmtGlobal(rv2); // 02/11/2026: cifra completa
     svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
     svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="#96a8c8">' + rvL2 + '</text>';
   }
@@ -23814,7 +23815,7 @@ function div_renderAcumulado(datos) {
   var contenedorAncho = (el.parentElement && el.parentElement.offsetWidth) || 320;
   var W = Math.max(60, contenedorAncho - 30);
   var H = 150;
-  var PAD_L = 26, PAD_R = 4, PAD_T = 10, PAD_B = 18;
+  var PAD_L = 44, PAD_R = 4, PAD_T = 10, PAD_B = 18; // 02/11/2026: más sitio para cifras completas
   var gW = W - PAD_L - PAD_R;
   var gH = H - PAD_T - PAD_B;
   var paso = div_pasoEtiquetas(n, gW);
@@ -23828,7 +23829,7 @@ function div_renderAcumulado(datos) {
   for (var r2 = 0; r2 <= 3; r2++) {
     var ry2 = PAD_T + gH - Math.round(gH * r2 / 3);
     var rv2 = Math.round(maxVal * r2 / 3);
-    var rvL2 = rv2 >= 1000 ? (rv2 / 1000).toFixed(0) + 'k' : rv2;
+    var rvL2 = fmtGlobal(rv2); // 02/11/2026: cifra completa
     svg += '<line x1="' + PAD_L + '" y1="' + ry2 + '" x2="' + (W - PAD_R) + '" y2="' + ry2 + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
     svg += '<text x="' + (PAD_L - 5) + '" y="' + (ry2 + 3) + '" text-anchor="end" font-size="8" fill="#96a8c8">' + rvL2 + '</text>';
   }
@@ -23849,7 +23850,7 @@ function div_renderAcumulado(datos) {
     }
     svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + serie.color + '" stroke-width="1.4"/>';
     var ultimoVal = serie.valores[n - 1];
-    var ultimaLbl = ultimoVal >= 1000 ? (ultimoVal / 1000).toFixed(1).replace('.', ',') + 'k' : Math.round(ultimoVal);
+    var ultimaLbl = fmtGlobal(Math.round(ultimoVal)); // 02/11/2026: cifra completa
     var ultX = PAD_L + gW;
     var ultY = PAD_T + gH - Math.round(gH * ultimoVal / maxVal);
     svg += '<circle cx="' + Math.round(ultX) + '" cy="' + Math.round(ultY) + '" r="2" fill="' + serie.color + '"/>';
@@ -24040,17 +24041,24 @@ function divcal_renderTarjeta() {
   var prox = D.proximo;
   var dias = prox ? Math.round((new Date(prox.fecha) - new Date(D.hoyS)) / 86400000) : null;
   document.getElementById('fin-divcal-total').textContent = '~' + divcal_eur(D.total);
-  document.getElementById('fin-divcal-prox').innerHTML = prox
-    ? 'Próximo: <b style="color:' + (D.colorDe[prox.ticker] || '#c8d4e8') + ';">' + (FIN_NOMBRES[prox.ticker] || prox.ticker) + '</b> · ' + (prox.estado === 'confirmado' ? '' : '~') + divcal_fechaCorta(prox.fecha) + ' · ' + (prox.estado === 'confirmado' ? '' : '~') + divcal_eur(prox.importe) + (dias != null ? ' <span style="opacity:.75;">(en ' + dias + ' días)</span>' : '')
-    : 'Sin cobros previstos';
-  // Mini barras de los 12 meses
-  var max = Math.max.apply(null, D.meses.map(function(m) { return m.total; }).concat([1]));
-  document.getElementById('fin-divcal-mini').innerHTML = D.meses.map(function(m, i) {
-    var h = m.total > 0 ? Math.max(3, Math.round(26 * m.total / max)) : 2;
-    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">' +
-      '<div style="width:70%;height:' + h + 'px;border-radius:2px;background:' + (m.total > 0 ? (i === 0 ? '#d4af4c' : 'rgba(212,175,76,.55)') : 'rgba(255,255,255,.08)') + ';"></div>' +
-      '<div style="font-size:8px;color:var(--text-secondary);">' + m.corto.charAt(0).toUpperCase() + '</div></div>';
-  }).join('');
+  // 02/11/2026 (Patry, opción 1): en vez de un mini gráfico sin datos, los
+  // 3 PRÓXIMOS COBROS (fecha, empresa, importe). El gráfico grande se abre al pulsar.
+  var futuros = [];
+  D.meses.forEach(function(m) { (m.evs || []).forEach(function(e) { if (e && e.estado !== 'cobrado' && String(e.fecha) >= D.hoyS && numES(e.importe) > 0) futuros.push(e); }); });
+  futuros.sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
+  if (!futuros.length && prox) futuros = [prox];
+  document.getElementById('fin-divcal-mini').innerHTML = futuros.length ? futuros.slice(0, 3).map(function(e, i) {
+    var dd = Math.round((new Date(e.fecha) - new Date(D.hoyS)) / 86400000);
+    var conf = e.estado === 'confirmado';
+    var sub = (dd === 0 ? 'hoy' : 'en ' + dd + ' día' + (dd === 1 ? '' : 's')) + (conf ? '' : ' · previsto');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;' + (i ? 'border-top:1px solid rgba(255,255,255,.06);' : '') + '">'
+      + '<div style="display:flex;align-items:center;min-width:0;"><span style="width:44px;flex-shrink:0;font-size:11px;color:var(--text-secondary);">' + (conf ? '' : '~') + divcal_fechaCorta(e.fecha) + '</span>'
+      + '<span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:' + (D.colorDe[e.ticker] || '#c8d4e8') + ';margin-right:7px;"></span>'
+      + '<span style="font-size:13px;font-weight:700;color:var(--silver-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + notas_esc(FIN_NOMBRES[e.ticker] || e.ticker) + '</span></div>'
+      + '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:700;white-space:nowrap;color:' + (i === 0 ? '#d4af4c' : 'var(--silver-bright)') + ';">' + (conf ? '' : '~') + divcal_eur(e.importe) + '</div>'
+      + '<div style="font-size:9.5px;color:var(--text-secondary);">' + sub + '</div></div></div>';
+  }).join('') : '<div style="font-size:11.5px;color:var(--silver-mid);text-align:center;padding:6px 0;">Sin cobros previstos</div>';
+  void dias;
 }
 
 
@@ -24312,8 +24320,8 @@ function divcal_renderGrafico(D) {
       svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" fill="' + (D.colorDe[e.ticker] || '#c8d4e8') + '" opacity="' + op + '" rx="1.5"/>';
     });
     if (m.total > 0) {
-      var lab = m.total >= 1000 ? (m.total / 1000).toFixed(m.total >= 10000 ? 0 : 1).replace('.', ',') + 'k' : Math.round(m.total);
-      svg += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (y - 4).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#c8d4e8">' + lab + '</text>';
+      var lab = fmtGlobal(Math.round(m.total)); // 02/11/2026 (Patry): cifra completa, nunca "9,0k"
+      svg += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (y - 4).toFixed(1) + '" text-anchor="middle" font-size="' + (colW < 30 ? 8 : 9) + '" fill="#c8d4e8">' + lab + '</text>';
     }
     svg += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9" fill="' + (i === 0 ? '#d4af4c' : '#96a8c8') + '"' + (i === 0 ? ' font-weight="700"' : '') + '>' + m.corto + '</text>';
   });
@@ -24907,7 +24915,7 @@ function notas_add() {
   const texto = input.value.trim();
   if (!texto) return;
   const arr = notas_load();
-  arr.unshift({
+  arr.push({ // 02/11/2026 (Patry): las nuevas, al final
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     texto: texto,
     fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
@@ -24975,7 +24983,11 @@ function notas_render() {
   const cont = document.getElementById('notas-lista');
   const contador = document.getElementById('notas-contador');
   if (!cont) return;
-  const arr = notas_loadVisibles();
+  // 02/11/2026 (Patry): de la MÁS ANTIGUA arriba a la más nueva abajo (por
+  // momento de creación, que va dentro del id), para leerlas en el orden en
+  // que se escribieron.
+  const _creada = n => { const t = parseInt(String(n.id || '').slice(0, -4), 36); return isFinite(t) ? t : 0; };
+  const arr = notas_loadVisibles().slice().sort((a, b) => _creada(a) - _creada(b));
   const pendientes = arr.filter(n => !n.hecho).length;
   if (contador) contador.textContent = arr.length ? '(' + pendientes + ' pendiente' + (pendientes !== 1 ? 's' : '') + ')' : '';
   if (arr.length === 0) {
@@ -25170,7 +25182,7 @@ function pend_calcular() {
   } catch (e) {}
   try {
     pend_contratosPorVencer().forEach(function(c) {
-      items.push({ icon: '📄', t: 'Contrato de "' + c.nombre + '" vence en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's'), s: 'Revisa si renueva o finaliza', accion: 'contrato', id: c.id, empresa: c.empresa });
+      items.push({ icon: '📄', t: 'Contrato de "' + c.nombre + '" vence en ' + c.dias + ' día' + (c.dias === 1 ? '' : 's'), s: 'Revisa si renueva o finaliza', accion: 'contrato', id: c.id, empresa: c.empresa, dias: c.dias });
     });
   } catch (e) {}
   try {
@@ -25181,7 +25193,7 @@ function pend_calcular() {
   try {
     pend_subidasPactadas().forEach(function(s) {
       var cuando = s.dias < 0 ? ('debía empezar hace ' + Math.abs(s.dias) + ' día' + (Math.abs(s.dias) === 1 ? '' : 's')) : (s.dias === 0 ? 'empieza hoy' : ('en ' + s.dias + ' día' + (s.dias === 1 ? '' : 's')));
-      items.push({ icon: '📈', t: 'Subida de renta pactada: ' + s.nombre + ' sube a ' + fmtE(parseFloat(s.importe) || 0), s: (s.ref ? s.ref + ' · ' : '') + 'Pactada para el ' + fmtDate(s.fecha) + ' (' + cuando + ')', accion: 'subida', id: s.contratoId, empresa: s.empresa });
+      items.push({ icon: '📈', t: 'Subida de renta pactada: ' + s.nombre + ' sube a ' + fmtE(parseFloat(s.importe) || 0), s: (s.ref ? s.ref + ' · ' : '') + 'Pactada para el ' + fmtDate(s.fecha) + ' (' + cuando + ')', accion: 'subida', id: s.contratoId, empresa: s.empresa, dias: s.dias });
     });
   } catch (e) {}
   // 13/10/2026 (mejora F, pedido por Patry): UN SOLO aviso de contratos
@@ -25297,6 +25309,22 @@ function pend_calcular() {
   // PUNTO 221: ahora salen avisos de todas las empresas — Mercedes solo ve
   // los de las empresas a las que tiene acceso (nunca los de Patricio).
   items = items.filter(function(it) { return !it.empresa || usuarioPuedeEmpresa(it.empresa); });
+  // 02/11/2026 (Patry): lo más urgente ARRIBA. Cuatro niveles:
+  // 1) problemas (protección, nube, copias), 2) con plazo (contratos, IPC,
+  // subidas, Saveback, foto del día 1; el que vence antes primero),
+  // 3) datos del mes para la Renta, 4) datos que faltan e informativos.
+  var _nivel = function(it) {
+    if (it.icon === '🚨' || it.accion === 'nube' || it.accion === 'copia_drive' || it.icon === '💾' || it.icon === '🔒') return 1;
+    if (['contrato', 'ipc', 'subida', 'saveback', 'patrimonio_snapshot'].indexOf(it.accion) >= 0) return 2;
+    if (it.accion === 'renta_datos' || it.accion === 'intereses') return 3;
+    return 4;
+  };
+  items.forEach(function(it, k) { it._n = _nivel(it); it._k = k; });
+  items.sort(function(a, b) {
+    if (a._n !== b._n) return a._n - b._n;
+    if (a._n === 2) { var da = typeof a.dias === 'number' ? a.dias : 0, db = typeof b.dias === 'number' ? b.dias : 0; if (da !== db) return da - db; }
+    return a._k - b._k;
+  });
   return items;
 }
 
@@ -25849,7 +25877,7 @@ function pend_render() {
     return '<div style="' + estiloFila + '">' +
       '<div style="font-size:15px;flex-shrink:0;margin-top:1px;">' + it.icon + '</div>' +
       '<div style="flex:1;min-width:0;">' + chip +
-        '<div style="font-size:12.5px;color:var(--silver-bright);line-height:1.35;">' + it.t + '</div>' +
+        '<div style="font-size:12.5px;color:var(--silver-bright);line-height:1.35;">' + (typeof it.dias === 'number' && it.dias < 7 ? String(it.t).replace(/ en \d+ días?$/, '') : it.t) + (typeof it.dias === 'number' && it.dias < 7 ? ' <span style="font-size:10.5px;font-weight:700;color:#e57373;border:1px solid rgba(229,115,115,.6);border-radius:6px;padding:0 5px;white-space:nowrap;">' + (it.dias < 0 ? 'hace ' + Math.abs(it.dias) + ' día' + (it.dias === -1 ? '' : 's') : it.dias === 0 ? 'hoy' : 'en ' + it.dias + ' día' + (it.dias === 1 ? '' : 's')) + '</span>' : '') + '</div>' +
         '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:1px;">' + it.s + '</div>' +
         btn +
       '</div>' +
@@ -27858,22 +27886,60 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', renta_ajustarModalNominaTeclado);
   window.visualViewport.addEventListener('scroll', renta_ajustarModalNominaTeclado);
 }
+// 02/11/2026 (261102_01, Patry): la nómina de un mes se mete al mes
+// siguiente → el desplegable propone el MES SIGUIENTE AL ÚLTIMO GUARDADO, no
+// el del calendario. Sin "Extra junio/diciembre" (las extras van sumadas
+// dentro de su mes). Cambio de año: si al año anterior le falta diciembre,
+// se propone "Diciembre" y se guarda en la Renta de ese año (con aviso).
+var _nomAnioDestino = null;
+function renta_nomLeerAnio(anio) {
+  try { return (JSON.parse(localStorage.getItem('renta:nominas:' + anio) || '[]') || []).filter(function(n) { return n && !n.deleted; }); } catch (e) { return []; }
+}
+function renta_nomUltimoMes(anio) { // índice 0–11 del último mes normal guardado, o -1
+  var ult = -1;
+  renta_nomLeerAnio(anio).forEach(function(n) { var i = RENTA_MESES_NOMBRE.indexOf(n.mes); if (i > ult) ult = i; });
+  return ult;
+}
+function renta_nomPropuesta() {
+  var hoy = new Date(), anioHoy = hoy.getFullYear();
+  var ult = renta_nomUltimoMes(renta_anio);
+  if (ult >= 0 && ult < 11) return { anio: renta_anio, mes: RENTA_MESES_NOMBRE[ult + 1] };
+  if (ult === 11) return { anio: renta_anio + 1, mes: 'Enero' };
+  // Año sin nóminas: ¿al anterior le falta diciembre?
+  var ultPrev = renta_nomUltimoMes(renta_anio - 1);
+  if (ultPrev >= 0 && ultPrev < 11) return { anio: renta_anio - 1, mes: RENTA_MESES_NOMBRE[ultPrev + 1] };
+  // Sin pistas: la del mes anterior al de hoy (se cobra a final de mes)
+  if (renta_anio === anioHoy) return { anio: anioHoy, mes: RENTA_MESES_NOMBRE[Math.max(0, hoy.getMonth() - 1)] };
+  return { anio: renta_anio, mes: 'Enero' };
+}
+function renta_nomPintarAviso() {
+  var av = document.getElementById('renta-nom-anio-aviso'); if (!av) return;
+  if (_nomAnioDestino && _nomAnioDestino !== renta_anio) { av.textContent = '⚠️ Se guardará en la Renta ' + _nomAnioDestino; av.style.display = 'block'; }
+  else { av.textContent = ''; av.style.display = 'none'; }
+}
 function renta_abrirModalNomina(idx) {
   document.getElementById('renta-modal-nomina').style.display = 'flex';
   renta_ajustarModalNominaTeclado();
-  var meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre','Extra junio','Extra diciembre'];
   var sel = document.getElementById('renta-nom-mes');
-  if (sel && sel.options.length === 0) {
+  var editando = idx !== undefined && idx !== null && idx >= 0;
+  var nEdit = editando ? renta_getNominas()[idx] : null;
+  // 12 meses; una nómina antigua de "Extra …" que se edite conserva su opción
+  var meses = RENTA_MESES_NOMBRE.slice();
+  if (nEdit && meses.indexOf(nEdit.mes) < 0 && nEdit.mes) meses.push(nEdit.mes);
+  if (sel) {
+    sel.innerHTML = '';
     for (var mi = 0; mi < meses.length; mi++) {
       var o = document.createElement('option');
       o.value = meses[mi]; o.textContent = meses[mi]; sel.appendChild(o);
     }
-    sel.value = meses[new Date().getMonth()];
   }
+  _nomAnioDestino = null;
+  if (!editando && sel) { var prop = renta_nomPropuesta(); sel.value = prop.mes; _nomAnioDestino = prop.anio; }
+  renta_nomPintarAviso();
   var titEl = document.getElementById('renta-modal-nomina-titulo');
-  if (idx !== undefined && idx !== null && idx >= 0) {
+  if (editando) {
     renta_nomEditIdx = idx;
-    var n = renta_getNominas()[idx];
+    var n = nEdit;
     if (n) {
       sel.value = n.mes;
       document.getElementById('renta-nom-bruto').value = fmtGlobal(n.bruto);
@@ -27923,6 +27989,10 @@ function renta_guardarNomina() {
   var retencion = parseFmtGlobal(document.getElementById('renta-nom-retencion').value);
   var ss = parseFmtGlobal(document.getElementById('renta-nom-ss').value);
   if (!mes || !bruto) { avisar('Introduce al menos el mes y el salario bruto.'); return; }
+  // 02/11/2026: una nómina nueva puede ir a la Renta de otro año (diciembre del
+  // año anterior, o enero del siguiente) — se guarda en ese año.
+  var _anioVista = renta_anio, _anioG = (renta_nomEditIdx < 0 && _nomAnioDestino) ? _nomAnioDestino : renta_anio;
+  renta_anio = _anioG;
   var arr = renta_getNominas();
   // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
   // sincronización de Nóminas — mismo motivo que Contratos.
@@ -27934,6 +28004,8 @@ function renta_guardarNomina() {
   }
   renta_nomEditIdx = -1;
   renta_saveNominas(arr);
+  renta_anio = _anioVista; _nomAnioDestino = null;
+  if (_anioG !== _anioVista && typeof showToast === 'function') showToast('💼 Nómina de ' + mes.toLowerCase() + ' guardada en la Renta ' + _anioG, 'success');
   renta_cerrarModalNomina();
   document.getElementById('renta-nom-bruto').value = '';
   document.getElementById('renta-nom-retencion').value = '';
@@ -29274,6 +29346,8 @@ function ingotros_totalAnioDeclarable(year) {
 //  · los dividendos añadidos a mano (Capital mobiliario) suman en la base
 //    del ahorro con su retención real.
 var RENTA_MESES_NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+// 02/11/2026: factor de cada mes sobre la nómina base (calendario fijo de Patry)
+var RENTA_NOM_FACTOR = [1, 1, 2, 1, 1, 1, 2, 1, 1.5, 1, 1, 1.5];
 var RENTA_CAT_GASTO_VENTA = 'Gasto de venta de inmueble';
 function renta_calcPrevisionDatos(proy) {
   var nominas = renta_getNominas();
@@ -29291,13 +29365,19 @@ function renta_calcPrevisionDatos(proy) {
     else if (nm.mes === 'Extra diciembre') extraDic = nm;
   }
   if (proy && nReg > 0 && ultimoMes < 12) {
-    var faltan = 12 - ultimoMes;
-    brutoTrabajo += brutoReg / nReg * faltan;
-    retencionAcum += retReg / nReg * faltan;
-    ssTrabajo += ssReg / nReg * faltan;
-    if (extraJun && !extraDic) {
-      brutoTrabajo += parseFloat(extraJun.bruto) || 0;
-      retencionAcum += parseFloat(extraJun.retencion) || 0;
+    // 02/11/2026 (Patry): calendario FIJO de cobro — marzo y julio ×2,
+    // septiembre y diciembre ×1,5, el resto ×1 (las extras van dentro del
+    // mes). Los meses que faltan = base × factor de cada mes, no la media
+    // (que salía inflada o corta según la época del año).
+    var nUlt = null;
+    nominas.forEach(function(x) { if (x && !x.deleted && RENTA_MESES_NOM.indexOf(x.mes) === ultimoMes - 1) nUlt = x; });
+    var bU = nUlt ? numES(nUlt.bruto) : 0, fU = RENTA_NOM_FACTOR[ultimoMes - 1] || 1;
+    var base = bU > 0 ? bU / fU : brutoReg / nReg;
+    var pctRet = bU > 0 ? numES(nUlt.retencion) / bU : (brutoReg > 0 ? retReg / brutoReg : 0);
+    var ssMes = nUlt ? numES(nUlt.ss) : ssReg / nReg;
+    for (var mF = ultimoMes; mF < 12; mF++) {
+      var bF = base * (RENTA_NOM_FACTOR[mF] || 1);
+      brutoTrabajo += bF; retencionAcum += bF * pctRet; ssTrabajo += ssMes;
     }
   }
 
@@ -29419,7 +29499,8 @@ function renta_calcPrevisionDatos(proy) {
   return {
     sinDatos: false, todosInm: todosInm, inmPatricio: inmPatricio, capitalMobiliario: capitalMobiliario,
     cuotaGeneral: cuotaGeneral, cuotaAhorro: cuotaAhorro, cuotaTotal: cuotaTotal,
-    retencionAcum: retencionAcum, resultado: cuotaTotal - retencionAcum
+    retencionAcum: retencionAcum, resultado: cuotaTotal - retencionAcum,
+    brutoTrabajo: brutoTrabajo // 02/11/2026: para comprobar la previsión del trabajo
   };
 }
 function renta_calcPrevision() {
