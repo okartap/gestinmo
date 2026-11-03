@@ -2161,6 +2161,7 @@ const DATA_KEYS = [
   'app:fix_amorbase_x100_v1',
   'app:fix_snev_venta_v1', 'app:fix_contratos_num_v1', // 22/10/2026 (261022_06)
   'app:fix_pathist_huecos_v1', // 22/10/2026 (261022_08)
+  'app:fix_pathist_urb_v1', // 02/11/2026 (261102_03)
   // PUNTO 216 (24/09/2026): DNI, domicilios e IBAN — ya no van escritos en el archivo público de GitHub
   'app:datos_privados'
 ];
@@ -2290,7 +2291,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261102_02';
+const BUILD_ID = '261102_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -22524,6 +22525,7 @@ function fin_patHist_render() {
   if (sec) sec.style.display = '';
   if (emp === 'patricio') fin_patHist_migrarFinper(); // PUNTO 220
   if (emp === 'patricio') fin_patHist_rellenarHuecos(); // 22/10/2026 (B2)
+  if (emp === 'patricio') fin_patHist_corregirUrb(); // 02/11/2026
   fin_patHist_corregirExcel(); // PUNTO 222
   var lista = fin_patHist_load();
   var mesActual = fin_patHist_mesActual();
@@ -22614,7 +22616,12 @@ function fin_patHist_render() {
 var _patFoto = null; // líneas de la foto en curso
 
 // Desglose por banco de lo que hay AHORA en Finanzas (empresa activa).
-function fin_patHist_desglose() {
+function fin_patHist_desglose(ov) {
+  // 02/11/2026: "ov" = valores escritos en el Cierre del mes (aún sin
+  // guardar), para ver el reparto por banco ANTES de guardar.
+  ov = ov || {};
+  var _ovC = ov.c || {}, _ovF = ov.f || {}, _ovS = ov.s || {}, _ovT = ov.t || {};
+  var mercado = 0; // acciones + fondos + planes (lo "de bolsa")
   var emp = fin_emp();
   var bancos = {}, orden = [];
   function _linea(clave, nombre) {
@@ -22628,12 +22635,13 @@ function fin_patHist_desglose() {
   fin_visibles('fin:cuentas').forEach(function(c) {
     var clave = fin_asiClaveBrokerCuenta(c.nombre);
     var nombre = FIN_CUENTA_LABEL[clave] || (c.nombre || 'Cuenta');
-    _linea(clave, nombre).liquidez += numES(c.saldo);
+    _linea(clave, nombre).liquidez += (c.id in _ovC) ? _ovC[c.id] : numES(c.saldo);
   });
   // Invertido: fondos por su "Cuenta/Broker".
   var SIN = 'sin_asignar';
   fin_visibles('fin:fondos').forEach(function(f) {
-    var v = numES(f.valor);
+    var v = (f.id in _ovF) ? _ovF[f.id] : numES(f.valor);
+    mercado += v;
     if (f.cuenta) _linea(f.cuenta, _nombreClave(f.cuenta)).invertido += v;
     else if (f.gestora) _linea('g_' + String(f.gestora).toLowerCase().replace(/\s+/g, ''), f.gestora).invertido += v;
     else if (emp === 'patrimer') _linea('indexa', 'Indexa').invertido += v; // PUNTO 222: en Patrimer, los fondos son de Indexa
@@ -22647,7 +22655,8 @@ function fin_patHist_desglose() {
   var origenSimple = {};
   simples.forEach(function(s) {
     if (!s || s.deleted) return;
-    var v = numES(s.valorActual);
+    var v = (s.id in _ovS) ? _ovS[s.id] : numES(s.valorActual);
+    mercado += v;
     if (s.origenTicker) origenSimple[s.origenTicker] = true;
     var c = (s.origenTicker ? cuentaAcc[s.origenTicker] : '') || accPorDefecto;
     if (c) _linea(c, _nombreClave(c)).invertido += v;
@@ -22664,9 +22673,10 @@ function fin_patHist_desglose() {
   });
   Object.keys(pos).forEach(function(t) {
     if (pos[t] <= 0) return;
-    var cot = _finCotizaciones[t] || null;
+    var cot = (t in _ovT) ? _ovT[t] : (_finCotizaciones[t] || null);
     if (!cot) return;
     var v = cot * pos[t];
+    mercado += v;
     var c = cuentaAcc[t] || accPorDefecto;
     if (c) _linea(c, _nombreClave(c)).invertido += v;
     else _linea(SIN, 'Sin banco asignado').invertido += v;
@@ -22684,6 +22694,7 @@ function fin_patHist_desglose() {
   return {
     bancos: orden.map(function(k) { return bancos[k]; }),
     urbanitae: urbanitae,
+    mercado: mercado,
     inmobiliario: inm_patrimonioInmobiliario(emp).total
   };
 }
@@ -22867,15 +22878,32 @@ function cierre_leer() {
   inv += C.urb;
   return { liquidez: liq, invertido: inv, inmobiliario: C.inm, total: liq + inv + C.inm };
 }
+function cierre_ov() {
+  var C = _cierre, ov = { c: {}, f: {}, s: {}, t: {} }; if (!C) return ov;
+  C.cuentas.forEach(function(c, i) { if (!c.libroCaja && c.id) ov.c[c.id] = _cierreVal('cie-c' + i, numES(c.saldo)); });
+  C.fondos.forEach(function(f, i) { if (f.id) ov.f[f.id] = _cierreVal('cie-f' + i, numES(f.valor)); });
+  C.tickers.forEach(function(t, i) { ov.t[t] = _cierreVal('cie-t' + i, numES(_finCotizaciones[t])); });
+  C.simples.forEach(function(x, i) { if (x.id) ov.s[x.id] = _cierreVal('cie-s' + i, numES(x.valorActual)); });
+  return ov;
+}
 function cierre_recalc() {
   var R = cierre_leer(); var el = document.getElementById('cie-total'); if (!R || !el) return;
   var f = (document.getElementById('cie-fecha') || {}).value || '';
   var lista = fin_patHist_load().filter(function(x) { return x && !x.deleted && x.id < f.slice(0, 7); }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
   var ant = lista[lista.length - 1];
   var dif = ant ? R.total - numES(ant.total) : null;
+  // 02/11/2026: totales con y sin acciones + dónde sube y baja (por banco) frente a la foto anterior
+  var Dn = null; try { Dn = fin_patHist_desglose(cierre_ov()); } catch (eD) {}
+  var filaNueva = Dn ? fin_patHist_filaDe(Dn) : null;
+  var extra = '';
+  if (filaNueva) {
+    extra += '<div style="font-size:11.5px;color:var(--silver-mid);margin-top:4px;">Con acciones <b>' + fin_fmt(filaNueva.total) + '</b> · Sin acciones <b>' + fin_fmt(ph_sinAcc(filaNueva)) + '</b></div>';
+    if (ant) extra += ph_cambiosHtml(ant, filaNueva, true);
+  }
   el.innerHTML = '<div style="font-size:11px;color:var(--text-secondary);">Liquidez ' + fin_fmt(R.liquidez) + ' · Invertido ' + fin_fmt(R.invertido) + ' · Inmobiliario ' + fin_fmt(R.inmobiliario) + '</div>'
     + '<div style="font-size:22px;font-weight:700;font-family:\'Rajdhani\',sans-serif;color:var(--accent-gold);margin-top:4px;white-space:nowrap;">' + fin_fmt(R.total) + '</div>'
-    + (dif !== null ? '<div style="font-size:12px;font-weight:700;color:' + (dif >= 0 ? '#4caf82' : '#e57373') + ';">' + (dif >= 0 ? '+' : '') + fin_fmt(dif) + (numES(ant.total) ? ' (' + (dif >= 0 ? '+' : '') + (dif / numES(ant.total) * 100).toFixed(2).replace('.', ',') + ' %)' : '') + ' frente a ' + fin_patHist_fechaCorta(ant) + '</div>' : '');
+    + (dif !== null ? '<div style="font-size:12px;font-weight:700;color:' + (dif >= 0 ? '#4caf82' : '#e57373') + ';">' + (dif >= 0 ? '+' : '') + fin_fmt(dif) + (numES(ant.total) ? ' (' + (dif >= 0 ? '+' : '') + (dif / numES(ant.total) * 100).toFixed(2).replace('.', ',') + ' %)' : '') + ' frente a ' + fin_patHist_fechaCorta(ant) + '</div>' : '')
+    + extra;
 }
 function cierre_guardar() {
   if (bloqueaSiViewer('Guardar el cierre del mes')) return;
@@ -22899,10 +22927,11 @@ function cierre_guardar() {
     var d = fin_patHist_desglose();
     var liq = d.bancos.reduce(function(s2, b) { return s2 + b.liquidez; }, 0);
     var inv = d.bancos.reduce(function(s2, b) { return s2 + b.invertido; }, 0) + d.urbanitae;
+    var _merc = Math.round(d.mercado * 100) / 100; // 02/11/2026: acciones + fondos + planes, aparte
     var lista = fin_patHist_load().filter(function(x) { return x && x.id !== id; });
     var ant = fin_patHist_load().find(function(x) { return x && x.id === id; });
     lista.push({ id: id, fecha: fecha, liquidez: liq, invertido: inv, inmobiliario: d.inmobiliario, total: liq + inv + d.inmobiliario,
-      bancos: d.bancos.map(function(b) { return { nombre: b.nombre, liquidez: b.liquidez, invertido: b.invertido }; }), urbanitae: d.urbanitae,
+      bancos: d.bancos.map(function(b) { return { nombre: b.nombre, liquidez: b.liquidez, invertido: b.invertido }; }), urbanitae: d.urbanitae, mercado: _merc,
       nota: ant ? (ant.nota || '') : '', origen: 'cierre', updatedAt: ahora });
     fin_patHist_save(lista);
     cierre_cerrar();
@@ -22945,14 +22974,94 @@ function fin_patHist_rellenarHuecos() {
   } catch (e) { console.warn('[Huecos patrimonio]', e.message); }
 }
 
+// ═══ 02/11/2026 (Patry, ideas 2, 3 y 4): CON / SIN ACCIONES, DÓNDE SUBE Y
+// BAJA, Y MARCA DEL PAGO DE LA RENTA ═══
+// "Acciones" = acciones + fondos + planes (lo de bolsa). Urbanitae NO.
+// En las fotos: mercado = invertido − Urbanitae (las nuevas lo guardan aparte).
+function ph_mercado(r) { return (r && r.mercado != null) ? numES(r.mercado) : Math.max(0, numES(r && r.invertido) - numES(r && r.urbanitae)); }
+function ph_sinAcc(r) { return numES(r.total) - ph_mercado(r); }
+function fin_patHist_filaDe(d) {
+  var liq = d.bancos.reduce(function(s2, b) { return s2 + b.liquidez; }, 0);
+  var inv = d.bancos.reduce(function(s2, b) { return s2 + b.invertido; }, 0) + d.urbanitae;
+  return { liquidez: liq, invertido: inv, inmobiliario: d.inmobiliario, total: liq + inv + d.inmobiliario, urbanitae: d.urbanitae, mercado: d.mercado,
+    bancos: d.bancos.map(function(b) { return { nombre: b.nombre, liquidez: b.liquidez, invertido: b.invertido }; }) };
+}
+// Cambios de una foto a otra. porBanco: por banco o bróker si las dos lo traen;
+// si no (o si porBanco es false), por bloques.
+function ph_cambios(a, b, porBanco) {
+  var L = [];
+  var bancoDe = function(r) { var m = {}; (r.bancos || []).forEach(function(x) { m[x.nombre] = numES(x.liquidez) + numES(x.invertido); }); return m; };
+  if (porBanco && a.bancos && a.bancos.length && b.bancos && b.bancos.length) {
+    var ma = bancoDe(a), mb = bancoDe(b), nombres = {};
+    Object.keys(ma).concat(Object.keys(mb)).forEach(function(n) { nombres[n] = 1; });
+    Object.keys(nombres).forEach(function(n) { L.push({ n: n, d: (mb[n] || 0) - (ma[n] || 0) }); });
+    L.push({ n: 'Urbanitae', d: numES(b.urbanitae) - numES(a.urbanitae) });
+    L.push({ n: 'Inmobiliario', d: numES(b.inmobiliario) - numES(a.inmobiliario) });
+  } else {
+    L.push({ n: 'Liquidez', d: numES(b.liquidez) - numES(a.liquidez) });
+    L.push({ n: 'Acciones', d: ph_mercado(b) - ph_mercado(a) });
+    L.push({ n: 'Urbanitae', d: numES(b.urbanitae) - numES(a.urbanitae) });
+    L.push({ n: 'Inmobiliario', d: numES(b.inmobiliario) - numES(a.inmobiliario) });
+  }
+  return L.filter(function(x) { return Math.abs(x.d) >= 1; }).sort(function(x, y) { return Math.abs(y.d) - Math.abs(x.d); });
+}
+function ph_cambiosHtml(a, b, porBanco) {
+  var L = ph_cambios(a, b, porBanco); if (!L.length) return '';
+  return '<div style="font-size:11px;line-height:1.6;margin-top:4px;">' + L.map(function(x) {
+    var sube = x.d >= 0;
+    return '<span style="white-space:nowrap;color:' + (sube ? '#4caf82' : '#e57373') + ';">' + (sube ? '▲ ' : '▼ ') + notas_esc(x.n) + ' ' + (sube ? '+' : '') + fin_fmt(x.d) + '</span>';
+  }).join(' <span style="color:var(--text-secondary);">·</span> ') + '</div>';
+}
+// Pago de la Renta en el Histórico (solo Patricio): el 30/06 se ve en la foto
+// del 1 de julio (60 %) y el 05/11 en la del 1 de diciembre (40 %).
+var _phRentaCache = {};
+function ph_pagoRenta(r) {
+  if (fin_emp() !== 'patricio' || !r || !r.id) return null;
+  var m = r.id.slice(5, 7); if (m !== '07' && m !== '12') return null;
+  var Y = parseInt(r.id.slice(0, 4), 10) - 1;
+  var real = (typeof renta_resReal === 'function') ? renta_resReal(Y) : null, imp = null, est = false;
+  if (real) { if (real.tipo === 'devolver') return null; imp = numES(real.importe); }
+  else {
+    if (!(Y in _phRentaCache)) { try { _phRentaCache[Y] = renta_estimacionAnio(Y); } catch (e) { _phRentaCache[Y] = null; } }
+    imp = _phRentaCache[Y]; est = true;
+  }
+  if (!(imp > 0)) return null;
+  var pl = renta_plazos(imp);
+  return { anio: Y, plazo: m === '07' ? 1 : 2, importe: m === '07' ? pl.p1 : pl.p2, estimado: est };
+}
+
+// 02/11/2026: Patry empezó en Urbanitae en agosto de 2026. El reparto lineal
+// de las fotos estimadas le puso Urbanitae a julio; se recoloca: julio 0,
+// agosto 1/3 y septiembre 2/3 de lo de octubre. El invertido y el total de
+// esas fotos no cambian (solo cuánto de ese invertido es Urbanitae y cuánto bolsa).
+function fin_patHist_corregirUrb() {
+  try {
+    if (localStorage.getItem('app:fix_pathist_urb_v1')) return;
+    if (typeof getRol === 'function' && getRol() !== 'admin') return;
+    if (!window._appEstable) return;
+    var lista = fin_patHist_load('patricio');
+    var oct = lista.find(function(x) { return x && !x.deleted && x.id === '2026-10'; });
+    if (!oct) return;
+    var U = numES(oct.urbanitae), cambio = false, ahora = new Date().toISOString();
+    [['2026-07', 0], ['2026-08', 1 / 3], ['2026-09', 2 / 3]].forEach(function(p2) {
+      var row = lista.find(function(x) { return x && !x.deleted && x.id === p2[0] && x.estimada; });
+      if (!row) return;
+      var nuevo = Math.round(U * p2[1] * 100) / 100;
+      if (Math.abs(numES(row.urbanitae) - nuevo) > 0.005) { row.urbanitae = nuevo; row.updatedAt = ahora; cambio = true; }
+    });
+    if (cambio) fin_patHist_save(lista, 'patricio');
+    localStorage.setItem('app:fix_pathist_urb_v1', '1');
+  } catch (e) { console.warn('[Urbanitae estimadas]', e.message); }
+}
+
 // ═══ 22/10/2026 (D2): GRÁFICOS DEL HISTÓRICO DE PATRIMONIO ═══
 // Tres gráficos (un solo eje cada uno): 1) evolución del total (línea; los
 // meses estimados en discontinua), 2) composición (barras apiladas liquidez /
 // invertido / inmobiliario), 3) por banco o bróker (las fotos que lo traen).
 // Tocar cualquier mes muestra su detalle debajo. Paleta validada (modo oscuro).
-var PH_COL = { liquidez: '#3987e5', invertido: '#d95926', inmobiliario: '#199e70' };
+var PH_COL = { liquidez: '#3987e5', invertido: '#d95926', inmobiliario: '#199e70', urbanitae: '#c98500' };
 var PH_BANCO_COL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
-var _phSel = null, _phSoloFin = false, _phN = 0;
+var _phSel = null, _phSoloFin = false, _phN = 0, _phSinAcc = false;
 // 22/10/2026 (261022_09, pedido por Patry): en Patricio, las fotos anteriores
 // a la del 1 de diciembre de 2026 son aproximadas (cobro de Sierra Nevada en
 // varios meses, huecos estimados, boda) → la línea va en gris hasta ahí y en
@@ -22973,15 +23082,21 @@ function fin_patHist_grafico(ordenada) {
   var paso = Math.max(1, Math.ceil(n / 7));
   var ejeX = function(hh) { return L.map(function(r, i) { return (i % paso === 0 || i === n - 1) ? '<text x="' + xs(i) + '" y="' + (hh - 6) + '" text-anchor="middle" font-size="9" fill="#96a8c8">' + lab(r) + '</text>' : ''; }).join(''); };
   var grid = function(min, max, hh, ih2) { var g = ''; for (var k = 0; k <= 3; k++) { var v = min + (max - min) * k / 3, y = pt + ih2 - ih2 * k / 3; g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y + '" y2="' + y + '" stroke="rgba(255,255,255,0.07)"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#96a8c8">' + _phK(Math.abs(max - min) >= 3000 ? Math.round(v / 1000) * 1000 : v) + '</text>'; } return g; };
-  var totales = L.map(function(r) { return _phSoloFin ? numES(r.liquidez) + numES(r.invertido) : numES(r.total); });
+  _phRentaCache = {};
+  var totales = L.map(function(r) { var v = _phSoloFin ? numES(r.liquidez) + numES(r.invertido) : numES(r.total); return _phSinAcc ? v - ph_mercado(r) : v; });
   // resumen
   var ult = totales[n - 1], ant = totales[n - 2], ini = totales[0];
   var idx12 = -1; var ref12 = (function() { var r = L[n - 1]; var y = parseInt(r.id.slice(0, 4), 10) - 1; return y + r.id.slice(4); })();
   L.forEach(function(r, i) { if (r.id <= ref12) idx12 = i; });
   var chip = function(t, a, b) { if (b === undefined || b === null || !b) return ''; var d = a - b; return '<div style="flex:1;min-width:0;background:rgba(255,255,255,0.04);border-radius:10px;padding:6px 4px;text-align:center;"><div style="font-size:9.5px;color:var(--text-secondary);letter-spacing:.5px;">' + t + '</div><div style="font-size:13px;font-weight:700;white-space:nowrap;color:' + (d >= 0 ? '#4caf82' : '#e57373') + ';">' + (d >= 0 ? '+' : '') + _phK(d) + ' €</div><div style="font-size:10px;color:var(--text-secondary);">' + (d >= 0 ? '+' : '') + (d / b * 100).toFixed(1).replace('.', ',') + ' %</div></div>'; };
   var h = '<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;">'
-    + ['Todo', 'Solo financiero'].map(function(t, i) { var act = (i === 1) === _phSoloFin; return '<span onclick="_phSoloFin=' + (i === 1) + ';fin_patHist_render()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid ' + (act ? '#5b8dee' : 'var(--border)') + ';color:' + (act ? '#5b8dee' : 'var(--text-secondary)') + ';">' + t + '</span>'; }).join('') + '</div>';
-  h += '<div style="display:flex;gap:6px;margin-bottom:10px;">' + chip('ÚLTIMO MES', ult, ant) + (idx12 >= 0 && idx12 < n - 1 ? chip('12 MESES', ult, totales[idx12]) : '') + chip('DESDE EL INICIO', ult, ini) + '</div>';
+    + ['Todo', 'Solo financiero'].map(function(t, i) { var act = (i === 1) === _phSoloFin; return '<span onclick="_phSoloFin=' + (i === 1) + ';fin_patHist_render()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid ' + (act ? '#5b8dee' : 'var(--border)') + ';color:' + (act ? '#5b8dee' : 'var(--text-secondary)') + ';">' + t + '</span>'; }).join('') + '</div>'
+    + '<div style="display:flex;justify-content:center;gap:6px;margin:-2px 0 8px;">' // 02/11/2026: con / sin acciones (acciones + fondos + planes)
+    + ['Con acciones', 'Sin acciones'].map(function(t, i) { var act = (i === 1) === _phSinAcc; return '<span onclick="_phSinAcc=' + (i === 1) + ';fin_patHist_render()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid ' + (act ? '#5b8dee' : 'var(--border)') + ';color:' + (act ? '#5b8dee' : 'var(--text-secondary)') + ';">' + t + '</span>'; }).join('')
+    + '<span onclick="_nubeMsg(\'📈\', \'Con o sin acciones\', \'«Sin acciones» quita todo lo que es de bolsa: acciones, fondos y planes de pensiones. Urbanitae se queda.\\n\\nSirve para ver cuánto se mueve tu patrimonio por lo que ahorras o gastas, sin que la bolsa lo tape.\')" style="font-size:11px;color:#5b8dee;cursor:pointer;border:1px solid rgba(91,141,238,.5);border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;align-self:center;">i</span></div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:6px;">' + chip('ÚLTIMO MES', ult, ant) + (idx12 >= 0 && idx12 < n - 1 ? chip('12 MESES', ult, totales[idx12]) : '') + chip('DESDE EL INICIO', ult, ini) + '</div>';
+  var _cUlt = ph_cambios(L[n - 2], L[n - 1], false).filter(function(x) { return !(_phSoloFin && x.n === 'Inmobiliario') && !(_phSinAcc && x.n === 'Acciones'); });
+  if (_cUlt.length) h += '<div style="text-align:center;margin:-2px 0 10px;"><div style="font-size:9.5px;letter-spacing:.5px;color:var(--text-secondary);">ÚLTIMO MES · DÓNDE SUBE Y BAJA</div>' + '<div style="font-size:11px;line-height:1.6;">' + _cUlt.map(function(x) { var sube = x.d >= 0; return '<span style="white-space:nowrap;color:' + (sube ? '#4caf82' : '#e57373') + ';">' + (sube ? '▲ ' : '▼ ') + x.n + ' ' + (sube ? '+' : '') + fin_fmt(x.d) + '</span>'; }).join(' <span style="color:var(--text-secondary);">·</span> ') + '</div></div>';
   // 1) total
   var mn = Math.min.apply(null, totales), mx = Math.max.apply(null, totales); var pad = (mx - mn) * 0.15 || mx * 0.02 || 1; mn -= pad; mx += pad;
   var ys = function(v) { return pt + ih - ih * (v - mn) / (mx - mn); };
@@ -22993,14 +23108,17 @@ function fin_patHist_grafico(ordenada) {
   // meses con nota (p. ej. "Boda"): un círculo amarillo alrededor del punto (261022_10: sin el segundo aro)
   var anillos = L.map(function(r, i) { if (!String(r.nota || '').trim() || r.estimada) return ''; var cx = xs(i), cy = ys(totales[i]); return '<circle cx="' + cx + '" cy="' + cy + '" r="8" fill="none" stroke="' + PH_ORO + '" stroke-width="1.6"/>'; }).join('');
   var hayNotas = !!anillos;
-  var pts = L.map(function(r, i) { var c = gris(r) ? PH_GRIS : '#c8d4e8'; return '<circle cx="' + xs(i) + '" cy="' + ys(totales[i]) + '" r="' + (i === _phSel ? 5 : 3.5) + '" fill="' + (r.estimada ? '#1a2440' : c) + '" stroke="' + c + '" stroke-width="2"/>'; }).join('') + anillos;
+  // 02/11/2026: ▼ pago de la Renta (rojo suave) sobre las fotos del 1 jul y 1 dic
+  var flechas = L.map(function(r, i) { var pr = ph_pagoRenta(r); if (!pr) return ''; var cx = xs(i), cy = ys(totales[i]) - (String(r.nota || '').trim() ? 13 : 8); return '<path d="M' + (cx - 5) + ' ' + (cy - 7) + ' h10 l-5 7 z" fill="#e57373"/>'; }).join('');
+  var hayRenta = !!flechas;
+  var pts = L.map(function(r, i) { var c = gris(r) ? PH_GRIS : '#c8d4e8'; return '<circle cx="' + xs(i) + '" cy="' + ys(totales[i]) + '" r="' + (i === _phSel ? 5 : 3.5) + '" fill="' + (r.estimada ? '#1a2440' : c) + '" stroke="' + c + '" stroke-width="2"/>'; }).join('') + anillos + flechas;
   var hit = function(hh) { return L.map(function(r, i) { var w = (iw - 2 * ins) / Math.max(1, n - 1); return '<rect x="' + (xs(i) - w / 2) + '" y="0" width="' + w + '" height="' + hh + '" fill="transparent" style="cursor:pointer" onclick="_phSel=' + i + ';fin_patHist_render()"/>'; }).join(''); };
   var selLine = function(hh) { return '<line x1="' + xs(_phSel) + '" x2="' + xs(_phSel) + '" y1="' + pt + '" y2="' + (hh - pb) + '" stroke="rgba(200,212,232,0.35)" stroke-dasharray="2 3"/>'; };
   var caja = function(t, svg) { return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:8px 6px 4px;margin-bottom:10px;"><div style="font-size:10.5px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;text-align:center;margin-bottom:2px;">' + t + '</div>' + svg + '</div>'; };
-  h += caja((_phSoloFin ? 'Patrimonio financiero' : 'Patrimonio total') + ' · evolución', '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;">' + grid(mn, mx, H, ih) + selLine(H) + seg + pts + ejeX(H) + hit(H) + '</svg>'
-    + '<div style="font-size:9.5px;color:var(--text-secondary);text-align:center;">— real · - - - estimado' + (hayGris ? ' · <span style="color:' + PH_GRIS + ';font-weight:700;">━</span> aproximado' : '') + (hayNotas ? ' · <span style="color:' + PH_ORO + ';">○</span> con nota' : '') + '</div>');
+  h += caja((_phSoloFin ? 'Patrimonio financiero' : 'Patrimonio total') + (_phSinAcc ? ' sin acciones' : '') + ' · evolución', '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;">' + grid(mn, mx, H, ih) + selLine(H) + seg + pts + ejeX(H) + hit(H) + '</svg>'
+    + '<div style="font-size:9.5px;color:var(--text-secondary);text-align:center;">— real · - - - estimado' + (hayGris ? ' · <span style="color:' + PH_GRIS + ';font-weight:700;">━</span> aproximado' : '') + (hayNotas ? ' · <span style="color:' + PH_ORO + ';">○</span> con nota' : '') + (hayRenta ? ' · <span style="color:#e57373;">▼</span> pago de la Renta' : '') + '</div>');
   // 2) composición (barras apiladas desde 0)
-  var partes = _phSoloFin ? ['liquidez', 'invertido'] : ['liquidez', 'invertido', 'inmobiliario'];
+  var partes = _phSinAcc ? (_phSoloFin ? ['liquidez', 'urbanitae'] : ['liquidez', 'urbanitae', 'inmobiliario']) : (_phSoloFin ? ['liquidez', 'invertido'] : ['liquidez', 'invertido', 'inmobiliario']);
   var H2 = 160, ih2 = H2 - pt - pb, mx2 = Math.max.apply(null, L.map(function(r) { return partes.reduce(function(s2, c) { return s2 + Math.max(0, numES(r[c])); }, 0); })) * 1.05 || 1;
   var bw = Math.max(6, Math.min(24, iw / n * 0.62));
   var barras = L.map(function(r, i) {
@@ -23038,6 +23156,9 @@ function fin_patHist_grafico(ordenada) {
     + '<div style="font-size:11px;color:var(--silver-mid);margin-top:4px;line-height:1.5;">' + partes.map(function(c) { return '<span style="color:' + PH_COL[c] + ';">■</span> ' + c.charAt(0).toUpperCase() + c.slice(1) + ' ' + fin_fmt(numES(S[c])); }).join(' · ') + '</div>'
     + (String(S.nota || '').trim() ? '<div style="font-size:12px;font-weight:700;color:#f0d878;margin-top:5px;">' + notas_esc(S.nota) + '</div>' : '')
     + (fiable && String(S.id) < fiable ? '<div style="font-size:10px;color:' + PH_GRIS + ';margin-top:2px;">Dato aproximado (antes del 1 dic 2026)</div>' : '')
+    + (function() { var pr = ph_pagoRenta(S); return pr ? '<div style="font-size:12px;font-weight:700;color:#e57373;margin-top:5px;">▼ Pago Renta ' + pr.anio + ' · ' + (pr.plazo === 1 ? '1.er' : '2.º') + ' plazo: ' + (pr.estimado ? '~' : '') + fin_fmt(pr.importe) + (pr.estimado ? ' (previsión)' : '') + '</div>' : ''; })()
+    + '<div style="font-size:11px;color:var(--silver-mid);margin-top:4px;">Con acciones <b>' + fin_fmt(numES(S.total)) + '</b> · Sin acciones <b>' + fin_fmt(ph_sinAcc(S)) + '</b></div>'
+    + (_phSel > 0 ? ph_cambiosHtml(L[_phSel - 1], S, true) : '')
     + (S.bancos && S.bancos.length ? '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">🏦 ' + S.bancos.filter(function(b) { return numES(b.liquidez) + numES(b.invertido) > 0; }).map(function(b) { return notas_esc(b.nombre) + ' ' + fin_fmt(numES(b.liquidez) + numES(b.invertido)); }).join(' · ') + '</div>' : '')
     + '<div style="font-size:9.5px;color:var(--text-secondary);margin-top:4px;">Toca un mes en los gráficos para ver su detalle</div></div>';
   el.innerHTML = h;
