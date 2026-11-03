@@ -2291,7 +2291,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261103_01';
+const BUILD_ID = '261103_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -24418,9 +24418,12 @@ function divcal_render() {
       var idxEv = D.ev.indexOf(e);
       var editable = e.estado !== 'cobrado';
       h += '<div ' + (editable ? 'onclick="divcal_editar(' + idxEv + ')" ' : '') + 'style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;' + (editable ? 'cursor:pointer;' : '') + '">';
+      // 03/11/2026 (Patry): editar ✎ al PRINCIPIO de la fila y quitar ✕ al FINAL,
+      // separados, igual que en Otros ingresos (punto 243).
+      h += editable ? '<span style="color:var(--text-secondary);font-size:14px;width:18px;flex-shrink:0;text-align:center;">✎</span>' : '<span style="width:18px;flex-shrink:0;"></span>';
       h += '<span style="width:9px;height:9px;border-radius:50%;background:' + col + ';flex-shrink:0;"></span>';
       h += '<span style="color:var(--silver-bright);flex:1;">' + (FIN_NOMBRES[e.ticker] || e.ticker) + ' <span style="color:var(--text-secondary);font-size:11px;">· ' + aprox + divcal_fechaCorta(e.fecha) + '</span></span>';
-      h += badge + '<span style="min-width:72px;text-align:right;color:var(--silver-bright);font-weight:600;">' + aprox + divcal_eur(e.importe) + '</span>' + (editable ? '<span style="color:var(--text-secondary);font-size:12px;">✎</span><span onclick="event.stopPropagation();divcal_quitar(' + idxEv + ')" title="Quitar" style="color:#e57373;font-size:13px;font-weight:700;padding:0 2px 0 6px;cursor:pointer;">✕</span>' : '<span style="width:12px;"></span>') + '</div>';
+      h += badge + '<span style="min-width:72px;text-align:right;color:var(--silver-bright);font-weight:600;">' + aprox + divcal_eur(e.importe) + '</span>' + (editable ? '<span onclick="event.stopPropagation();divcal_quitar(' + idxEv + ')" title="Quitar" style="color:#e57373;font-size:15px;font-weight:700;width:22px;flex-shrink:0;text-align:right;cursor:pointer;">✕</span>' : '<span style="width:22px;flex-shrink:0;"></span>') + '</div>';
     });
     h += '</div>';
   });
