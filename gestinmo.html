@@ -2291,7 +2291,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261102_03';
+const BUILD_ID = '261103_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -24100,6 +24100,7 @@ function divcal_datos() {
     var ratio = antes > 0 ? accionesHoy[o.ticker] / antes : 1;
     var idP = o.ticker + '|' + o.tipo + '|' + o.fecha;
     var aj = ajusteDe(idP);
+    if (aj && aj.anulado) return; // 03/11/2026: "este año no lo paga" (p. ej. Telefónica, diciembre)
     var fProy = aj && aj.fecha ? aj.fecha : divcal_mas12(o.fecha);
     if (fProy >= finVentana) return;
     // Si ya hay un cobro real de esa acción ese mismo mes, no se duplica
@@ -24215,6 +24216,7 @@ function divcal_editar(i) {
   var b = document.getElementById('divcal-m-reset');
   b.style.display = (e.ajustado || e.manual) ? '' : 'none';
   b.textContent = e.manual ? 'Quitar este cobro' : 'Volver a la estimación';
+  var bq = document.getElementById('divcal-m-quitar'); if (bq) bq.style.display = e.manual ? 'none' : ''; // los manuales ya tienen "Quitar este cobro"
   divcal_abrirModal((FIN_NOMBRES[e.ticker] || e.ticker) + (e.scrip ? ' · acciones (scrip)' : ' · efectivo'),
     e.manual ? 'Cobro añadido a mano.' : ('Estimación: ~' + divcal_eur(e.estimado) + ' hacia el ' + divcal_fechaCorta(e.fechaEstimada) + '. Pon la fecha y el importe bruto que anuncie la empresa.'));
 }
@@ -24231,6 +24233,7 @@ function divcal_nuevo() {
   document.getElementById('divcal-m-importe').value = '';
   document.getElementById('divcal-m-acc').value = '';
   document.getElementById('divcal-m-reset').style.display = 'none';
+  var bqN = document.getElementById('divcal-m-quitar'); if (bqN) bqN.style.display = 'none';
   divcal_abrirModal('Añadir cobro previsto', 'Por ejemplo, un dividendo a cuenta que la previsión no tiene.');
   divcal_selTicker(_divcalEd.ticker); divcal_selTipo(false);
 }
@@ -24250,6 +24253,31 @@ function divcal_guardar() {
   divcal_ajustesSave(arr);
   closeModalById('divcal-modal');
   divcal_render(); divcal_renderTarjeta();
+}
+// 03/11/2026 (Patry): quitar un cobro de la previsión — una empresa que deja de
+// pagar ese dividendo (Telefónica quitó el de diciembre). Los previstos quedan
+// marcados "anulado" (se puede deshacer borrando ese ajuste); los añadidos a mano se borran.
+function divcal_quitar(i) {
+  if (bloqueaSiViewer('Quitar un cobro del calendario de dividendos')) return;
+  var e = (window._divcalUlt && window._divcalUlt.ev || [])[i];
+  if (!e || e.estado === 'cobrado' || !e.id) return;
+  var nom = FIN_NOMBRES[e.ticker] || e.ticker;
+  showConfirm('✕', 'Quitar ' + nom + ' · ' + divcal_fechaCorta(e.fecha), e.manual ? '¿Quitar este cobro añadido a mano?' : 'Para cuando una empresa deja de pagar este dividendo. Se quita de la previsión de este año; los demás cobros de ' + nom + ' siguen igual.', [{ label: 'Quitar', cls: 'r', fn: function() {
+    var emp = fin_emp(), ahora = new Date().toISOString(), arr = divcal_ajustesLoad(), k = -1;
+    arr.forEach(function(a, j) { if (a && a.id === e.id && a.empresa === emp) k = j; });
+    var reg = e.manual ? { id: e.id, empresa: emp, deleted: true, updatedAt: ahora } : { id: e.id, empresa: emp, ticker: e.ticker, anulado: true, updatedAt: ahora };
+    if (k >= 0) arr[k] = reg; else arr.push(reg);
+    divcal_ajustesSave(arr);
+    try { closeModalById('divcal-modal'); } catch (eC) {}
+    divcal_render(); divcal_renderTarjeta();
+    if (typeof showToast === 'function') showToast('✕ ' + nom + ' quitado de la previsión', 'success');
+  } }]);
+}
+function divcal_quitarDesdeModal() {
+  if (!_divcalEd) return;
+  var lista = (window._divcalUlt && window._divcalUlt.ev) || [], i = -1;
+  lista.forEach(function(x, j) { if (x && x.id === _divcalEd.id) i = j; });
+  if (i >= 0) divcal_quitar(i);
 }
 function divcal_reset() {
   if (!_divcalEd) return;
@@ -24392,7 +24420,7 @@ function divcal_render() {
       h += '<div ' + (editable ? 'onclick="divcal_editar(' + idxEv + ')" ' : '') + 'style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;' + (editable ? 'cursor:pointer;' : '') + '">';
       h += '<span style="width:9px;height:9px;border-radius:50%;background:' + col + ';flex-shrink:0;"></span>';
       h += '<span style="color:var(--silver-bright);flex:1;">' + (FIN_NOMBRES[e.ticker] || e.ticker) + ' <span style="color:var(--text-secondary);font-size:11px;">· ' + aprox + divcal_fechaCorta(e.fecha) + '</span></span>';
-      h += badge + '<span style="min-width:72px;text-align:right;color:var(--silver-bright);font-weight:600;">' + aprox + divcal_eur(e.importe) + '</span>' + (editable ? '<span style="color:var(--text-secondary);font-size:12px;">✎</span>' : '<span style="width:12px;"></span>') + '</div>';
+      h += badge + '<span style="min-width:72px;text-align:right;color:var(--silver-bright);font-weight:600;">' + aprox + divcal_eur(e.importe) + '</span>' + (editable ? '<span style="color:var(--text-secondary);font-size:12px;">✎</span><span onclick="event.stopPropagation();divcal_quitar(' + idxEv + ')" title="Quitar" style="color:#e57373;font-size:13px;font-weight:700;padding:0 2px 0 6px;cursor:pointer;">✕</span>' : '<span style="width:12px;"></span>') + '</div>';
     });
     h += '</div>';
   });
@@ -30240,6 +30268,7 @@ if ('serviceWorker' in navigator) {
     <button class="btn1" onclick="divcal_guardar()">Guardar fecha e importe</button>
     <button class="btn2" onclick="divcal_pasarAAcciones()" style="margin-top:8px;border-color:rgba(76,175,130,.6);color:var(--accent-green);">✓ Cobrado: pasarlo a Acciones</button>
     <button class="btn2" id="divcal-m-reset" onclick="divcal_reset()" style="margin-top:8px;display:none;">Volver a la estimación</button>
+    <button class="btn2" id="divcal-m-quitar" onclick="divcal_quitarDesdeModal()" style="margin-top:8px;color:#e57373;border-color:rgba(229,115,115,.5);">✕ No lo paga · quitar de la previsión</button>
     <button class="btn2" onclick="closeModalById('divcal-modal')" style="margin-top:8px;">Cancelar</button>
   </div>
 </div>
