@@ -2291,7 +2291,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261103_02';
+const BUILD_ID = '261107_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -19645,6 +19645,28 @@ function fin_haceDias(iso) {
   var txt = d === 0 ? 'actualizado hoy' : d === 1 ? 'actualizado ayer' : 'actualizado hace ' + d + ' días';
   return '<div style="font-size:10px;color:' + col + ';margin-top:1px;">🕒 ' + txt + '</div>';
 }
+// 07/11/2026 (Patry, opción A): tarjetas compactas en Cuentas, Fondos y
+// Urbanitae — ✎ al principio, importe y ✕ al final, sin botones grandes.
+function fin_haceDiasCorto(iso) {
+  if (!iso) return '';
+  var t = Date.parse(iso); if (!isFinite(t)) return '';
+  var d = Math.max(0, Math.floor((Date.now() - t) / 86400000));
+  var col = d > 60 ? '#e57373' : d >= 30 ? '#e0a030' : 'inherit';
+  return '<span style="color:' + col + ';white-space:nowrap;">🕒 ' + (d === 0 ? 'hoy' : d === 1 ? 'ayer' : 'hace ' + d + ' días') + '</span>';
+}
+function fin_filaCompacta(o) {
+  // o: { editar: 'js()' | null, nombre, sub (html), importe (html), quitar: 'js()' | null, derecha (html extra) }
+  var admin = !(typeof getRol === 'function' && getRol() !== 'admin');
+  var ed = admin && o.editar, qu = admin && o.quitar;
+  return '<div style="display:flex;align-items:center;gap:8px;">'
+    + (ed ? '<span onclick="' + o.editar + '" title="Editar" style="color:var(--text-secondary);font-size:16px;width:18px;flex-shrink:0;text-align:center;cursor:pointer;">✎</span>' : (o.sinHueco ? '' : '<span style="width:18px;flex-shrink:0;"></span>'))
+    + '<div style="flex:1;min-width:0;"' + (ed ? ' onclick="' + o.editar + '"' : '') + '><div class="fin-card-nombre" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + o.nombre + '</div>'
+    + (o.sub ? '<div style="font-size:10.5px;color:var(--text-secondary);line-height:1.35;">' + o.sub + '</div>' : '') + '</div>'
+    + '<div class="fin-card-saldo">' + o.importe + '</div>'
+    + (o.derecha || '')
+    + (qu ? '<span onclick="' + o.quitar + '" title="Eliminar" style="color:#e57373;font-size:16px;font-weight:700;width:20px;flex-shrink:0;text-align:right;cursor:pointer;">✕</span>' : '')
+    + '</div>';
+}
 function fin_save(base, data) {
   localStorage.setItem(fin_key(base), JSON.stringify(data));
 }
@@ -20199,15 +20221,11 @@ function fin_renderCuentas() {
     total += parseFloat(c.saldo) || 0;
     // PUNTO 256 (06/10/2026): cuenta llevada como libro de caja (Efectivo)
     if (c.libroCaja) { html += caja_htmlCuenta(c); continue; }
-    html += '<div class="fin-card">';
-    html += '<div class="fin-card-top">';
-    html += '<div><div class="fin-card-nombre">' + (c.nombre || 'Cuenta') + '</div>';
-    html += '<div class="fin-card-sub">' + (c.iban ? 'IBAN \u00b7\u00b7\u00b7\u00b7 ' + c.iban : '') + '</div>' + fin_haceDias(c.saldoFecha || c.updatedAt) + '</div>';
-    html += '<div class="fin-card-saldo">' + fin_fmt(c.saldo) + '</div></div>';
-    html += '<div class="fin-card-actions">';
-    html += '<div class="fin-action-btn" onclick="fin_editarCuenta(' + i + ')">Actualizar saldo</div>';
-    html += '<div class="fin-action-btn red" onclick="fin_borrarCuenta(' + i + ')">Eliminar</div>';
-    html += '</div></div>';
+    html += '<div class="fin-card" style="padding:10px;">' + fin_filaCompacta({ // 07/11/2026: opción A
+      editar: 'fin_editarCuenta(' + i + ')', quitar: 'fin_borrarCuenta(' + i + ')',
+      nombre: notas_esc(c.nombre || 'Cuenta'),
+      sub: [c.iban ? 'IBAN \u00b7\u00b7' + notas_esc(c.iban) : '', fin_haceDiasCorto(c.saldoFecha || c.updatedAt)].filter(Boolean).join(' · '),
+      importe: fin_fmt(c.saldo) }) + '</div>';
   }
   lista.innerHTML = html;
   if (totEl) {
@@ -20358,15 +20376,12 @@ function caja_htmlCuenta(c) {
   var acc = 0;
   movs.forEach(function(m) { acc += parseFloat(m.importe) || 0; m._saldo = acc; });
   var abierto = !!window._cajaAbierto[c.id];
-  var h = '<div class="fin-card">';
-  h += '<div class="fin-card-top">';
-  h += '<div><div class="fin-card-nombre">' + (c.nombre || 'Efectivo') + '</div>';
-  h += '<div class="fin-card-sub">' + (c.iban ? 'IBAN ···· ' + c.iban : 'Libro de caja') + '</div></div>';
-  h += '<div class="fin-card-saldo">' + fin_fmt(c.saldo) + '</div></div>';
-  h += '<div class="fin-card-actions">';
-  h += '<div class="fin-action-btn green" onclick="caja_abrir(\'' + c.id + '\',\'ing\')">+ Ingreso</div>';
-  h += '<div class="fin-action-btn red" onclick="caja_abrir(\'' + c.id + '\',\'gas\')">− Gasto</div>';
-  h += '</div>';
+  // 07/11/2026 (opción A): una fila con botones pequeños + (ingreso) y − (gasto)
+  var admin = !(typeof getRol === 'function' && getRol() !== 'admin');
+  var btnC = function(t, col, js) { return '<span onclick="' + js + '" style="border:1.5px solid ' + col + ';color:' + col + ';border-radius:8px;min-width:30px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;cursor:pointer;">' + t + '</span>'; };
+  var h = '<div class="fin-card" style="padding:10px;">';
+  h += fin_filaCompacta({ editar: null, quitar: null, nombre: notas_esc(c.nombre || 'Efectivo'), sub: (c.iban ? 'IBAN ··' + notas_esc(c.iban) : 'Libro de caja'), importe: fin_fmt(c.saldo),
+    derecha: admin ? btnC('+', 'var(--accent-green)', "caja_abrir('" + c.id + "','ing')") + btnC('−', '#e57373', "caja_abrir('" + c.id + "','gas')") : '' });
   h += '<div class="caja-toggle" onclick="caja_toggle(\'' + c.id + '\')">' + (abierto ? '▲' : '▼') + ' Movimientos (' + movs.length + ')</div>';
   if (abierto) {
     if (!movs.length) {
@@ -21169,27 +21184,20 @@ function fin_renderFondos() {
     var pl = val - ap;
     var plp = ap > 0 ? (pl / ap) * 100 : 0;
     total += val;
-    html += '<div class="fin-card">';
-    html += '<div class="fin-card-top"><div>';
-    html += '<div class="fin-card-nombre">' + (f.nombre || 'Fondo') + '</div>';
-    html += '<div class="fin-card-sub">' + [f.gestora, FIN_CUENTA_LABEL[f.cuenta] || ''].filter(Boolean).join(' · ') + '</div>' + fin_haceDias(f.valorFecha || f.updatedAt);
-    html += '</div><div class="fin-card-saldo">' + fin_fmt(val) + '</div></div>';
-    html += '<div class="fin-card-meta">';
-    html += '<div class="fin-meta-item">Aportado: <span class="fin-meta-val">' + fin_fmt(ap) + '</span></div>';
-    html += '<div class="fin-meta-item">Plusvalia: <span class="fin-meta-val ' + (pl >= 0 ? 'fin-plus' : 'fin-minus') + '">' + fin_fmt(pl) + ' (' + fin_fmtPct(plp) + ')</span></div>';
-    // PUNTO 86 (30/08/2026): aviso discreto de que este fondo tiene DCA
-    // configurado, y con qué importe/periodicidad.
-    if (f.dcaActivo && (parseFloat(f.dcaImporte) || 0) > 0) {
-      html += '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">' + fin_dcaTextoTarjeta(f) + '</div>';
-    }
-    html += '</div>';
-    html += '<div class="fin-card-actions">';
-    // PUNTO 250: Saveback, historial de aportaciones y aportación extra.
-    html += fin_movHtml('fondo', i, f);
-    html += '<div class="fin-action-btn" onclick="fin_editarFondo(' + i + ')">Actualizar valor</div>';
-    html += '<div class="fin-action-btn" onclick="fin_extraAbrir(\'fondo\',' + i + ')">＋ Aportación</div>';
-    html += '<div class="fin-action-btn" onclick="fin_editarFondoNombre(' + i + ')">Editar nombre</div>';
-    html += '<div class="fin-action-btn red" onclick="fin_borrarFondo(' + i + ')">Eliminar</div>';
+    // 07/11/2026 (opción A): ✎ = actualizar valor y nombre (misma ventana), ✕ = eliminar
+    var _adm = !(typeof getRol === 'function' && getRol() !== 'admin');
+    html += '<div class="fin-card" style="padding:10px;">';
+    html += fin_filaCompacta({ editar: 'fin_editarFondo(' + i + ')', quitar: 'fin_borrarFondo(' + i + ')',
+      nombre: notas_esc(f.nombre || 'Fondo'),
+      sub: [notas_esc(f.gestora || ''), (FIN_CUENTA_LABEL[f.cuenta] || '') !== (f.gestora || '') ? (FIN_CUENTA_LABEL[f.cuenta] || '') : '', fin_haceDiasCorto(f.valorFecha || f.updatedAt)].filter(Boolean).join(' · '),
+      importe: fin_fmt(val) });
+    html += '<div style="margin-left:26px;">';
+    html += '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:11.5px;flex-wrap:wrap;"><span style="color:var(--text-secondary);">Aportado <b style="color:var(--silver-bright);">' + fin_fmt(ap) + '</b></span><span style="font-weight:700;white-space:nowrap;color:' + (pl >= 0 ? 'var(--accent-green)' : '#e57373') + ';">' + (pl >= 0 ? '+' : '') + fin_fmt(pl) + ' (' + fin_fmtPct(plp) + ')</span></div>';
+    var _dcaTxt = (f.dcaActivo && (parseFloat(f.dcaImporte) || 0) > 0) ? fin_dcaTextoTarjeta(f) : ''; // PUNTO 86
+    if (_dcaTxt || _adm) html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;"><span style="font-size:10.5px;color:var(--silver-dim);min-width:0;">' + _dcaTxt + '</span>'
+      + (_adm ? '<span onclick="fin_extraAbrir(\'fondo\',' + i + ')" style="border:1px solid #5b8dee;color:#5b8dee;border-radius:8px;padding:3px 9px;font-size:10.5px;font-weight:800;white-space:nowrap;flex-shrink:0;cursor:pointer;">＋ APORTACIÓN</span>' : '') + '</div>';
+    // PUNTO 250: Saveback e historial de aportaciones
+    html += '<div style="margin-top:6px;">' + fin_movHtml('fondo', i, f).replace('margin-top:-4px;', 'margin-top:0;') + '</div>';
     html += '</div></div>';
   }
   lista.innerHTML = html;
@@ -22019,34 +22027,28 @@ function fin_renderUrbanitae() {
     var cobrado = u.estado === 'cobrado';
     if (!cobrado) totalEnCurso += capital;
     var r = fin_urbanitaeCalcular(capital, u.interes, u.meses);
-    html += '<div class="fin-card">';
-    html += '<div class="fin-card-top"><div>';
-    html += '<div class="fin-card-nombre">' + (u.nombre || 'Proyecto') + '</div>';
-    html += '<div class="fin-card-sub">' + (u.fecha ? fin_urbanitaeFechaCorta(u.fecha) : '') + '</div>' + (cobrado ? '' : fin_haceDias(u.updatedAt));
-    html += '</div><div class="fin-card-saldo">' + fin_fmt(capital) + '</div></div>';
-    html += '<div class="fin-card-meta">';
-    html += '<div class="fin-meta-item">Interés: <span class="fin-meta-val">' + fin_fmtPct(u.interes) + '</span></div>';
-    html += '<div class="fin-meta-item">Plazo: <span class="fin-meta-val">' + (u.meses || 0) + ' meses</span></div>';
+    // 07/11/2026 (opción A): ✎ = editar, ✕ = eliminar; datos en cuadrícula de 3 columnas
     var vencDate = ordenUrb[oi].venc;
-    html += '<div class="fin-meta-item">Vencimiento previsto' + (u.vencUrb ? ' (Urbanitae)' : '') + ': <span class="fin-meta-val">' + (vencDate ? fin_urbanitaeFechaCortaDate(vencDate) : '—') + '</span></div>';
-    // PUNTO 230: datos nuevos de la ficha
-    var vCon = fin_urbanitaeVencContrato(u);
-    if (u.vencUrb && vCon) html += '<div class="fin-meta-item">Según contrato: <span class="fin-meta-val">' + fin_urbanitaeFechaCortaDate(vCon) + '</span></div>';
-    if (parseFloat(u.prorroga) > 0) html += '<div class="fin-meta-item">Prórroga posible: <span class="fin-meta-val">+' + parseFloat(u.prorroga) + ' meses</span></div>';
-    if (parseFloat(u.makeWhole) > 0) {
-      var mwMin = fin_urbanitaeCalcular(capital, u.interes, u.makeWhole);
-      html += '<div class="fin-meta-item">Mínimo garantizado: <span class="fin-meta-val">' + parseFloat(u.makeWhole) + ' meses (' + fin_fmt(mwMin.bruto) + ' brutos)</span></div>';
-    }
-    if (cobrado && u.fechaCobro) html += '<div class="fin-meta-item">Cobrado el: <span class="fin-meta-val">' + fin_urbanitaeFechaCorta(u.fechaCobro) + (u.intCobrados ? ' · ' + fin_fmt(u.intCobrados) + ' intereses' : '') + '</span></div>';
-    html += '<div class="fin-meta-item" style="width:100%;">Resultado previsto: <span class="fin-meta-val fin-plus">' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos</span></div>';
-    html += '<div class="fin-meta-item" style="width:100%;">Estado: <span class="fin-meta-val" style="' + (cobrado ? 'color:var(--accent-blue);' : 'color:var(--accent-green);') + '">' + (cobrado ? '✅ Cobrado' : '🟢 En curso') + '</span></div>';
-    html += '</div>';
-    if (u.detalle) {
-      html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:4px;padding-top:6px;border-top:1px solid var(--border);">' + notas_esc(u.detalle) + '</div>';
-    }
-    html += '<div class="fin-card-actions">';
-    html += '<div class="fin-action-btn" onclick="fin_editarUrbanitae(' + i + ')">Editar</div>';
-    html += '<div class="fin-action-btn red" onclick="fin_borrarUrbanitae(' + i + ')">Eliminar</div>';
+    var vCon = fin_urbanitaeVencContrato(u); // PUNTO 230
+    var celdas = [];
+    var cel = function(k, v) { celdas.push('<div style="min-width:0;"><div style="font-size:9.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + k + '</div><div style="font-size:12px;font-weight:700;color:var(--silver-bright);white-space:nowrap;">' + v + '</div></div>'); };
+    cel('Interés', fin_fmtPct(u.interes));
+    cel('Plazo', (u.meses || 0) + ' meses');
+    if (parseFloat(u.prorroga) > 0) cel('Prórroga', '+' + parseFloat(u.prorroga) + ' meses');
+    cel(u.vencUrb ? 'Venc. Urbanitae' : 'Venc. previsto', vencDate ? fin_urbanitaeFechaCortaDate(vencDate) : '—');
+    if (u.vencUrb && vCon) cel('Según contrato', fin_urbanitaeFechaCortaDate(vCon));
+    if (parseFloat(u.makeWhole) > 0) { var mwMin = fin_urbanitaeCalcular(capital, u.interes, u.makeWhole); cel('Mín. garantizado', parseFloat(u.makeWhole) + ' m · ' + fin_fmt(mwMin.bruto)); }
+    if (cobrado && u.fechaCobro) cel('Cobrado el', fin_urbanitaeFechaCorta(u.fechaCobro));
+    if (cobrado && u.intCobrados) cel('Intereses cobrados', fin_fmt(u.intCobrados));
+    html += '<div class="fin-card" style="padding:10px;">';
+    html += fin_filaCompacta({ editar: 'fin_editarUrbanitae(' + i + ')', quitar: 'fin_borrarUrbanitae(' + i + ')',
+      nombre: notas_esc(u.nombre || 'Proyecto'),
+      sub: [u.fecha ? fin_urbanitaeFechaCorta(u.fecha) : '', '<span style="color:' + (cobrado ? 'var(--accent-blue)' : 'var(--accent-green)') + ';">' + (cobrado ? '✅ Cobrado' : '🟢 En curso') + '</span>', cobrado ? '' : fin_haceDiasCorto(u.updatedAt)].filter(Boolean).join(' · '),
+      importe: fin_fmt(capital) });
+    html += '<div style="margin-left:26px;">';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;margin-top:8px;">' + celdas.join('') + '</div>';
+    html += '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:6px;">Resultado previsto: <b style="color:var(--accent-green);">' + fin_fmt(r.bruto) + ' brutos · ' + fin_fmt(r.neto) + ' netos</b></div>';
+    if (u.detalle) html += '<div style="font-size:11px;color:var(--silver-dim);margin-top:4px;padding-top:6px;border-top:1px solid var(--border);">' + notas_esc(u.detalle) + '</div>';
     html += '</div></div>';
   }
   lista.innerHTML = html;
