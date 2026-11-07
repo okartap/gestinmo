@@ -2291,7 +2291,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261107_01';
+const BUILD_ID = '261108_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -22270,6 +22270,34 @@ function fin_borrarUrbanitae(idx) {
 }
 
 // --- PATRIMONIO ---
+var FIN_REP_COL = { Financiero: '#5b8dee', Inmuebles: '#199e70', Cuentas: '#3987e5', Fondos: '#d95926', Acciones: '#c98500', Urbanitae: '#d55181' };
+function fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmuebles) {
+  var fin = cuentas + fondos + acciones + urbanitae, tot = fin + inmuebles;
+  var pc = function(a, t) { return t > 0 ? (a / t * 100).toFixed(2).replace('.', ',') + ' %' : '—'; };
+  var barra = function(partes, alto) {
+    var vis = partes.filter(function(p) { return p[1] > 0; });
+    if (!vis.length) return '';
+    return '<div style="display:flex;height:' + alto + 'px;border-radius:7px;overflow:hidden;gap:2px;margin:6px 0 8px;">' + vis.map(function(p) { return '<div style="flex:' + p[1] + ' 1 0;min-width:3px;background:' + FIN_REP_COL[p[0]] + ';"></div>'; }).join('') + '</div>';
+  };
+  var lado = function(k, v, t, der) { return '<div style="text-align:' + (der ? 'right' : 'left') + ';min-width:0;"><div style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">' + (der ? '' : '<span style="color:' + FIN_REP_COL[k] + ';">●</span> ') + k + ' ' + pc(v, t) + (der ? ' <span style="color:' + FIN_REP_COL[k] + ';">●</span>' : '') + '</div><div style="font-size:15px;font-weight:700;color:var(--silver-bright);white-space:nowrap;">' + fin_fmt(v) + '</div></div>'; };
+  var h = '';
+  if (inmuebles > 0) {
+    h += '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:4px;">Total</div>'
+      + barra([['Financiero', fin], ['Inmuebles', inmuebles]], 10)
+      + '<div style="display:flex;justify-content:space-between;gap:10px;">' + lado('Financiero', fin, tot, false) + lado('Inmuebles', inmuebles, tot, true) + '</div>'
+      + '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:12px;">Dentro del financiero</div>';
+  }
+  var items = [['Cuentas', cuentas], ['Fondos', fondos], ['Acciones', acciones], ['Urbanitae', urbanitae]].filter(function(x) { return x[1] > 0; });
+  items.sort(function(a, b) { return b[1] - a[1]; }); // de mayor a menor
+  h += barra(items, 12);
+  h += items.map(function(x) {
+    return '<div style="display:grid;grid-template-columns:1fr 62px minmax(118px,auto);gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'
+      + '<span style="font-size:13px;color:var(--silver-bright);"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + FIN_REP_COL[x[0]] + ';margin-right:8px;vertical-align:-1px;"></span>' + x[0] + '</span>'
+      + '<span style="font-size:11px;color:var(--text-secondary);text-align:right;">' + pc(x[1], fin) + '</span>'
+      + '<span style="font-size:13.5px;font-weight:700;color:var(--silver-bright);text-align:right;white-space:nowrap;">' + fin_fmt(x[1]) + '</span></div>';
+  }).join('');
+  return h;
+}
 function fin_calcPatrimonio() {
   // PUNTO 165 (22/09/2026): totales calculados con fin_visibles() — la lista
   // sin los elementos "tachados" (borrados) — para no seguir sumando algo
@@ -22339,12 +22367,10 @@ function fin_calcPatrimonio() {
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
   var rowsEl = document.getElementById('fin-patrimonio-rows');
   if (rowsEl) {
-    rowsEl.innerHTML =
-      '<div class="row"><span>Cuentas</span><span>' + (cuentas > 0 ? fin_fmt(cuentas) : '-') + '</span></div>' +
-      '<div class="row"><span>Fondos</span><span>' + (fondos > 0 ? fin_fmt(fondos) : '-') + '</span></div>' +
-      '<div class="row"><span>Acciones</span><span>' + (acciones > 0 ? fin_fmt(acciones) : '-') + '</span></div>' +
-      (urbanitae > 0 ? '<div class="row"><span>Urbanitae</span><span>' + fin_fmt(urbanitae) + '</span></div>' : '') +
-      '<div class="row"><span>Inmuebles</span><span>' + (inmob.total > 0 ? fin_fmt(inmob.total) : '-') + '</span></div>' +
+    // 08/11/2026 (Patry, opción C + B): en vez de la lista, dos barras de
+    // reparto — Financiero / Inmuebles y, debajo, los apartados financieros
+    // de mayor a menor (barra + lista con % sobre lo financiero).
+    rowsEl.innerHTML = fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmob.total) +
       (igc > 0 ? '<div class="row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span>' + fin_fmt(total + igc) + '</span></div>' : '');
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
