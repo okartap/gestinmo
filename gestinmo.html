@@ -2072,6 +2072,7 @@ const DATA_KEYS = [
   'fin:patrimonio_financiero_actual:patricio',
   'fin:acciones_cuenta:patricio',
   'fin:acciones_dca', // 18/10/2026: aportación automática de acciones en modo detallado
+  'fin:igc_patrimer', // 08/11/2026: 33 % de IGC (antes fijo en el código)
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
@@ -2162,6 +2163,7 @@ const DATA_KEYS = [
   'app:fix_snev_venta_v1', 'app:fix_contratos_num_v1', // 22/10/2026 (261022_06)
   'app:fix_pathist_huecos_v1', // 22/10/2026 (261022_08)
   'app:fix_pathist_urb_v1', // 02/11/2026 (261102_03)
+  'app:fix_renta_261108_v1', 'app:fix_gastos_ref_v1', // 08/11/2026 (261108_03)
   // PUNTO 216 (24/09/2026): DNI, domicilios e IBAN — ya no van escritos en el archivo público de GitHub
   'app:datos_privados'
 ];
@@ -2291,7 +2293,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261108_01';
+const BUILD_ID = '261108_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -5011,6 +5013,17 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
             <div class="form-label">Año de la reforma <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(vacío = desde el inicio del alquiler)</span></div>
             <input class="form-input" id="f-venta-anio-reforma" type="text" inputmode="numeric">
           </div>
+          <!-- 08/11/2026: fecha exacta de la venta (para los días de imputación) -->
+          <div class="form-group">
+            <div class="form-label">Fecha de la venta <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(la de la escritura)</span></div>
+            <input class="form-input" id="f-venta-fecha" type="date">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <div class="form-label">Amortización real acumulada (€) <span style="font-size:10px;color:var(--silver-dim);text-transform:none;letter-spacing:0">(suma de lo amortizado en tus Rentas; vacío = la calcula la app)</span></div>
+            <input class="form-input" id="f-venta-amort-real" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)">
+          </div>
         </div>
         <div class="form-hint">Con esto, Renta Patricio puede calcular aparte la ganancia patrimonial de la venta y mostrarte el resultado del IRPF de ese año contando también la venta. La plusvalía municipal se puede dejar en 0 y rellenar más adelante en cuanto llegue — el cálculo se actualiza solo.</div>
       </div>
@@ -7015,7 +7028,7 @@ abierto. -->
     <div id="fin-fondo-dca-campos" style="display:none;">
       <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-fondo-dca-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
       <div class="mfield"><div class="mflabel">Días del mes</div><input class="minput" id="fin-fondo-dca-dias" type="text" inputmode="numeric" placeholder="1, 15"></div>
-      <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Aportado". El "Valor actual" se sigue actualizando a mano.</div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Aportado" y al "Valor actual". El día 1, en el Cierre del mes, se ajusta al valor real del broker.</div>
     </div>
     <!-- PUNTO 250 (05/10/2026): Saveback de la tarjeta (Trade Republic). -->
     <div class="mfield" style="display:flex;align-items:center;gap:10px;">
@@ -7025,6 +7038,15 @@ abierto. -->
     <div id="fin-fondo-save-campos" style="display:none;">
       <div class="mfield"><div class="mflabel">Saveback mensual (euros)</div><input class="minput" id="fin-fondo-save-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
       <div class="form-hint" style="margin:-4px 2px 10px;">Se cobra el día 1 del mes siguiente; ese día te saldrá un aviso para confirmarlo. Al activarlo se apuntan los cobros de este año ya recibidos (sin sumarlos al "Aportado", que ya los incluye).</div>
+    </div>
+    <!-- 08/11/2026: plan de pensiones → reducción en la Renta (máx. 1.500 €/año) -->
+    <div class="mfield" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="fin-fondo-pp" onchange="fin_togglePpCampos()" style="width:18px;height:18px;flex-shrink:0;">
+      <label for="fin-fondo-pp" style="font-size:13px;font-weight:700;color:var(--silver-bright);cursor:pointer;">Es plan de pensiones</label>
+    </div>
+    <div id="fin-fondo-pp-campos" style="display:none;">
+      <div class="mfield"><div class="mflabel" id="fin-fondo-pp-lbl">Aportado este año (euros)</div><input class="minput" id="fin-fondo-pp-anio" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">La Renta resta lo aportado en el año, como máximo 1.500 €. Las aportaciones automáticas se suman solas.</div>
     </div>
     <button class="btn1" onclick="fin_guardarFondo()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-fondo')" style="margin-top:8px;">Cancelar</button>
@@ -7057,7 +7079,7 @@ cálculo a mano. -->
     <div id="fin-accsimple-dca-campos" style="display:none;">
       <div class="mfield"><div class="mflabel">Importe de cada aportación (euros)</div><input class="minput" id="fin-accsimple-dca-importe" type="text" inputmode="decimal" onfocus="numMiles_alEnfocar(this)" onblur="numMiles_alSalirDinero(this)"></div>
       <div class="mfield"><div class="mflabel">Días del mes</div><input class="minput" id="fin-accsimple-dca-dias" type="text" inputmode="numeric" placeholder="1, 15"></div>
-      <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Invertido". El "Valor actual" se sigue actualizando a mano.</div>
+      <div class="form-hint" style="margin:-4px 2px 10px;">Esos días se suma sola al "Invertido" y al "Valor actual". El día 1, en el Cierre del mes, se ajusta al valor real del broker.</div>
     </div>
     <button class="btn1" onclick="fin_guardarAccionSimple()">Guardar</button>
     <button class="btn2" onclick="closeModalById('fin-modal-accion-simple')" style="margin-top:8px;">Cancelar</button>
@@ -7536,7 +7558,7 @@ con editar/borrar en cada línea. -->
         <span style="font-size:20px;">🧾</span>
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">OTROS GASTOS</div>
-          <div style="font-size:11px;color:var(--text-secondary);">Facturas deducibles con foto</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Gastos de los pisos, por piso</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -7546,7 +7568,7 @@ con editar/borrar en cada línea. -->
     </div>
     <div id="bloque-gastos" style="display:none;padding:0 16px 14px;">
       <div id="renta-lista-gastos" style="margin-bottom:12px;"></div>
-      <button onclick="renta_abrirModalGasto('otro')" style="width:100%;background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir gasto con factura</button>
+      <button onclick="renta_abrirModalGasto('otro')" style="width:100%;background:rgba(91,141,238,0.15);border:1px dashed rgba(91,141,238,0.4);border-radius:10px;color:#5b8dee;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:10px;cursor:pointer;">+ Añadir gasto</button>
     </div>
   </div>
 
@@ -7606,8 +7628,14 @@ con editar/borrar en cada línea. -->
 <div id="renta-modal-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:flex-end;justify-content:center;">
   <div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;box-sizing:border-box;">
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
-    <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">🧾 AÑADIR GASTO</div>
+    <div id="renta-gasto-titulo" style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);margin-bottom:16px;text-align:center;">🧾 AÑADIR GASTO</div>
     <input type="hidden" id="renta-gasto-tipo-hidden">
+    <input type="hidden" id="renta-gasto-edit-id"><input type="hidden" id="renta-gasto-edit-anio">
+    <!-- 08/11/2026 (Patry): cada gasto, con su piso — un solo sitio para los gastos -->
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">¿DE QUÉ PISO ES?</div>
+      <select id="renta-gasto-ref" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;"></select>
+    </div>
     <!-- PUNTO 166 (14/09/2026): a petición tuya, toda la información de este
          modal (etiquetas, campos y textos de estado) queda centrada, a
          petición tuya del 14/09/2026 — incluidos los propios campos donde
@@ -7629,10 +7657,7 @@ con editar/borrar en cada línea. -->
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;letter-spacing:.5px;text-align:center;">CATEGORÍA</div>
       <select id="renta-gasto-categoria" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:'Rajdhani',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;">
-        <option value="IBI">IBI</option>
         <option value="Reparación">Reparación / Conservación</option>
-        <option value="Seguro">Seguro</option>
-        <option value="Comunidad">Comunidad de propietarios</option>
         <option value="Gestoría">Gestoría / Asesoría</option>
         <option value="Suministros">Suministros</option>
         <option value="Otros">Otros</option>
@@ -8127,6 +8152,7 @@ const BACKUP_KEYS = [
   'fin:patrimonio_financiero_actual:patricio',
   'fin:acciones_cuenta:patricio',
   'fin:acciones_dca', // 18/10/2026: aportación automática de acciones en modo detallado
+  'fin:igc_patrimer', // 08/11/2026: 33 % de IGC (antes fijo en el código)
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 166 (14/09/2026): documentos por inmueble (enlaces a Drive).
@@ -8916,6 +8942,11 @@ function inm_gananciaPatrimonialVenta(inm) {
   var aniosReforma = anioReforma ? ((anioVenta > Math.max(anioReforma, anioInicio || anioReforma)) ? anioVenta - Math.max(anioReforma, anioInicio || anioReforma) : 0) : aniosCompletos;
   var cuotaCompra = (precio + gastosCompra) * pctConstruccion * 0.03, cuotaReforma = reforma * 0.03;
   var amortizacionAcumulada = cuotaCompra * aniosCompletos + cuotaReforma * aniosReforma + cuotaAnual3pc * (mesesUltimoAnio / 12);
+  // 08/11/2026 (Patry): si se ha puesto la amortización REAL acumulada (la de
+  // los días alquilados de cada año, sacada de las Rentas presentadas), manda
+  // esa cifra en lugar de la estimación por años completos.
+  var amortReal = numES(inm.ventaAmortReal) || 0;
+  if (amortReal > 0) amortizacionAcumulada = amortReal;
   var valorAdquisicionActualizado = Math.max(0, valorAdquisicion - amortizacionAcumulada);
   var ventaDeclarada = parseFloat(inm.ventaDeclarado) || 0;
   var gastosVenta = parseFloat(inm.ventaGastos) || 0;
@@ -10442,6 +10473,8 @@ function openModal(editIdx) {
     document.getElementById('f-venta-plusvalia').value = inm.ventaPlusvalia ? fmt(inm.ventaPlusvalia) : '';
     document.getElementById('f-venta-anio-inicio').value = inm.ventaAnioInicioAlquiler || '';
     if (document.getElementById('f-venta-anio-reforma')) document.getElementById('f-venta-anio-reforma').value = inm.ventaAnioReforma || ''; // 22/10/2026
+    if (document.getElementById('f-venta-fecha')) document.getElementById('f-venta-fecha').value = inm.ventaFecha || ''; // 08/11/2026
+    if (document.getElementById('f-venta-amort-real')) document.getElementById('f-venta-amort-real').value = numES(inm.ventaAmortReal) ? fmt(numES(inm.ventaAmortReal)) : ''; // 08/11/2026
     document.getElementById('f-venta-pct-construccion').value = (inm.ventaPctConstruccion || inm.ventaPctConstruccion === 0) ? inm.ventaPctConstruccion : '';
     document.getElementById('f-venta-meses-ultimo-anio').value = (inm.ventaMesesUltimoAnio || inm.ventaMesesUltimoAnio === 0) ? inm.ventaMesesUltimoAnio : '';
     document.getElementById('f-notas').value = inm.notas || '';
@@ -10601,6 +10634,8 @@ function saveInmueble() {
     ventaPctConstruccion: document.getElementById('f-venta-pct-construccion').value.trim() || '',
     ventaMesesUltimoAnio: document.getElementById('f-venta-meses-ultimo-anio').value.trim() || '',
     ventaAnioReforma: (document.getElementById('f-venta-anio-reforma') ? document.getElementById('f-venta-anio-reforma').value.trim() : '') || '', // 22/10/2026
+    ventaFecha: (document.getElementById('f-venta-fecha') ? document.getElementById('f-venta-fecha').value : '') || '', // 08/11/2026
+    ventaAmortReal: (document.getElementById('f-venta-amort-real') ? parseFmtGlobal(document.getElementById('f-venta-amort-real').value) : '') || '', // 08/11/2026
     notas: document.getElementById('f-notas').value.trim(),
     inquilino: _inquilinoNombre,
     // PUNTO 32: plaza de garaje asociada a este piso (solo tiene sentido si
@@ -17139,6 +17174,31 @@ document.addEventListener('firebaseLoaded', function() {
       localStorage.setItem('app:fix_snev_venta_v1', '1');
     } catch (e) { console.error('Error en los datos de venta de Sierra Nevada', e); }
   })();
+  // 08/11/2026 — revisión de la Renta con Patry: (1) fecha de la escritura de
+  // venta de Sierra Nevada (SNEV01), para los días de imputación de 2026;
+  // (2) el plan de pensiones de MyInvestor queda marcado como "plan de
+  // pensiones" (reducción en la Renta). Solo si siguen en blanco.
+  (function _fixRenta261108V1() {
+    try {
+      if (localStorage.getItem('app:fix_renta_261108_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var ahora = new Date().toISOString();
+      var l = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'), n = 0;
+      l.forEach(function(i) {
+        if (!i || i.ref !== 'SNEV01' || i.ventaFecha) return;
+        if (String(i.ventaAnio || '') === '2026') { i.ventaFecha = '2026-09-04'; i.updatedAt = ahora; n++; }
+      });
+      if (n) localStorage.setItem('inmuebles:lista', JSON.stringify(l));
+      var fs = JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]'), m = 0;
+      fs.forEach(function(f) {
+        if (!f || f.deleted || f.esPlanPensiones !== undefined) return;
+        if (/plan\s+de\s+pensiones/i.test(f.nombre || '')) { f.esPlanPensiones = true; f.updatedAt = ahora; m++; }
+      });
+      if (m) localStorage.setItem('fin:fondos:patricio', JSON.stringify(fs));
+      localStorage.setItem('app:fix_renta_261108_v1', '1');
+      console.log('[Renta 08/11] venta SN: ' + n + ' · plan de pensiones: ' + m);
+    } catch (e) { console.error('Error en la corrección de la Renta (08/11)', e); }
+  })();
   // 22/10/2026 — rentas y fianzas de contratos guardadas como TEXTO ("946,48")
   // pasan a número (946.48). Se leían bien, pero eran una fuente de errores.
   (function _fixContratosNumV1() {
@@ -21220,6 +21280,7 @@ function fin_nuevoFondo() {
   document.getElementById('fin-fondo-dca-importe').value = '';
   document.getElementById('fin-fondo-dca-dias').value = '1, 15';
   if (document.getElementById('fin-fondo-save-activo')) { document.getElementById('fin-fondo-save-activo').checked = false; document.getElementById('fin-fondo-save-importe').value = numMiles_fmtDinero(15); fin_toggleSaveCampos(); }
+  if (document.getElementById('fin-fondo-pp')) { document.getElementById('fin-fondo-pp').checked = false; document.getElementById('fin-fondo-pp-anio').value = ''; fin_togglePpCampos(); } // 08/11/2026
   fin_toggleDcaCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
 }
@@ -21239,6 +21300,11 @@ function fin_editarFondo(idx) {
   document.getElementById('fin-fondo-save-activo').checked = !!f.saveActivo;
   document.getElementById('fin-fondo-save-importe').value = numMiles_fmtDinero(f.saveImporte != null ? f.saveImporte : 15);
   fin_toggleSaveCampos();
+  // 08/11/2026: plan de pensiones
+  document.getElementById('fin-fondo-pp').checked = !!f.esPlanPensiones;
+  var _ppA = fin_ppAportadoAnio(f, new Date().getFullYear());
+  document.getElementById('fin-fondo-pp-anio').value = _ppA ? numMiles_fmtDinero(_ppA) : '';
+  fin_togglePpCampos();
   document.getElementById('fin-modal-fondo').classList.add('open');
   setTimeout(function() { var el = document.getElementById('fin-fondo-valor'); if (el) { el.focus(); el.select(); } }, 150);
 }
@@ -21293,6 +21359,15 @@ function fin_guardarFondo() {
   // PUNTO 250: se conservan los historiales al editar (antes se perdían).
   if (_prevF && _prevF.dcaUltimas) obj.dcaUltimas = _prevF.dcaUltimas;
   if (_prevF && _prevF.extras) obj.extras = _prevF.extras;
+  // 08/11/2026: plan de pensiones (marca + aportado de cada año)
+  obj.esPlanPensiones = !!(document.getElementById('fin-fondo-pp') && document.getElementById('fin-fondo-pp').checked);
+  obj.ppAnio = (_prevF && _prevF.ppAnio) ? JSON.parse(JSON.stringify(_prevF.ppAnio)) : {};
+  if (_prevF && _prevF.ppConf) obj.ppConf = _prevF.ppConf;
+  if (obj.esPlanPensiones) {
+    var _ppY = String(new Date().getFullYear()), _ppTxt = document.getElementById('fin-fondo-pp-anio').value;
+    var _ppAntes = _prevF ? fin_ppAportadoAnio(_prevF, _ppY) : 0, _ppNuevo = parseImporteFlexible(_ppTxt) || 0;
+    if (String(_ppTxt).trim() !== '' && Math.abs(_ppNuevo - _ppAntes) > 0.004) obj.ppAnio[_ppY] = _ppNuevo;
+  }
   // PUNTO 250: Saveback.
   obj.saveActivo = document.getElementById('fin-fondo-save-activo').checked;
   obj.saveImporte = parseImporteFlexible(document.getElementById('fin-fondo-save-importe').value) || 15;
@@ -21452,6 +21527,8 @@ function fin_saveGuardar(quitar) {
   var antImp = (ant && !ant.inicial) ? (parseFloat(ant.importe) || 0) : 0;
   var nuevoCuenta = (ant && ant.inicial) ? 0 : imp;
   f.aportado = Math.round(((parseFloat(f.aportado) || 0) - antImp + nuevoCuenta) * 100) / 100;
+  // 08/11/2026 (Patry): el Saveback también suma (o se corrige) en el valor del fondo.
+  f.valor = Math.round(((parseFloat(f.valor) || 0) - antImp + nuevoCuenta) * 100) / 100;
   if (quitar === true) { if (i >= 0) f.saveHist.splice(i, 1); }
   else {
     var reg = { mes: _finSave.mes, importe: imp };
@@ -21586,6 +21663,12 @@ function fin_dcaAutoAplicar() {
         if (!fechas.length) return;
         var total = Math.round(fechas.length * imp * 100) / 100;
         f.aportado = Math.round(((parseFloat(f.aportado) || 0) + total) * 100) / 100;
+        // 08/11/2026: plan de pensiones — se suma a lo aportado en cada año
+        // (solo si ese año ya tiene dato guardado; si no, se cuenta solo desde el historial).
+        if (f.esPlanPensiones && f.ppAnio) fechas.forEach(function(x) { var yk = String(x).slice(0, 4); if (f.ppAnio[yk] != null && f.ppAnio[yk] !== '') f.ppAnio[yk] = Math.round(((numES(f.ppAnio[yk]) || 0) + imp) * 100) / 100; });
+        // 08/11/2026 (Patry): la aportación suma también al valor del fondo
+        // (el dinero entra a coste); el Cierre del mes ajusta luego la bolsa.
+        f.valor = Math.round(((parseFloat(f.valor) || 0) + total) * 100) / 100;
         f.dcaAplicadoHasta = hoy;
         f.dcaUltimas = (f.dcaUltimas || []).concat(fechas.map(function(x) { return { fecha: x, importe: imp }; })).slice(-24);
         f.updatedAt = new Date().toISOString();
@@ -21607,6 +21690,7 @@ function fin_dcaAutoAplicar() {
         if (!fechas.length) return;
         // PUNTO 249: como en los fondos, solo se suma al invertido (coste).
         a.coste = Math.round(((parseFloat(a.coste) || 0) + fechas.length * imp) * 100) / 100;
+        a.valorActual = Math.round(((parseFloat(a.valorActual) || 0) + fechas.length * imp) * 100) / 100; // 08/11/2026: también al valor
         a.dcaAplicadoHasta = hoy;
         a.dcaUltimas = (a.dcaUltimas || []).concat(fechas.map(function(x) { return { fecha: x, importe: imp }; })).slice(-24);
         a.updatedAt = new Date().toISOString();
@@ -21625,6 +21709,25 @@ function fin_dcaAutoAplicar() {
     try { if (typeof fin_renderAcciones === 'function') fin_renderAcciones(); } catch (e) {}
   } catch (e) { console.warn('[PUNTO 248] DCA automático:', e.message); }
   finally { _finDcaEnCurso = false; }
+}
+function fin_ppConfirmar(fondoId, anio) { // 08/11/2026: confirmación de enero
+  if (typeof bloqueaSiViewer === 'function' && bloqueaSiViewer('Confirmar el plan de pensiones')) return;
+  var lista = []; try { lista = JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]'); } catch (e) {}
+  var f = lista.find(function(x) { return x && x.id === fondoId; }); if (!f) return;
+  pedirTexto('🏦', 'Plan de pensiones ' + anio, 'Lo aportado en ' + anio + ' según el certificado del plan. La Renta resta como máximo 1.500 €.', numMiles_fmtDinero(fin_ppAportadoAnio(f, anio)), function(v) {
+    var n = parseImporteFlexible(v); if (!(n >= 0)) { avisar('Importe no válido.'); return; }
+    f.ppAnio = f.ppAnio || {}; f.ppAnio[String(anio)] = n;
+    f.ppConf = f.ppConf || {}; f.ppConf[String(anio)] = new Date().toISOString();
+    f.updatedAt = new Date().toISOString();
+    localStorage.setItem('fin:fondos:patricio', JSON.stringify(lista));
+    try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
+    try { if (typeof renta_calcPrevision === 'function') renta_calcPrevision(); } catch (e) {}
+  });
+}
+function fin_togglePpCampos() { // 08/11/2026
+  var chk = document.getElementById('fin-fondo-pp'), c = document.getElementById('fin-fondo-pp-campos');
+  if (c) c.style.display = (chk && chk.checked) ? 'block' : 'none';
+  var l = document.getElementById('fin-fondo-pp-lbl'); if (l) l.textContent = 'Aportado en ' + new Date().getFullYear() + ' (euros)';
 }
 function fin_toggleDcaCamposAcc() {
   var chk = document.getElementById('fin-accsimple-dca-activo');
@@ -21648,6 +21751,28 @@ document.addEventListener('firebaseLoaded', function() { setTimeout(fin_dcaAutoA
 // para que, si se borra a mano, no vuelva a aparecer. Sin cotización no se
 // apunta nada y se reintenta la próxima vez. Se empieza a contar desde el día
 // en que se activa (nunca suma de golpe nada antiguo).
+// 08/11/2026 (privacidad): 33 % de Industrias (IGC) en el patrimonio de
+// Patrimer. Antes era un importe fijo escrito en el código; ahora es un dato
+// guardado ('fin:igc_patrimer', se sincroniza) que Patry pone con el ✎.
+function fin_igcValor() { try { return numES(localStorage.getItem('fin:igc_patrimer') || 0) || 0; } catch (e) { return 0; } }
+function fin_igcFilaHtml(total, igc) {
+  var adm = (typeof getRol !== 'function' || getRol() === 'admin');
+  var ed = adm ? '<span onclick="fin_igcEditar()" style="color:#5b8dee;cursor:pointer;margin-right:8px;">✎</span>' : '';
+  if (igc > 0) return '<div class="row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>' + ed + 'Total+IGC</span><span>' + fin_fmt(total + igc) + '</span></div>';
+  if (!adm) return '';
+  return '<div class="row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px;font-size:12px;color:var(--silver-dim);"><span>' + ed + '33 % de IGC</span><span>sin dato · pulsa ✎</span></div>';
+}
+function fin_igcEditar() {
+  if (typeof bloqueaSiViewer === 'function' && bloqueaSiViewer('Cambiar el valor de IGC')) return;
+  var act = fin_igcValor();
+  pedirTexto('🏭', 'Valor del 33 % de IGC', 'Importe en euros que corresponde a Patrimer (su 33 % de Industrias). Se suma en "Total+IGC".', act > 0 ? numMiles_fmtDinero(act) : '', function(v) {
+    var n = parseImporteFlexible(v);
+    if (!(n >= 0)) { avisar('Importe no válido.'); return; }
+    localStorage.setItem('fin:igc_patrimer', String(n));
+    try { fin_render(); } catch (e) {}
+    try { if (typeof dash_render === 'function') dash_render(); } catch (e) {}
+  });
+}
 function fin_accDcaLoad() {
   try { var m = JSON.parse(localStorage.getItem('fin:acciones_dca') || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; } catch (e) { return {}; }
 }
@@ -21920,6 +22045,7 @@ function fin_dcaAplicar() {
   var f = data[p.idx];
   if (f) {
     f.aportado = (parseFloat(f.aportado) || 0) + totalAplicado;
+    f.valor = (parseFloat(f.valor) || 0) + totalAplicado; // 08/11/2026: también al valor
     f.dcaUltimaAplicada = p.nuevaFechaAplicada;
     // El importe usado esta vez queda como el nuevo "importe programado" para
     // la próxima vez (si se aplicaron varios ciclos a la vez, se reparte a
@@ -22355,9 +22481,10 @@ function fin_calcPatrimonio() {
   // esta app (sus inmuebles/activos no están dados de alta aquí), así que
   // esto NO se calcula solo — es un importe fijo que Patry confirma y
   // actualiza a mano cuando cambie (como ya hace con las cotizaciones).
-  // Confirmado con Patry: 1.000.000€ es YA el 33% (no el total de Industrias).
-  var PATRIMONIO_IGC_PATRIMER = 1000000;
-  var igc = (empresaActivaFin === 'patrimer') ? PATRIMONIO_IGC_PATRIMER : 0;
+  // 08/11/2026 (privacidad): el importe ya NO va escrito en el código (el
+  // repositorio es público); se guarda como dato ('fin:igc_patrimer') y se
+  // edita con el ✎ de la fila "33 % IGC" (solo admin).
+  var igc = (empresaActivaFin === 'patrimer') ? fin_igcValor() : 0;
   // AJUSTE 25/08/2026 (noche): a petición de Patry, el número grande de arriba
   // ("Patrimonio total") vuelve a ser solo lo de esta empresa (sin IGC) — el
   // 33% de Industrias se muestra aparte, como una fila más (no en pequeño),
@@ -22371,7 +22498,7 @@ function fin_calcPatrimonio() {
     // reparto — Financiero / Inmuebles y, debajo, los apartados financieros
     // de mayor a menor (barra + lista con % sobre lo financiero).
     rowsEl.innerHTML = fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmob.total) +
-      (igc > 0 ? '<div class="row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;"><span>Total+IGC</span><span>' + fin_fmt(total + igc) + '</span></div>' : '');
+      (empresaActivaFin === 'patrimer' ? fin_igcFilaHtml(total, igc) : '');
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
   if (notaEl) {
@@ -24973,7 +25100,7 @@ function dash_render() {
   var _inmobDash = inm_patrimonioInmobiliario(_empActivaPat);
   // PUNTO 47 (25/08/2026): mismo 33% de Industrias (IGC) que en Finanzas —
   // importe fijo, ver comentario junto a PATRIMONIO_IGC_PATRIMER en fin_render().
-  var _igcDash = (_empActivaPat === 'patrimer') ? 1000000 : 0;
+  var _igcDash = (_empActivaPat === 'patrimer') ? fin_igcValor() : 0; // 08/11/2026: dato guardado, no en el código
   // AJUSTE 25/08/2026 (noche): igual que en Finanzas — el número grande ya no
   // incluye el IGC, se muestra aparte como fila "Total+IGC".
   var total = cuentas + fondos + acciones + urbanitae + _inmobDash.total;
@@ -25465,6 +25592,19 @@ function pend_calcular() {
           items.push({ icon: '💳', t: 'Saveback de ' + fin_mesTxt(_mAntS) + ' (cobrado el día 1): ¿' + fmtGlobal(fS.saveImporte != null ? fS.saveImporte : 15) + ' €?', s: (fS.nombre || 'Fondo') + ' · pulsa para confirmarlo', accion: 'saveback', fondoId: fS.id, mes: _mAntS });
         });
       } catch (eS) {}
+      // 08/11/2026: gastos antiguos sin piso (una sola vez)
+      try { var _nSP = rgas_sinPiso().length; if (_nSP) items.push({ icon: '🧾', t: 'Gastos: ' + _nSP + ' sin piso asignado', s: 'Pulsa para pasarlos a su piso (solo una vez)', accion: 'rgas_ordenar' }); } catch (eSP) {}
+      // 08/11/2026: en enero, confirmar lo aportado al plan de pensiones el año anterior (Renta).
+      try {
+        var _hoyPP = new Date();
+        if (_hoyPP.getMonth() === 0) {
+          var _yPP = String(_hoyPP.getFullYear() - 1);
+          (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(fP) {
+            if (!fP || fP.deleted || !fP.esPlanPensiones || (fP.ppConf && fP.ppConf[_yPP])) return;
+            items.push({ icon: '🏦', t: 'Plan de pensiones: ¿aportaste ' + fmtGlobal(fin_ppAportadoAnio(fP, _yPP)) + ' € en ' + _yPP + '?', s: (fP.nombre || 'Plan') + ' · confírmalo con el certificado (Renta ' + _yPP + ')', accion: 'ppconf', fondoId: fP.id, anio: _yPP });
+          });
+        }
+      } catch (ePP) {}
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
     }
   } catch (e) {}
@@ -25592,6 +25732,7 @@ function sib_render(idx) {
   var btn = function(txt, fn, color) { return '<button onclick="' + fn + '" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid ' + (color || 'var(--border)') + ';border-radius:10px;color:' + (color || 'var(--silver-bright)') + ';font-family:\'Rajdhani\',sans-serif;font-size:12.5px;font-weight:700;padding:9px 4px;cursor:pointer;">' + txt + '</button>'; };
   var tit = function(t) { return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);">' + t + '</div><span onclick="sib_info()" style="font-size:12px;color:#5b8dee;cursor:pointer;border:1px solid rgba(91,141,238,.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">i</span></div>'; };
   var html = sib_htmlGastos(inm); // 13/10/2026: resumen de gastos anuales arriba
+  try { html += rgas_htmlFicha(inm, sib_idx, sib_anio); } catch (eRg) { console.warn('Gastos del piso:', eRg.message); } // 08/11/2026: lista de gastos del piso
   // SEGURO
   html += '<div style="' + caja + '">' + tit('🛡️ SEGURO');
   if (hayS) {
@@ -25967,6 +26108,14 @@ function inm_gastosAnuales(inm, idx) {
       }
     }
     if (rO) { res.otros = sib_num(rO.otros); res.anio.otros = rO.anio; }
+    // 08/11/2026: + los gastos apuntados uno a uno en la lista del piso (año en curso).
+    try {
+      var _lisY = (typeof rgas_delPiso === 'function' && inm.ref) ? rgas_delPiso(inm.ref, Y).reduce(function(s, g) { return s + numES(g.importe); }, 0) : 0;
+      if (_lisY > 0) {
+        var _antY = (rO && parseInt(rO.anio, 10) === Y) ? sib_num(rO.otros) : 0;
+        res.otros = _antY + _lisY; res.anio.otros = Y;
+      }
+    } catch (eL) {}
   } catch (e) { console.warn('Gastos anuales:', e.message); }
   res.total = Math.round((res.seguro + res.ibi + res.comunidad + res.otros) * 100) / 100;
   return res;
@@ -26002,8 +26151,8 @@ function sib_editarGastos() {
   sib_abrirModal('💶 GASTOS ' + sib_anio + ' · ' + (inm.ref || ''),
     sib_campo('sib-com', 'COMUNIDAD (€/MES)', r.comunidadMes, 'num')
     + '<div style="font-size:11px;color:var(--silver-dim);text-align:center;margin:-4px 0 10px;">Pon la cuota de un mes: la app la pasa a año (× 12).</div>'
-    + sib_campo('sib-otros', 'OTROS GASTOS DEL AÑO (€)', r.otros, 'num')
-    + '<div style="font-size:11px;color:var(--silver-dim);text-align:center;margin-top:-4px;">Mantenimiento, derramas, tasas… en total al año.</div>');
+    + sib_campo('sib-otros', 'OTROS GASTOS SIN DETALLE (€)', r.otros, 'num')
+    + '<div style="font-size:11px;color:var(--silver-dim);text-align:center;margin-top:-4px;">Total apuntado antes, sin detalle. Mejor apunta cada gasto con "+ Añadir gasto" (lista de abajo).</div>');
 }
 // Corrección única: el importe que había en el antiguo campo manual pasa a
 // "Otros gastos" del año actual (para que no se pierda), y el campo se vacía.
@@ -26123,6 +26272,10 @@ function pend_gestionar(i) {
     if (typeof registro_abrir === 'function') registro_abrir();
   } else if (it.accion === 'saveback') {
     if (typeof fin_saveAbrir === 'function') fin_saveAbrir('patricio', it.fondoId, it.mes);
+  } else if (it.accion === 'rgas_ordenar') {
+    rgas_ordenarAbrir(); // 08/11/2026
+  } else if (it.accion === 'ppconf') {
+    fin_ppConfirmar(it.fondoId, it.anio); // 08/11/2026
   } else if (it.accion === 'intereses') {
     if (typeof rint_abrir === 'function') rint_abrir(it.mes);
   } else if (it.accion === 'renta_datos') {
@@ -26391,6 +26544,7 @@ window._refreshCurrentModule = function(key) {
     'fin:patrimonio_financiero_actual:patricio': 'finperdash',
     'fin:acciones_cuenta:patricio': 'finanzas',
     'fin:acciones_dca': 'finanzas', // 18/10/2026
+    'fin:igc_patrimer': 'finanzas', // 08/11/2026
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
@@ -28480,88 +28634,12 @@ function alqmen_guardarMes(forzar) {
 // Se apunta el historial real de subidas SIN mover fechas de fin y SIN generar
 // adendas en PDF, y se corrigen los cobros de 2025 de esos dos pisos (solo los
 // meses que ya existen; los que faltan se dejan vacíos y se avisa).
-//  · Daniel: 04/2024 450→465 · 04/2025 465→480 · 04/2026 480→494,70
-//  · Aziati: 11/2025 800→825
 // Solo cambia algo si el contrato sigue con la renta original y sin historial;
 // los cobros, solo si el importe no es ya el correcto. Se puede ejecutar en
 // varios aparatos sin duplicar nada.
-var CORR247 = [
-  { ref: 'VIV-P02', original: 450, final: 494.70, hist: [
-      { mes: '2024-04', rentaAnterior: 450, rentaNueva: 465 },
-      { mes: '2025-04', rentaAnterior: 465, rentaNueva: 480 },
-      { mes: '2026-04', rentaAnterior: 480, rentaNueva: 494.70 } ],
-    cobros2025: function(m) { return m <= 3 ? 465 : 480; } },
-  { ref: 'VIV-P03', original: 800, final: 825, hist: [
-      { mes: '2025-11', rentaAnterior: 800, rentaNueva: 825 } ],
-    cobros2025: function(m) { return m <= 10 ? 800 : 825; } }
-];
-function correccion247() {
-  var FLAG = 'app:correccion_247_hecha';
-  try {
-    if (localStorage.getItem(FLAG)) return;
-    if (typeof getRol === 'function' && getRol() !== 'admin') return;
-    // Solo con la sesión de la nube activa: así se parte de los datos al día.
-    if (typeof window._nubeSesionActiva === 'function' && window._nubeSesionActiva() !== true) return;
-    var ahora = new Date().toISOString();
-    var informe = [];
-    var inms = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]');
-    var contratos = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
-    var cambiosCon = false;
-    CORR247.forEach(function(cfg) {
-      var c = contratos.find(function(x) { return x.ref === cfg.ref && x.estado === 'activo'; });
-      if (!c) { informe.push(cfg.ref + ': no se encuentra el contrato activo — sin cambios'); return; }
-      var rentaAct = parseRentaMixta(c.renta);
-      var yaHist = (c.ipcAplicado || []).length > 0;
-      if (Math.abs(rentaAct - cfg.original) < 0.005 && !yaHist) {
-        c.ipcAplicado = cfg.hist.map(function(h) {
-          return { mes: h.mes, pct: Math.round((h.rentaNueva / h.rentaAnterior - 1) * 10000) / 100, rentaAnterior: h.rentaAnterior, rentaNueva: h.rentaNueva, correccion: true };
-        });
-        c.renta = cfg.final;
-        c.rentaAnterior = cfg.hist[cfg.hist.length - 1].rentaAnterior;
-        c.updatedAt = ahora;
-        cambiosCon = true;
-        informe.push(cfg.ref + ': contrato a ' + fmtGlobal(cfg.final) + ' €/mes, con ' + cfg.hist.length + ' subida(s) apuntada(s)');
-      } else if (Math.abs(rentaAct - cfg.final) < 0.005) {
-        informe.push(cfg.ref + ': el contrato ya estaba a ' + fmtGlobal(cfg.final) + ' € — sin cambios');
-      } else {
-        informe.push(cfg.ref + ': el contrato tiene ' + fmtGlobal(rentaAct) + ' € (no es el original) — no se toca, revisar a mano');
-      }
-    });
-    if (cambiosCon) localStorage.setItem('contratos:lista', JSON.stringify(contratos));
-    // Cobros 2025
-    var regs = inm_alqMenLoad();
-    var cambiosCob = 0;
-    CORR247.forEach(function(cfg) {
-      var idx = inms.findIndex(function(i) { return i && i.ref === cfg.ref && (i.propietario || '').toLowerCase() === 'patricio'; });
-      if (idx < 0) return;
-      var faltan = [];
-      for (var m = 1; m <= 12; m++) {
-        var ym = '2025-' + String(m).padStart(2, '0');
-        var r = regs.find(function(x) { return inm_recEs(x, idx) && x.mes === ym; });
-        if (!r) { faltan.push(RENTA_MESES_NOMBRE[m - 1].slice(0, 3).toLowerCase()); continue; }
-        var debe = cfg.cobros2025(m);
-        if (Math.abs((parseFloat(r.alquiler) || 0) - debe) > 0.005) { r.alquiler = debe; r.updatedAt = ahora; cambiosCob++; }
-      }
-      if (faltan.length) informe.push(cfg.ref + ' — meses de 2025 sin dato (se dejan vacíos): ' + faltan.join(', '));
-    });
-    if (cambiosCob) { inm_alqMenSave(regs); informe.push('Cobros de 2025 corregidos: ' + cambiosCob + ' mes(es)'); }
-    localStorage.setItem(FLAG, ahora);
-    if (cambiosCon || cambiosCob) {
-      if (typeof renderLista === 'function') { try { renderLista(); } catch (e) {} }
-      if (typeof dash_render === 'function') { try { dash_render(); } catch (e) {} }
-    }
-    window._informeCorreccion247 = informe;
-    if (cambiosCon || cambiosCob || informe.some(function(t) { return /sin dato|revisar a mano|no se encuentra/.test(t); })) {
-      setTimeout(function() {
-        showConfirm('🛠️', 'Corrección de Daniel y Aziati', informe.join('\n'), [{ label: 'Aceptar', cls: 'g', fn: function() {} }]);
-        var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
-      }, 400);
-    }
-  } catch (e) { console.warn('[PUNTO 247] corrección:', e.message); }
-}
-// 06/10/2026: desactivada. La corrección ya se hizo (05/10) y los datos viajaron por la nube;
-// en otros aparatos solo volvía a salir el aviso sin cambiar nada.
-// document.addEventListener('firebaseLoaded', function() { setTimeout(correccion247, 4000); });
+// 08/11/2026 (privacidad): eliminados los datos y la función de esta corrección
+// (ya estaba desactivada desde el 06/10 y hecha; llevaba importes de alquiler en el código público).
+
 
 // ── PUNTO 97 (05/09/2026): SEGURO E IBI ANUAL ──────────────────────────────
 // Un dato al año por inmueble, con histórico desplegable de años anteriores
@@ -29070,51 +29148,250 @@ function renta_saveGastos(arr) {
   localStorage.setItem('renta:gastos:' + renta_anio, JSON.stringify(arr));
 }
 function renta_renderGastos() {
-  var gastos = renta_getGastos();
+  // 08/11/2026 (Patry): RESUMEN de los gastos de los pisos, agrupados por piso.
+  // Se apuntan en la ficha de cada piso (o aquí, eligiendo el piso).
   var cont = document.getElementById('renta-lista-gastos');
   if (!cont) return;
-  if (gastos.length === 0) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin gastos añadidos.</div>';
-    document.getElementById('renta-total-gastos').textContent = '— €';
-    return;
+  var Y = renta_anio, gastos = rgas_load(Y).filter(function(g) { return g && !g.deleted; });
+  var pisos = rgas_pisosPatricio();
+  var D = null; try { D = renta_calcPrevisionDatos(Y === new Date().getFullYear()); } catch (e) {}
+  var vacio = {}; ((D && D.pisos) || []).forEach(function(p) { if (p.diasAlq === 0) vacio[p.ref] = true; });
+  var grp = 'font-size:12px;font-weight:700;display:flex;justify-content:space-between;margin:12px 0 2px;letter-spacing:.5px;';
+  var html = '', total = 0;
+  var sinPiso = rgas_sinPiso();
+  if (sinPiso.length && rgas_esAdmin()) {
+    html += '<div onclick="rgas_ordenarAbrir()" style="cursor:pointer;font-size:12px;color:var(--accent-amber);background:rgba(224,156,58,.08);border:1px solid rgba(224,156,58,.35);border-radius:9px;padding:8px 10px;margin-bottom:8px;text-align:center;">⚠️ ' + sinPiso.length + ' gasto' + (sinPiso.length === 1 ? '' : 's') + ' antiguo' + (sinPiso.length === 1 ? '' : 's') + ' sin piso · <b>pulsa para ordenarlos</b></div>';
   }
-  var total = 0;
-  var html = '';
-  var htmlVenta = '', totalVenta = 0; // 22/10/2026 (A5): gastos de la venta, aparte
-  // PUNTO 224 (01/10/2026): lo más reciente primero. (índice real conservado para ver/compartir/borrar)
-  var ordenG = gastos.map(function(_, k) { return k; }).sort(function(a, b) { return String(gastos[b].fecha || '').localeCompare(String(gastos[a].fecha || '')); });
-  for (var oi = 0; oi < ordenG.length; oi++) {
-    var i = ordenG[oi];
-    var g = gastos[i];
-    var _esVenta = g.categoria === RENTA_CAT_GASTO_VENTA; // 22/10/2026 (A5)
-    if (_esVenta) totalVenta += numES(g.importe); else total += numES(g.importe);
-    // PUNTO 167 (14/09/2026): además del "ver", un botón de compartir
-    // (WhatsApp, correo...) con el archivo real, cuando hay foto/factura.
-    var fotoLink = g.fotoUrl
-      ? ' <a href="' + g.fotoUrl + '" target="_blank" style="color:#5b8dee;font-size:11px;">📎 ver</a>'
-        + ' <button onclick="renta_compartirGasto(' + i + ')" title="Compartir" style="background:none;border:none;color:#5b8dee;font-size:11px;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">' + _svgCompartir(12) + ' compartir</button>'
-      : '';
-    var _fila = '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
-      + '<div><div style="font-size:13px;font-weight:700;color:' + (_esVenta ? 'var(--silver-mid)' : 'var(--silver-bright)') + ';">' + g.concepto + fotoLink + '</div>'
-      + '<div style="font-size:11px;color:var(--text-secondary);">' + (g.fecha || '') + (g.categoria && !_esVenta ? ' · ' + g.categoria : '') + '</div></div>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<div style="font-size:13px;font-weight:700;color:' + (_esVenta ? 'var(--silver-dim)' : '#e07070') + ';white-space:nowrap;">-' + fmtGlobal(g.importe) + ' €</div>'
-      + '<button onclick="renta_borrarGasto(' + i + ')" style="background:none;border:none;color:#e07070;font-size:16px;cursor:pointer;">✕</button>'
-      + '</div></div>';
-    if (_esVenta) htmlVenta += _fila; else html += _fila;
+  pisos.forEach(function(p) {
+    var ref = p.inm.ref, lista = rgas_delPiso(ref, Y);
+    var r = sib_registro(p.idx, Y) || {}, antes = numES(r.otros) || 0;
+    var sub = lista.reduce(function(s, g) { return s + numES(g.importe); }, 0) + antes;
+    if (!lista.length && !(antes > 0)) return;
+    var vac = !!vacio[ref];
+    if (!vac) total += sub;
+    html += '<div style="' + grp + 'color:' + (vac ? 'var(--text-secondary)' : 'var(--accent-green)') + ';"><span>' + sib_esc(rgas_nombrePiso(ref)) + '</span><span>' + fmtGlobal(sub) + ' €</span></div>';
+    lista.forEach(function(g) { html += rgas_filaHtml(g, Y); });
+    if (antes > 0) html += '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;opacity:.7;font-style:italic;"><span style="color:var(--text-secondary);width:40px;font-size:11.5px;">' + Y + '</span><span style="flex:1;">Total apuntado antes <span style="font-size:10.5px;">(ficha del piso)</span></span><span style="font-weight:700;white-space:nowrap;">' + fmtGlobal(antes) + ' €</span></div>';
+    if (vac) html += '<div style="font-size:11.5px;color:var(--accent-amber);background:rgba(224,156,58,.08);border:1px solid rgba(224,156,58,.35);border-radius:9px;padding:7px 9px;margin:6px 0;text-align:center;">Vacío en ' + Y + ': sus gastos y su amortización no restan. Se declara la imputación de rentas.</div>';
+  });
+  // Varios pisos
+  var varios = gastos.filter(function(g) { return g.ref === RGAS_VARIOS && g.categoria !== RENTA_CAT_GASTO_VENTA; });
+  if (varios.length) {
+    var sv = varios.reduce(function(s, g) { return s + numES(g.importe); }, 0); total += sv;
+    html += '<div style="' + grp + 'color:var(--accent-green);"><span>Varios pisos</span><span>' + fmtGlobal(sv) + ' €</span></div>';
+    varios.forEach(function(g) { html += rgas_filaHtml(g, Y, { sub: (g.categoria || '') + ' · se reparte entre los pisos alquilados' }); });
   }
-  if (!html) html = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;">Sin gastos deducibles del alquiler.</div>';
-  if (htmlVenta) {
-    html += '<div style="font-size:11px;letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase;margin:14px 0 4px;text-align:center;">Gastos de la venta · ' + fmtGlobal(totalVenta) + ' €</div>'
-      + '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-bottom:8px;line-height:1.4;">Se restan en la ganancia de la venta, no del alquiler.</div>'
-      + htmlVenta;
+  // Antiguos sin piso (hasta que se ordenen)
+  var sp = gastos.filter(function(g) { return !g.ref && g.categoria !== RENTA_CAT_GASTO_VENTA; });
+  if (sp.length) {
+    var ss = sp.reduce(function(s, g) { return s + numES(g.importe); }, 0); total += ss;
+    html += '<div style="' + grp + 'color:var(--accent-amber);"><span>Sin piso (por ordenar)</span><span>' + fmtGlobal(ss) + ' €</span></div>';
+    sp.forEach(function(g) { html += rgas_filaHtml(g, Y); });
   }
+  if (!html) html = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 8px;text-align:center;">Sin gastos apuntados en ' + Y + '.<br>Se apuntan en la ficha de cada piso (pestaña Gastos) o con el botón de abajo.</div>';
+  // Gastos de la venta: los importes de la ficha (los que usa la ganancia) y
+  // las facturas guardadas como justificante.
+  var todos = []; try { todos = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'); } catch (e) {}
+  todos.forEach(function(inm, idxV) {
+    if (!inm || (inm.propietario || '').toLowerCase() !== 'patricio' || inm.estado !== 'vendido' || parseInt(inm.ventaAnio, 10) !== Y) return;
+    var gv = numES(inm.ventaGastos) || 0, pl = numES(inm.ventaPlusvalia) || 0;
+    var fact = []; for (var a = Y - 1; a <= Y; a++) rgas_load(a).forEach(function(g) { if (g && !g.deleted && g.categoria === RENTA_CAT_GASTO_VENTA && (g.ref === inm.ref || !g.ref)) fact.push({ a: a, g: g }); });
+    html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:14px;">'
+      + '<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--accent-gold);margin-bottom:4px;text-align:center;">🏷️ GASTOS DE VENTA · ' + sib_esc(String(inm.direccionCalle || inm.direccion || inm.ref).split(',')[0]) + '</div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span>Gastos de venta (agencia, notaría…)</span><b>' + (gv ? fmtGlobal(gv) + ' €' : '—') + '</b></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span>Plusvalía municipal</span><b style="' + (pl ? '' : 'color:var(--accent-amber);font-weight:600;') + '">' + (pl ? fmtGlobal(pl) + ' €' : 'Pendiente de importe') + '</b></div>';
+    if (fact.length) { html += '<div style="font-size:11px;color:var(--text-secondary);margin-top:8px;text-align:center;">Facturas guardadas (justificantes)</div>'; fact.forEach(function(x) { html += rgas_filaHtml(x.g, x.a, { gris: false, sub: 'Justificante · el importe que cuenta es el de arriba' }); }); }
+    html += '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">Restan de la ganancia de la venta, no del alquiler. Se cambian en la ficha del piso (✎ → Resultado de la venta).</div></div>';
+  });
   cont.innerHTML = html;
   document.getElementById('renta-total-gastos').textContent = fmtGlobal(total) + ' €';
-  // PUNTO 174 (14/09/2026): precarga en segundo plano de las fotos/facturas
-  // de esta lista, para que "compartir" no dependa de la velocidad de la
-  // conexión en el momento justo de pulsarlo — ver _precargarBlobDrive.
   gastos.forEach(function(g) { if (g.fotoUrl) _precargarBlobDrive(g.fotoUrl); });
+}
+
+// ── 08/11/2026 (Patry): GASTOS DE LOS PISOS EN UN SOLO SITIO ─────────────
+// Cada gasto se apunta UNA vez, con su piso (o "Varios pisos"), y se guarda
+// en la lista del año ('renta:gastos:AAAA', la de siempre, ahora con "ref").
+// La ficha del piso (pestaña Gastos) enseña los de ese piso; Renta → Gastos es
+// el resumen de todos. Los gastos antiguos sin piso se ordenan una sola vez.
+function rgas_load(anio) { try { var a = JSON.parse(localStorage.getItem('renta:gastos:' + anio) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function rgas_save(anio, arr) { localStorage.setItem('renta:gastos:' + anio, JSON.stringify(arr)); }
+function rgas_id(g) { return (g && g.id) || ('leg_gastos_' + (g.concepto || '') + '|' + (g.fecha || '') + '|' + (g.categoria || '')); }
+function rgas_nuevoId() { return 'gas_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function rgas_buscar(anio, id) { var arr = rgas_load(anio); for (var i = 0; i < arr.length; i++) { if (arr[i] && rgas_id(arr[i]) === id) return { arr: arr, i: i }; } return null; }
+function rgas_esAdmin() { return typeof getRol !== 'function' || getRol() === 'admin'; }
+function rgas_inmPorRef(ref) { var l = []; try { l = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'); } catch (e) {} for (var i = 0; i < l.length; i++) { if (l[i] && l[i].ref === ref) return { inm: l[i], idx: i }; } return null; }
+function rgas_nombrePiso(ref) {
+  if (ref === RGAS_VARIOS) return 'Varios pisos';
+  var x = rgas_inmPorRef(ref); if (!x) return ref || 'Sin piso';
+  var d = String(x.inm.direccionCalle || x.inm.direccion || '').split(',')[0];
+  return ref + (d ? ' · ' + d : '');
+}
+function rgas_pisosPatricio() {
+  var l = []; try { l = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'); } catch (e) {}
+  var Y = new Date().getFullYear();
+  return l.map(function(i, idx) { return { inm: i, idx: idx }; }).filter(function(x) {
+    var i = x.inm; if (!i || i.deleted || (i.propietario || '').toLowerCase() !== 'patricio' || !i.ref) return false;
+    return !(i.estado === 'vendido' && (parseInt(i.ventaAnio, 10) || 0) < Y - 1);
+  });
+}
+// Gastos de un piso en un año (sin los de venta ni los que ya están en la ficha).
+function rgas_delPiso(ref, anio) {
+  return rgas_load(anio).filter(function(g) { return g && !g.deleted && g.ref === ref && !g.enFicha && g.categoria !== RENTA_CAT_GASTO_VENTA; })
+    .sort(function(a, b) { return String(b.fecha || '').localeCompare(String(a.fecha || '')); });
+}
+function rgas_sinPiso() {
+  var res = [], Y = new Date().getFullYear();
+  for (var a = 2022; a <= Y + 1; a++) rgas_load(a).forEach(function(g) { if (g && !g.deleted && !g.ref) res.push({ anio: a, g: g }); });
+  return res;
+}
+function rgas_fecha(f) { var p = String(f || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : (f || ''); }
+function rgas_filaHtml(g, anio, o) {
+  o = o || {};
+  var id = rgas_id(g).replace(/'/g, "\\'"), adm = rgas_esAdmin() && !o.soloVer;
+  var foto = g.fotoUrl ? ' <a href="' + g.fotoUrl + '" target="_blank" style="color:#5b8dee;font-size:11px;">📎 ver</a>'
+    + ' <button onclick="rgas_compartir(' + anio + ',\'' + id + '\')" title="Compartir" style="background:none;border:none;color:#5b8dee;font-size:11px;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">' + _svgCompartir(12) + '</button>' : '';
+  return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;' + (o.gris ? 'opacity:.6;' : '') + '">'
+    + (adm ? '<span onclick="rgas_editar(' + anio + ',\'' + id + '\')" style="color:#5b8dee;font-size:14px;width:18px;text-align:center;cursor:pointer;flex-shrink:0;">✎</span>' : '')
+    + '<span style="color:var(--text-secondary);width:40px;font-size:11.5px;flex-shrink:0;">' + rgas_fecha(g.fecha) + '</span>'
+    + '<span style="flex:1;min-width:0;color:var(--silver-bright);">' + sib_esc(g.concepto || '') + foto + '<span style="display:block;color:var(--text-secondary);font-size:10.5px;">' + sib_esc(o.sub || g.categoria || '') + '</span></span>'
+    + '<span style="font-weight:700;white-space:nowrap;color:var(--silver-bright);">' + fmtGlobal(numES(g.importe)) + ' €</span>'
+    + (adm ? '<span onclick="rgas_borrar(' + anio + ',\'' + id + '\')" style="color:#e57373;font-size:13px;width:18px;text-align:center;cursor:pointer;flex-shrink:0;">✕</span>' : '')
+    + '</div>';
+}
+function rgas_compartir(anio, id) { var b = rgas_buscar(anio, id); if (b && b.arr[b.i].fotoUrl) compartirArchivoDrive(b.arr[b.i].fotoUrl, b.arr[b.i].concepto || 'gasto'); }
+function rgas_refrescar() {
+  try { renta_renderGastos(); } catch (e) {}
+  try { renta_calcPrevision(); } catch (e) {}
+  try { if (typeof sib_render === 'function' && document.getElementById('tab-gastos-sib') && sib_idx != null) sib_render(); } catch (e) {}
+  try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
+}
+function rgas_borrar(anio, id) {
+  if (bloqueaSiViewer('Borrar un gasto')) return;
+  var b = rgas_buscar(anio, id); if (!b) return;
+  var g = b.arr[b.i];
+  showConfirm('🗑️', '¿Borrar este gasto?', (g.concepto || '') + ' · ' + fmtGlobal(numES(g.importe)) + ' € — esta acción no se puede deshacer.', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Borrar', cls: 'r', fn: function() { var b2 = rgas_buscar(anio, id); if (!b2) return; b2.arr.splice(b2.i, 1); rgas_save(anio, b2.arr); rgas_refrescar(); } }
+  ]);
+}
+function rgas_editar(anio, id) {
+  if (bloqueaSiViewer('Editar un gasto')) return;
+  var b = rgas_buscar(anio, id); if (!b) return;
+  renta_abrirModalGasto('otro', { editAnio: anio, editId: id, g: b.arr[b.i] });
+}
+// Añadir desde la ficha de un piso (o desde Renta, con el piso por elegir).
+function rgas_nuevo(ref, anio) {
+  if (bloqueaSiViewer('Añadir un gasto')) return;
+  renta_abrirModalGasto('otro', { ref: ref || '', anio: anio || null });
+}
+// Caja "🧾 OTROS GASTOS AAAA" de la pestaña Gastos de la ficha.
+function rgas_htmlFicha(inm, idx, anio) {
+  var caja = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px;';
+  var lista = rgas_delPiso(inm.ref, anio);
+  var r = sib_registro(idx, anio) || {};
+  var antes = numES(r.otros) || 0;
+  var h = '<div style="' + caja + '"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);">🧾 OTROS GASTOS ' + anio + '</div>'
+    + '<span style="font-size:12px;color:var(--text-secondary);font-weight:600;">' + (lista.length + (antes > 0 ? 1 : 0)) + '</span></div>';
+  lista.forEach(function(g) { h += rgas_filaHtml(g, anio); });
+  if (antes > 0) {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;opacity:.7;font-style:italic;">'
+      + (rgas_esAdmin() ? '<span onclick="sib_editarGastos()" style="color:#5b8dee;font-size:14px;width:18px;text-align:center;cursor:pointer;">✎</span>' : '')
+      + '<span style="color:var(--text-secondary);width:40px;font-size:11.5px;">' + anio + '</span>'
+      + '<span style="flex:1;color:var(--silver-bright);">Total apuntado antes<span style="display:block;color:var(--text-secondary);font-size:10.5px;">Importe que ya tenías (sin detalle)</span></span>'
+      + '<span style="font-weight:700;white-space:nowrap;">' + fmtGlobal(antes) + ' €</span>'
+      + (rgas_esAdmin() ? '<span onclick="rgas_quitarAntes(' + idx + ',' + anio + ')" style="color:#e57373;font-size:13px;width:18px;text-align:center;cursor:pointer;">✕</span>' : '')
+      + '</div>';
+  }
+  if (!lista.length && !(antes > 0)) h += '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:4px 0 6px;">Sin gastos apuntados en ' + anio + '.</div>';
+  if (rgas_esAdmin()) h += '<button onclick="rgas_nuevo(\'' + String(inm.ref || '').replace(/'/g, "\\'") + '\',' + anio + ')" style="width:100%;background:rgba(91,141,238,.12);border:1px solid rgba(91,141,238,.5);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;padding:9px;cursor:pointer;margin-top:10px;">+ Añadir gasto</button>';
+  if ((inm.propietario || '').toLowerCase() === 'patricio') h += '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">Estos gastos son los que usa la Renta (solo por los días alquilados).</div>';
+  return h + '</div>';
+}
+function rgas_quitarAntes(idx, anio) {
+  if (bloqueaSiViewer('Quitar un gasto')) return;
+  showConfirm('🗑️', 'Quitar "Total apuntado antes"', '¿Quitar este importe de ' + anio + '? Si son gastos reales, mejor apúntalos uno a uno con "+ Añadir gasto".', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Quitar', cls: 'r', fn: function() { sib_guardarRegistro(idx, anio, { otros: 0 }); rgas_refrescar(); } }
+  ]);
+}
+// Aviso al guardar: mismo piso, misma fecha y mismo importe → ¿repetido?
+function rgas_repetido(anio, ref, fecha, importe, idEdit) {
+  var a = rgas_load(anio);
+  for (var i = 0; i < a.length; i++) {
+    var g = a[i]; if (!g || g.deleted || rgas_id(g) === idEdit) continue;
+    if ((g.ref || '') === (ref || '') && (g.fecha || '') === (fecha || '') && Math.abs(numES(g.importe) - importe) < 0.01) return g;
+  }
+  return null;
+}
+// ── Ordenar los gastos antiguos (una sola vez) ──
+function rgas_claves(inm) {
+  var t = (String(inm.direccionCalle || '') + ' ' + String(inm.direccion || '') + ' ' + String(inm.ref || '')).toLowerCase();
+  var stop = { calle: 1, avda: 1, avenida: 1, plaza: 1, lorca: 1, murcia: 1, granada: 1, piso: 1, bajo: 1, edificio: 1 };
+  return t.normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9-]+/).filter(function(w) { return w.length >= 4 && !stop[w] && !/^\d+$/.test(w); });
+}
+function rgas_propuesta(g, pisos) {
+  var t = ((g.concepto || '') + ' ' + (g.categoria || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  var hits = pisos.filter(function(p) { return rgas_claves(p.inm).some(function(w) { return t.indexOf(w) >= 0; }); });
+  if (g.categoria === RENTA_CAT_GASTO_VENTA) {
+    var vend = pisos.filter(function(p) { return p.inm.estado === 'vendido'; });
+    if (hits.length === 1) return hits[0].inm.ref;
+    if (vend.length === 1) return vend[0].inm.ref;
+  }
+  return hits.length === 1 ? hits[0].inm.ref : '';
+}
+function rgas_ordenarAbrir() {
+  if (bloqueaSiViewer('Ordenar los gastos')) return;
+  var items = rgas_sinPiso(), pisos = rgas_pisosPatricio();
+  if (!items.length) { avisar('No hay gastos sin piso. ✓'); return; }
+  var prev = document.getElementById('rgas-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'rgas-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var sel = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13px;padding:8px;text-align:center;text-align-last:center;margin-top:6px;';
+  var h = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:18px 18px 30px;width:100%;max-width:480px;box-sizing:border-box;max-height:88vh;overflow:auto;">'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;color:var(--silver-bright);">Pasar gastos a su piso</div>'
+    + '<div style="text-align:center;font-size:12px;color:var(--text-secondary);margin:4px 0 12px;line-height:1.4;">Estos gastos estaban en Renta → Gastos sin piso.<br>Elige de qué piso es cada uno (solo hay que hacerlo una vez).</div>';
+  items.forEach(function(x, k) {
+    var g = x.g, prop = rgas_propuesta(g, pisos), esVenta = g.categoria === RENTA_CAT_GASTO_VENTA;
+    h += '<div style="border-bottom:1px solid rgba(255,255,255,0.06);padding:9px 0;"><div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--silver-bright);"><span>' + rgas_fecha(g.fecha) + '/' + String(x.anio).slice(2) + ' · ' + sib_esc(g.concepto || '') + (esVenta ? ' <span style="color:var(--accent-gold);font-size:11px;">(gasto de venta)</span>' : '') + '</span><b style="white-space:nowrap;">' + fmtGlobal(numES(g.importe)) + ' €</b></div>'
+      + '<select id="rgas-sel-' + k + '" style="' + sel + '"><option value="">— Elige el piso —</option>'
+      + pisos.map(function(p) { return '<option value="' + sib_esc(p.inm.ref) + '"' + (prop === p.inm.ref ? ' selected' : '') + '>' + sib_esc(rgas_nombrePiso(p.inm.ref)) + '</option>'; }).join('')
+      + (esVenta ? '' : '<option value="' + RGAS_VARIOS + '">Varios pisos</option>')
+      + '</select>' + (prop ? '<div style="color:var(--accent-green);font-size:11px;text-align:center;margin-top:3px;">✓ Propuesto por la app (puedes cambiarlo)</div>' : '') + '</div>';
+  });
+  h += '<button onclick="rgas_ordenarGuardar()" style="width:100%;background:rgba(76,175,130,.14);border:1px solid rgba(76,175,130,.6);border-radius:12px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:14px;">Guardar</button>'
+    + '<button onclick="document.getElementById(\'rgas-capa\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">Cancelar</button>'
+    + '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;">Los que dejes sin elegir se quedan como están y se reparten entre los pisos, como hasta ahora.</div></div>';
+  capa.innerHTML = h;
+  document.body.appendChild(capa);
+  window._rgasItems = items;
+}
+function rgas_ordenarGuardar() {
+  var items = window._rgasItems || [], ahora = new Date().toISOString(), porAnio = {}, n = 0;
+  items.forEach(function(x, k) {
+    var s = document.getElementById('rgas-sel-' + k); if (!s || !s.value) return;
+    (porAnio[x.anio] = porAnio[x.anio] || []).push({ id: rgas_id(x.g), ref: s.value });
+  });
+  Object.keys(porAnio).forEach(function(a) {
+    var arr = rgas_load(a);
+    porAnio[a].forEach(function(c) {
+      for (var i = 0; i < arr.length; i++) {
+        var g = arr[i]; if (!g || g.ref || rgas_id(g) !== c.id) continue;
+        if (!g.id) g.id = c.id;
+        g.ref = c.ref; g.updatedAt = ahora; n++;
+        // Comunidad / IBI / seguro antiguos que ya están en la ficha del piso: se
+        // quedan como justificante, sin contarlos otra vez.
+        if (/^(Comunidad|IBI|Seguro)$/.test(g.categoria || '') && c.ref !== RGAS_VARIOS) {
+          var x = rgas_inmPorRef(c.ref), r = x ? sib_registro(x.idx, parseInt(a, 10)) : null;
+          if (r && ((g.categoria === 'Comunidad' && numES(r.comunidadMes) > 0) || (g.categoria === 'IBI' && numES(r.ibi) > 0) || (g.categoria === 'Seguro' && numES(r.seguro) > 0))) g.enFicha = true;
+        }
+        break;
+      }
+    });
+    rgas_save(a, arr);
+  });
+  var capa = document.getElementById('rgas-capa'); if (capa) capa.remove();
+  rgas_refrescar();
+  if (typeof showToast === 'function') showToast('✓ ' + n + ' gasto(s) pasados a su piso', 'success');
 }
 
 // PUNTO 167 (14/09/2026): compartir la foto/factura de un gasto a
@@ -29144,11 +29421,39 @@ function renta_borrarGasto(idx) {
   ]);
 }
 
-function renta_abrirModalGasto(tipo) {
+function renta_abrirModalGasto(tipo, opts) {
+  // 08/11/2026: el mismo formulario desde Renta y desde la ficha de un piso;
+  // lo primero, de qué piso es. También sirve para editar (opts.editId).
+  opts = opts || {};
   document.getElementById('renta-modal-gasto').style.display = 'flex';
   document.getElementById('renta-gasto-tipo-hidden').value = tipo;
+  var g = opts.g || null;
+  document.getElementById('renta-gasto-edit-id').value = opts.editId || '';
+  document.getElementById('renta-gasto-edit-anio').value = opts.editAnio || '';
+  var tit = document.getElementById('renta-gasto-titulo'); if (tit) tit.textContent = g ? '✎ EDITAR GASTO' : '🧾 AÑADIR GASTO';
+  var refSel = g ? (g.ref || '') : (opts.ref || '');
+  var sel = document.getElementById('renta-gasto-ref');
+  if (sel) {
+    var pisos = rgas_pisosPatricio(), h = '<option value="">— Elige el piso —</option>', esta = false;
+    pisos.forEach(function(p) { if (p.inm.ref === refSel) esta = true; h += '<option value="' + sib_esc(p.inm.ref) + '">' + sib_esc(rgas_nombrePiso(p.inm.ref)) + '</option>'; });
+    if (refSel && refSel !== RGAS_VARIOS && !esta) h += '<option value="' + sib_esc(refSel) + '">' + sib_esc(rgas_nombrePiso(refSel)) + '</option>';
+    h += '<option value="' + RGAS_VARIOS + '">Varios pisos (se reparte)</option>';
+    sel.innerHTML = h; sel.value = refSel;
+  }
+  var cat = document.getElementById('renta-gasto-categoria');
+  if (cat) {
+    // Gastos antiguos de comunidad / IBI / seguro: se conserva su categoría al editar.
+    Array.prototype.slice.call(cat.querySelectorAll('option[data-antigua]')).forEach(function(o) { o.remove(); });
+    if (g && g.categoria && !Array.prototype.some.call(cat.options, function(o) { return o.value === g.categoria; })) {
+      var op = document.createElement('option'); op.value = g.categoria; op.textContent = g.categoria; op.setAttribute('data-antigua', '1'); cat.appendChild(op);
+    }
+    cat.value = g ? (g.categoria || 'Otros') : 'Reparación';
+  }
   var hoyStr = _fechaHoyLocal();
-  document.getElementById('renta-gasto-fecha').value = hoyStr;
+  var anioOp = parseInt(opts.anio, 10) || 0;
+  document.getElementById('renta-gasto-fecha').value = g ? (g.fecha || '') : ((anioOp && String(anioOp) !== hoyStr.slice(0, 4)) ? (anioOp + '-12-31') : hoyStr);
+  document.getElementById('renta-gasto-concepto').value = g ? (g.concepto || '') : '';
+  document.getElementById('renta-gasto-importe').value = g ? fmtGlobal(numES(g.importe)) : '';
 }
 function renta_cerrarModalGasto() {
   document.getElementById('renta-modal-gasto').style.display = 'none';
@@ -29161,21 +29466,53 @@ function renta_cerrarModalGasto() {
 // mismo archivo. Con _gastoSubiendo, cualquier pulsación mientras ya hay
 // una subida en curso se ignora.
 var _gastoSubiendo = false;
-function renta_guardarGasto() {
+function renta_guardarGasto(forzar) {
   if (bloqueaSiViewer('Guardar un gasto')) return;
   if (_gastoSubiendo) return;
   var concepto = document.getElementById('renta-gasto-concepto').value.trim();
   var importe = parseFmtGlobal(document.getElementById('renta-gasto-importe').value);
   var fecha = document.getElementById('renta-gasto-fecha').value;
   var categoria = document.getElementById('renta-gasto-categoria').value;
+  var ref = (document.getElementById('renta-gasto-ref') || {}).value || '';
+  var editId = document.getElementById('renta-gasto-edit-id').value;
+  var editAnio = parseInt(document.getElementById('renta-gasto-edit-anio').value, 10) || 0;
+  if (!ref) { avisar('Elige de qué piso es el gasto (o "Varios pisos").'); return; }
   if (!concepto || !importe) { avisar('Introduce el concepto y el importe.'); return; }
+  var anioG = parseInt(String(fecha || '').slice(0, 4), 10) || renta_anio;
+  // 08/11/2026: aviso de gasto repetido (mismo piso, misma fecha, mismo importe)
+  if (forzar !== true) {
+    var rep = rgas_repetido(anioG, ref, fecha, importe, editId);
+    if (rep) {
+      showConfirm('⚠️', '¿Gasto repetido?', 'En ' + rgas_nombrePiso(ref) + ' ya hay un gasto de ' + fmtGlobal(numES(rep.importe)) + ' € el ' + rinf_fecha(fecha) + ': "' + (rep.concepto || '') + '".\nSi es el mismo, contaría dos veces y la Renta saldría más baja de lo real.', [
+        { label: 'Es el mismo: no guardar', cls: 'g', fn: function() { renta_cerrarModalGasto(); } },
+        { label: 'Son distintos: guardar los dos', cls: 'c', fn: function() { renta_guardarGasto(true); } },
+        { label: 'Cancelar', cls: 'c', fn: function() {} }
+      ]);
+      var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
+      return;
+    }
+  }
 
   function guardarConFoto(fotoUrl) {
-    var arr = renta_getGastos();
-    // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de
-    // sincronización de Gastos — mismo motivo que Contratos.
-    arr.push({ concepto: concepto, importe: importe, fecha: fecha, categoria: categoria, fotoUrl: fotoUrl || null, updatedAt: new Date().toISOString() });
-    renta_saveGastos(arr);
+    var ahora = new Date().toISOString(), obj = null;
+    if (editId) {
+      var b = rgas_buscar(editAnio || anioG, editId);
+      if (b) {
+        obj = b.arr[b.i];
+        if (!obj.id) obj.id = editId;
+        if (editAnio && editAnio !== anioG) { b.arr.splice(b.i, 1); rgas_save(editAnio, b.arr); obj = JSON.parse(JSON.stringify(obj)); }
+      }
+    }
+    var arr = rgas_load(anioG);
+    if (!obj) { obj = { id: rgas_nuevoId() }; arr.push(obj); }
+    else if (!editAnio || editAnio === anioG) { arr = rgas_load(anioG); var k = -1; for (var i = 0; i < arr.length; i++) { if (arr[i] && rgas_id(arr[i]) === obj.id) { k = i; break; } } if (k >= 0) { obj = arr[k]; if (!obj.id) obj.id = editId; } else arr.push(obj); }
+    else arr.push(obj);
+    obj.concepto = concepto; obj.importe = importe; obj.fecha = fecha; obj.categoria = categoria; obj.ref = ref;
+    if (fotoUrl) obj.fotoUrl = fotoUrl; else if (obj.fotoUrl === undefined) obj.fotoUrl = null;
+    delete obj.enFicha;
+    // PUNTO 160 (10/09/2026): sello de modificación, para el blindaje de sincronización.
+    obj.updatedAt = ahora;
+    rgas_save(anioG, arr);
     renta_cerrarModalGasto();
     document.getElementById('renta-gasto-concepto').value = '';
     document.getElementById('renta-gasto-importe').value = '';
@@ -29183,8 +29520,7 @@ function renta_guardarGasto() {
     document.getElementById('renta-foto-img').src = '';
     document.getElementById('renta-foto-nombre').textContent = '';
     _fotoArchivo = null;
-    renta_renderGastos();
-    renta_calcPrevision();
+    rgas_refrescar();
     if (fotoUrl) info('✓ Gasto guardado y foto subida a Drive.');
     else info('✓ Gasto guardado.');
   }
@@ -29194,7 +29530,7 @@ function renta_guardarGasto() {
     var btn = document.querySelector('#renta-modal-gasto button');
     _gastoSubiendo = true;
     if (btn) { btn.textContent = 'Subiendo foto...'; btn.disabled = true; btn.style.opacity = '0.6'; }
-    renta_subirFoto(_fotoArchivo, renta_anio, concepto, function(err, url) {
+    renta_subirFoto(_fotoArchivo, anioG, concepto, function(err, url) {
       _gastoSubiendo = false;
       if (btn) { btn.textContent = 'GUARDAR'; btn.disabled = false; btn.style.opacity = ''; }
       if (err) {
@@ -29529,6 +29865,90 @@ var RENTA_MESES_NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio',
 // 02/11/2026: factor de cada mes sobre la nómina base (calendario fijo de Patry)
 var RENTA_NOM_FACTOR = [1, 1, 2, 1, 1, 1, 2, 1, 1.5, 1, 1, 1.5];
 var RENTA_CAT_GASTO_VENTA = 'Gasto de venta de inmueble';
+// ── 08/11/2026: REVISIÓN DE LA RENTA CON PATRY (comparada con su Renta 2025) ──
+// Escala general del IRPF: estatal + autonómica de la Región de Murcia, ya
+// sumadas (tipo total de cada tramo).
+var RENTA_ESCALA_MURCIA = [[0,12450,0.19],[12450,20200,0.232],[20200,34000,0.283],[34000,35200,0.329],[35200,60000,0.364],[60000,300000,0.45],[300000,999999999,0.47]];
+var RENTA_PP_MAX = 1500;          // reducción máxima por aportaciones a planes de pensiones
+var RENTA_IMPUT_PCT = 0.02;       // imputación de rentas: 2 % del valor catastral (no revisado)
+var RGAS_VARIOS = '__varios__';   // gasto de "Varios pisos" (se reparte entre los alquilados)
+function renta_diasDelAnio(anio) { return ((anio % 4 === 0 && anio % 100 !== 0) || anio % 400 === 0) ? 366 : 365; }
+function renta_diaDelAnio(iso) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); if (!m) return 0;
+  var d = new Date(+m[1], +m[2] - 1, +m[3], 12), ini = new Date(+m[1], 0, 1, 12);
+  return Math.round((d - ini) / 86400000) + 1;
+}
+function renta_diasMes(anio, mes) { return new Date(anio, mes, 0).getDate(); }
+// Días del año en que el inmueble fue de Patricio. Vendido ese año: hasta el
+// día anterior a la fecha de la venta (si no está la fecha, el año entero).
+function renta_diasPropiedad(inm, anio) {
+  var total = renta_diasDelAnio(anio);
+  if (!inm) return 0;
+  if (inm.estado === 'vendido') {
+    var va = parseInt(inm.ventaAnio, 10) || 0;
+    if (va && va < anio) return 0;
+    if (va === anio && /^\d{4}-\d{2}-\d{2}$/.test(inm.ventaFecha || '') && parseInt(inm.ventaFecha.slice(0, 4), 10) === anio) total = Math.max(0, renta_diaDelAnio(inm.ventaFecha) - 1);
+  }
+  return total;
+}
+// Días alquilados: los meses con alquiler cobrado (Cobros mensuales, y los
+// proyectados en la estimación del año completo). En el mes en que empieza
+// un contrato se cuenta desde el día de inicio.
+function renta_diasAlquilado(inm, mesesAlq, anio, ctrs) {
+  var dias = 0;
+  Object.keys(mesesAlq || {}).forEach(function(k) {
+    var m = parseInt(k, 10); if (!(m >= 1 && m <= 12)) return;
+    var dm = renta_diasMes(anio, m), desde = 1;
+    (ctrs || []).forEach(function(c) {
+      if (!c || c.deleted || c.ref !== inm.ref || (c.tipo || 'contrato') === 'rescision') return;
+      var mi = /^(\d{4})-(\d{2})-(\d{2})/.exec(c.inicio || '');
+      if (mi && +mi[1] === anio && +mi[2] === m) desde = Math.max(desde, +mi[3]);
+    });
+    dias += Math.max(0, dm - desde + 1);
+  });
+  return dias;
+}
+// Imputación de rentas de un piso los días que no estuvo alquilado: 2 % del
+// valor catastral (el del año, o el último apuntado) × días / días del año.
+// Solo pisos; necesita el valor catastral en la ficha (pestaña Gastos).
+function renta_imputacionPiso(inm, idx, anio, diasVacio) {
+  if (!inm || !(diasVacio > 0) || (inm.tipo && inm.tipo !== 'piso')) return 0;
+  var vc = 0, anioVc = 0;
+  try {
+    inm_seguroIbiLoad().forEach(function(r) {
+      if (!r || r.deleted || !inm_recEs(r, idx)) return;
+      var a = parseInt(r.anio, 10) || 0, v = numES(r.vcTotal) || 0;
+      if (v > 0 && a <= anio && a >= anioVc) { vc = v; anioVc = a; }
+    });
+  } catch (e) {}
+  if (!(vc > 0)) return 0;
+  return vc * RENTA_IMPUT_PCT * diasVacio / renta_diasDelAnio(anio);
+}
+// Aportaciones del año a los fondos marcados como plan de pensiones: el dato
+// guardado del año (ppAnio, confirmado/corregido por Patry) o, si no hay, las
+// aportaciones automáticas apuntadas ese año. En la estimación del año en
+// curso se suman también las que quedan hasta el 31/12.
+function renta_aportPlanPensiones(anio, proy) {
+  var total = 0;
+  var fondos = []; try { fondos = JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []; } catch (e) {}
+  fondos.forEach(function(f) {
+    if (!f || f.deleted || !f.esPlanPensiones) return;
+    total += fin_ppAportadoAnio(f, anio);
+    if (proy && anio === new Date().getFullYear() && f.dcaActivo && (parseFloat(f.dcaImporte) || 0) > 0) {
+      var desde = f.dcaAplicadoHasta || fin_dcaHoy();
+      if (desde < fin_dcaHoy()) desde = fin_dcaHoy();
+      total += fin_dcaFechasEntre(f.dcaDias && f.dcaDias.length ? f.dcaDias : [1, 15], desde, anio + '-12-31').length * (parseFloat(f.dcaImporte) || 0);
+    }
+  });
+  return Math.round(total * 100) / 100;
+}
+function fin_ppAportadoAnio(f, anio) {
+  var k = String(anio);
+  if (f && f.ppAnio && f.ppAnio[k] != null && f.ppAnio[k] !== '') return numES(f.ppAnio[k]) || 0;
+  var s = 0;
+  ((f && f.dcaUltimas) || []).forEach(function(x) { if (x && String(x.fecha || '').slice(0, 4) === k) s += parseFloat(x.importe) || 0; });
+  return Math.round(s * 100) / 100;
+}
 function renta_calcPrevisionDatos(proy) {
   var nominas = renta_getNominas();
   // "ssTrabajo" = cuota de autónomo (ver PUNTO 126).
@@ -29568,7 +29988,7 @@ function renta_calcPrevisionDatos(proy) {
     if ((todosInm[ii].propietario || '').toLowerCase() === 'patricio') inmPatricio.push(ii);
   }
   var porInm = {};
-  inmPatricio.forEach(function(ix) { porInm[ix] = { ingreso: 0, comunidad: 0, meses: 0, ultimo: 0, segibi: 0 }; });
+  inmPatricio.forEach(function(ix) { porInm[ix] = { ingreso: 0, comunidad: 0, meses: 0, ultimo: 0, segibi: 0, otros: 0, mesesAlq: {} }; });
   var hayComunidad = false;
   (typeof inm_alqMenLoad === 'function' ? inm_alqMenLoad() : []).forEach(function(reg) {
     var ixP = inm_recIdx(reg); // 13/10/2026: por referencia
@@ -29579,66 +29999,104 @@ function renta_calcPrevisionDatos(proy) {
     var alq = parseFloat(reg.alquiler) || 0, com = parseFloat(reg.comunidad) || 0;
     o.ingreso += alq; o.comunidad += com;
     if (com > 0) hayComunidad = true;
-    if (alq > 0) { o.meses++; var mm = parseInt(p[1], 10); if (mm > o.ultimo) o.ultimo = mm; }
+    if (alq > 0) { o.meses++; var mm = parseInt(p[1], 10); o.mesesAlq[mm] = true; if (mm > o.ultimo) o.ultimo = mm; }
   });
   if (proy) {
     inmPatricio.forEach(function(ix) {
       var o = porInm[ix];
-      if (o.meses > 0 && o.ultimo < 12) {
+      var vend = (todosInm[ix] || {}).estado === 'vendido';
+      if (o.meses > 0 && o.ultimo < 12 && !vend) {
         var falt = 12 - o.ultimo;
         var comMedia = o.comunidad / Math.max(1, o.meses);
         o.ingreso += o.ingreso / o.meses * falt;
         o.comunidad += comMedia * falt;
+        for (var mP = o.ultimo + 1; mP <= 12; mP++) o.mesesAlq[mP] = true; // 08/11/2026: días alquilados proyectados
       }
     });
   }
-  // Seguro e IBI del año (dato anual por piso)
+  // Seguro e IBI del año (dato anual por piso) + "Otros gastos" de la ficha
+  // (08/11/2026: antes no se contaban) + valor catastral para la imputación.
   var haySegIbi = false;
   (typeof inm_seguroIbiLoad === 'function' ? inm_seguroIbiLoad() : []).forEach(function(reg) {
     var ixS = inm_recIdx(reg); // 13/10/2026: por referencia
     if (!reg || reg.deleted || parseInt(reg.anio, 10) !== renta_anio || !porInm[ixS]) return;
     var v = (parseFloat(reg.seguro) || 0) + (parseFloat(reg.ibi) || 0);
     porInm[ixS].segibi += v;
+    porInm[ixS].otros += numES(reg.otros) || 0;
     if (v > 0) haySegIbi = true;
   });
 
-  // Otros gastos deducibles. Fuera: gastos de venta de inmueble; y si ya hay
-  // datos de comunidad / seguro-IBI en sus pantallas, los de esas mismas
-  // categorías aquí no se cuentan otra vez (evita contarlos dos veces).
+  // Gastos apuntados gasto a gasto (08/11/2026: cada uno con su piso). Los de
+  // un piso de Patricio van a ese piso; los de "Varios pisos" y los antiguos
+  // sin piso se reparten entre los pisos según lo alquilado. Fuera: gastos de
+  // venta (van a la ganancia) y gastos de pisos que no son de Patricio. Los
+  // antiguos sin piso de comunidad / seguro / IBI no se cuentan otra vez si
+  // ya hay datos en sus pantallas (evita contarlos dos veces).
   var gastosArr = renta_getGastos();
   var gastosDeducibles = 0;
   for (var gi = 0; gi < gastosArr.length; gi++) {
     var gx = gastosArr[gi];
-    if (!gx || gx.deleted) continue;
+    if (!gx || gx.deleted || gx.enFicha) continue; // enFicha: comunidad/IBI/seguro ya contados en la ficha
     var cat = gx.categoria || '';
     if (cat === RENTA_CAT_GASTO_VENTA) continue;
-    if (hayComunidad && cat === 'Comunidad') continue;
-    if (haySegIbi && (cat === 'IBI' || cat === 'Seguro')) continue;
+    var refG = gx.ref || '';
+    if (refG && refG !== RGAS_VARIOS) {
+      var ixG = -1;
+      for (var gj = 0; gj < inmPatricio.length; gj++) { if ((todosInm[inmPatricio[gj]] || {}).ref === refG) { ixG = inmPatricio[gj]; break; } }
+      if (ixG >= 0) porInm[ixG].otros += parseFloat(gx.importe) || 0;
+      continue; // de un piso que no es de Patricio → no va a su Renta
+    }
+    if (!refG && hayComunidad && cat === 'Comunidad') continue;
+    if (!refG && haySegIbi && (cat === 'IBI' || cat === 'Seguro')) continue;
     gastosDeducibles += parseFloat(gx.importe) || 0;
   }
 
   // PUNTO 210: reducción por alquiler de vivienda sobre el rendimiento NETO
   // (60% contratos anteriores al 26/05/2023, 50% el resto).
+  // 08/11/2026 (revisión de la Renta con Patry): gastos fijos y amortización
+  // solo por los DÍAS ALQUILADOS; los días que un piso está vacío se declara
+  // la imputación de rentas (2 % del valor catastral). Un piso vacío todo el
+  // año no resta nada.
   var datos = renta_getInmDatos();
   var _ctrsRenta = [];
   try { _ctrsRenta = JSON.parse(localStorage.getItem('contratos:lista') || '[]'); } catch (eC) {}
+  var diasAnio = renta_diasDelAnio(renta_anio);
   var ingresoAlquilerTotal = 0;
   inmPatricio.forEach(function(ix) { ingresoAlquilerTotal += porInm[ix].ingreso; });
-  var baseAlquilerTotal = 0;
+  var baseAlquilerTotal = 0, imputacionTotal = 0, pisosDet = [];
+  // "Hasta hoy" (sin proyectar) en el año en curso: los días cuentan hasta el
+  // último mes con cobros apuntados (o hasta hoy si aún no hay ninguno), para
+  // no tomar como "vacíos" los meses que todavía no han llegado.
+  var _hastaDia = diasAnio;
+  if (!proy && renta_anio === new Date().getFullYear()) {
+    var _maxUlt = 0; inmPatricio.forEach(function(ix) { if (porInm[ix].ultimo > _maxUlt) _maxUlt = porInm[ix].ultimo; });
+    var _hoyD = new Date();
+    _hastaDia = _maxUlt > 0 ? renta_diaDelAnio(renta_anio + '-' + String(_maxUlt).padStart(2, '0') + '-' + String(renta_diasMes(renta_anio, _maxUlt)).padStart(2, '0'))
+                            : renta_diaDelAnio(_hoyD.getFullYear() + '-' + String(_hoyD.getMonth() + 1).padStart(2, '0') + '-' + String(_hoyD.getDate()).padStart(2, '0'));
+  }
   for (var mi = 0; mi < inmPatricio.length; mi++) {
     var idx = inmPatricio[mi];
+    var inmX = todosInm[idx] || {};
     var d = renta_inmDatosDe(datos, idx); // 13/10/2026
     var o2 = porInm[idx];
-    var gastoAsignado = ingresoAlquilerTotal > 0 ? gastosDeducibles * (o2.ingreso / ingresoAlquilerTotal) : gastosDeducibles / inmPatricio.length;
-    var amorAnual = (parseFloat(d.amorBase) || 0) * 0.03;
-    var rendNeto = o2.ingreso - gastoAsignado - o2.comunidad - o2.segibi - amorAnual;
+    var diasProp = Math.min(renta_diasPropiedad(inmX, renta_anio), _hastaDia);
+    var diasAlq = Math.min(diasProp, renta_diasAlquilado(inmX, o2.mesesAlq, renta_anio, _ctrsRenta));
+    var fAlq = diasProp > 0 ? diasAlq / diasProp : 0;
+    var gastoAsignado = ingresoAlquilerTotal > 0 ? gastosDeducibles * (o2.ingreso / ingresoAlquilerTotal) : 0;
+    var amorAnual = (parseFloat(d.amorBase) || 0) * 0.03 * diasAlq / diasAnio;
+    var gastosPiso = gastoAsignado + o2.comunidad + (o2.segibi + o2.otros) * fAlq;
+    var rendNeto = o2.ingreso - gastosPiso - amorAnual;
+    if (diasAlq === 0 && o2.ingreso === 0) rendNeto = 0;
     if (d.tipo === 'vivienda' && rendNeto > 0) {
-      var _refInm = (todosInm[idx] || {}).ref;
+      var _refInm = inmX.ref;
       var _ctrV = _ctrsRenta.filter(function(c) { return c.ref === _refInm && c.estado === 'activo'; })[0];
       var _pctRed = (_ctrV && _ctrV.inicio && _ctrV.inicio < '2023-05-26') ? 0.60 : 0.50;
       rendNeto = rendNeto * (1 - _pctRed);
     }
     baseAlquilerTotal += rendNeto;
+    var imput = renta_imputacionPiso(inmX, idx, renta_anio, diasProp - diasAlq);
+    imputacionTotal += imput;
+    pisosDet.push({ idx: idx, ref: inmX.ref, diasProp: diasProp, diasAlq: diasAlq, gastos: gastosPiso, amort: amorAnual, imputacion: imput, rendNeto: rendNeto });
   }
 
   // Capital mobiliario: dividendos de Finanzas (bruto, retención 19%) +
@@ -29658,11 +30116,17 @@ function renta_calcPrevisionDatos(proy) {
   try { capSave = fin_saveTotalAnio(renta_anio).total; } catch (e) {}
   var capitalMobiliario = capFinanzas + capManual + capInt + capSave;
 
-  if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0) return { sinDatos: true };
+  if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0 && imputacionTotal === 0) return { sinDatos: true };
+
+  // 08/11/2026: reducción por aportaciones al plan de pensiones (máx. 1.500 €).
+  var aportPP = renta_aportPlanPensiones(renta_anio, proy);
+  var reduccionPP = Math.min(RENTA_PP_MAX, aportPP);
 
   var minimoFamiliar = 5550; // mínimo personal (sin hijos)
+  // 08/11/2026 (Patry vive en Murcia): escala general estatal + autonómica de
+  // la Región de Murcia sumadas (antes solo se usaba una escala genérica).
   function calcIRPF(base) {
-    var tramos = [[0,12450,0.19],[12450,20200,0.24],[20200,35200,0.30],[35200,60000,0.37],[60000,300000,0.45],[300000,999999999,0.47]];
+    var tramos = RENTA_ESCALA_MURCIA;
     var imp = 0;
     for (var t = 0; t < tramos.length; t++) {
       if (base <= tramos[t][0]) break;
@@ -29671,7 +30135,7 @@ function renta_calcPrevisionDatos(proy) {
     return imp;
   }
   var baseGeneral = Math.max(0, brutoTrabajo - ssTrabajo - 2000);
-  var baseTotal = Math.max(0, baseGeneral + baseAlquilerTotal);
+  var baseTotal = Math.max(0, baseGeneral + baseAlquilerTotal + imputacionTotal - reduccionPP);
   var cuotaGeneral = Math.max(0, calcIRPF(baseTotal) - calcIRPF(minimoFamiliar));
   var cuotaAhorro = renta_calcAhorroTramos(capitalMobiliario);
   var cuotaTotal = cuotaGeneral + cuotaAhorro;
@@ -29680,7 +30144,8 @@ function renta_calcPrevisionDatos(proy) {
     sinDatos: false, todosInm: todosInm, inmPatricio: inmPatricio, capitalMobiliario: capitalMobiliario,
     cuotaGeneral: cuotaGeneral, cuotaAhorro: cuotaAhorro, cuotaTotal: cuotaTotal,
     retencionAcum: retencionAcum, resultado: cuotaTotal - retencionAcum,
-    brutoTrabajo: brutoTrabajo // 02/11/2026: para comprobar la previsión del trabajo
+    brutoTrabajo: brutoTrabajo, // 02/11/2026: para comprobar la previsión del trabajo
+    imputacion: imputacionTotal, reduccionPP: reduccionPP, aportPP: aportPP, pisos: pisosDet, baseTotal: baseTotal // 08/11/2026
   };
 }
 function renta_calcPrevision() {
@@ -29716,6 +30181,16 @@ function renta_calcPrevision() {
   notaPrev.textContent = resultado > 0
     ? 'Estimaci\u00f3n: a PAGAR (cuota ' + fmtGlobal(cuotaTotal.toFixed(0)) + '\u20ac \u2212 retenciones ' + fmtGlobal(retencionAcum.toFixed(0)) + '\u20ac)'
     : 'Estimaci\u00f3n: a DEVOLVER (cuota ' + fmtGlobal(cuotaTotal.toFixed(0)) + '\u20ac \u2212 retenciones ' + fmtGlobal(retencionAcum.toFixed(0)) + '\u20ac)';
+  // 08/11/2026: lo nuevo de la revisión, a la vista
+  var _extra = [];
+  if (D.imputacion > 0.5) _extra.push('imputación de pisos vacíos: ' + fmtGlobal(D.imputacion.toFixed(2)) + ' €');
+  if (D.reduccionPP > 0.5) _extra.push('plan de pensiones: −' + fmtGlobal(D.reduccionPP.toFixed(2)) + ' €');
+  if (_extra.length) {
+    var _ex = document.createElement('div');
+    _ex.style.cssText = 'font-size:11px;opacity:.85;margin-top:3px;';
+    _ex.textContent = 'Incluye ' + _extra.join(' · ');
+    notaPrev.appendChild(_ex);
+  }
 
   // PUNTO 125 (06/09/2026) -- IMPACTO DE VENTA, EN SU PROPIO APARTADO
   // -----------------------------------------------------------------
@@ -29814,21 +30289,31 @@ function rinf_datos(anio) {
   var alq = (typeof inm_alqMenLoad === 'function') ? inm_alqMenLoad() : [];
   var segibi = (typeof inm_seguroIbiLoad === 'function') ? inm_seguroIbiLoad() : [];
   D.inmuebles = [];
+  // 08/11/2026: en el año en curso, los días cuentan hasta el último mes con cobros apuntados.
+  var _rinfHasta = renta_diasDelAnio(anio), _rinfMax = 0;
+  alq.forEach(function(r) { if (r && !r.deleted && r.mes && parseInt(r.mes.slice(0, 4), 10) === anio && rinf_num(r.alquiler) > 0) _rinfMax = Math.max(_rinfMax, parseInt(r.mes.slice(5, 7), 10) || 0); });
+  if (_rinfMax > 0) _rinfHasta = renta_diaDelAnio(anio + '-' + String(_rinfMax).padStart(2, '0') + '-' + String(renta_diasMes(anio, _rinfMax)).padStart(2, '0'));
   todos.forEach(function(inm, idx) {
     if (!inm || (inm.propietario || '').toLowerCase() !== 'patricio') return;
-    var o = { ref: inm.ref || '', dir: inm.direccionCalle || inm.direccion || '', catastral: inm.catastral || '', ingreso: 0, meses: 0, comunidad: 0, seguro: 0, ibi: 0 };
+    var o = { ref: inm.ref || '', dir: inm.direccionCalle || inm.direccion || '', catastral: inm.catastral || '', ingreso: 0, meses: 0, comunidad: 0, seguro: 0, ibi: 0, otrosFicha: 0 };
+    var _mesesAlqI = {}; // 08/11/2026: días alquilados
     alq.forEach(function(r) {
       if (!r || r.deleted || !inm_recEs(r, idx) || !r.mes || parseInt(r.mes.slice(0, 4), 10) !== anio) return;
-      var a = rinf_num(r.alquiler); o.ingreso += a; o.comunidad += rinf_num(r.comunidad); if (a > 0) o.meses++;
+      var a = rinf_num(r.alquiler); o.ingreso += a; o.comunidad += rinf_num(r.comunidad); if (a > 0) { o.meses++; _mesesAlqI[parseInt(r.mes.slice(5, 7), 10)] = true; }
     });
     segibi.forEach(function(r) {
       if (!r || r.deleted || !inm_recEs(r, idx) || parseInt(r.anio, 10) !== anio) return;
-      o.seguro += rinf_num(r.seguro); o.ibi += rinf_num(r.ibi);
+      o.seguro += rinf_num(r.seguro); o.ibi += rinf_num(r.ibi); o.otrosFicha += rinf_num(numES(r.otros)); // 08/11/2026
       if (rinf_num(r.vcTotal) > 0) o.vcTotal = rinf_num(r.vcTotal); // 12/10/2026
       if (rinf_num(r.vcConstruccion) > 0) o.vcConstruccion = rinf_num(r.vcConstruccion);
     });
     var d = renta_inmDatosDe(datosInm, idx); // 13/10/2026
-    o.amort = rinf_num((parseFloat(d.amorBase) || 0) * 0.03);
+    // 08/11/2026: amortización solo por los días alquilados + imputación de los días vacíos
+    var _dProp = renta_diasPropiedad(inm, anio);
+    if (anio === new Date().getFullYear()) _dProp = Math.min(_dProp, _rinfHasta); // año en curso: hasta el último mes con cobros
+    o.dias = Math.min(_dProp, renta_diasAlquilado(inm, _mesesAlqI, anio, ctrs));
+    o.amort = rinf_num((parseFloat(d.amorBase) || 0) * 0.03 * o.dias / renta_diasDelAnio(anio));
+    o.imputacion = rinf_num(renta_imputacionPiso(inm, idx, anio, _dProp - o.dias));
     // Contrato del año: el activo, o el último que estuvo vigente ese año
     var cs = ctrs.filter(function(c) { return c.ref === inm.ref && (c.tipo || 'contrato') !== 'rescision'; })
       .filter(function(c) { return !c.inicio || parseInt(c.inicio.slice(0, 4), 10) <= anio; })
@@ -29838,7 +30323,7 @@ function rinf_datos(anio) {
     o.dni = c ? (c.inqDNI || '') : '';
     o.inicio = c ? (c.inicio || '') : '';
     o.reduccion = (d.tipo === 'vivienda' || inm.tipo === 'piso') ? ((o.inicio && o.inicio < '2023-05-26') ? '60 %' : '50 %') : '—';
-    if (o.ingreso > 0 || o.comunidad > 0 || o.seguro > 0 || o.ibi > 0) D.inmuebles.push(o);
+    if (o.ingreso > 0 || o.comunidad > 0 || o.seguro > 0 || o.ibi > 0 || o.imputacion > 0) D.inmuebles.push(o);
   });
   D.inmuebles.forEach(function(o) { ['ingreso', 'comunidad', 'seguro', 'ibi'].forEach(function(k) { o[k] = rinf_num(o[k]); }); });
   D.inmTot = D.inmuebles.reduce(function(t, o) { t.ingreso += o.ingreso; t.comunidad += o.comunidad; t.seguro += o.seguro; t.ibi += o.ibi; t.amort += o.amort; return t; }, { ingreso: 0, comunidad: 0, seguro: 0, ibi: 0, amort: 0 });
@@ -29849,15 +30334,22 @@ function rinf_datos(anio) {
   // ya salen por inmueble; los de venta van a la ganancia patrimonial).
   var hayCom = D.inmuebles.some(function(o) { return o.comunidad > 0; });
   var haySI = D.inmuebles.some(function(o) { return o.seguro > 0 || o.ibi > 0; });
-  D.gastos = rinf_json('renta:gastos:' + anio, []).filter(function(g) { return g && !g.deleted; })
+  // 08/11/2026: cada gasto con su piso; fuera los de pisos que no son de Patricio.
+  var _refsPat = {}; todos.forEach(function(i) { if (i && (i.propietario || '').toLowerCase() === 'patricio' && i.ref) _refsPat[i.ref] = true; });
+  D.imputacion = rinf_num(D.inmuebles.reduce(function(t, o) { return t + (o.imputacion || 0); }, 0));
+  D.gastos = rinf_json('renta:gastos:' + anio, []).filter(function(g) { return g && !g.deleted && (!g.ref || g.ref === RGAS_VARIOS || _refsPat[g.ref]); })
     .sort(function(a, b) { return String(b.fecha || '').localeCompare(String(a.fecha || '')); })
     .map(function(g) {
       var cat = g.categoria || '', nota = 'Gasto del alquiler';
       if (cat === RENTA_CAT_GASTO_VENTA) nota = 'Gasto de la venta';
+      else if (g.enFicha) nota = 'Ya incluido por inmueble'; // 08/11/2026
       else if (hayCom && cat === 'Comunidad') nota = 'Ya incluido por inmueble';
       else if (haySI && (cat === 'IBI' || cat === 'Seguro')) nota = 'Ya incluido por inmueble';
-      return { fecha: g.fecha || '', concepto: g.concepto || '', cat: cat, importe: rinf_num(g.importe), nota: nota, enlace: g.fotoUrl || '' };
+      var pre = g.ref ? (g.ref === RGAS_VARIOS ? 'Varios pisos · ' : g.ref + ' · ') : '';
+      return { fecha: g.fecha || '', concepto: pre + (g.concepto || ''), cat: cat, importe: rinf_num(g.importe), nota: nota, enlace: g.fotoUrl || '' };
     });
+  // 08/11/2026: "Otros gastos" apuntados en la ficha sin detalle (total del año).
+  D.inmuebles.forEach(function(o) { if (o.otrosFicha > 0) D.gastos.push({ fecha: '', concepto: o.ref + ' · Otros gastos de la ficha (total del año, sin detalle)', cat: 'Otros', importe: rinf_num(o.otrosFicha), nota: 'Gasto del alquiler', enlace: '' }); });
   D.gastosAlquiler = rinf_num(D.gastos.filter(function(g) { return g.nota === 'Gasto del alquiler'; }).reduce(function(s, g) { return s + g.importe; }, 0));
 
   // 4. Capital mobiliario
@@ -30042,6 +30534,7 @@ function renta_informePDF() {
     { c: 'Alquileres: ingresos del año', v: E(D.inmTot.ingreso), r: '' },
     { c: 'Alquileres: gastos (comunidad, seguro, IBI, otros, amortización)', v: E(-(D.inmTot.comunidad + D.inmTot.seguro + D.inmTot.ibi + D.inmTot.amort + D.gastosAlquiler)), r: '' },
     { c: 'Alquileres: rendimiento neto (antes de reducción)', v: E(rentNeto), r: '' },
+    { c: 'Imputación de rentas (pisos vacíos, 2 % del valor catastral)', v: E(D.imputacion || 0), r: '' }, // 08/11/2026
     { c: 'Capital mobiliario (intereses, dividendos, Saveback)', v: E(D.capTot.bruto), r: E(D.capTot.ret) }
   ];
   D.ventas.forEach(function(v) { res.push({ c: 'Ganancia/pérdida patrimonial: ' + v.dir, v: v.completo ? E(v.ganancia) : 'Faltan datos', r: '' }); });
@@ -30179,6 +30672,7 @@ function renta_informeExcel() {
       ['Alquileres: ingresos del año', D.inmTot.ingreso, ''],
       ['Alquileres: gastos (comunidad, seguro, IBI, otros, amortización)', -(D.inmTot.comunidad + D.inmTot.seguro + D.inmTot.ibi + D.inmTot.amort + D.gastosAlquiler), ''],
       ['Alquileres: rendimiento neto (antes de reducción)', rinf_num(rentNeto), ''],
+      ['Imputación de rentas (pisos vacíos, 2 % del valor catastral)', rinf_num(D.imputacion || 0), ''], // 08/11/2026
       ['Capital mobiliario (intereses, dividendos, Saveback)', rinf_num(D.capTot.bruto), rinf_num(D.capTot.ret)]];
     D.ventas.forEach(function(v) { res.push(['Ganancia/pérdida patrimonial: ' + v.dir, v.completo ? v.ganancia : 'Faltan datos', '']); });
     if (D.otros.length) res.push(['Otros ingresos declarables', D.otros.reduce(function(s, x) { return s + x.importe; }, 0), '']);
