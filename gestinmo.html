@@ -2293,7 +2293,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261110_02';
+const BUILD_ID = '261111_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -20684,55 +20684,52 @@ function fin_renderAcciones() {
     var totalDivs = p.divsEfectivo + p.divsScrip + p.divsSobrantes;
     var dpa = p.num > 0 && totalDivs > 0 ? totalDivs / p.num : null;
     var yoc = pm > 0 && dpa !== null ? (dpa / pm) * 100 : null;
-    html += '<div class="fin-card">';
-    html += '<div class="fin-card-top"><div>';
-    html += '<div class="fin-card-nombre">' + p.nombre + cotBtn + '</div>';
-    html += '<div class="fin-card-sub">' + numMiles_fmtCantidad(p.num) + ' acc \u00b7 P.M. ' + fin_fmt(pm) + '</div>';
-    html += '</div><div class="fin-card-saldo">' + (val !== null ? fin_fmt(val) : '-') + '</div></div>';
-    // PUNTO 114 (06/09/2026): a qué cuenta/broker pertenece esta posición —
-    // lo usa el Panel Patrimonio Financiero para sumar el Invertido de cada
-    // broker sin que tengas que volver a escribir el importe a mano.
+    // 11/11/2026 (Patry, opción B): tarjeta compacta — arriba valor y
+    // ganancia; las 4 cifras de dividendos en cuadrícula 2×2; botones con el
+    // texto centrado: los de uso diario en una fila y los de ajuste debajo.
     var cuentaAccion = _finAccionesCuenta[p.ticker] || '';
-    html += '<div class="fin-card-meta"><div class="fin-meta-item">Plusvalia: ' + plHtml + '</div>';
+    var _dcaAcc = fin_accDcaDe(fin_emp(), p.ticker); // 18/10/2026: aportación automática (modo detallado)
+    var _kpi = function(t, v, cls) { return '<div style="background:rgba(255,255,255,0.035);border-radius:9px;padding:6px 6px;text-align:center;"><div style="font-size:10px;color:var(--silver-dim);letter-spacing:.5px;">' + t + '</div><div style="font-size:14px;font-weight:700;' + (cls === 'p' ? 'color:var(--accent-green);' : 'color:var(--silver-bright);') + '">' + v + '</div></div>'; };
+    var _bt = function(txt, fn, tipo) {
+      var c = tipo === 'v' ? 'border-color:rgba(229,115,115,.5);background:rgba(229,115,115,.08);color:#e57373;'
+        : tipo === 'd' ? 'border-color:rgba(92,184,138,.5);background:rgba(92,184,138,.08);color:var(--accent-green);'
+        : tipo === 's' ? 'border-color:var(--border);background:transparent;color:var(--silver-dim);'
+        : 'border-color:rgba(91,141,238,.45);background:rgba(91,141,238,.08);color:#8fb0f5;';
+      return '<div onclick="' + fn + '" style="border:1px solid;' + c + 'border-radius:10px;font-family:\'Rajdhani\',sans-serif;font-weight:700;font-size:12px;letter-spacing:.5px;text-align:center;display:flex;align-items:center;justify-content:center;padding:8px 3px;min-height:40px;line-height:1.15;cursor:pointer;text-transform:uppercase;">' + txt + '</div>';
+    };
+    html += '<div class="fin-card">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;"><div class="fin-card-nombre">' + p.nombre + '</div><div class="fin-card-saldo">' + (val !== null ? fin_fmt(val) : '-') + '</div></div>';
+    html += '<div class="fin-card-sub">' + numMiles_fmtCantidad(p.num) + ' acc · P.M. ' + fin_fmt(pm) + ' · ' + cotBtn.replace('margin-left:6px;', '') + '</div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:5px;font-size:13px;">' + plHtml + '<span style="font-size:12px;color:var(--silver-dim);">invertido ' + fin_fmt(p.coste) + '</span></div>';
     if (totalDivs > 0) {
-      html += '<div class="fin-meta-item">Dividendos cobrados: <span class="fin-meta-val fin-plus">' + fin_fmt(totalDivs) + '</span></div>';
-      // PUNTO 121 (21/09/2026): igual que el PUNTO 36 de arriba, estos dos campos
-      // se pintaban con toFixed(4) directo (punto decimal, sin miles, 4 decimales)
-      // en vez de pasar por fin_fmt \u2014 mismo bug, mismo arreglo.
-      if (dpa !== null) html += '<div class="fin-meta-item">Dividendos cobrados/acc.: <span class="fin-meta-val">' + fin_fmt(dpa).replace(' \u20ac', ' \u20ac/acc') + '</span></div>';
-      // PUNTO 75 (28/08/2026): coste neto por accion = precio medio de compra
-      // menos lo ya cobrado en dividendos por accion (cuanto queda "en juego" de verdad).
-      if (dpa !== null && pm > 0) html += '<div class="fin-meta-item">Coste neto/acc.: <span class="fin-meta-val">' + fin_fmt(pm - dpa).replace(' \u20ac', ' \u20ac/acc') + '</span></div>';
-      if (yoc !== null) html += '<div class="fin-meta-item">Yield on Cost: <span class="fin-meta-val fin-plus">' + fin_fmtPct(yoc) + '</span></div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px;">'
+        + _kpi('DIVIDENDOS COBRADOS', fin_fmt(totalDivs), 'p')
+        + _kpi('YIELD ON COST', yoc !== null ? fin_fmtPct(yoc) : '-', 'p')
+        + _kpi('DIVIDENDOS / ACC', dpa !== null ? fin_fmt(dpa) : '-')
+        // PUNTO 75: coste neto por acción = precio medio − dividendos por acción
+        + _kpi('COSTE NETO / ACC', (dpa !== null && pm > 0) ? fin_fmt(pm - dpa) : '-')
+        + '</div>';
     }
-    // 18/10/2026: aportación automática (modo detallado)
-    var _dcaAcc = fin_accDcaDe(fin_emp(), p.ticker);
-    if (_dcaAcc) html += '<div class="fin-meta-item" style="width:100%;color:var(--silver-dim);font-size:11px;margin-top:2px;">' + fin_dcaTextoTarjeta({ dcaImporte: _dcaAcc.importe, dcaDias: _dcaAcc.dias }) + '</div>';
-    html += '</div>';
-    // PUNTO 124 (21/09/2026): antes esto era una caja aparte con su propia
-    // etiqueta "Cuenta / Broker" — mucho más llamativa que en Fondos, donde
-    // el broker es solo texto pequeño junto al nombre. Sigue siendo el mismo
-    // <select> de siempre (se puede tocar para cambiarlo), pero ahora se ve
-    // como el "nombre del broker" de Fondos: texto pequeño, sin caja ni
-    // etiqueta encima.
-    html += '<div class="fin-card-sub" style="margin-top:2px;">';
+    // Aportación automática + broker (el mismo desplegable de siempre, PUNTO 114/124)
+    html += '<div style="font-size:12px;color:var(--silver-dim);margin-top:8px;text-align:center;">' + (_dcaAcc ? fin_dcaTextoTarjeta({ dcaImporte: _dcaAcc.importe, dcaDias: _dcaAcc.dias }) + ' · ' : '');
     html += '<select class="fin-acc-broker-inline" onchange="fin_setAccionCuenta(\'' + p.ticker + '\', this.value)">';
     ['', 'caixa', 'myinvestor', 'traderepublic', 'otra'].forEach(function(op) {
       html += '<option value="' + op + '"' + (cuentaAccion === op ? ' selected' : '') + '>' + (op === '' ? 'Sin asignar' : FIN_CUENTA_LABEL[op]) + '</option>';
     });
     html += '</select></div>';
-    html += '<div class="fin-card-actions">';
-    html += '<div class="fin-action-btn" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'compra\')">+ Compra</div>';
-    html += '<div class="fin-action-btn red" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'venta\')">- Venta</div>';
-    html += '<div class="fin-action-btn green" onclick="fin_nuevaAccionPre(\'' + p.ticker + '\',\'dividendo\')">Dividendo</div>';
-    html += '<div class="fin-action-btn" onclick="fin_verHistorico(\'' + p.ticker + '\')">Historico</div>';
-    html += '<div class="fin-action-btn" onclick="fin_accDcaAbrir(\'' + p.ticker + '\')">' + (_dcaAcc ? '🔄 ' : '') + 'Aport. auto</div>'; // 18/10/2026
-    if (_dcaAcc) html += '<div class="fin-action-btn" onclick="fin_accCuadrarAbrir(\'' + p.ticker + '\')">⚖️ Cuadrar</div>'; // 18/10/2026 (261018_02)
-    // PUNTO 148 (08/09/2026): pasar esta posición a modo simple — se le pasan
-    // los datos actuales ya calculados (num/coste/valor) para precargar el
-    // registro simple, sin que tengas que volver a escribirlos.
-    html += '<div class="fin-action-btn" onclick="fin_pasarASimple(\'' + p.ticker + '\',\'' + p.nombre.replace(/'/g,"\\'") + '\',' + p.num + ',' + p.coste + ',' + (val||0) + ')">Pasar a simple</div>';
-    html += '</div></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;">'
+      + _bt('+ Compra', 'fin_nuevaAccionPre(\'' + p.ticker + '\',\'compra\')')
+      + _bt('− Venta', 'fin_nuevaAccionPre(\'' + p.ticker + '\',\'venta\')', 'v')
+      + _bt('Dividendo', 'fin_nuevaAccionPre(\'' + p.ticker + '\',\'dividendo\')', 'd')
+      + _bt('Histórico', 'fin_verHistorico(\'' + p.ticker + '\')')
+      + '</div>';
+    // PUNTO 148: pasar a modo simple con los datos ya calculados (num/coste/valor)
+    html += '<div style="display:grid;grid-template-columns:repeat(' + (_dcaAcc ? 3 : 2) + ',1fr);gap:6px;margin-top:6px;">'
+      + _bt((_dcaAcc ? '🔄 ' : '') + 'Aport. auto', 'fin_accDcaAbrir(\'' + p.ticker + '\')', 's')
+      + (_dcaAcc ? _bt('⚖️ Cuadrar', 'fin_accCuadrarAbrir(\'' + p.ticker + '\')', 's') : '')
+      + _bt('A simple', 'fin_pasarASimple(\'' + p.ticker + '\',\'' + p.nombre.replace(/'/g,"\\'") + '\',' + p.num + ',' + p.coste + ',' + (val||0) + ')', 's')
+      + '</div>';
+    html += '</div>';
   }
   lista.innerHTML = html || '<div style="font-size:12px;color:var(--silver-dim);text-align:center;padding:12px 0;">Sin posiciones activas.</div>';
   if (totEl && totalValor > 0) {
