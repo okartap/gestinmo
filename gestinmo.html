@@ -2293,7 +2293,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261110_01';
+const BUILD_ID = '261110_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -26583,6 +26583,14 @@ window._refreshCurrentModule = function(key) {
     const _sumaEnInicio = key === 'ingresos:otros:patricio' || key === 'inmuebles:alquileres_mensuales' ||
       key === 'renta:dividendos_manuales' || /^renta:nominas:/.test(key) || /^facturacion:/.test(key);
     if (_sumaEnInicio && _modIni && _modIni.classList.contains('active') && typeof dash_render === 'function') dash_render();
+    // 10/11/2026 — BUG REAL (Patry, valor catastral de Carril "pedido 3 veces"):
+    // el dato SÍ se guardaba y llegaba de la nube, pero con Inicio en pantalla
+    // "Pendiente de gestionar" no se repintaba, ni la pestaña Gastos de una ficha
+    // abierta: seguías viendo el aviso y los "—" antiguos hasta salir y volver.
+    // Ahora, al llegar cualquier cambio de otro aparato, se repintan los dos.
+    if (_modIni && _modIni.classList.contains('active') && typeof pend_render === 'function') pend_render();
+    if ((key === 'inmuebles:seguro_ibi' || key === 'inmuebles:alquileres_mensuales' || /^renta:gastos:/.test(key) || key === 'inmuebles:lista')
+        && typeof sib_render === 'function' && sib_idx != null && document.getElementById('inm-view-detalle') && document.getElementById('inm-view-detalle').classList.contains('active')) sib_render();
   } catch (eIni) { console.warn('Refresco de Inicio:', eIni.message); }
   const module = keyModuleMap[key];
   if (!module) return;
