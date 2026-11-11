@@ -2075,6 +2075,7 @@ const DATA_KEYS = [
   'fin:igc_patrimer', // 08/11/2026: 33 % de IGC (antes fijo en el código)
   'fin:tesoreria_manual', // 11/11/2026: cobros y pagos previstos apuntados a mano (tesorería)
   'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
+  'inmuebles:incidencias', 'contratos:actas', // 11/11/2026: incidencias por piso y actas de entrada/salida
   'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
@@ -2296,7 +2297,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261111_09';
+const BUILD_ID = '261111_11';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2920,7 +2921,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:certificados' || key === 'fin:divcal_ajustes' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs' || key === 'fin:tesoreria_manual';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:certificados' || key === 'fin:divcal_ajustes' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs' || key === 'fin:tesoreria_manual' || key === 'inmuebles:incidencias' || key === 'contratos:actas';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -4686,6 +4687,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div class="detail-tab active" onclick="setDetailTab(this,'tab-info')">Info</div>
     <div class="detail-tab" onclick="setDetailTab(this,'tab-docs')">Docs</div>
     <div class="detail-tab" onclick="setDetailTab(this,'tab-gastos')">Gastos</div>
+    <div class="detail-tab" onclick="setDetailTab(this,'tab-incidencias')">Incidencias</div>
     <div class="detail-tab" onclick="setDetailTab(this,'tab-contratos')">Contratos</div>
     <div class="detail-tab" onclick="setDetailTab(this,'tab-fotos')">Fotos</div>
   </div>
@@ -4732,6 +4734,11 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     <div class="info-section-title" style="margin-bottom:14px">Gastos del inmueble</div>
     <!-- 12/10/2026: seguro (póliza) e IBI/valor catastral por años — sib_render -->
     <div id="tab-gastos-sib"></div>
+  </div>
+  <!-- 11/11/2026 (I3): incidencias del inmueble -->
+  <div class="tab-content" id="tab-incidencias">
+    <div class="info-section-title" style="margin-bottom:14px">Incidencias</div>
+    <div id="tab-incidencias-cont"></div>
   </div>
   <div class="tab-content" id="tab-contratos">
     <div class="info-section-title" style="margin-bottom:14px">Historial de contratos</div>
@@ -5609,7 +5616,10 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       <div class="dtab" onclick="setDetalleTab(this,'det-tab-subidas')">Subidas</div>
       <div class="dtab" onclick="setDetalleTab(this,'det-tab-padron')">Padrón</div>
       <div class="dtab" onclick="setDetalleTab(this,'det-tab-docs')">Docs</div>
+      <div class="dtab" onclick="setDetalleTab(this,'det-tab-actas')">Actas</div>
     </div>
+    <!-- 11/11/2026 (I4): actas de entrada y salida -->
+    <div class="dtab-panel" id="det-tab-actas"><div id="det-actas-cont"></div></div>
     <div class="dtab-panel active" id="det-tab-lau">
       <div id="det-lau-rustica" style="display:none;background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px;">
         Los contratos rústicos no están sujetos a los plazos de prórroga obligatoria de la LAU (esos plazos aplican a vivienda habitual). La duración es la pactada libremente en el contrato.
@@ -6616,6 +6626,8 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     <div style="font-size:26px;font-weight:700;color:var(--accent-gold);" id="fin-patrimonio-total">-</div>
     <div class="fin-patrimonio-rows" id="fin-patrimonio-rows"></div>
     <div style="font-size:12px;color:var(--silver-dim);" id="fin-patrimonio-nota"></div>
+    <!-- 11/11/2026 (I5): informe de patrimonio en PDF -->
+    <div onclick="inf_abrir()" id="fin-inf-btn" style="margin-top:10px;border:1px solid rgba(91,141,238,.5);background:rgba(91,141,238,.1);border-radius:10px;color:#8fb0f5;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:.5px;padding:8px;text-align:center;cursor:pointer;">📄 INFORME DE PATRIMONIO (PDF)</div>
   </div>
   <div style="font-size:11px;color:var(--silver-dim);text-align:right;margin:-8px 2px 10px;" id="fin-ultima-actualizacion"></div>
   <div class="fin-section">
@@ -8171,6 +8183,7 @@ const BACKUP_KEYS = [
   'fin:igc_patrimer', // 08/11/2026: 33 % de IGC (antes fijo en el código)
   'fin:tesoreria_manual', // 11/11/2026: cobros y pagos previstos apuntados a mano (tesorería)
   'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
+  'inmuebles:incidencias', 'contratos:actas', // 11/11/2026: incidencias por piso y actas de entrada/salida
   'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
@@ -10254,6 +10267,7 @@ function setDetailTab(el, tabId) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById(tabId).classList.add('active');
+  if (tabId === 'tab-incidencias') { try { inc_render(); } catch (e) { console.warn('Incidencias:', e.message); } } // 11/11/2026 (I3)
 }
 
 // ─── MODAL ─────────────────────────────────────────────────────────────────
@@ -12015,10 +12029,223 @@ function setSort(el) {
   con_sortBy = txt === 'a–z' ? 'az' : txt === 'inmueble' ? 'inmueble' : 'fecha';
   con_renderLista();
 }
+// ═══════════════════════════════════════════════════════════════════════
+// 11/11/2026 (Patry, idea I4): ACTAS DE ENTRADA Y SALIDA DE INQUILINO
+// En cada contrato (pestaña "Actas"): estado de cada estancia con fotos,
+// contadores, llaves e inventario. La de salida parte de la de entrada,
+// marca lo que ha cambiado y calcula la fianza a devolver con descuentos.
+// PDF para firmar. Las fotos van a Google Drive (carpeta "GestInmo Actas"),
+// la app solo guarda el enlace. Datos: 'contratos:actas' (lista por id).
+// ═══════════════════════════════════════════════════════════════════════
+var ACT_ESTANCIAS = ['Entrada y pasillo', 'Salón', 'Cocina', 'Baño', 'Dormitorio 1', 'Dormitorio 2', 'Terraza'];
+var ACT_ESTADOS = ['Bien', 'Detalle', 'Mal'];
+var _act = null; // acta en edición
+function act_load() { try { var a = JSON.parse(localStorage.getItem('contratos:actas') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function act_save(a) { localStorage.setItem('contratos:actas', JSON.stringify(a)); }
+function act_delContrato(cid) { return act_load().filter(function(a) { return a && !a.deleted && a.ctrId === cid; }); }
+function act_render() {
+  var cont = document.getElementById('det-actas-cont'), c = _detalleContratoActual; if (!cont || !c) return;
+  var adm = rgas_esAdmin(), L = act_delContrato(c.id), ent = L.filter(function(a) { return a.tipo === 'entrada'; })[0], sal = L.filter(function(a) { return a.tipo === 'salida'; })[0];
+  var bt = 'width:100%;border-radius:10px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;padding:10px;cursor:pointer;margin-bottom:8px;';
+  var tarjeta = function(a, tit) {
+    var n = (a.estancias || []).reduce(function(s, e) { return s + ((e.fotos || []).length); }, 0) + ((a.contadores || []).reduce(function(s, k) { return s + (k.foto ? 1 : 0); }, 0));
+    var det = (a.estancias || []).filter(function(e) { return e.estado && e.estado !== 'Bien'; }).length;
+    return '<div style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><b style="font-size:13.5px;color:var(--silver-bright);">📋 ' + tit + '</b><span style="font-size:12px;color:var(--text2);">' + rinf_fecha(a.fecha) + '</span></div>'
+      + '<div style="font-size:12px;color:var(--text2);margin-top:4px;">' + (a.estancias || []).length + ' estancias · ' + det + ' con detalles · ' + n + ' foto' + (n === 1 ? '' : 's') + (a.tipo === 'salida' && numES(a.fianza) > 0 ? ' · a devolver ' + fmtGlobal(act_devolver(a)) + ' €' : '') + '</div>'
+      + '<div style="display:grid;grid-template-columns:' + (adm ? '1fr 1fr 1fr' : '1fr') + ';gap:6px;margin-top:8px;">'
+      + (adm ? '<div onclick="act_editar(\'' + a.id + '\')" style="text-align:center;border:1px solid rgba(91,141,238,.5);border-radius:9px;padding:7px;font-size:12px;font-weight:700;color:#8fb0f5;cursor:pointer;">✎ Editar</div>' : '')
+      + '<div onclick="act_pdf(\'' + a.id + '\')" style="text-align:center;border:1px solid rgba(91,141,238,.5);border-radius:9px;padding:7px;font-size:12px;font-weight:700;color:#8fb0f5;cursor:pointer;">📤 PDF</div>'
+      + (adm ? '<div onclick="act_borrar(\'' + a.id + '\')" style="text-align:center;border:1px solid rgba(229,115,115,.5);border-radius:9px;padding:7px;font-size:12px;font-weight:700;color:#e57373;cursor:pointer;">✕ Borrar</div>' : '')
+      + '</div></div>';
+  };
+  var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.4;">Estado del piso al entrar y al salir el inquilino, con fotos, contadores, llaves y fianza.</div>';
+  h += ent ? tarjeta(ent, 'Acta de entrada') : (adm ? '<button onclick="act_nueva(\'entrada\')" style="' + bt + 'background:rgba(91,141,238,.12);border:1px solid rgba(91,141,238,.5);color:var(--silver-bright);">📋 Hacer acta de entrada</button>' : '<div style="font-size:12px;color:var(--text2);">Sin acta de entrada.</div>');
+  h += sal ? tarjeta(sal, 'Acta de salida') : (adm ? '<button onclick="act_nueva(\'salida\')" style="' + bt + 'background:transparent;border:1px solid var(--border);color:var(--silver-dim);">📋 Hacer acta de salida' + (ent ? ' (parte de la de entrada)' : '') + '</button>' : '');
+  cont.innerHTML = h;
+}
+function act_devolver(a) { return Math.max(0, Math.round(((numES(a.fianza) || 0) - (a.descuentos || []).reduce(function(s, d) { return s + (numES(d.importe) || 0); }, 0)) * 100) / 100); }
+function act_nueva(tipo) {
+  if (bloqueaSiViewer('Hacer un acta')) return;
+  var c = _detalleContratoActual; if (!c) return;
+  var ent = act_delContrato(c.id).filter(function(a) { return a.tipo === 'entrada'; })[0];
+  var base = (tipo === 'salida' && ent) ? JSON.parse(JSON.stringify(ent)) : null;
+  _act = { id: 'act_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ctrId: c.id, ref: c.ref || '', tipo: tipo, fecha: tipo === 'entrada' && c.inicio ? c.inicio : _fechaHoyLocal(),
+    estancias: base ? base.estancias.map(function(e) { return { nombre: e.nombre, estado: e.estado || 'Bien', nota: e.nota || '', fotos: [], entrada: { estado: e.estado || 'Bien', nota: e.nota || '' } }; }) : ACT_ESTANCIAS.map(function(n) { return { nombre: n, estado: 'Bien', nota: '', fotos: [] }; }),
+    contadores: base ? base.contadores.map(function(k) { return { nombre: k.nombre, lectura: '', foto: '', entrada: k.lectura || '' }; }) : [{ nombre: 'Luz', lectura: '', foto: '' }, { nombre: 'Agua', lectura: '', foto: '' }, { nombre: 'Gas', lectura: '', foto: '' }],
+    llaves: base ? JSON.parse(JSON.stringify(base.llaves || {})) : { portal: '', piso: '', buzon: '', otras: '' },
+    inventario: base ? base.inventario || '' : '', notas: '',
+    fianza: tipo === 'salida' ? (numES(c.fianza) || 0) : '', descuentos: [], nuevo: true };
+  act_pintar();
+}
+function act_editar(id) {
+  if (bloqueaSiViewer('Editar un acta')) return;
+  var a = act_load().filter(function(x) { return x && x.id === id; })[0]; if (!a) return;
+  _act = JSON.parse(JSON.stringify(a)); act_pintar();
+}
+function act_leer() {
+  var A = _act; if (!A) return; var g = function(id) { var e = document.getElementById(id); return e ? e.value : null; };
+  if (g('act-fecha') !== null) A.fecha = g('act-fecha');
+  A.estancias.forEach(function(e, i) { if (g('act-e-n' + i) !== null) { e.nombre = g('act-e-n' + i).trim() || e.nombre; e.estado = g('act-e-s' + i); e.nota = g('act-e-t' + i).trim(); } });
+  A.contadores.forEach(function(k, i) { if (g('act-k-l' + i) !== null) k.lectura = g('act-k-l' + i).trim(); });
+  ['portal', 'piso', 'buzon', 'otras'].forEach(function(k) { if (g('act-ll-' + k) !== null) A.llaves[k] = g('act-ll-' + k).trim(); });
+  if (g('act-inv') !== null) A.inventario = g('act-inv');
+  if (g('act-notas') !== null) A.notas = g('act-notas');
+  if (g('act-fianza') !== null) A.fianza = parseFmtGlobal(g('act-fianza')) || 0;
+  (A.descuentos || []).forEach(function(d, i) { if (g('act-d-c' + i) !== null) { d.concepto = g('act-d-c' + i).trim(); d.importe = parseFmtGlobal(g('act-d-i' + i)) || 0; } });
+}
+function act_pintar() {
+  var A = _act; if (!A) return;
+  var prevScroll = 0, prev = document.getElementById('act-capa'); if (prev) { var sc = prev.firstElementChild; prevScroll = sc ? sc.scrollTop : 0; prev.remove(); }
+  var capa = document.createElement('div'); capa.id = 'act-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var inp = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:9px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13.5px;padding:8px 10px;box-sizing:border-box;';
+  var lbl = function(t) { return '<div style="font-size:11px;color:var(--text-secondary);margin:14px 0 6px;letter-spacing:.6px;text-align:center;font-weight:700;">' + t + '</div>'; };
+  var foto = function(fn, n) { return '<span onclick="' + fn + '" style="font-size:12px;color:#5b8dee;cursor:pointer;white-space:nowrap;">📷 ' + (n ? n : '＋') + '</span>'; };
+  var sal = A.tipo === 'salida';
+  var h = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:18px 16px 30px;width:100%;max-width:520px;box-sizing:border-box;max-height:92vh;overflow:auto;">'
+    + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);text-align:center;">📋 ACTA DE ' + (sal ? 'SALIDA' : 'ENTRADA') + ' · ' + sib_esc(A.ref) + '</div>'
+    + (typeof _driveToken !== 'undefined' && _driveToken ? '' : '<div onclick="renta_conectarDrive()" style="font-size:11.5px;color:#e0a23a;text-align:center;margin-top:6px;cursor:pointer;">Para añadir fotos, conecta Google Drive (pulsa aquí)</div>')
+    + lbl('FECHA') + '<input id="act-fecha" type="date" value="' + sib_esc(A.fecha || '') + '" style="' + inp + 'text-align:center;-webkit-appearance:none;appearance:none;">'
+    + lbl('ESTANCIAS');
+  A.estancias.forEach(function(e, i) {
+    var cambio = sal && e.entrada && (e.entrada.estado !== e.estado || (e.nota && e.nota !== e.entrada.nota));
+    h += '<div style="border:1px solid ' + (cambio ? 'rgba(224,156,58,.5)' : 'var(--border)') + ';border-radius:10px;padding:8px;margin-bottom:6px;">'
+      + '<div style="display:flex;gap:6px;align-items:center;"><input id="act-e-n' + i + '" value="' + sib_esc(e.nombre) + '" style="' + inp + 'flex:1;font-weight:700;">'
+      + '<select id="act-e-s' + i + '" style="' + inp + 'width:96px;">' + ACT_ESTADOS.map(function(s) { return '<option' + (e.estado === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>'
+      + foto('act_fotoEst(' + i + ')', (e.fotos || []).length) + '<span onclick="act_quitarEst(' + i + ')" style="color:#e57373;cursor:pointer;font-size:13px;padding:0 2px;">✕</span></div>'
+      + '<input id="act-e-t' + i + '" placeholder="Detalle (opcional)" value="' + sib_esc(e.nota || '') + '" style="' + inp + 'margin-top:6px;">'
+      + (sal && e.entrada ? '<div style="font-size:10.5px;color:' + (cambio ? '#e0a23a' : 'var(--text-secondary)') + ';margin-top:4px;">Al entrar: ' + sib_esc(e.entrada.estado) + (e.entrada.nota ? ' · ' + sib_esc(e.entrada.nota) : '') + (cambio ? ' · ha cambiado' : '') + '</div>' : '')
+      + ((e.fotos || []).length ? '<div style="font-size:10.5px;margin-top:4px;">' + e.fotos.map(function(u, j) { return '<a href="' + sib_esc(u) + '" target="_blank" style="color:#5b8dee;margin-right:8px;">foto ' + (j + 1) + '</a>'; }).join('') + '</div>' : '')
+      + '</div>';
+  });
+  h += '<div onclick="act_leer();_act.estancias.push({nombre:\'Otra estancia\',estado:\'Bien\',nota:\'\',fotos:[]});act_pintar()" style="text-align:center;font-size:12px;color:#5b8dee;cursor:pointer;padding:4px;">＋ Añadir estancia</div>';
+  h += lbl('CONTADORES');
+  A.contadores.forEach(function(k, i) {
+    h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><span style="width:52px;font-size:13px;font-weight:700;color:var(--silver-bright);">' + sib_esc(k.nombre) + '</span>'
+      + '<input id="act-k-l' + i + '" placeholder="Lectura" value="' + sib_esc(k.lectura || '') + '" style="' + inp + 'flex:1;text-align:center;">' + foto('act_fotoCont(' + i + ')', k.foto ? '✓' : '') + '</div>'
+      + (sal && k.entrada ? '<div style="font-size:10.5px;color:var(--text-secondary);margin:-3px 0 6px 58px;">Al entrar: ' + sib_esc(k.entrada) + '</div>' : '');
+  });
+  h += lbl('LLAVES ENTREGADAS') + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">' + [['portal', 'Portal'], ['piso', 'Piso'], ['buzon', 'Buzón'], ['otras', 'Otras']].map(function(p) { return '<div><div style="font-size:10.5px;color:var(--text-secondary);text-align:center;">' + p[1] + '</div><input id="act-ll-' + p[0] + '" value="' + sib_esc(A.llaves[p[0]] || '') + '" inputmode="numeric" style="' + inp + 'text-align:center;"></div>'; }).join('') + '</div>';
+  h += lbl('INVENTARIO (muebles y electrodomésticos)') + '<textarea id="act-inv" rows="3" placeholder="Frigorífico, lavadora, sofá…" style="' + inp + 'resize:vertical;">' + sib_esc(A.inventario || '') + '</textarea>';
+  if (sal) {
+    h += lbl('FIANZA') + '<input id="act-fianza" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (numES(A.fianza) ? fmtGlobal(numES(A.fianza)) : '') + '" style="' + inp + 'text-align:center;">';
+    (A.descuentos || []).forEach(function(d, i) {
+      h += '<div style="display:flex;gap:6px;margin-top:6px;"><input id="act-d-c' + i + '" placeholder="Motivo (ej: mampara rota)" value="' + sib_esc(d.concepto || '') + '" style="' + inp + 'flex:1;"><input id="act-d-i' + i + '" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (numES(d.importe) ? fmtGlobal(numES(d.importe)) : '') + '" placeholder="€" style="' + inp + 'width:90px;text-align:center;"><span onclick="act_leer();_act.descuentos.splice(' + i + ',1);act_pintar()" style="color:#e57373;cursor:pointer;align-self:center;">✕</span></div>';
+    });
+    h += '<div onclick="act_leer();_act.descuentos.push({concepto:\'\',importe:0});act_pintar()" style="text-align:center;font-size:12px;color:#5b8dee;cursor:pointer;padding:6px;">＋ Añadir descuento</div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding:6px 2px;border-top:1px solid var(--border);"><span>A devolver</span><span>' + fmtGlobal(act_devolver(A)) + ' €</span></div>';
+  }
+  h += lbl('OBSERVACIONES') + '<textarea id="act-notas" rows="2" style="' + inp + 'resize:vertical;">' + sib_esc(A.notas || '') + '</textarea>'
+    + '<button onclick="act_guardar()" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:16px;">GUARDAR</button>'
+    + '<button onclick="_act=null;document.getElementById(\'act-capa\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button></div>';
+  capa.innerHTML = h; document.body.appendChild(capa);
+  if (prevScroll) capa.firstElementChild.scrollTop = prevScroll;
+  var fz = document.getElementById('act-fianza'); if (fz) fz.addEventListener('change', function() { act_leer(); act_pintar(); });
+  (A.descuentos || []).forEach(function(d, i) { var e = document.getElementById('act-d-i' + i); if (e) e.addEventListener('change', function() { act_leer(); act_pintar(); }); });
+}
+function act_quitarEst(i) { act_leer(); _act.estancias.splice(i, 1); act_pintar(); }
+function act_elegirFoto(cb) {
+  if (typeof _driveToken === 'undefined' || !_driveToken) { avisar('Conecta primero Google Drive (aviso de arriba del acta) para guardar las fotos.'); return; }
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.onchange = function() {
+    var files = Array.prototype.slice.call(inp.files || []); if (!files.length) return;
+    act_leer(); var pend = files.length, urls = [];
+    if (typeof showToast === 'function') showToast('Subiendo ' + files.length + ' foto' + (files.length === 1 ? '' : 's') + ' a Drive…', 'info');
+    files.forEach(function(f) {
+      act_subirFoto(f, function(err, url) {
+        if (!err && url) urls.push(url); else console.warn('Foto del acta:', err);
+        if (--pend === 0) { cb(urls); act_pintar(); if (urls.length < files.length) avisar('Algunas fotos no se han podido subir.'); }
+      });
+    });
+  };
+  inp.click();
+}
+function act_fotoEst(i) { act_elegirFoto(function(urls) { var e = _act.estancias[i]; e.fotos = (e.fotos || []).concat(urls); }); }
+function act_fotoCont(i) { act_elegirFoto(function(urls) { if (urls[0]) _act.contadores[i].foto = urls[0]; }); }
+function act_subirFoto(archivo, cb) {
+  var A = _act;
+  renta_obtenerCarpeta('GestInmo Actas', null, function(err, rootId) {
+    if (err) { cb(err); return; }
+    renta_obtenerCarpeta((A.ref || 'sin-ref') + ' ' + (A.tipo || ''), rootId, function(err2, dirId) {
+      if (err2) { cb(err2); return; }
+      renta_comprimirImagen(archivo, function(blob) {
+        var nombre = (A.fecha || _fechaHoyLocal()) + '_' + Date.now().toString(36) + '.jpg';
+        var form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify({ name: nombre, parents: [dirId] })], { type: 'application/json' }));
+        form.append('file', blob, nombre);
+        fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', { method: 'POST', headers: { 'Authorization': 'Bearer ' + _driveToken }, body: form })
+          .then(function(r) { return r.json(); }).then(function(f) { cb(null, f.webViewLink || ('https://drive.google.com/file/d/' + f.id + '/view')); }).catch(function(e) { cb(e); });
+      });
+    });
+  });
+}
+function act_guardar() {
+  if (bloqueaSiViewer('Guardar un acta')) return;
+  act_leer(); var A = _act; if (!A) return;
+  if (!A.fecha) { avisar('Pon la fecha del acta.'); return; }
+  delete A.nuevo; A.updatedAt = new Date().toISOString();
+  var l = act_load(), i = -1; for (var k = 0; k < l.length; k++) if (l[k] && l[k].id === A.id) i = k;
+  if (i >= 0) l[i] = A; else l.push(A);
+  act_save(l); _act = null;
+  var c = document.getElementById('act-capa'); if (c) c.remove();
+  act_render(); if (typeof showToast === 'function') showToast('✓ Acta guardada', 'success');
+}
+function act_borrar(id) {
+  if (bloqueaSiViewer('Borrar un acta')) return;
+  showConfirm('🗑️', '¿Borrar el acta?', 'Las fotos se quedan en tu Google Drive.', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Borrar', cls: 'r', fn: function() { var l = act_load(), a = l.filter(function(x) { return x && x.id === id; })[0]; if (!a) return; a.deleted = true; a.updatedAt = new Date().toISOString(); act_save(l); act_render(); } }
+  ]);
+}
+function act_pdf(id) {
+  if (!window.jspdf || !window.jspdf.jsPDF) { avisar('No se ha podido cargar el generador de PDF. Comprueba la conexión y vuelve a intentarlo.'); return; }
+  var A = act_load().filter(function(x) { return x && x.id === id; })[0]; if (!A) return;
+  var c = (JSON.parse(localStorage.getItem('contratos:lista') || '[]') || []).filter(function(x) { return x && x.id === A.ctrId; })[0] || {};
+  var inm = (pend_inmPorRef() || {})[A.ref] || {};
+  var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210, M = 16, y = 18, sal = A.tipo === 'salida';
+  var limpio = function(s) { return String(s == null ? '' : s).replace(/−/g, '-').replace(/[^ -ÿ€·\n]/g, '').replace(/[ \t]+/g, ' ').trim(); };
+  var hueco = function(h) { if (y + h > 280) { doc.addPage(); y = 18; } };
+  var titulo = function(t) { hueco(14); y += 3; doc.setFillColor(28, 40, 72); doc.rect(M, y - 5, W - 2 * M, 7.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(255, 255, 255); doc.text(limpio(t), M + 2.5, y); y += 8; doc.setTextColor(30, 30, 30); };
+  var linea = function(t, b) { doc.setFont('helvetica', b ? 'bold' : 'normal'); doc.setFontSize(9.5); var ls = doc.splitTextToSize(limpio(t), W - 2 * M - 4); hueco(ls.length * 4.6 + 1); doc.text(ls, M + 2, y); y += ls.length * 4.6 + 1; };
+  var enlace = function(txt, url) { hueco(5); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(30, 90, 200); doc.textWithLink(txt, M + 6, y, { url: url }); doc.setTextColor(30, 30, 30); y += 4.2; };
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('Acta de ' + (sal ? 'salida' : 'entrada') + ' del inmueble', W / 2, y, { align: 'center' }); y += 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(95, 95, 95);
+  doc.text(limpio((A.ref || '') + ' · ' + String(inm.direccionCalle || inm.direccion || c.dir || '') + ' · ' + rinf_fecha(A.fecha)), W / 2, y, { align: 'center' }); y += 5; doc.setTextColor(30, 30, 30);
+  titulo('PARTES');
+  linea('Arrendador: ' + (c.arrendador || c.arrNombre || (normEmpresa(String(inm.propietario || '').toLowerCase()) === 'patricio' ? 'Patricio Gómez García' : 'Patrimer Levante, S.L.')));
+  linea('Inquilino: ' + (c.inqNombre || '') + (c.cotitulares && c.cotitulares.length ? ' y ' + c.cotitulares.map(function(f) { return f.nombre; }).join(', ') : ''));
+  titulo('ESTADO DE LAS ESTANCIAS');
+  (A.estancias || []).forEach(function(e) {
+    var cambio = sal && e.entrada && (e.entrada.estado !== e.estado || (e.nota && e.nota !== e.entrada.nota));
+    linea(e.nombre + ': ' + e.estado + (e.nota ? ' - ' + e.nota : '') + (sal && e.entrada ? '   (al entrar: ' + e.entrada.estado + (e.entrada.nota ? ' - ' + e.entrada.nota : '') + ')' : '') + (cambio ? '  [CAMBIO]' : ''), cambio);
+    (e.fotos || []).forEach(function(u, j) { enlace('Foto ' + (j + 1) + ' de ' + e.nombre + ' (ver en Drive)', u); });
+  });
+  titulo('CONTADORES');
+  if (!(A.contadores || []).some(function(k) { return k.lectura || k.foto; })) linea('Sin lecturas apuntadas.');
+  (A.contadores || []).forEach(function(k) { if (!k.lectura && !k.foto) return; linea(k.nombre + ': ' + (k.lectura || '-') + (sal && k.entrada ? '   (al entrar: ' + k.entrada + ')' : '')); if (k.foto) enlace('Foto del contador de ' + k.nombre.toLowerCase() + ' (ver en Drive)', k.foto); });
+  titulo('LLAVES ENTREGADAS');
+  var ll = A.llaves || {}; linea('Portal: ' + (ll.portal || '-') + '    Piso: ' + (ll.piso || '-') + '    Buzón: ' + (ll.buzon || '-') + (ll.otras ? '    Otras: ' + ll.otras : ''));
+  if (A.inventario) { titulo('INVENTARIO'); linea(A.inventario); }
+  if (sal) {
+    titulo('FIANZA');
+    linea('Fianza depositada: ' + fmtGlobal(numES(A.fianza) || 0) + ' €');
+    (A.descuentos || []).forEach(function(d) { if (numES(d.importe) > 0) linea('Descuento - ' + (d.concepto || 'sin motivo') + ': -' + fmtGlobal(numES(d.importe)) + ' €'); });
+    linea('A devolver: ' + fmtGlobal(act_devolver(A)) + ' €', true);
+  }
+  if (A.notas) { titulo('OBSERVACIONES'); linea(A.notas); }
+  hueco(40); y += 14;
+  doc.setDrawColor(120, 120, 120); doc.line(M + 4, y, M + 74, y); doc.line(W - M - 74, y, W - M - 4, y);
+  doc.setFontSize(9); doc.text('El arrendador', M + 39, y + 5, { align: 'center' }); doc.text('El inquilino', W - M - 39, y + 5, { align: 'center' });
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('GestInmo - ' + new Date().toLocaleDateString('es-ES'), W / 2, 290, { align: 'center' });
+  rinf_entregar(doc.output('blob'), 'Acta_' + (sal ? 'salida' : 'entrada') + '_' + (A.ref || '') + '_' + (A.fecha || '') + '.pdf', 'application/pdf');
+}
+
 function setDetalleTab(el, tabId) {
   document.querySelectorAll('.dtab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.dtab-panel').forEach(p => p.classList.remove('active'));
   el.classList.add('active'); document.getElementById(tabId).classList.add('active');
+  if (tabId === 'det-tab-actas') { try { act_render(); } catch (e) { console.warn('Actas:', e.message); } } // 11/11/2026 (I4)
 }
 
 function calcFechaFin() {
@@ -23895,6 +24122,130 @@ function res_htmlLista(emp) {
   return h + '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:5px;">Uno por cada Cierre del mes</div></div>';
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 11/11/2026 (Patry, idea I5): INFORME DE PATRIMONIO EN PDF
+// Para el notario, el banco o la familia. Patricio, Patrimer o los dos; a
+// hoy (con el detalle de cada cuenta, fondo, acción e inmueble) o a la
+// última foto del mes (solo totales por bloque). Inmuebles a su "valor de
+// mercado actual" (o al precio de compra si no lo tienen, y se avisa).
+// Nunca incluye DNI ni números de cuenta.
+// ═══════════════════════════════════════════════════════════════════════
+var _infSel = { quien: 'patricio', fecha: 'hoy', inc: { inm: true, cue: true, fon: true, acc: true, urb: true, det: false } };
+function inf_datosEmp(emp, fecha) {
+  var R = function(v) { return Math.round((numES(v) || 0) * 100) / 100; };
+  var D = { emp: emp, nombre: emp === 'patricio' ? 'Patricio Gómez García' : 'Patrimer Levante, S.L.', bloques: {} };
+  if (fecha === 'foto') {
+    var L = fin_patHist_load(emp).filter(function(r) { return r && !r.deleted; }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
+    var u = L[L.length - 1]; if (!u) return null;
+    D.fechaTxt = '1 de ' + fin_patHist_nombreMes(u.id).toLowerCase() + (u.estimada ? ' (aproximado)' : '');
+    var acc = ph_mercado(u);
+    D.bloques = { inm: { total: R(u.inmobiliario), items: [] }, cue: { total: R(u.liquidez), items: [] }, fon: null, acc: { total: R(acc), items: [], txt: 'Fondos, planes y acciones' }, urb: { total: R(u.urbanitae), items: [] } };
+    D.foto = true;
+    return D;
+  }
+  D.fechaTxt = new Date().toLocaleDateString('es-ES');
+  window._finEmpForzada = emp;
+  try {
+    var cue = fin_visibles('fin:cuentas').map(function(c) { return { t: [c.entidad || FIN_CUENTA_LABEL[c.cuenta] || '', c.nombre || ''].filter(Boolean).join(' · ') || 'Cuenta', v: R(c.saldo) }; });
+    var fon = fin_visibles('fin:fondos').map(function(f) { return { t: f.nombre || 'Fondo', v: R(f.valor), s: f.esPlanPensiones ? 'plan de pensiones' : '' }; });
+    var acc = [], origen = {};
+    fin_accSimpleLoad().forEach(function(a) { if (!a || a.deleted) return; if (a.origenTicker) origen[a.origenTicker] = true; acc.push({ t: a.nombre || a.ticker || 'Acción', v: R(a.valorActual) }); });
+    var pos = {};
+    fin_visibles('fin:acciones').forEach(function(op) {
+      var t = op.ticker; if (!t || origen[t]) return; pos[t] = pos[t] || 0;
+      if (op.tipo === 'compra') pos[t] += numES(op.cantidad); else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad); else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones);
+    });
+    Object.keys(pos).forEach(function(t) { if (pos[t] > 0.000001 && _finCotizaciones[t]) acc.push({ t: FIN_NOMBRES[t] || t, v: R(_finCotizaciones[t] * pos[t]), s: fmtGlobal(pos[t].toFixed(pos[t] % 1 ? 4 : 0)) + ' acc.' }); });
+    var urb = fin_visibles('fin:urbanitae').filter(function(u) { return u.estado !== 'cobrado'; }).map(function(u) { return { t: u.nombre || 'Proyecto', v: R(u.capital) }; });
+  } finally { window._finEmpForzada = null; }
+  var inm = [], conCompra = 0;
+  loadInmuebles().forEach(function(i) {
+    if (!i || i.deleted || i.estado === 'vendido' || normEmpresa(String(i.propietario || 'patrimer').toLowerCase()) !== emp) return;
+    var vm = numES(i.precioActual) || 0, pc = numES(i.precio) || 0;
+    if (!(vm > 0) && !(pc > 0)) return;
+    if (!(vm > 0)) conCompra++;
+    var dir = String(i.direccionCalle || i.direccion || '').split(',')[0];
+    inm.push({ t: (i.ref || '') + (dir ? ' · ' + dir : ''), v: R(vm > 0 ? vm : pc), s: (vm > 0 ? '' : 'precio de compra') + (i.estado === 'alquilado' && numES(i.renta) > 0 ? (vm > 0 ? '' : ' · ') + 'alquilado' : ''), m2: i.m2, renta: numES(i.renta) || 0 });
+  });
+  var tot = function(a) { return Math.round(a.reduce(function(s, x) { return s + x.v; }, 0) * 100) / 100; };
+  var ord = function(a) { return a.sort(function(x, y) { return y.v - x.v; }); };
+  D.bloques = { inm: { total: tot(inm), items: inm, conCompra: conCompra }, cue: { total: tot(cue), items: ord(cue) }, fon: { total: tot(fon), items: ord(fon) }, acc: { total: tot(acc), items: ord(acc) }, urb: { total: tot(urb), items: ord(urb) } };
+  return D;
+}
+var INF_TIT = { inm: 'Inmuebles', cue: 'Cuentas y liquidez', fon: 'Fondos y planes', acc: 'Acciones', urb: 'Urbanitae' };
+function inf_abrir() {
+  var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
+  var puedeP = (typeof usuarioPuedeEmpresa !== 'function' || usuarioPuedeEmpresa('patricio'));
+  _infSel.quien = (emp === 'patricio' && puedeP) ? 'patricio' : 'patrimer';
+  inf_pintar();
+}
+function inf_pintar() {
+  var puedeP = (typeof usuarioPuedeEmpresa !== 'function' || usuarioPuedeEmpresa('patricio'));
+  var prev = document.getElementById('inf-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'inf-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var chip = function(on, txt, fn) { return '<span onclick="' + fn + '" style="font-size:12.5px;padding:6px 12px;border-radius:16px;cursor:pointer;border:1px solid ' + (on ? 'var(--accent-green)' : 'var(--border)') + ';color:' + (on ? 'var(--silver-bright)' : 'var(--silver-dim)') + ';background:' + (on ? 'rgba(76,175,130,.15)' : 'transparent') + ';">' + txt + '</span>'; };
+  var fila = function(arr) { return '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:4px 0 8px;">' + arr.join('') + '</div>'; };
+  var lbl = function(t) { return '<div style="font-size:11px;color:var(--text-secondary);letter-spacing:.6px;text-align:center;margin:10px 0 2px;">' + t + '</div>'; };
+  var S = _infSel, h = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 18px 30px;width:100%;max-width:480px;box-sizing:border-box;max-height:90vh;overflow:auto;">'
+    + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);text-align:center;">📄 INFORME DE PATRIMONIO</div>';
+  h += lbl('¿DE QUIÉN?') + fila(puedeP ? [chip(S.quien === 'patricio', 'Patricio', "_infSel.quien='patricio';inf_pintar()"), chip(S.quien === 'patrimer', 'Patrimer', "_infSel.quien='patrimer';inf_pintar()"), chip(S.quien === 'ambos', 'Los dos', "_infSel.quien='ambos';inf_pintar()")] : [chip(true, 'Patrimer', '')]);
+  h += lbl('¿A QUÉ FECHA?') + fila([chip(S.fecha === 'hoy', 'Hoy', "_infSel.fecha='hoy';inf_pintar()"), chip(S.fecha === 'foto', 'Última foto del mes', "_infSel.fecha='foto';inf_pintar()")]);
+  if (S.fecha === 'hoy') {
+    h += lbl('¿QUÉ INCLUYE?') + fila(['inm', 'cue', 'fon', 'acc', 'urb'].map(function(k) { return chip(S.inc[k], INF_TIT[k], "_infSel.inc." + k + "=!_infSel.inc." + k + ";inf_pintar()"); }).concat([chip(S.inc.det, 'Detalle de cada partida', "_infSel.inc.det=!_infSel.inc.det;inf_pintar()")]));
+  } else h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;line-height:1.4;">Con la foto del mes solo hay totales por bloque (sin el detalle de cada partida).</div>';
+  h += '<button onclick="inf_pdf()" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:14px;">📤 GENERAR Y COMPARTIR</button>'
+    + '<button onclick="document.getElementById(\'inf-capa\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button>'
+    + '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;line-height:1.4;">Para el notario, el banco o la familia. Nunca lleva DNI ni números de cuenta.</div></div>';
+  capa.innerHTML = h; document.body.appendChild(capa);
+}
+function inf_pdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) { avisar('No se ha podido cargar el generador de PDF. Comprueba la conexión y vuelve a intentarlo.'); return; }
+  var S = _infSel; if (typeof usuarioPuedeEmpresa === 'function' && !usuarioPuedeEmpresa('patricio')) S.quien = 'patrimer';
+  var emps = S.quien === 'ambos' ? ['patricio', 'patrimer'] : [S.quien];
+  var datos = emps.map(function(e) { return inf_datosEmp(e, S.fecha); }).filter(Boolean);
+  if (!datos.length) { avisar('No hay ninguna foto del mes todavía.'); return; }
+  var claves = S.fecha === 'foto' ? ['inm', 'cue', 'acc', 'urb'] : ['inm', 'cue', 'fon', 'acc', 'urb'].filter(function(k) { return S.inc[k]; });
+  if (!claves.length) { avisar('Elige al menos un bloque.'); return; }
+  var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210, M = 16, y = 20;
+  var limpio = function(s) { return String(s == null ? '' : s).replace(/−/g, '-').replace(/[^ -ÿ€·]/g, '').replace(/\s+/g, ' ').trim(); };
+  var eur = function(v) { return fmtGlobal((numES(v) || 0).toFixed(2)) + ' €'; };
+  var hueco = function(h) { if (y + h > 280) { doc.addPage(); y = 18; } };
+  var titulo = function(t) { hueco(14); y += 3; doc.setFillColor(28, 40, 72); doc.rect(M, y - 5, W - 2 * M, 7.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(255, 255, 255); doc.text(limpio(t), M + 2.5, y); y += 8; doc.setTextColor(30, 30, 30); };
+  var fila = function(t, v, sub, negrita, gris) {
+    hueco(6); doc.setFont('helvetica', negrita ? 'bold' : 'normal'); doc.setFontSize(negrita ? 10.5 : 9.5); doc.setTextColor(gris ? 90 : 30, gris ? 90 : 30, gris ? 90 : 30);
+    var ls = doc.splitTextToSize(limpio(t) + (sub ? '  (' + limpio(sub) + ')' : ''), W - 2 * M - 42);
+    doc.text(ls, M + 2, y); doc.text(limpio(v), W - M - 2, y, { align: 'right' });
+    y += ls.length * 4.6 + 1; doc.setDrawColor(225, 225, 225); doc.line(M, y - 3.2, W - M, y - 3.2); doc.setTextColor(30, 30, 30);
+  };
+  var nota = function(t) { doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(100, 100, 100); var ls = doc.splitTextToSize(limpio(t), W - 2 * M); hueco(ls.length * 3.6 + 2); doc.text(ls, M + 2, y); y += ls.length * 3.6 + 2; doc.setTextColor(30, 30, 30); };
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.text('Informe de patrimonio', W / 2, y, { align: 'center' }); y += 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(95, 95, 95);
+  doc.text(limpio(datos.map(function(D) { return D.nombre; }).join(' y ') + ' · a ' + datos[0].fechaTxt), W / 2, y, { align: 'center' }); y += 5; doc.setTextColor(30, 30, 30);
+  var granTotal = 0;
+  datos.forEach(function(D) {
+    var B = D.bloques, totalEmp = 0;
+    if (datos.length > 1) { y += 3; hueco(10); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(limpio(D.nombre), M, y + 2); y += 7; }
+    titulo('RESUMEN');
+    claves.forEach(function(k) { var b = B[k]; if (!b) return; totalEmp += b.total; fila(b.txt || INF_TIT[k] + (k === 'inm' && b.items.length ? ' (' + b.items.length + ')' : ''), eur(b.total)); });
+    fila('TOTAL', eur(totalEmp), '', true); granTotal += totalEmp;
+    if (!D.foto && S.inc.det) {
+      claves.forEach(function(k) {
+        var b = B[k]; if (!b || !b.items.length) return;
+        titulo(INF_TIT[k].toUpperCase());
+        b.items.forEach(function(it) { fila(it.t, eur(it.v), it.s, false); });
+        if (k === 'inm' && b.conCompra) nota(b.conCompra + ' inmueble' + (b.conCompra === 1 ? '' : 's') + ' sin valor de mercado: se cuenta' + (b.conCompra === 1 ? '' : 'n') + ' a precio de compra.');
+      });
+    } else if (!D.foto && B.inm && B.inm.conCompra && claves.indexOf('inm') >= 0) nota(B.inm.conCompra + ' inmueble' + (B.inm.conCompra === 1 ? '' : 's') + ' sin valor de mercado: se cuenta' + (B.inm.conCompra === 1 ? '' : 'n') + ' a precio de compra.');
+  });
+  if (datos.length > 1) { y += 2; titulo('TOTAL CONJUNTO'); fila('Patricio + Patrimer', eur(granTotal), '', true); }
+  y += 2; nota('Valores según los datos de la app a la fecha indicada: inmuebles a su valor de mercado estimado por el propietario (o precio de compra), cuentas a su saldo, fondos y acciones a su último valor conocido, Urbanitae al capital invertido. No es una tasación oficial.');
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('GestInmo - ' + new Date().toLocaleDateString('es-ES'), W / 2, 290, { align: 'center' });
+  var nombre = 'Informe_patrimonio_' + (S.quien === 'ambos' ? 'Patricio_y_Patrimer' : (S.quien === 'patricio' ? 'Patricio' : 'Patrimer')) + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+  var c = document.getElementById('inf-capa'); if (c) c.remove();
+  rinf_entregar(doc.output('blob'), nombre, 'application/pdf');
+}
+
 function fin_patHist_grafico(ordenada) {
   var el = document.getElementById('fin-pathist-graf'); if (!el) return;
   var L = (ordenada || []).filter(function(x) { return x && !x.deleted; });
@@ -26203,6 +26554,19 @@ function pend_calcular() {
       }
     }
   } catch (e) {}
+  // 11/11/2026 (I3): incidencias abiertas hace más de 15 días (una línea por empresa)
+  try {
+    var _incPorEmp = {}, _inmRef = pend_inmPorRef();
+    inc_load().forEach(function(x) {
+      if (!x || x.deleted || x.estado === 'resuelta' || inc_dias(x.fecha) <= 15) return;
+      var inm = _inmRef[x.ref]; var e = inm ? normEmpresa(String(inm.propietario || 'patrimer').toLowerCase()) : 'patrimer';
+      (_incPorEmp[e] = _incPorEmp[e] || []).push(x);
+    });
+    Object.keys(_incPorEmp).forEach(function(e) {
+      var l = _incPorEmp[e].sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
+      items.push({ icon: '🔧', t: l.length + ' incidencia' + (l.length === 1 ? '' : 's') + ' abierta' + (l.length === 1 ? '' : 's') + ' hace más de 15 días', s: l.map(function(x) { return x.ref + ': ' + x.titulo + ' (' + inc_dias(x.fecha) + ' días)'; }).join(' · '), accion: 'incidencia', ref: l[0].ref, empresa: e });
+    });
+  } catch (eInc) {}
   // 12/10/2026 — un solo aviso: valores catastrales que faltan para la Renta
   // (pisos de Patricio). Se rellenan en la ficha del inmueble → Gastos.
   try {
@@ -26582,6 +26946,118 @@ function cee_irInmueble(idx) {
     if (typeof inmdoc_render === 'function') inmdoc_render(idx);
   }, 250);
 }
+// ═══════════════════════════════════════════════════════════════════════
+// 11/11/2026 (Patry, idea I3): INCIDENCIAS POR PISO
+// Pestaña "Incidencias" en la ficha: qué pasa, proveedor y teléfono, estado
+// y coste. Al resolverla con coste, la app ofrece apuntarlo en los gastos del
+// piso (la lista única de gastos) sin escribirlo dos veces. Las abiertas hace
+// más de 15 días salen en "Pendiente de gestionar".
+// Datos: 'inmuebles:incidencias' (lista por id, se sincroniza).
+// ═══════════════════════════════════════════════════════════════════════
+function inc_load() { try { var a = JSON.parse(localStorage.getItem('inmuebles:incidencias') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function inc_save(a) { localStorage.setItem('inmuebles:incidencias', JSON.stringify(a)); }
+function inc_dias(f) { var a = new Date(String(f) + 'T12:00:00'), h = new Date(); return Math.max(0, Math.floor((h - a) / 86400000)); }
+function inc_delPiso(ref) { return inc_load().filter(function(x) { return x && !x.deleted && x.ref === ref; }).sort(function(a, b) { return (a.estado === 'resuelta') - (b.estado === 'resuelta') || String(b.fecha || '').localeCompare(String(a.fecha || '')); }); }
+function inc_render() {
+  var cont = document.getElementById('tab-incidencias-cont'); if (!cont) return;
+  var idx = (typeof currentDetailIdx !== 'undefined') ? currentDetailIdx : null, inm = idx != null ? loadInmuebles()[idx] : null;
+  if (!inm || !inm.ref) { cont.innerHTML = ''; return; }
+  var adm = rgas_esAdmin(), lista = inc_delPiso(inm.ref), refJ = String(inm.ref).replace(/'/g, "\\'");
+  var h = '';
+  if (adm) h += '<button onclick="inc_abrir(\'' + refJ + '\')" style="width:100%;background:rgba(91,141,238,.12);border:1px solid rgba(91,141,238,.5);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;padding:9px;cursor:pointer;margin-bottom:10px;">＋ Nueva incidencia</button>';
+  if (!lista.length) h += '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:6px 0;">Sin incidencias apuntadas en este inmueble.</div>';
+  lista.forEach(function(x) {
+    var id = String(x.id).replace(/'/g, "\\'"), ab = x.estado !== 'resuelta', dias = inc_dias(x.fecha);
+    var sub = [rinf_fecha(x.fecha), x.proveedor, x.telefono ? '📞 <a href="tel:' + sib_esc(String(x.telefono).replace(/\s/g, '')) + '" style="color:#5b8dee;">' + sib_esc(x.telefono) + '</a>' : '', numES(x.coste) > 0 ? fmtGlobal(numES(x.coste)) + ' €' + (x.gastoId ? ' → en Gastos ✓' : '') : ''].filter(Boolean);
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;">'
+      + (adm ? '<span onclick="inc_abrir(\'' + refJ + '\',\'' + id + '\')" style="color:#5b8dee;font-size:14px;width:18px;text-align:center;cursor:pointer;flex-shrink:0;">✎</span>' : '')
+      + '<span style="flex:1;min-width:0;color:var(--silver-bright);">' + sib_esc(x.titulo || '') + '<span style="display:block;color:var(--text-secondary);font-size:10.5px;">' + sub.map(function(t, i) { return i === 2 && x.telefono ? t : (/<a /.test(t) ? t : sib_esc(t)); }).join(' · ') + '</span>' + (x.notas ? '<span style="display:block;color:var(--text-secondary);font-size:10.5px;font-style:italic;">' + sib_esc(x.notas) + '</span>' : '') + '</span>'
+      + '<span style="font-size:10.5px;padding:2px 7px;border-radius:9px;white-space:nowrap;' + (ab ? 'color:#e0a23a;border:1px solid rgba(224,156,58,.5);' : 'color:var(--accent-green);border:1px solid rgba(76,175,130,.5);') + '">' + (ab ? 'abierta · ' + dias + ' día' + (dias === 1 ? '' : 's') : 'resuelta') + '</span>'
+      + (adm ? '<span onclick="inc_borrar(\'' + id + '\')" style="color:#e57373;font-size:13px;width:18px;text-align:center;cursor:pointer;flex-shrink:0;">✕</span>' : '')
+      + '</div>';
+  });
+  var hace = new Date(); hace.setFullYear(hace.getFullYear() - 1); var hS = sib_ymd(hace);
+  var ult = lista.filter(function(x) { return String(x.fecha || '') >= hS; }), coste = ult.reduce(function(s, x) { return s + (numES(x.coste) || 0); }, 0);
+  if (lista.length) h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:8px;">' + ult.length + ' incidencia' + (ult.length === 1 ? '' : 's') + ' en el último año' + (coste > 0 ? ' · ' + fmtGlobal(coste) + ' € de coste' : '') + '</div>';
+  cont.innerHTML = h;
+}
+function inc_abrir(ref, id) {
+  if (bloqueaSiViewer('Apuntar una incidencia')) return;
+  var x = id ? inc_load().filter(function(z) { return z && z.id === id; })[0] : null;
+  var prev = document.getElementById('inc-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'inc-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var inp = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;';
+  var lbl = 'font-size:11px;color:var(--text-secondary);margin:10px 0 4px;letter-spacing:.5px;text-align:center;';
+  var v = function(k) { return x && x[k] != null ? sib_esc(String(x[k])) : ''; };
+  var res = x && x.estado === 'resuelta';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;box-sizing:border-box;max-height:90vh;overflow:auto;">'
+    + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);text-align:center;">🔧 ' + (x ? 'EDITAR INCIDENCIA' : 'NUEVA INCIDENCIA') + ' · ' + sib_esc(ref) + '</div>'
+    + '<input type="hidden" id="inc-id" value="' + v('id') + '"><input type="hidden" id="inc-ref" value="' + sib_esc(ref) + '">'
+    + '<div style="' + lbl + '">¿QUÉ PASA?</div><input id="inc-titulo" type="text" placeholder="Ej: Fuga en el baño" value="' + v('titulo') + '" style="' + inp + '">'
+    + '<div style="' + lbl + '">FECHA DEL AVISO</div><input id="inc-fecha" type="date" value="' + (x ? v('fecha') : _fechaHoyLocal()) + '" style="' + inp + '-webkit-appearance:none;appearance:none;">'
+    + '<div style="' + lbl + '">PROVEEDOR (opcional)</div><input id="inc-prov" type="text" placeholder="Ej: Fontanería Pérez" value="' + v('proveedor') + '" style="' + inp + '">'
+    + '<div style="' + lbl + '">TELÉFONO (opcional)</div><input id="inc-tel" type="tel" value="' + v('telefono') + '" style="' + inp + '">'
+    + '<div style="' + lbl + '">ESTADO</div><select id="inc-estado" onchange="document.getElementById(\'inc-res\').style.display=this.value===\'resuelta\'?\'block\':\'none\'" style="' + inp + '"><option value="abierta"' + (res ? '' : ' selected') + '>Abierta</option><option value="resuelta"' + (res ? ' selected' : '') + '>Resuelta</option></select>'
+    + '<div id="inc-res" style="display:' + (res ? 'block' : 'none') + ';"><div style="' + lbl + '">FECHA DE RESOLUCIÓN</div><input id="inc-fres" type="date" value="' + (x && x.fechaResuelta ? v('fechaResuelta') : _fechaHoyLocal()) + '" style="' + inp + '-webkit-appearance:none;appearance:none;">'
+    + '<div style="' + lbl + '">COSTE (€, opcional)</div><input id="inc-coste" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (x && numES(x.coste) > 0 ? fmtGlobal(numES(x.coste)) : '') + '" style="' + inp + '"></div>'
+    + '<div style="' + lbl + '">NOTAS (opcional)</div><input id="inc-notas" type="text" value="' + v('notas') + '" style="' + inp + '">'
+    + '<button onclick="inc_guardar()" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:16px;">GUARDAR</button>'
+    + '<button onclick="document.getElementById(\'inc-capa\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button></div>';
+  document.body.appendChild(capa);
+}
+function inc_guardar() {
+  if (bloqueaSiViewer('Apuntar una incidencia')) return;
+  var g = function(id) { return (document.getElementById(id) || {}).value || ''; };
+  var titulo = g('inc-titulo').trim(), fecha = g('inc-fecha'), ref = g('inc-ref'), id = g('inc-id');
+  if (!titulo || !fecha) { avisar('Pon qué pasa y la fecha.'); return; }
+  var lista = inc_load(), x = id ? lista.filter(function(z) { return z && z.id === id; })[0] : null;
+  if (!x) { x = { id: 'inc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ref: ref }; lista.push(x); }
+  x.titulo = titulo; x.fecha = fecha; x.proveedor = g('inc-prov').trim(); x.telefono = g('inc-tel').trim(); x.notas = g('inc-notas').trim();
+  x.estado = g('inc-estado') === 'resuelta' ? 'resuelta' : 'abierta';
+  if (x.estado === 'resuelta') { x.fechaResuelta = g('inc-fres') || _fechaHoyLocal(); x.coste = parseFmtGlobal(g('inc-coste')) || 0; } else { x.fechaResuelta = ''; }
+  x.updatedAt = new Date().toISOString();
+  inc_save(lista);
+  var c = document.getElementById('inc-capa'); if (c) c.remove();
+  inc_render(); try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
+  // Resuelta con coste y aún sin gasto: ofrecer apuntarlo en los gastos del piso
+  if (x.estado === 'resuelta' && numES(x.coste) > 0 && !x.gastoId) {
+    var xid = x.id;
+    showConfirm('🧾', '¿Apuntarlo en los gastos del piso?', fmtGlobal(numES(x.coste)) + ' € de "' + x.titulo + '" (' + ref + '), con fecha ' + rinf_fecha(x.fechaResuelta) + '.\nDespués puedes añadir la factura desde Gastos.', [
+      { label: 'Sí, apuntarlo', cls: 'g', fn: function() { inc_aGasto(xid); } },
+      { label: 'Ahora no', cls: 'c', fn: function() {} }
+    ]);
+    var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
+  }
+}
+function inc_aGasto(id) {
+  var lista = inc_load(), x = lista.filter(function(z) { return z && z.id === id; })[0]; if (!x || x.gastoId) return;
+  var f = x.fechaResuelta || _fechaHoyLocal(), anio = parseInt(f.slice(0, 4), 10), arr = rgas_load(anio), gid = rgas_nuevoId();
+  arr.push({ id: gid, concepto: x.titulo + (x.proveedor ? ' (' + x.proveedor + ')' : ''), importe: numES(x.coste), fecha: f, categoria: 'Reparación', ref: x.ref, fotoUrl: null, incidenciaId: x.id, updatedAt: new Date().toISOString() });
+  rgas_save(anio, arr);
+  x.gastoId = gid; x.updatedAt = new Date().toISOString(); inc_save(lista);
+  inc_render(); try { rgas_refrescar(); } catch (e) {}
+  if (typeof showToast === 'function') showToast('✓ Apuntado en los gastos del piso', 'success');
+}
+function inc_borrar(id) {
+  if (bloqueaSiViewer('Borrar una incidencia')) return;
+  var x = inc_load().filter(function(z) { return z && z.id === id; })[0]; if (!x) return;
+  showConfirm('🗑️', '¿Borrar esta incidencia?', (x.titulo || '') + (x.gastoId ? '\nEl gasto apuntado en Gastos NO se borra.' : ''), [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Borrar', cls: 'r', fn: function() { var l = inc_load(), z = l.filter(function(w) { return w && w.id === id; })[0]; if (!z) return; z.deleted = true; z.updatedAt = new Date().toISOString(); inc_save(l); inc_render(); try { pend_render(); } catch (e) {} } }
+  ]);
+  var cmS = document.getElementById('cm-s'); if (cmS) cmS.style.whiteSpace = 'pre-line';
+}
+function inc_irA(ref) {
+  var l = loadInmuebles(), idx = -1; for (var i = 0; i < l.length; i++) if (l[i] && l[i].ref === ref) { idx = i; break; }
+  if (idx < 0) return;
+  showModule('inmuebles');
+  setTimeout(function() {
+    if (typeof inm_showDetail === 'function') inm_showDetail(idx);
+    var tab = document.querySelector('.detail-tab[onclick*="tab-incidencias"]'); if (tab) setDetailTab(tab, 'tab-incidencias');
+  }, 250);
+}
+
 function sib_irInmueble(idx, anio) {
   showModule('inmuebles');
   setTimeout(function() {
@@ -26952,6 +27428,8 @@ function pend_gestionar(i) {
     if (typeof registro_abrir === 'function') registro_abrir();
   } else if (it.accion === 'saveback') {
     if (typeof fin_saveAbrir === 'function') fin_saveAbrir('patricio', it.fondoId, it.mes);
+  } else if (it.accion === 'incidencia') {
+    inc_irA(it.ref); // 11/11/2026 (I3)
   } else if (it.accion === 'rgas_ordenar') {
     rgas_ordenarAbrir(); // 08/11/2026
   } else if (it.accion === 'ppconf') {
@@ -27227,6 +27705,7 @@ window._refreshCurrentModule = function(key) {
     'fin:igc_patrimer': 'finanzas', // 08/11/2026
     'fin:tesoreria_manual': 'finanzas', // 11/11/2026
     'fin:objetivo_patrimonio': 'finanzas', // 11/11/2026
+    'inmuebles:incidencias': 'inmuebles', 'contratos:actas': 'contratos', // 11/11/2026
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
@@ -27268,6 +27747,8 @@ window._refreshCurrentModule = function(key) {
     if (_modIni && _modIni.classList.contains('active') && typeof pend_render === 'function') pend_render();
     if ((key === 'inmuebles:seguro_ibi' || key === 'inmuebles:alquileres_mensuales' || /^renta:gastos:/.test(key) || key === 'inmuebles:lista')
         && typeof sib_render === 'function' && sib_idx != null && document.getElementById('inm-view-detalle') && document.getElementById('inm-view-detalle').classList.contains('active')) sib_render();
+    if (key === 'inmuebles:incidencias' && typeof inc_render === 'function') inc_render(); // 11/11/2026 (I3)
+    if (key === 'contratos:actas' && typeof act_render === 'function' && document.getElementById('det-tab-actas') && document.getElementById('det-tab-actas').classList.contains('active')) act_render(); // 11/11/2026 (I4)
   } catch (eIni) { console.warn('Refresco de Inicio:', eIni.message); }
   const module = keyModuleMap[key];
   if (!module) return;
