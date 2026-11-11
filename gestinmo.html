@@ -2297,7 +2297,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261111_11';
+const BUILD_ID = '261111_13';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -21961,14 +21961,16 @@ function fin_dcaAutoAplicar() {
   } catch (e) { console.warn('[PUNTO 248] DCA automático:', e.message); }
   finally { _finDcaEnCurso = false; }
 }
-function fin_ppConfirmar(fondoId, anio) { // 08/11/2026: confirmación de enero
+function fin_ppConfirmar(fondoId, anio, hastaHoy) { // 08/11/2026: confirmación de enero (11/11/2026: hastaHoy = aviso de diciembre)
   if (typeof bloqueaSiViewer === 'function' && bloqueaSiViewer('Confirmar el plan de pensiones')) return;
   var lista = []; try { lista = JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]'); } catch (e) {}
   var f = lista.find(function(x) { return x && x.id === fondoId; }); if (!f) return;
-  pedirTexto('🏦', 'Plan de pensiones ' + anio, 'Lo aportado en ' + anio + ' según el certificado del plan. La Renta resta como máximo 1.500 €.', numMiles_fmtDinero(fin_ppAportadoAnio(f, anio)), function(v) {
+  var _txtPP = hastaHoy ? 'Lo aportado en ' + anio + ' hasta hoy (mira el plan en MyInvestor). Las aportaciones automáticas que queden este año se suman solas. La Renta resta como máximo 1.500 €.' : 'Lo aportado en ' + anio + ' según el certificado del plan. La Renta resta como máximo 1.500 €.';
+  pedirTexto('🏦', 'Plan de pensiones ' + anio, _txtPP, numMiles_fmtDinero(fin_ppAportadoAnio(f, anio)), function(v) {
     var n = parseImporteFlexible(v); if (!(n >= 0)) { avisar('Importe no válido.'); return; }
     f.ppAnio = f.ppAnio || {}; f.ppAnio[String(anio)] = n;
-    f.ppConf = f.ppConf || {}; f.ppConf[String(anio)] = new Date().toISOString();
+    if (hastaHoy) { f.ppDic = f.ppDic || {}; f.ppDic[String(anio)] = new Date().toISOString(); }
+    else { f.ppConf = f.ppConf || {}; f.ppConf[String(anio)] = new Date().toISOString(); }
     f.updatedAt = new Date().toISOString();
     localStorage.setItem('fin:fondos:patricio', JSON.stringify(lista));
     try { if (typeof pend_render === 'function') pend_render(); } catch (e) {}
@@ -26643,6 +26645,8 @@ function pend_calcular() {
           });
         }
       } catch (ePP) {}
+      // 11/11/2026 (Patry, idea I2 opción B): en diciembre, lo que aún se puede hacer por la Renta.
+      try { var _ppDic = renta_avisoDiciembre(new Date()); if (_ppDic) items.push(_ppDic); } catch (ePD) {}
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
     }
   } catch (e) {}
@@ -27434,6 +27438,8 @@ function pend_gestionar(i) {
     rgas_ordenarAbrir(); // 08/11/2026
   } else if (it.accion === 'ppconf') {
     fin_ppConfirmar(it.fondoId, it.anio); // 08/11/2026
+  } else if (it.accion === 'ppdic') {
+    fin_ppConfirmar(it.fondoId, it.anio, true); // 11/11/2026 (I2)
   } else if (it.accion === 'intereses') {
     if (typeof rint_abrir === 'function') rint_abrir(it.mes);
   } else if (it.accion === 'renta_datos') {
@@ -31091,6 +31097,35 @@ function fin_ppAportadoAnio(f, anio) {
   var s = 0;
   ((f && f.dcaUltimas) || []).forEach(function(x) { if (x && String(x.fecha || '').slice(0, 4) === k) s += parseFloat(x.importe) || 0; });
   return Math.round(s * 100) / 100;
+}
+// 11/11/2026 (Patry, idea I2 opción B): aviso de Pendientes en diciembre.
+// Dice cuánto falta del plan de pensiones hasta 1.500 € y cuánto bajaría la
+// Renta, y cuánto baja por cada 1.000 € de gastos de los pisos pagados este
+// año. Las cifras salen de la previsión de la Renta, calculando dos veces
+// (con y sin) sin tocar ningún dato. Desaparece al llegar al máximo del plan.
+function renta_avisoDiciembre(hoy) {
+  if (!hoy || hoy.getMonth() !== 11) return null;
+  if (typeof getRol === 'function' && getRol() !== 'admin') return null;
+  var anio = hoy.getFullYear(), fP = null;
+  try { (JSON.parse(localStorage.getItem('fin:fondos:patricio') || '[]') || []).forEach(function(f) { if (!fP && f && !f.deleted && f.esPlanPensiones) fP = f; }); } catch (e) {}
+  if (!fP) return null;
+  var llevas = renta_aportPlanPensiones(anio, true), falta = Math.round((RENTA_PP_MAX - llevas) * 100) / 100;
+  if (falta <= 0.5) return null;
+  var _anioAntes = renta_anio, _ppAntes = renta_aportPlanPensiones, _gasAntes = renta_getGastos, base, conPP, conGas;
+  try {
+    renta_anio = anio;
+    var res = function() { var D = renta_calcPrevisionDatos(true); return D && !D.sinDatos ? (D.resultado || 0) : null; };
+    base = res();
+    renta_aportPlanPensiones = function() { return RENTA_PP_MAX; }; conPP = res(); renta_aportPlanPensiones = _ppAntes;
+    var refG = ((rgas_pisosPatricio()[0] || {}).inm || {}).ref;
+    if (refG) { renta_getGastos = function() { return _gasAntes.apply(this, arguments).concat([{ id: '__sim__', concepto: 'sim', importe: 1000, fecha: anio + '-12-15', categoria: 'Reparación', ref: refG }]); }; conGas = res(); }
+  } catch (e) { console.warn('Aviso Renta diciembre:', e.message); }
+  finally { renta_aportPlanPensiones = _ppAntes; renta_getGastos = _gasAntes; renta_anio = _anioAntes; }
+  if (base == null || conPP == null) return null;
+  var ahorroPP = Math.max(0, Math.round(base - conPP)), ahorroGas = conGas != null ? Math.max(0, Math.round(base - conGas)) : 0;
+  return { icon: '💡', t: 'Antes del 31/12: te faltan ' + fmtGlobal(falta) + ' € para el máximo del plan de pensiones (≈ ' + fmtGlobal(ahorroPP) + ' € menos de Renta)',
+    s: 'La app tiene ' + fmtGlobal(llevas) + ' € aportados en ' + anio + ', contando los automáticos de diciembre. Pulsa si no es así' + (ahorroGas ? ' · Cada 1.000 € de gastos de los pisos pagados este año ≈ ' + fmtGlobal(ahorroGas) + ' € menos' : ''),
+    accion: 'ppdic', fondoId: fP.id, anio: String(anio) };
 }
 function renta_calcPrevisionDatos(proy) {
   var nominas = renta_getNominas();
