@@ -2296,7 +2296,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261111_07';
+const BUILD_ID = '261111_09';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4563,6 +4563,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <!-- 11/11/2026 (I1): resumen de la previsión de tesorería (mes más bajo) -->
     <div class="chart-card" id="tes-inicio" style="margin-bottom:16px;display:none;"></div>
+    <!-- 11/11/2026 (I6): resumen mensual (días 1–10, tras el Cierre del mes) -->
+    <div class="chart-card" id="res-inicio" style="margin-bottom:16px;display:none;"></div>
 
     <!-- PUNTO 90b (03/09/2026): acceso permanente y discreto al registro de
          actividad, solo para el admin — no depende de que haya algo nuevo
@@ -20101,13 +20103,23 @@ function fin_renderUltimaActualizacion() {
 // (no se sincroniza entre Patricio/Mercedes ni entre dispositivos) para
 // que la próxima vez que abras Finanzas se quede como lo dejaste.
 var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'tesoreria', 'finper', 'trading'];
+// 11/11/2026 (Patry): al abrir la app, TODAS las secciones empiezan
+// cerradas. Mientras la app siga abierta se respeta lo que abras o cierres
+// (aunque cambies de pantalla); al cerrarla del todo, vuelven a cerradas.
+// Antes el estado se guardaba para siempre en el aparato (localStorage);
+// ahora solo dura la sesión (sessionStorage, con copia en memoria).
+var _finColapsoMem = null;
 function fin_seccionesColapsadasLoad() {
-  try { return JSON.parse(localStorage.getItem('fin:secciones_colapsadas') || '{}'); }
-  catch (e) { return {}; }
+  if (_finColapsoMem) return JSON.parse(JSON.stringify(_finColapsoMem));
+  try { _finColapsoMem = JSON.parse(sessionStorage.getItem('fin:secciones_colapsadas_sesion') || '{}') || {}; } catch (e) { _finColapsoMem = {}; }
+  return JSON.parse(JSON.stringify(_finColapsoMem));
 }
 function fin_seccionesColapsadasSave(estado) {
-  try { localStorage.setItem('fin:secciones_colapsadas', JSON.stringify(estado)); } catch (e) {}
+  _finColapsoMem = JSON.parse(JSON.stringify(estado || {}));
+  try { sessionStorage.setItem('fin:secciones_colapsadas_sesion', JSON.stringify(_finColapsoMem)); } catch (e) {}
 }
+function fin_seccionColapsada(key) { var e = fin_seccionesColapsadasLoad(); return e[key] === undefined ? true : !!e[key]; }
+try { localStorage.removeItem('fin:secciones_colapsadas'); } catch (e) {} // ya no se usa
 function fin_aplicarColapso(key, colapsada) {
   var body = document.getElementById('fin-' + key + '-body');
   var chev = document.getElementById('fin-' + key + '-chev');
@@ -20116,14 +20128,13 @@ function fin_aplicarColapso(key, colapsada) {
 }
 function fin_toggleSeccion(key) {
   var estado = fin_seccionesColapsadasLoad();
-  estado[key] = !estado[key];
+  estado[key] = !fin_seccionColapsada(key);
   fin_seccionesColapsadasSave(estado);
   fin_aplicarColapso(key, estado[key]);
 }
 function fin_aplicarColapsosGuardados() {
-  var estado = fin_seccionesColapsadasLoad();
   for (var i = 0; i < FIN_SECCIONES_COLAPSABLES.length; i++) {
-    fin_aplicarColapso(FIN_SECCIONES_COLAPSABLES[i], !!estado[FIN_SECCIONES_COLAPSABLES[i]]);
+    fin_aplicarColapso(FIN_SECCIONES_COLAPSABLES[i], fin_seccionColapsada(FIN_SECCIONES_COLAPSABLES[i]));
   }
 }
 function fin_render() {
@@ -22109,7 +22120,7 @@ function tes_renderInicio() {
 function tes_irDesdeInicio() {
   showModule('finanzas');
   setTimeout(function() {
-    try { var est = fin_seccionesColapsadasLoad(); if (est.tesoreria) { est.tesoreria = false; fin_seccionesColapsadasSave(est); fin_aplicarColapso('tesoreria', false); } } catch (e) {}
+    try { var est = fin_seccionesColapsadasLoad(); if (fin_seccionColapsada('tesoreria')) { est.tesoreria = false; fin_seccionesColapsadasSave(est); fin_aplicarColapso('tesoreria', false); } } catch (e) {}
     var s = document.getElementById('fin-tesoreria-section'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 300);
 }
@@ -23711,6 +23722,179 @@ function obj_quitar() {
   ]);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 11/11/2026 (Patry, idea I6): RESUMEN MENSUAL
+// Sale de cada foto del Cierre del mes: la foto del 1 de diciembre da el
+// resumen de NOVIEMBRE (patrimonio frente a la foto anterior, lo que entró y
+// salió en el mes, avance al objetivo) y, en el último, lo que viene y lo
+// pendiente. Se calcula al vuelo con los datos que ya hay (no se guarda nada
+// nuevo). En Inicio se ve los días 1–10; todos, en Finanzas → Histórico.
+// ═══════════════════════════════════════════════════════════════════════
+function res_mesAnterior(id) { var p = String(id).split('-'), y = parseInt(p[0], 10), m = parseInt(p[1], 10) - 1; if (m < 1) { m = 12; y--; } return y + '-' + String(m).padStart(2, '0'); }
+function res_lista(emp) { return fin_patHist_load(emp).filter(function(r) { return r && !r.deleted && r.id; }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); }); }
+function res_datos(emp, id) {
+  var L = res_lista(emp), ix = -1;
+  for (var i = 0; i < L.length; i++) if (L[i].id === id) ix = i;
+  if (ix < 1) return null;
+  var cur = L[ix], prev = L[ix - 1], X = res_mesAnterior(id), R = function(v) { return Math.round(v * 100) / 100; };
+  var D = { emp: emp, id: id, mes: X, cur: cur, prev: prev, total: numES(cur.total), dif: numES(cur.total) - numES(prev.total), estimada: !!(cur.estimada || prev.estimada) };
+  D.pct = numES(prev.total) ? D.dif / numES(prev.total) * 100 : 0;
+  try { D.cambios = ph_cambios(prev, cur, false); } catch (e) { D.cambios = []; }
+  try { D.obj = obj_calc(emp, L.slice(0, ix + 1)); } catch (e) { D.obj = null; }
+  // ── Lo que entró y salió en el mes X
+  var mov = [], add = function(t, v) { if (Math.abs(v) >= 0.005) mov.push({ t: t, v: R(v) }); };
+  var inms = loadInmuebles(), refsEmp = {};
+  inms.forEach(function(i) { if (i && i.ref && normEmpresa(String(i.propietario || 'patrimer').toLowerCase()) === emp) refsEmp[i.ref] = true; });
+  if (emp === 'patricio') {
+    var alq = 0, nP = {};
+    (inm_alqMenLoad() || []).forEach(function(r) { if (!r || r.deleted || r.mes !== X) return; var ix2 = inm_recIdx(r), i2 = inms[ix2]; if (!i2 || !refsEmp[i2.ref]) return; var a = numES(r.alquiler) || 0; if (a > 0) { alq += a; nP[i2.ref] = 1; } });
+    add('Alquileres cobrados (' + Object.keys(nP).length + ' piso' + (Object.keys(nP).length === 1 ? '' : 's') + ')', alq);
+    var MES_N = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    var Xn = res_mesAnterior(X), pn = Xn.split('-'), nomina = 0;
+    try { (JSON.parse(localStorage.getItem('renta:nominas:' + pn[0]) || '[]') || []).forEach(function(n) { if (n && !n.deleted && n.mes === MES_N[parseInt(pn[1], 10) - 1]) nomina += (numES(n.bruto) || 0) - (numES(n.retencion) || 0) - (numES(n.ss) || 0); }); } catch (e) {}
+    add('Nómina de ' + MES_N[parseInt(pn[1], 10) - 1].toLowerCase() + ' (neta)', nomina);
+    var intr = 0; try { (JSON.parse(localStorage.getItem('renta:intereses_cuenta') || '[]') || []).forEach(function(i) { if (i && !i.deleted && i.mes === X) intr += (numES(i.bruto) || 0) - (numES(i.retencion) || 0); }); } catch (e) {}
+    add('Intereses de la cuenta (netos)', intr);
+  } else {
+    var alqC = 0, nC = 0, mesFin = X + '-31';
+    try { (JSON.parse(localStorage.getItem('contratos:lista') || '[]') || []).forEach(function(c) {
+      if (!c || c.deleted || !refsEmp[c.ref] || String(c.tipo || '').indexOf('rustica') === 0) return;
+      if (c.inicio && c.inicio > mesFin) return;
+      if (c.estado !== 'activo' && (!c.fin || c.fin < X + '-01')) return;
+      var r = numES(c.renta) || 0; if (r > 0) { alqC += r; nC++; }
+    }); } catch (e) {}
+    add('Alquileres según contratos (' + nC + ')', alqC);
+  }
+  var divs = 0; try { (JSON.parse(localStorage.getItem('fin:acciones:' + emp) || '[]') || []).forEach(function(o) { if (o && !o.deleted && o.tipo === 'dividendo' && String(o.fecha || '').slice(0, 7) === X) divs += numES(o.divImporte) || 0; }); } catch (e) {}
+  add('Dividendos', divs);
+  var gastos = 0; try { rgas_load(parseInt(X.slice(0, 4), 10)).forEach(function(g) { if (!g || g.deleted || g.enFicha || g.categoria === RENTA_CAT_GASTO_VENTA || String(g.fecha || '').slice(0, 7) !== X) return; if (refsEmp[g.ref] || (emp === 'patricio' && (g.ref === RGAS_VARIOS || !g.ref))) gastos += numES(g.importe) || 0; }); } catch (e) {}
+  add('Gastos de los pisos apuntados', -gastos);
+  var inv = 0;
+  ['fin:fondos:', 'fin:acciones_simple:'].forEach(function(k) { try { (JSON.parse(localStorage.getItem(k + emp) || '[]') || []).forEach(function(f) { if (f && !f.deleted) (f.dcaUltimas || []).forEach(function(x) { if (x && String(x.fecha || '').slice(0, 7) === X) inv += numES(x.importe) || 0; }); }); } catch (e) {} });
+  try { (JSON.parse(localStorage.getItem('fin:acciones:' + emp) || '[]') || []).forEach(function(o) { if (o && !o.deleted && o.tipo === 'compra' && String(o.fecha || '').slice(0, 7) === X) inv += (numES(o.cantidad) || 0) * (numES(o.precio) || 0) + (numES(o.comision) || 0); }); } catch (e) {}
+  add('Aportaciones y compras de inversión', -inv);
+  D.mov = mov; D.entra = R(mov.filter(function(m) { return m.v > 0; }).reduce(function(s, m) { return s + m.v; }, 0)); D.sale = R(-mov.filter(function(m) { return m.v < 0; }).reduce(function(s, m) { return s + m.v; }, 0));
+  // ── Solo en el resumen del mes en curso: lo que viene y lo pendiente
+  var hoy = new Date(), mesHoy = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+  D.actual = (ix === L.length - 1 && id === mesHoy);
+  if (D.actual) {
+    try { D.viene = agenda_calcular().filter(function(e) { return String(e.f).slice(0, 7) === id && (!e.emp || e.emp === emp); }).map(function(e) { return { icon: e.icon, t: e.t, f: e.f }; }); } catch (e) { D.viene = []; }
+    try { var T = tes_calcular(emp), mT = T.meses.filter(function(x) { return x.ym === id; })[0]; D.liqFin = mT ? mT.saldo : null; } catch (e) { D.liqFin = null; }
+    try { D.pend = pend_calcular().filter(function(it) { return it && (it.empresa === emp || !it.empresa); }).map(function(it) { return it.t; }).slice(0, 8); } catch (e) { D.pend = []; }
+  }
+  return D;
+}
+function res_pctTxt(p) { return (p >= 0 ? '+' : '−') + Math.abs(p).toFixed(1).replace('.', ',') + ' %'; }
+function res_objTxt(O) {
+  if (O.logrado) return '¡Objetivo conseguido!';
+  var margen = Math.max(500, O.meta * 0.0025), e = O.dif >= margen ? 'Vas ' + fmtGlobal(Math.round(O.dif)) + ' € por delante' : (O.dif <= -margen ? 'Vas ' + fmtGlobal(Math.round(-O.dif)) + ' € por detrás' : 'Vas en el camino');
+  return e + ' · ritmo necesario +' + fmtGlobal(Math.round(O.ritmo)) + ' €/mes';
+}
+function res_eur(v, signo) { var s = fmtGlobal(Math.abs(v).toFixed(2)) + ' €'; return signo ? (v >= 0 ? '+' : '−') + s : (v < 0 ? '−' : '') + s; }
+function res_html(D) {
+  var caja = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;';
+  var tit = 'font-size:12px;font-weight:700;letter-spacing:.8px;text-align:center;margin-bottom:8px;color:var(--silver-bright);';
+  var fila = function(t, v, col) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;"><span style="color:var(--silver);">' + t + '</span><b style="white-space:nowrap;color:' + col + ';">' + res_eur(v, true) + '</b></div>'; };
+  var mesTxt = fin_patHist_nombreMes(D.mes);
+  var h = '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">📄 RESUMEN DE ' + mesTxt.toUpperCase() + '</div>'
+    + '<div style="text-align:center;font-size:12px;color:var(--text-secondary);margin:2px 0 12px;">' + (D.emp === 'patricio' ? 'Patricio' : 'Patrimer') + ' · cierre del 1 de ' + fin_patHist_nombreMes(D.id).toLowerCase() + (D.estimada ? ' · aproximado' : '') + '</div>';
+  h += '<div style="' + caja + '"><div style="' + tit + '">💼 PATRIMONIO</div>'
+    + '<div style="text-align:center;font-size:26px;font-weight:700;color:' + PH_ORO + ';">' + fmtGlobal(Math.round(D.total)) + ' €</div>'
+    + '<div style="text-align:center;font-size:13px;font-weight:700;color:' + (D.dif >= 0 ? 'var(--accent-green)' : '#e57373') + ';">' + (D.dif >= 0 ? '+' : '−') + fmtGlobal(Math.round(Math.abs(D.dif))) + ' € (' + res_pctTxt(D.pct) + ') en el mes</div>';
+  if (D.cambios && D.cambios.length) h += '<div style="text-align:center;font-size:11.5px;line-height:1.6;margin-top:4px;">' + D.cambios.map(function(x) { var s = x.d >= 0; return '<span style="white-space:nowrap;color:' + (s ? '#4caf82' : '#e57373') + ';">' + (s ? '▲ ' : '▼ ') + sib_esc(x.n) + ' ' + (s ? '+' : '−') + fmtGlobal(Math.round(Math.abs(x.d))) + ' €</span>'; }).join(' <span style="color:var(--text-secondary);">·</span> ') + '</div>';
+  if (D.obj) {
+    var O = D.obj;
+    h += '<div style="margin-top:10px;font-size:12px;text-align:center;color:var(--silver);">🎯 Objetivo ' + fmtGlobal(Math.round(O.meta)) + ' € (' + obj_mesTxt(O.metaId) + ') · llevas el ' + Math.floor(O.pct) + ' %</div>'
+      + '<div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;margin:6px 0 4px;"><div style="height:100%;width:' + O.pct.toFixed(1) + '%;background:' + PH_ORO + ';"></div></div>'
+      + '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;">' + res_objTxt(O) + '</div>';
+  }
+  h += '</div>';
+  h += '<div style="' + caja + '"><div style="' + tit + '">💶 LO QUE ENTRÓ Y SALIÓ EN ' + mesTxt.split(' ')[0].toUpperCase() + '</div>';
+  if (!D.mov.length) h += '<div style="font-size:12px;color:var(--text-secondary);text-align:center;">Sin movimientos apuntados en el mes.</div>';
+  D.mov.forEach(function(m) { h += fila(sib_esc(m.t), m.v, m.v >= 0 ? 'var(--accent-green)' : '#e57373'); });
+  if (D.mov.length) { var neto = D.entra - D.sale; h += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13.5px;font-weight:700;"><span>Neto del mes</span><span style="color:' + (neto >= 0 ? 'var(--accent-green)' : '#e57373') + ';">' + res_eur(neto, true) + '</span></div>'; }
+  h += '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:6px;">Con lo apuntado en la app; no incluye tus gastos del día a día.</div></div>';
+  if (D.actual) {
+    var mesSig = fin_patHist_nombreMes(D.id).split(' ')[0];
+    h += '<div style="' + caja + '"><div style="' + tit + '">🗓️ LO QUE VIENE EN ' + mesSig.toUpperCase() + '</div>';
+    (D.viene || []).forEach(function(e) { h += '<div style="font-size:12px;padding:4px 0;color:var(--silver);">' + e.icon + ' ' + sib_esc(e.t) + ' · ' + rinf_fecha(e.f).slice(0, 5) + '</div>'; });
+    if (D.liqFin !== null && D.liqFin !== undefined) h += '<div style="font-size:12px;padding:4px 0;color:var(--silver);">💧 Liquidez prevista a fin de mes: <b style="color:var(--silver-bright);">' + fmtGlobal(Math.round(D.liqFin)) + ' €</b></div>';
+    if (!(D.viene || []).length && (D.liqFin === null || D.liqFin === undefined)) h += '<div style="font-size:12px;color:var(--text-secondary);text-align:center;">Nada previsto.</div>';
+    h += '</div>';
+    if ((D.pend || []).length) h += '<div style="' + caja + '"><div style="' + tit + '">⚠️ PENDIENTE DE GESTIONAR</div>' + D.pend.map(function(t) { return '<div style="font-size:12px;padding:4px 0;color:var(--silver);">' + sib_esc(t) + '</div>'; }).join('') + '</div>';
+  }
+  return h;
+}
+function res_abrir(emp, id) {
+  var D = res_datos(emp, id); if (!D) { avisar('No hay datos para ese resumen.'); return; }
+  var prev = document.getElementById('res-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'res-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var bt = 'border-radius:10px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;padding:11px;cursor:pointer;text-align:center;';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:18px 16px 30px;width:100%;max-width:480px;box-sizing:border-box;max-height:92vh;overflow:auto;">' + res_html(D)
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    + '<div onclick="res_pdf(\'' + emp + '\',\'' + id + '\')" style="' + bt + 'border:1px solid rgba(91,141,238,.5);background:rgba(91,141,238,.1);color:#8fb0f5;">📤 COMPARTIR PDF</div>'
+    + '<div onclick="document.getElementById(\'res-capa\').remove()" style="' + bt + 'border:1px solid var(--border);background:var(--navy-mid);color:var(--silver-dim);">✕ CERRAR</div></div></div>';
+  capa.addEventListener('click', function(ev) { if (ev.target === capa) capa.remove(); });
+  document.body.appendChild(capa);
+}
+function res_pdf(emp, id) {
+  if (!window.jspdf || !window.jspdf.jsPDF) { avisar('No se ha podido cargar el generador de PDF. Comprueba la conexión y vuelve a intentarlo.'); return; }
+  var D = res_datos(emp, id); if (!D) return;
+  var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210, M = 16, y = 20;
+  var limpio = function(s) { return String(s).replace(/[^ -ÿ€−–·]/g, '').replace(/−/g, '-').replace(/\s+/g, ' ').trim(); };
+  var eur = function(v, signo) { return limpio(res_eur(v, signo)); };
+  var titulo = function(s) { y += 4; doc.setFillColor(28, 40, 72); doc.rect(M, y - 5, W - 2 * M, 7.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(255, 255, 255); doc.text(s, M + 2.5, y); y += 8; doc.setTextColor(30, 30, 30); };
+  var fila = function(t, v) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(limpio(t), M + 2, y); doc.text(v, W - M - 2, y, { align: 'right' }); y += 6; };
+  var linea = function(t) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); var ls = doc.splitTextToSize(limpio(t), W - 2 * M - 4); doc.text(ls, M + 2, y); y += ls.length * 5 + 1; };
+  var mesTxt = fin_patHist_nombreMes(D.mes);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('Resumen de ' + mesTxt.toLowerCase(), W / 2, y, { align: 'center' }); y += 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(95, 95, 95);
+  doc.text((emp === 'patricio' ? 'Patricio' : 'Patrimer') + ' - cierre del 1 de ' + fin_patHist_nombreMes(D.id).toLowerCase() + (D.estimada ? ' (aproximado)' : ''), W / 2, y, { align: 'center' }); y += 6; doc.setTextColor(30, 30, 30);
+  titulo('PATRIMONIO');
+  fila('Patrimonio total', eur(D.total)); fila('Cambio en el mes', eur(D.dif, true) + ' (' + limpio(res_pctTxt(D.pct)) + ')');
+  (D.cambios || []).forEach(function(x) { fila('   ' + x.n, eur(x.d, true)); });
+  if (D.obj) { var O = D.obj; linea('Objetivo: ' + fmtGlobal(Math.round(O.meta)) + ' € para ' + obj_mesTxt(O.metaId) + '. Llevas el ' + Math.floor(O.pct) + ' %. ' + res_objTxt(O) + '.'); }
+  titulo('LO QUE ENTRÓ Y SALIÓ EN ' + mesTxt.split(' ')[0].toUpperCase());
+  D.mov.forEach(function(m) { fila(m.t, eur(m.v, true)); });
+  if (D.mov.length) { doc.setFont('helvetica', 'bold'); fila('Neto del mes', eur(D.entra - D.sale, true)); } else linea('Sin movimientos apuntados en el mes.');
+  if (D.actual) {
+    titulo('LO QUE VIENE EN ' + fin_patHist_nombreMes(D.id).split(' ')[0].toUpperCase());
+    (D.viene || []).forEach(function(e) { linea(e.t + ' - ' + rinf_fecha(e.f)); });
+    if (D.liqFin !== null && D.liqFin !== undefined) linea('Liquidez prevista a fin de mes: ' + fmtGlobal(Math.round(D.liqFin)) + ' EUR');
+    if ((D.pend || []).length) { titulo('PENDIENTE DE GESTIONAR'); D.pend.forEach(function(t) { linea(t); }); }
+  }
+  y = Math.max(y + 6, 280); doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('GestInmo - ' + new Date().toLocaleDateString('es-ES'), W / 2, 288, { align: 'center' });
+  var nombre = 'Resumen_' + mesTxt.replace(' ', '_') + '_' + (emp === 'patricio' ? 'Patricio' : 'Patrimer') + '.pdf';
+  rinf_entregar(doc.output('blob'), nombre, 'application/pdf');
+}
+// Tarjeta en Inicio: los días 1–10, si ya está la foto de este mes.
+function res_renderInicio() {
+  var el = document.getElementById('res-inicio'); if (!el) return;
+  var emp = localStorage.getItem('patrimer:empresa') || 'patrimer'; if (emp === 'empresa') emp = 'patrimer';
+  var hoy = new Date(), id = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+  var D = null;
+  if ((emp === 'patricio' || emp === 'patrimer') && hoy.getDate() <= 10 && (typeof usuarioPuedeEmpresa !== 'function' || usuarioPuedeEmpresa(emp))) { try { D = res_datos(emp, id); } catch (e) { D = null; } }
+  if (!D) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div onclick="res_abrir(\'' + emp + '\',\'' + id + '\')" style="cursor:pointer;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">📄 RESUMEN DE ' + fin_patHist_nombreMes(D.mes).split(' ')[0].toUpperCase() + '</div><div style="font-size:12px;color:#5b8dee;">Ver →</div></div>'
+    + '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12.5px;"><span style="color:var(--text-secondary);">Patrimonio</span><b>' + fmtGlobal(Math.round(D.total)) + ' € <span style="color:' + (D.dif >= 0 ? 'var(--accent-green)' : '#e57373') + ';">' + (D.dif >= 0 ? '+' : '−') + fmtGlobal(Math.round(Math.abs(D.dif))) + ' €</span></b></div>'
+    + '<div style="display:flex;justify-content:space-between;margin-top:3px;font-size:12.5px;"><span style="color:var(--text-secondary);">Entró / salió</span><b><span style="color:var(--accent-green);">+' + fmtGlobal(Math.round(D.entra)) + '</span> · <span style="color:#e57373;">−' + fmtGlobal(Math.round(D.sale)) + '</span></b></div></div>';
+}
+// Lista de resúmenes guardados (al final del Histórico de patrimonio).
+function res_htmlLista(emp) {
+  var L = res_lista(emp); if (L.length < 2) return '';
+  var h = '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:10px;">'
+    + '<div style="font-size:12px;font-weight:700;letter-spacing:.8px;text-align:center;color:var(--silver-bright);margin-bottom:4px;">📄 RESÚMENES MENSUALES</div>';
+  L.slice(1).reverse().forEach(function(r) {
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;">'
+      + '<span style="color:var(--silver);">' + fin_patHist_nombreMes(res_mesAnterior(r.id)) + (r.estimada ? ' <span style="font-size:10.5px;color:var(--text-secondary);">(aprox.)</span>' : '') + '</span>'
+      + '<span style="white-space:nowrap;"><span onclick="res_abrir(\'' + emp + '\',\'' + r.id + '\')" style="color:#5b8dee;font-weight:700;cursor:pointer;">Ver</span> <span style="color:var(--text-secondary);">·</span> <span onclick="res_pdf(\'' + emp + '\',\'' + r.id + '\')" style="color:#5b8dee;font-weight:700;cursor:pointer;">PDF</span></span></div>';
+  });
+  return h + '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:5px;">Uno por cada Cierre del mes</div></div>';
+}
+
 function fin_patHist_grafico(ordenada) {
   var el = document.getElementById('fin-pathist-graf'); if (!el) return;
   var L = (ordenada || []).filter(function(x) { return x && !x.deleted; });
@@ -23805,6 +23989,7 @@ function fin_patHist_grafico(ordenada) {
     + (_phSel > 0 ? ph_cambiosHtml(L[_phSel - 1], S, true) : '')
     + (S.bancos && S.bancos.length ? '<div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">🏦 ' + S.bancos.filter(function(b) { return numES(b.liquidez) + numES(b.invertido) > 0; }).map(function(b) { return notas_esc(b.nombre) + ' ' + fin_fmt(numES(b.liquidez) + numES(b.invertido)); }).join(' · ') + '</div>' : '')
     + '<div style="font-size:9.5px;color:var(--text-secondary);margin-top:4px;">Toca un mes en los gráficos para ver su detalle</div></div>';
+  try { var _empRes = fin_emp(); h += res_htmlLista(_empRes === 'empresa' ? 'patrimer' : _empRes); } catch (eRes) { console.warn('Resúmenes:', eRes.message); } // 11/11/2026 (I6)
   el.innerHTML = h;
 }
 
@@ -26672,6 +26857,7 @@ function sib_editarGastos() {
 function pend_render() {
   try { agenda_render(); } catch (eAg) { console.warn('Agenda:', eAg.message); } // 12/10/2026
   try { tes_renderInicio(); } catch (eTs) { console.warn('Tesorería (Inicio):', eTs.message); } // 11/11/2026
+  try { res_renderInicio(); } catch (eRs) { console.warn('Resumen mensual (Inicio):', eRs.message); } // 11/11/2026
   var card = document.getElementById('pend-card');
   var body = document.getElementById('pend-body');
   var contador = document.getElementById('pend-contador');
