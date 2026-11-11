@@ -2073,6 +2073,9 @@ const DATA_KEYS = [
   'fin:acciones_cuenta:patricio',
   'fin:acciones_dca', // 18/10/2026: aportación automática de acciones en modo detallado
   'fin:igc_patrimer', // 08/11/2026: 33 % de IGC (antes fijo en el código)
+  'fin:tesoreria_manual', // 11/11/2026: cobros y pagos previstos apuntados a mano (tesorería)
+  'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
+  'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
   // amortización real (punto 35) sin tener que entrar en cada inmueble.
@@ -2293,7 +2296,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261111_02';
+const BUILD_ID = '261111_07';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2917,7 +2920,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:certificados' || key === 'fin:divcal_ajustes' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs';
+  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:certificados' || key === 'fin:divcal_ajustes' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs' || key === 'fin:tesoreria_manual';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -4558,6 +4561,8 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
       </div>
       <div id="agenda-body" style="margin-top:10px;"></div>
     </div>
+    <!-- 11/11/2026 (I1): resumen de la previsión de tesorería (mes más bajo) -->
+    <div class="chart-card" id="tes-inicio" style="margin-bottom:16px;display:none;"></div>
 
     <!-- PUNTO 90b (03/09/2026): acceso permanente y discreto al registro de
          actividad, solo para el admin — no depende de que haya algo nuevo
@@ -6706,6 +6711,15 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     <div id="fin-pathist-faltan-inmob" style="display:none;font-size:10.5px;color:var(--silver-dim);margin-top:8px;"></div>
     </div>
   </div>
+  <!-- 11/11/2026 (idea I1): Previsión de tesorería a 12 meses (Patricio y Patrimer) -->
+  <div class="fin-section" id="fin-tesoreria-section" style="display:none;">
+    <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-tesoreria-chev" onclick="fin_toggleSeccion('tesoreria')">&#9660;</button>
+      <div class="fin-section-title">&#128167; Previsión de tesorería</div>
+      <span onclick="tes_info()" style="margin-left:auto;font-size:12px;color:#5b8dee;cursor:pointer;border:1px solid rgba(91,141,238,.5);border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;">i</span>
+    </div>
+    <div id="fin-tesoreria-body"><div id="fin-tesoreria-cont"></div></div>
+  </div>
   <!-- PUNTO 109 (06/09/2026): Patrimonio Financiero (personal) — a petición
   tuya, tabla propia y APARTE del "Histórico de patrimonio" de arriba (que
   se calcula solo con lo que ya tienes cargado en Cuentas/Fondos/Acciones).
@@ -8153,6 +8167,9 @@ const BACKUP_KEYS = [
   'fin:acciones_cuenta:patricio',
   'fin:acciones_dca', // 18/10/2026: aportación automática de acciones en modo detallado
   'fin:igc_patrimer', // 08/11/2026: 33 % de IGC (antes fijo en el código)
+  'fin:tesoreria_manual', // 11/11/2026: cobros y pagos previstos apuntados a mano (tesorería)
+  'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
+  'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
   // PUNTO 166 (14/09/2026): documentos por inmueble (enlaces a Drive).
@@ -17174,6 +17191,38 @@ document.addEventListener('firebaseLoaded', function() {
       localStorage.setItem('app:fix_snev_venta_v1', '1');
     } catch (e) { console.error('Error en los datos de venta de Sierra Nevada', e); }
   })();
+  // 11/11/2026 — Patry: en VIV01 (piso de Patrimer, inquilina Rahma) sigue
+  // apareciendo el contrato que se dio de alta por error el 17/09/2026 (copia
+  // del de Carril de Caldereros, VIV-P04, donde esa inquilina ya es
+  // cotitular). La corrección del 12/10 (_fixViv01HelenaV1) lo borró, pero
+  // el 10/11 volvía a estar en la copia de seguridad. Segundo intento, más
+  // fuerte: se apunta a mano en el registro de borrados (para que la nube no
+  // lo devuelva) y se repite al arrancar y cuando ya ha llegado la nube
+  // (15 s y 60 s), hasta que de verdad no esté. Solo ese contrato (por id).
+  function _fixCtrViv01DupV1() {
+    try {
+      if (localStorage.getItem('app:fix_ctr_viv01_dup_v1')) return;
+      if (typeof getRol === 'function' && getRol() !== 'admin') return;
+      var ID = 'ctr-1789634626463';
+      var l = JSON.parse(localStorage.getItem('contratos:lista') || '[]');
+      var esDup = function(c) { return c && c.id === ID && c.ref === 'VIV01'; };
+      var mapaB = {}; try { mapaB = JSON.parse(localStorage.getItem('sync:borrados') || '{}') || {}; } catch (eB) { mapaB = {}; }
+      var marcado = !!(mapaB['contratos:lista'] && mapaB['contratos:lista'][ID]);
+      var hay = l.some(esDup);
+      if (!marcado) {
+        mapaB['contratos:lista'] = mapaB['contratos:lista'] || {};
+        mapaB['contratos:lista'][ID] = new Date().toISOString();
+        localStorage.setItem('sync:borrados', JSON.stringify(mapaB));
+      }
+      if (hay) localStorage.setItem('contratos:lista', JSON.stringify(l.filter(function(c) { return !esDup(c); })));
+      // Se da por hecho cuando ya ha pasado la sincronización y no está.
+      if (!hay && window._appEstable) localStorage.setItem('app:fix_ctr_viv01_dup_v1', '1');
+      if (hay) console.log('[Contratos 11/11] contrato duplicado de VIV01 borrado');
+    } catch (e) { console.error('Error al borrar el contrato duplicado de VIV01', e); }
+  }
+  _fixCtrViv01DupV1();
+  setTimeout(_fixCtrViv01DupV1, 15000);
+  setTimeout(_fixCtrViv01DupV1, 60000);
   // 08/11/2026 — revisión de la Renta con Patry: (1) fecha de la escritura de
   // venta de Sierra Nevada (SNEV01), para los días de imputación de 2026;
   // (2) el plan de pensiones de MyInvestor queda marcado como "plan de
@@ -19695,16 +19744,6 @@ function fin_load(base) {
     return JSON.parse(raw || '[]');
   } catch(e) { return []; }
 }
-// 22/10/2026 (D4): "actualizado hace X días" en cuentas, fondos y Urbanitae
-// (gris < 30 días, ámbar 30–60, rojo > 60). El cierre del mes lo pone a cero.
-function fin_haceDias(iso) {
-  if (!iso) return '';
-  var t = Date.parse(iso); if (!isFinite(t)) return '';
-  var d = Math.max(0, Math.floor((Date.now() - t) / 86400000));
-  var col = d > 60 ? '#e57373' : d >= 30 ? '#e0a030' : 'var(--text-secondary)';
-  var txt = d === 0 ? 'actualizado hoy' : d === 1 ? 'actualizado ayer' : 'actualizado hace ' + d + ' días';
-  return '<div style="font-size:10px;color:' + col + ';margin-top:1px;">🕒 ' + txt + '</div>';
-}
 // 07/11/2026 (Patry, opción A): tarjetas compactas en Cuentas, Fondos y
 // Urbanitae — ✎ al principio, importe y ✕ al final, sin botones grandes.
 function fin_haceDiasCorto(iso) {
@@ -19768,19 +19807,6 @@ function fin_fmt(v) {
 // s\u00ed tiene sitio de sobra, sigue mostrando el s\u00edmbolo con normalidad.
 function fin_fmtSinSimbolo(v) {
   return fin_fmt(v).replace(' \u20ac', '');
-}
-// AJUSTE 26/08/2026: variantes SIN decimales (redondeado al euro), pedidas
-// para las tarjetas "Reparto" y "Patrimonio Total" de Inicio \u2014 as\u00ed ganan
-// a\u00fan m\u00e1s aire adem\u00e1s de quitar el s\u00edmbolo \u20ac. Solo cambia lo que se ve en
-// pantalla; el dato real (con decimales) sigue intacto por dentro, no se
-// pierde precisi\u00f3n en ning\u00fan c\u00e1lculo.
-function fin_fmtEntero(v) {
-  var n = Math.round(parseFloat(v) || 0);
-  return fmtGlobal(n) + ' \u20ac'; // PUNTO 205: antes toLocaleString — "1200" sin punto de miles
-}
-function fin_fmtEnteroSinSimbolo(v) {
-  var n = Math.round(parseFloat(v) || 0);
-  return fmtGlobal(n); // PUNTO 205: antes toLocaleString — "1200" sin punto de miles
 }
 // Interpreta un importe escrito a mano admitiendo los formatos habituales:
 // "2500.75" (punto decimal), "2.500,75" (punto de miles + coma decimal) o,
@@ -20074,7 +20100,7 @@ function fin_renderUltimaActualizacion() {
 // pediste. El estado (plegada/desplegada) se guarda en el dispositivo
 // (no se sincroniza entre Patricio/Mercedes ni entre dispositivos) para
 // que la próxima vez que abras Finanzas se quede como lo dejaste.
-var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'finper', 'trading'];
+var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'tesoreria', 'finper', 'trading'];
 function fin_seccionesColapsadasLoad() {
   try { return JSON.parse(localStorage.getItem('fin:secciones_colapsadas') || '{}'); }
   catch (e) { return {}; }
@@ -20110,6 +20136,7 @@ function fin_render() {
   fin_renderAcciones();
   fin_renderUrbanitae();
   fin_patHist_render();
+  try { tes_render(); } catch (eTes) { console.warn('Tesorería:', eTes.message); } // 11/11/2026 (I1)
   finper_render();
   // PUNTO 114 (06/09/2026): tarjeta de acceso al Panel Patrimonio Financiero
   // — mismo criterio que la sección de arriba, solo visible para Patricio.
@@ -20187,7 +20214,6 @@ function trd_guardarCapital() {
   _trdCapAbierto = false;
   if (_tradingCache) _pintarTrading(_tradingCache);
 }
-function trd_editarCapital() { _trdCapAbierto = true; if (_tradingCache) _pintarTrading(_tradingCache); }
 function trd_toggleCap() {
   _trdCapAbierto = !_trdCapAbierto;
   var p = document.getElementById('trd-cap-panel');
@@ -20412,12 +20438,6 @@ function caja_syncSaldos() {
     if (cambio) { localStorage.setItem(k, JSON.stringify(lista)); tocado = true; }
   });
   return tocado;
-}
-function caja_fmtFecha(f) {
-  var p = String(f || '').split('-');
-  if (p.length < 3) return f || '';
-  var M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return parseInt(p[2], 10) + '-' + M[parseInt(p[1], 10) - 1] + '-' + p[0].slice(2);
 }
 // 10/10/2026 (261010_01, pedido por Patry): en la tabla, fecha corta "10 oct"
 // e importes sin decimales con punto de miles (nunca habrá ≥ 99.999).
@@ -21305,10 +21325,6 @@ function fin_editarFondo(idx) {
   document.getElementById('fin-modal-fondo').classList.add('open');
   setTimeout(function() { var el = document.getElementById('fin-fondo-valor'); if (el) { el.focus(); el.select(); } }, 150);
 }
-function fin_editarFondoNombre(idx) {
-  fin_editarFondo(idx);
-  setTimeout(function() { var el = document.getElementById('fin-fondo-nombre'); if (el) { el.focus(); el.select(); } }, 200);
-}
 // PUNTO 86 (30/08/2026): muestra/oculta los 3 campos de configuración del
 // DCA según el interruptor "Aportación periódica automática" — los valores
 // escritos no se pierden al ocultarlos, solo se dejan de usar si el
@@ -21748,6 +21764,356 @@ document.addEventListener('firebaseLoaded', function() { setTimeout(fin_dcaAutoA
 // para que, si se borra a mano, no vuelva a aparecer. Sin cotización no se
 // apunta nada y se reintenta la próxima vez. Se empieza a contar desde el día
 // en que se activa (nunca suma de golpe nada antiguo).
+// ═══════════════════════════════════════════════════════════════════════
+// 11/11/2026 (Patry, idea I1): PREVISIÓN DE TESORERÍA A 12 MESES
+// Con lo que la app ya sabe (contratos, nómina, dividendos, Urbanitae, Renta,
+// IBI, seguros, comunidades, aportaciones automáticas) + lo que Patry añada a
+// mano ('fin:tesoreria_manual'), calcula mes a mes entradas, salidas y la
+// liquidez prevista. Por empresa (Patricio y Patrimer). Solo lee: no cambia
+// ningún dato del resto de la app.
+// ═══════════════════════════════════════════════════════════════════════
+var TES_MESES_TXT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+var _tesAbierto = {}, _tesCache = null;
+function tes_manualLoad() { try { var a = JSON.parse(localStorage.getItem('fin:tesoreria_manual') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function tes_manualSave(a) { localStorage.setItem('fin:tesoreria_manual', JSON.stringify(a)); }
+function tes_esAdmin() { return typeof getRol !== 'function' || getRol() === 'admin'; }
+function tes_ym(y, m) { return y + '-' + String(m).padStart(2, '0'); }
+function tes_calcular(emp) {
+  var hoy = new Date(), hoyS = sib_ymd(sib_hoy());
+  var R = function(x) { return Math.round(x * 100) / 100; };
+  // Meses: lo que queda del mes en curso (solo cobros y pagos con fecha) + 12 meses completos
+  var meses = [], y = hoy.getFullYear(), m = hoy.getMonth() + 1;
+  for (var k = 0; k <= 12; k++) {
+    var yy = y + Math.floor((m - 1 + k) / 12), mm = (m - 1 + k) % 12 + 1;
+    meses.push({ ym: tes_ym(yy, mm), y: yy, m: mm, parcial: k === 0, items: [], entradas: 0, salidas: 0, saldo: 0 });
+  }
+  var porYm = {}; meses.forEach(function(x) { porYm[x.ym] = x; });
+  var notas = [];
+  var add = function(ym, t, imp, nota) { var o = porYm[ym]; if (!o || !imp) return; o.items.push({ t: t, imp: R(imp), nota: nota || '' }); };
+  var addFecha = function(f, t, imp, nota) { if (!f || f < hoyS) return; add(String(f).slice(0, 7), t, imp, nota); };
+  var completos = meses.filter(function(x) { return !x.parcial; });
+
+  // ── Liquidez de partida: la suma de las cuentas
+  var liq = 0;
+  try { (JSON.parse(localStorage.getItem('fin:cuentas:' + emp) || '[]') || []).forEach(function(c) { if (c && !c.deleted) liq += numES(c.saldo) || 0; }); } catch (e) {}
+
+  // ── ENTRADAS
+  // Alquileres de los contratos activos (mensuales) y rentas rústicas (una vez al año)
+  var inmPorRef = pend_inmPorRef(), nCtr = 0, hayVence = false;
+  var ctrs = []; try { ctrs = JSON.parse(localStorage.getItem('contratos:lista') || '[]') || []; } catch (e) {}
+  var alqMes = {}; completos.forEach(function(x) { alqMes[x.ym] = 0; });
+  ctrs.forEach(function(c) {
+    if (!c || c.deleted || c.estado !== 'activo' || pend_empresaContrato(c, inmPorRef) !== emp) return;
+    var renta = numES(c.renta) || 0; if (!(renta > 0)) return;
+    if (String(c.tipo || '').indexOf('rustica') === 0) {
+      var mi = /^\d{4}-(\d{2})/.exec(c.inicio || '');
+      if (!mi) { notas.push('Renta rústica de ' + (c.ref || '') + ' sin fecha: no incluida'); return; }
+      completos.forEach(function(x) { if (x.m === parseInt(mi[1], 10)) add(x.ym, 'Renta rústica ' + (c.ref || ''), renta, 'una vez al año, según el contrato'); });
+      return;
+    }
+    nCtr++;
+    var fin = String(c.fin || '').slice(0, 7);
+    completos.forEach(function(x) {
+      var r = renta;
+      (c.subidasPactadas || []).forEach(function(s) { if (s && !s.aplicada && String(s.fecha || '').slice(0, 7) <= x.ym && numES(s.importe) > 0) r = numES(s.importe); });
+      if (fin && x.ym > fin) hayVence = true;
+      alqMes[x.ym] += r;
+    });
+  });
+  completos.forEach(function(x) { if (alqMes[x.ym] > 0) add(x.ym, 'Alquileres (' + nCtr + ' contrato' + (nCtr === 1 ? '' : 's') + ')', alqMes[x.ym], 'según contratos'); });
+  if (hayVence) notas.push('Se supone que los contratos que vencen se renuevan con la misma renta');
+  // Nómina (solo Patricio): neto medio de este año, con el calendario fijo de pagas
+  if (emp === 'patricio') {
+    try {
+      var noms = JSON.parse(localStorage.getItem('renta:nominas:' + y) || '[]') || [], sN = 0, nN = 0;
+      var MES_N = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      noms.forEach(function(n) {
+        if (!n || n.deleted) return; var ix = MES_N.indexOf(n.mes); if (ix < 0) return;
+        var neto = (numES(n.bruto) || 0) - (numES(n.retencion) || 0) - (numES(n.ss) || 0);
+        if (neto > 0) { sN += neto / RENTA_NOM_FACTOR[ix]; nN++; }
+      });
+      if (nN) completos.forEach(function(x) { add(x.ym, 'Nómina', sN / nN * RENTA_NOM_FACTOR[x.m - 1], RENTA_NOM_FACTOR[x.m - 1] > 1 ? 'con paga extra · previsto' : 'previsto'); });
+    } catch (e) {}
+    // Intereses de la cuenta: media neta de los 3 últimos cobros
+    try {
+      var ints = (JSON.parse(localStorage.getItem('renta:intereses_cuenta') || '[]') || []).filter(function(i) { return i && !i.deleted; })
+        .sort(function(a, b) { return String(b.mes || b.fecha || '').localeCompare(String(a.mes || a.fecha || '')); }).slice(0, 3);
+      var sI = ints.reduce(function(s, i) { return s + (numES(i.bruto) || 0) - (numES(i.retencion) || 0); }, 0);
+      if (ints.length && sI > 0) completos.forEach(function(x) { add(x.ym, 'Intereses de la cuenta', sI / ints.length, 'media de los últimos cobros'); });
+    } catch (e) {}
+  }
+  // Dividendos previstos (Calendario de dividendos); los scrip no entran en caja
+  try {
+    window._finEmpForzada = emp;
+    divcal_datos().ev.forEach(function(e) {
+      if ((e.estado === 'previsto' || e.estado === 'confirmado') && !e.scrip && e.importe > 0)
+        addFecha(e.fecha, 'Dividendo ' + ((typeof FIN_NOMBRES !== 'undefined' && FIN_NOMBRES[e.ticker]) || e.ticker), e.importe, e.estado === 'confirmado' ? 'confirmado' : 'previsto');
+    });
+  } catch (e) {} finally { window._finEmpForzada = null; }
+  // Urbanitae: devolución del capital + intereses estimados al vencimiento
+  try {
+    (JSON.parse(localStorage.getItem('fin:urbanitae:' + emp) || '[]') || []).forEach(function(u) {
+      if (!u || u.deleted || u.estado === 'cobrado') return;
+      var d = fin_urbanitaeVencimiento(u); if (!d || isNaN(d.getTime())) return;
+      var cap = numES(u.capital) || 0, int = cap * (numES(u.interes) || 0) / 100 * (numES(u.meses) || 0) / 12;
+      addFecha(sib_ymd(d), 'Urbanitae: ' + (u.nombre || 'proyecto'), cap + int, 'capital + intereses estimados · fecha prevista');
+    });
+  } catch (e) {}
+
+  // ── SALIDAS
+  // Pagos de la Renta (Patricio): 60 % el 30/06 y 40 % el 05/11
+  if (emp === 'patricio') {
+    try {
+      [y - 1, y].forEach(function(Y) {
+        var f1 = (Y + 1) + '-06-30', f2 = (Y + 1) + '-11-05';
+        var real = renta_resReal(Y), imp = null, est = false;
+        if (real) imp = real.tipo === 'devolver' ? -numES(real.importe) : numES(real.importe);
+        else { imp = renta_estimacionAnio(Y); est = true; }
+        if (imp === null || isNaN(imp)) return;
+        if (imp > 0) { var pl = renta_plazos(imp); addFecha(f1, 'Renta ' + Y + ': 1.er plazo (60 %)', -pl.p1, est ? 'estimado' : ''); addFecha(f2, 'Renta ' + Y + ': 2.º plazo (40 %)', -pl.p2, est ? 'estimado' : ''); }
+        else if (imp < 0) addFecha(f1, 'Devolución de la Renta ' + Y, -imp, est ? 'estimado' : '');
+      });
+    } catch (e) {}
+  }
+  // IBI, seguros y comunidades de los inmuebles de la empresa
+  var comMes = 0, nIbiSin = 0, nSegSin = 0;
+  try {
+    var regs = inm_seguroIbiLoad();
+    loadInmuebles().forEach(function(inm, idx) {
+      if (!inm || inm.deleted || inm.estado === 'vendido' || normEmpresa(String(inm.propietario || 'patrimer').toLowerCase()) !== emp) return;
+      var G = inm_gastosAnuales(inm, idx), nom = inm.ref || 'inmueble';
+      comMes += (G.comunidad || 0) / 12;
+      var mis = regs.filter(function(r) { return r && !r.deleted && inm_recEs(r, idx); }).sort(function(a, b) { return b.anio - a.anio; });
+      var rI = mis.filter(function(r) { return numES(r.ibi) > 0; })[0];
+      if (rI) {
+        var rF = mis.filter(function(r) { return r.ibiFecha; })[0];
+        if (rF) { var pi = sib_proximaAnual(rF.ibiFecha); addFecha(pi, 'IBI de ' + nom, -numES(rI.ibi), 'como en ' + rI.anio); }
+        else nIbiSin++;
+      }
+      var rS = mis.filter(function(r) { return numES(r.seguro) > 0; })[0];
+      if (rS) {
+        var pr = sib_proximaAnual((inm.seguro || {}).renovacion);
+        if (pr) addFecha(pr, 'Seguro de ' + nom, -numES(rS.seguro), 'renovación');
+        else nSegSin++;
+      }
+    });
+  } catch (e) {}
+  if (comMes > 0) completos.forEach(function(x) { add(x.ym, 'Comunidades', -comMes, ''); });
+  if (nIbiSin) notas.push(nIbiSin + ' recibo' + (nIbiSin === 1 ? '' : 's') + ' de IBI sin fecha de cargo: no incluido' + (nIbiSin === 1 ? '' : 's') + ' (ficha → Gastos)');
+  if (nSegSin) notas.push(nSegSin + ' seguro' + (nSegSin === 1 ? '' : 's') + ' sin fecha de renovación: no incluido' + (nSegSin === 1 ? '' : 's'));
+  // Aportaciones automáticas a fondos y acciones (salen de la cuenta)
+  try {
+    var dcas = [];
+    (JSON.parse(localStorage.getItem('fin:fondos:' + emp) || '[]') || []).forEach(function(f) { if (f && !f.deleted && f.dcaActivo && numES(f.dcaImporte) > 0) dcas.push({ imp: numES(f.dcaImporte), dias: f.dcaDias }); });
+    (JSON.parse(localStorage.getItem('fin:acciones_simple:' + emp) || '[]') || []).forEach(function(a) { if (a && !a.deleted && a.dcaActivo && numES(a.dcaImporte) > 0) dcas.push({ imp: numES(a.dcaImporte), dias: a.dcaDias }); });
+    var ad = fin_accDcaLoad() || {};
+    Object.keys(ad).forEach(function(k) { var o = ad[k]; if (k.indexOf(emp + '|') === 0 && o && o.activo && numES(o.importe) > 0) dcas.push({ imp: numES(o.importe), dias: o.dias }); });
+    var dcaMes = dcas.reduce(function(s, d) { return s + d.imp * ((d.dias && d.dias.length) || 2); }, 0);
+    if (dcaMes > 0) completos.forEach(function(x) { add(x.ym, 'Aportaciones automáticas a fondos y acciones', -dcaMes, 'pasan de la cuenta a inversión'); });
+  } catch (e) {}
+  // Lo añadido a mano (una vez o cada mes)
+  tes_manualLoad().forEach(function(it) {
+    if (!it || it.deleted || it.emp !== emp || !it.fecha) return;
+    var imp = numES(it.importe) || 0; if (!imp) return;
+    if (it.repetir === 'mes') { var desde = String(it.fecha).slice(0, 7); completos.forEach(function(x) { if (x.ym >= desde) o_add(x.ym); }); }
+    else addFecha(it.fecha, it.concepto || 'Apuntado a mano', imp, 'apuntado por ti');
+    function o_add(ym) { var o = porYm[ym]; o.items.push({ t: it.concepto || 'Apuntado a mano', imp: R(imp), nota: 'apuntado por ti · cada mes', manual: true }); }
+  });
+
+  // ── Totales y liquidez acumulada
+  var saldo = liq, min = null;
+  meses.forEach(function(x) {
+    x.items.sort(function(a, b) { return (b.imp > 0) - (a.imp > 0) || Math.abs(b.imp) - Math.abs(a.imp); });
+    x.items.forEach(function(i) { if (i.imp > 0) x.entradas += i.imp; else x.salidas += -i.imp; });
+    x.entradas = R(x.entradas); x.salidas = R(x.salidas);
+    saldo = R(saldo + x.entradas - x.salidas); x.saldo = saldo;
+    if (!min || x.saldo < min.saldo) min = x;
+  });
+  if (meses[0].parcial && !meses[0].items.length) meses.shift();
+  return { emp: emp, liq: R(liq), meses: meses, min: min, fin: meses[meses.length - 1], notas: notas };
+}
+function tes_mesTxt(x, largo) { return TES_MESES_TXT[x.m - 1] + (largo || x.m === 1 ? ' ' + String(x.y).slice(2) : ''); }
+function tes_eur(v) { return fmtGlobal(Math.round(v)) + ' €'; }
+function tes_ejes(vals, conCero) {
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if (conCero) { mn = Math.min(mn, 0); mx = Math.max(mx, 0); }
+  if (mx === mn) { mx += 1; mn -= 1; }
+  var paso = Math.pow(10, Math.floor(Math.log10((mx - mn) / 3)));
+  [1, 2, 2.5, 5, 10].some(function(f) { if ((mx - mn) / (paso * f) <= 4) { paso = paso * f; return true; } return false; });
+  var a = Math.floor(mn / paso) * paso, b = Math.ceil(mx / paso) * paso, t = [];
+  for (var v = a; v <= b + paso / 2; v += paso) t.push(Math.round(v));
+  return { min: a, max: b, ticks: t };
+}
+function tes_grafLinea(T) {
+  var M = T.meses, W = 360, H = 150, L = 46, Rg = 10, Tp = 16, B = 22;
+  var vals = [T.liq].concat(M.map(function(x) { return x.saldo; }));
+  var E = tes_ejes(vals, false), X = function(i) { return L + (W - L - Rg) * i / (vals.length - 1); }, Y = function(v) { return Tp + (H - Tp - B) * (1 - (v - E.min) / (E.max - E.min)); };
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Liquidez prevista a fin de cada mes">';
+  E.ticks.forEach(function(t) { s += '<line x1="' + L + '" y1="' + Y(t) + '" x2="' + (W - Rg) + '" y2="' + Y(t) + '" stroke="rgba(255,255,255,.07)"/><text x="' + (L - 4) + '" y="' + (Y(t) + 3) + '" font-size="8.5" fill="#93a3c3" text-anchor="end">' + fmtGlobal(t) + '</text>'; });
+  s += '<polyline fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" points="' + vals.map(function(v, i) { return X(i).toFixed(1) + ',' + Y(v).toFixed(1); }).join(' ') + '"/>';
+  var iMin = M.indexOf(T.min) + 1, iFin = vals.length - 1;
+  [iMin, iFin].forEach(function(i, k) {
+    if (k === 1 && iFin === iMin) return;
+    var arriba = (k === 1 && vals[i] >= vals[iMin]), tx = Math.min(W - Rg - 2, Math.max(L + 18, X(i)));
+    s += '<circle cx="' + X(i) + '" cy="' + Y(vals[i]) + '" r="4.5" fill="' + (k === 0 ? '#e0a23a' : '#3987e5') + '" stroke="#0e1520" stroke-width="2"/>'
+      + '<text x="' + tx + '" y="' + (Y(vals[i]) + (arriba ? -8 : 15)) + '" font-size="9.5" fill="#dfe6f3" text-anchor="' + (i === iFin ? 'end' : 'middle') + '">' + fmtGlobal(Math.round(vals[i])) + '</text>';
+  });
+  s += '<text x="' + X(0) + '" y="' + (H - 6) + '" font-size="8.5" fill="#93a3c3" text-anchor="middle">hoy</text>';
+  M.forEach(function(x, i) { if (i % 2 === 1 || M.length < 8) s += '<text x="' + X(i + 1) + '" y="' + (H - 6) + '" font-size="8.5" fill="#93a3c3" text-anchor="middle">' + TES_MESES_TXT[x.m - 1] + '</text>'; });
+  return s + '</svg>';
+}
+function tes_grafBarras(T) {
+  var M = T.meses, W = 360, H = 150, L = 46, Rg = 6, Tp = 10, B = 22;
+  var E = tes_ejes(M.map(function(x) { return x.entradas; }).concat(M.map(function(x) { return -x.salidas; })), true);
+  var Y = function(v) { return Tp + (H - Tp - B) * (1 - (v - E.min) / (E.max - E.min)); }, paso = (W - L - Rg) / M.length, bw = Math.max(4, Math.min(10, paso / 2 - 2));
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Entradas y salidas de cada mes">';
+  E.ticks.forEach(function(t) { s += '<line x1="' + L + '" y1="' + Y(t) + '" x2="' + (W - Rg) + '" y2="' + Y(t) + '" stroke="rgba(255,255,255,' + (t === 0 ? '.28' : '.07') + ')"/><text x="' + (L - 4) + '" y="' + (Y(t) + 3) + '" font-size="8.5" fill="#93a3c3" text-anchor="end">' + (t > 0 ? '+' : (t < 0 ? '−' : '')) + fmtGlobal(Math.abs(t)) + '</text>'; });
+  M.forEach(function(x, i) {
+    var cx = L + paso * i + paso / 2;
+    if (x.entradas > 0) s += '<rect x="' + (cx - bw - 1) + '" y="' + Y(x.entradas) + '" width="' + bw + '" height="' + Math.max(1, Y(0) - Y(x.entradas)) + '" rx="2" fill="#3fae7f"/>';
+    if (x.salidas > 0) s += '<rect x="' + (cx + 1) + '" y="' + Y(0) + '" width="' + bw + '" height="' + Math.max(1, Y(-x.salidas) - Y(0)) + '" rx="2" fill="#e57373"/>';
+    if (i % 2 === 0 || M.length < 8) s += '<text x="' + cx + '" y="' + (H - 6) + '" font-size="8.5" fill="#93a3c3" text-anchor="middle">' + TES_MESES_TXT[x.m - 1] + '</text>';
+  });
+  return s + '</svg>';
+}
+function tes_render() {
+  var sec = document.getElementById('fin-tesoreria-section'), cont = document.getElementById('fin-tesoreria-cont');
+  if (!sec || !cont) return;
+  var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
+  if (emp !== 'patricio' && emp !== 'patrimer') { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  var T; try { T = tes_calcular(emp); } catch (e) { console.warn('Tesorería:', e.message); cont.innerHTML = '<div style="font-size:12px;color:var(--silver-dim);text-align:center;">No se ha podido calcular la previsión.</div>'; return; }
+  _tesCache = T;
+  var caja = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;';
+  var tit = 'font-size:12px;font-weight:700;letter-spacing:.8px;text-align:center;margin-bottom:6px;color:var(--silver-bright);';
+  var k = function(t, v, c) { return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:7px 4px;text-align:center;"><div style="font-size:10px;color:var(--silver-dim);letter-spacing:.4px;">' + t + '</div><div style="font-size:14px;font-weight:700;color:' + (c || 'var(--silver-bright)') + ';">' + v + '</div></div>'; };
+  var baja = T.min && T.min.saldo < T.liq;
+  var h = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;">'
+    + k('LIQUIDEZ HOY', tes_eur(T.liq))
+    + k('MES MÁS BAJO', T.min ? (T.meses.indexOf(T.min) < 0 ? 'hoy' : tes_mesTxt(T.min, true)) + ' · ' + tes_eur(T.min.saldo) : '—', T.min && T.min.saldo < 0 ? '#e57373' : (baja ? '#e0a23a' : ''))
+    + k('DENTRO DE 12 MESES', tes_eur(T.fin.saldo), T.fin.saldo >= T.liq ? 'var(--accent-green)' : '#e0a23a') + '</div>';
+  if (T.min && T.min.saldo < 0) h += '<div style="font-size:11.5px;color:#e57373;background:rgba(229,115,115,.08);border:1px solid rgba(229,115,115,.4);border-radius:9px;padding:7px 9px;text-align:center;margin-bottom:12px;">⚠️ En ' + tes_mesTxt(T.min, true) + ' la liquidez prevista baja de cero</div>';
+  else {
+    var flojos = T.meses.filter(function(x) { return !x.parcial && x.salidas > x.entradas; });
+    if (flojos.length) h += '<div style="font-size:11.5px;color:#e0a23a;background:rgba(224,156,58,.08);border:1px solid rgba(224,156,58,.35);border-radius:9px;padding:7px 9px;text-align:center;margin-bottom:12px;">⚠️ Meses en los que sale más de lo que entra: ' + flojos.map(function(x) { return tes_mesTxt(x, true); }).join(', ') + '</div>';
+  }
+  h += '<div style="' + caja + '"><div style="' + tit + '">LIQUIDEZ PREVISTA A FIN DE CADA MES (€)</div>' + tes_grafLinea(T) + '</div>';
+  h += '<div style="' + caja + '"><div style="' + tit + '">ENTRADAS Y SALIDAS DE CADA MES (€)</div>' + tes_grafBarras(T)
+    + '<div style="display:flex;justify-content:center;gap:14px;font-size:11px;color:var(--silver-dim);margin-top:4px;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#3fae7f;margin-right:4px;"></i>Entradas (+)</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#e57373;margin-right:4px;"></i>Salidas (−)</span></div></div>';
+  // Detalle por mes
+  h += '<div style="' + caja + '"><div style="' + tit + '">DETALLE POR MES</div>'
+    + '<div style="display:flex;gap:8px;padding:4px 0;font-size:10.5px;color:var(--silver-dim);border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:58px;">MES</span><span style="flex:1;text-align:right;">ENTRADAS</span><span style="flex:1;text-align:right;">SALIDAS</span><span style="width:88px;text-align:right;">LIQUIDEZ</span></div>';
+  T.meses.forEach(function(x, i) {
+    var ab = !!_tesAbierto[x.ym], esMin = x === T.min && baja;
+    h += '<div onclick="tes_toggleMes(\'' + x.ym + '\')" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;cursor:pointer;' + (esMin ? 'background:rgba(224,156,58,.06);' : '') + '">'
+      + '<span style="width:58px;font-weight:700;color:var(--silver-bright);">' + (ab ? '▾ ' : '▸ ') + tes_mesTxt(x) + (x.parcial ? '*' : '') + '</span>'
+      + '<span style="flex:1;text-align:right;color:#3fae7f;">' + (x.entradas ? '+' + fmtGlobal(Math.round(x.entradas)) : '—') + '</span>'
+      + '<span style="flex:1;text-align:right;color:#e57373;">' + (x.salidas ? '−' + fmtGlobal(Math.round(x.salidas)) : '—') + '</span>'
+      + '<span style="width:88px;text-align:right;font-weight:700;color:' + (x.saldo < 0 ? '#e57373' : (esMin ? '#e0a23a' : 'var(--silver-bright)')) + ';">' + tes_eur(x.saldo) + '</span></div>';
+    if (ab) {
+      h += '<div style="font-size:11.5px;color:var(--silver-dim);padding:6px 0 8px 10px;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.6;">';
+      if (!x.items.length) h += 'Sin cobros ni pagos previstos.';
+      var ent = x.items.filter(function(it) { return it.imp > 0; }), sal = x.items.filter(function(it) { return it.imp < 0; });
+      var fila = function(it) { return '<div style="display:flex;justify-content:space-between;gap:8px;"><span>' + sib_esc(it.t) + (it.nota ? ' <span style="opacity:.7;">— ' + sib_esc(it.nota) + '</span>' : '') + '</span><span style="white-space:nowrap;color:var(--silver);">' + fmtGlobal(Math.abs(it.imp)) + ' €</span></div>'; };
+      if (ent.length) h += '<div style="color:#3fae7f;font-weight:700;">Entradas</div>' + ent.map(fila).join('');
+      if (sal.length) h += '<div style="color:#e57373;font-weight:700;margin-top:2px;">Salidas</div>' + sal.map(fila).join('');
+      h += '</div>';
+    }
+  });
+  if (T.meses[0] && T.meses[0].parcial) h += '<div style="font-size:10.5px;color:var(--silver-dim);margin-top:6px;text-align:center;">* Lo que queda de este mes: solo cobros y pagos con fecha</div>';
+  h += '</div>';
+  // Apuntado a mano
+  var man = tes_manualLoad().filter(function(it) { return it && !it.deleted && it.emp === emp; }).sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
+  h += '<div style="' + caja + '"><div style="' + tit + '">COBROS Y PAGOS APUNTADOS POR TI</div>';
+  if (tes_esAdmin()) h += '<button onclick="tes_manualAbrir()" style="width:100%;background:rgba(91,141,238,.12);border:1px solid rgba(91,141,238,.5);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;padding:9px;cursor:pointer;margin-bottom:8px;">＋ Añadir un cobro o pago previsto</button>';
+  if (!man.some(function(it) { return it.repetir === 'mes' && numES(it.importe) < 0; })) h += '<div style="font-size:11.5px;color:#e0a23a;background:rgba(224,156,58,.08);border:1px solid rgba(224,156,58,.35);border-radius:9px;padding:7px 9px;text-align:center;margin-bottom:6px;line-height:1.4;">⚠️ Faltan tus gastos habituales' + (emp === 'patrimer' ? ' (gestoría, impuestos, suministros, mantenimiento…)' : ' del mes') + ': sin ellos la liquidez sale más alta de lo real. Añádelos como pago "cada mes".</div>';
+  if (!man.length) h += '<div style="font-size:11.5px;color:var(--silver-dim);text-align:center;line-height:1.4;">También para lo que la app no puede saber: una compra, una obra, un cobro extraordinario…</div>';
+  man.forEach(function(it) {
+    var imp = numES(it.importe) || 0, id = String(it.id).replace(/'/g, "\\'");
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;">'
+      + (tes_esAdmin() ? '<span onclick="tes_manualAbrir(\'' + id + '\')" style="color:#5b8dee;font-size:14px;width:18px;text-align:center;cursor:pointer;">✎</span>' : '')
+      + '<span style="flex:1;min-width:0;color:var(--silver-bright);">' + sib_esc(it.concepto || '') + '<span style="display:block;color:var(--silver-dim);font-size:10.5px;">' + (it.repetir === 'mes' ? 'Cada mes desde ' : 'El ') + sib_fechaLarga(it.fecha) + '</span></span>'
+      + '<span style="font-weight:700;white-space:nowrap;color:' + (imp > 0 ? '#3fae7f' : '#e57373') + ';">' + (imp > 0 ? '+' : '−') + fmtGlobal(Math.abs(imp)) + ' €</span>'
+      + (tes_esAdmin() ? '<span onclick="tes_manualBorrar(\'' + id + '\')" style="color:#e57373;font-size:13px;width:18px;text-align:center;cursor:pointer;">✕</span>' : '')
+      + '</div>';
+  });
+  h += '</div>';
+  if (T.notas.length) h += '<div style="font-size:11px;color:var(--silver-dim);text-align:center;line-height:1.5;margin-bottom:4px;">' + T.notas.map(sib_esc).join('<br>') + '</div>';
+  cont.innerHTML = h;
+}
+function tes_toggleMes(ym) { _tesAbierto[ym] = !_tesAbierto[ym]; tes_render(); }
+function tes_info() {
+  _nubeMsg('💧', 'Previsión de tesorería', 'Calcula, mes a mes, cuánto dinero tendrás en las cuentas durante los próximos 12 meses.\n\n'
+    + 'ENTRADAS: alquileres de los contratos activos · nómina con tu calendario de pagas · dividendos del Calendario · vencimientos de Urbanitae · intereses de la cuenta.\n\n'
+    + 'SALIDAS: pagos de la Renta (60 % y 40 %) · IBI y seguros que tengan fecha en la ficha del inmueble · comunidades · aportaciones automáticas a fondos y acciones.\n\n'
+    + 'LIQUIDEZ DE PARTIDA: la suma de tus cuentas hoy.\n\n'
+    + 'La app NO conoce tus gastos del día a día ni compras u obras futuras: añádelos con "＋ Añadir un cobro o pago previsto" (una vez o cada mes) para que la previsión sea realista.\n\nPulsa un mes para ver qué entra y qué sale.');
+}
+// ── Cobros y pagos apuntados a mano ──
+function tes_manualAbrir(id) {
+  if (bloqueaSiViewer('Apuntar un cobro o pago previsto')) return;
+  var it = id ? tes_manualLoad().filter(function(x) { return x && x.id === id; })[0] : null;
+  var imp = it ? numES(it.importe) || 0 : 0;
+  var prev = document.getElementById('tes-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'tes-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var inp = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;';
+  var lbl = 'font-size:11px;color:var(--text-secondary);margin:10px 0 4px;letter-spacing:.5px;text-align:center;';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;box-sizing:border-box;max-height:90vh;overflow:auto;">'
+    + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);text-align:center;">' + (it ? '✎ EDITAR' : '＋ COBRO O PAGO PREVISTO') + '</div>'
+    + '<input type="hidden" id="tes-id" value="' + (it ? sib_esc(it.id) : '') + '">'
+    + '<div style="' + lbl + '">¿QUÉ ES?</div><select id="tes-tipo" style="' + inp + '"><option value="pago"' + (imp <= 0 ? ' selected' : '') + '>Pago (sale dinero)</option><option value="cobro"' + (imp > 0 ? ' selected' : '') + '>Cobro (entra dinero)</option></select>'
+    + '<div style="' + lbl + '">CONCEPTO</div><input id="tes-concepto" type="text" placeholder="Ej: Arras del edificio, gastos del mes…" value="' + (it ? sib_esc(it.concepto || '') : '') + '" style="' + inp + '">'
+    + '<div style="' + lbl + '">IMPORTE (€)</div><input id="tes-importe" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (imp ? fmtGlobal(Math.abs(imp)) : '') + '" style="' + inp + '">'
+    + '<div style="' + lbl + '">¿CUÁNDO?</div><select id="tes-repetir" style="' + inp + '"><option value="una"' + (!it || it.repetir !== 'mes' ? ' selected' : '') + '>Una sola vez</option><option value="mes"' + (it && it.repetir === 'mes' ? ' selected' : '') + '>Cada mes (desde la fecha)</option></select>'
+    + '<div style="' + lbl + '">FECHA</div><input id="tes-fecha" type="date" value="' + (it ? sib_esc(it.fecha || '') : _fechaHoyLocal()) + '" style="' + inp + '-webkit-appearance:none;appearance:none;">'
+    + '<button onclick="tes_manualGuardar()" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:16px;">GUARDAR</button>'
+    + '<button onclick="document.getElementById(\'tes-capa\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button></div>';
+  document.body.appendChild(capa);
+}
+function tes_manualGuardar() {
+  if (bloqueaSiViewer('Apuntar un cobro o pago previsto')) return;
+  var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
+  var concepto = document.getElementById('tes-concepto').value.trim(), imp = parseFmtGlobal(document.getElementById('tes-importe').value) || 0;
+  var fecha = document.getElementById('tes-fecha').value, id = document.getElementById('tes-id').value;
+  if (!concepto || !(imp > 0) || !fecha) { avisar('Pon el concepto, el importe y la fecha.'); return; }
+  if (document.getElementById('tes-tipo').value === 'pago') imp = -imp;
+  var lista = tes_manualLoad(), it = id ? lista.filter(function(x) { return x && x.id === id; })[0] : null;
+  if (!it) { it = { id: 'tes_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), emp: emp }; lista.push(it); }
+  it.concepto = concepto; it.importe = imp; it.fecha = fecha; it.repetir = document.getElementById('tes-repetir').value; it.updatedAt = new Date().toISOString();
+  tes_manualSave(lista);
+  var capa = document.getElementById('tes-capa'); if (capa) capa.remove();
+  tes_render(); try { tes_renderInicio(); } catch (e) {}
+}
+function tes_manualBorrar(id) {
+  if (bloqueaSiViewer('Borrar un cobro o pago previsto')) return;
+  var lista = tes_manualLoad(), it = lista.filter(function(x) { return x && x.id === id; })[0]; if (!it) return;
+  showConfirm('🗑️', '¿Borrar este apunte?', (it.concepto || '') + ' · ' + fmtGlobal(Math.abs(numES(it.importe) || 0)) + ' €', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Borrar', cls: 'r', fn: function() { var l = tes_manualLoad(), x = l.filter(function(z) { return z && z.id === id; })[0]; if (!x) return; x.deleted = true; x.updatedAt = new Date().toISOString(); tes_manualSave(l); tes_render(); try { tes_renderInicio(); } catch (e) {} } }
+  ]);
+}
+// Resumen pequeño en Inicio: el mes más bajo de la empresa en pantalla.
+function tes_renderInicio() {
+  var el = document.getElementById('tes-inicio'); if (!el) return;
+  var emp = localStorage.getItem('patrimer:empresa') || 'patrimer'; if (emp === 'empresa') emp = 'patrimer';
+  if ((emp !== 'patricio' && emp !== 'patrimer') || (typeof usuarioPuedeEmpresa === 'function' && !usuarioPuedeEmpresa(emp))) { el.style.display = 'none'; return; }
+  var T; try { T = tes_calcular(emp); } catch (e) { el.style.display = 'none'; return; }
+  if (!T.min || !(T.liq > 0 || T.meses.some(function(x) { return x.items.length; }))) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  var col = T.min.saldo < 0 ? '#e57373' : (T.min.saldo < T.liq ? '#e0a23a' : 'var(--accent-green)');
+  el.innerHTML = '<div onclick="tes_irDesdeInicio()" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;">'
+    + '<div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">💧 TESORERÍA 12 MESES</div>'
+    + '<div style="text-align:right;line-height:1.2;"><div style="font-size:10px;color:var(--silver-dim);letter-spacing:.4px;">MES MÁS BAJO · ' + (T.meses.indexOf(T.min) < 0 ? 'HOY' : tes_mesTxt(T.min, true).toUpperCase()) + '</div><div style="font-size:15px;font-weight:700;color:' + col + ';">' + tes_eur(T.min.saldo) + ' <span style="color:#5b8dee;font-size:12px;">→</span></div></div></div>';
+}
+function tes_irDesdeInicio() {
+  showModule('finanzas');
+  setTimeout(function() {
+    try { var est = fin_seccionesColapsadasLoad(); if (est.tesoreria) { est.tesoreria = false; fin_seccionesColapsadasSave(est); fin_aplicarColapso('tesoreria', false); } } catch (e) {}
+    var s = document.getElementById('fin-tesoreria-section'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 300);
+}
+
 // 08/11/2026 (privacidad): 33 % de Industrias (IGC) en el patrimonio de
 // Patrimer. Antes era un importe fijo escrito en el código; ahora es un dato
 // guardado ('fin:igc_patrimer', se sincroniza) que Patry pone con el ✎.
@@ -22640,12 +23006,6 @@ function fin_patHist_calcularActual() {
     inmobRefsSinValor: inmob.refsSinValor
   };
 }
-// PUNTO 220 (01/10/2026): el "＋" ahora abre el flujo nuevo (aviso de
-// actualizar saldos → foto por banco editable). Se mantiene el nombre por
-// si algún botón antiguo lo llama.
-function fin_patHist_guardarSnapshot() {
-  fin_patHist_abrirFoto();
-}
 function fin_patHist_editarNota(id) {
   if (bloqueaSiViewer('Editar una nota del histórico de patrimonio')) return;
   var lista = fin_patHist_load();
@@ -23221,6 +23581,136 @@ var _phSel = null, _phSoloFin = false, _phN = 0, _phSinAcc = false;
 var PH_FIABLE_DESDE = { patricio: '2026-12' };
 var PH_GRIS = '#5d6b86', PH_ORO = '#d4af37';
 function _phK(v) { return fmtGlobal(Math.round(v)); } // 261022_11 (Patry): cifras completas con punto de miles, nunca "13 k"
+// ═══════════════════════════════════════════════════════════════════════
+// 11/11/2026 (Patry, idea I7): OBJETIVO DE PATRIMONIO
+// Un objetivo por empresa (Patricio y Patrimer): importe, fecha y si cuenta
+// todo el patrimonio o "sin acciones". Se guarda en 'fin:objetivo_patrimonio'
+// (se sincroniza). Al fijarlo se anota el punto de partida (la última foto
+// del Histórico) y se dibuja el "camino" recto hasta la meta.
+// ═══════════════════════════════════════════════════════════════════════
+function obj_load() { try { var o = JSON.parse(localStorage.getItem('fin:objetivo_patrimonio') || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch (e) { return {}; } }
+function obj_de(emp) { var o = obj_load()[emp]; return (o && !o.deleted && numES(o.importe) > 0 && o.fecha) ? o : null; }
+function obj_valor(r, base) { return base === 'sinacc' ? ph_sinAcc(r) : numES(r.total); }
+function obj_mesesEntre(a, b) { var pa = String(a).split('-'), pb = String(b).split('-'); return (parseInt(pb[0], 10) - parseInt(pa[0], 10)) * 12 + (parseInt(pb[1], 10) - parseInt(pa[1], 10)); }
+function obj_calc(emp, L) {
+  var O = obj_de(emp); if (!O || !L || !L.length) return null;
+  var ult = L[L.length - 1], hoy = obj_valor(ult, O.base), meta = numES(O.importe);
+  var iniId = O.inicioId || ult.id, iniV = numES(O.inicioValor) || hoy, metaId = String(O.fecha).slice(0, 7);
+  var total = Math.max(1, obj_mesesEntre(iniId, metaId)), pasados = Math.max(0, Math.min(total, obj_mesesEntre(iniId, ult.id)));
+  var deberia = iniV + (meta - iniV) * pasados / total, restantes = Math.max(1, obj_mesesEntre(ult.id, metaId));
+  var ref12 = null; L.forEach(function(r) { if (obj_mesesEntre(r.id, ult.id) >= 12 && (!ref12 || r.id > ref12.id)) ref12 = r; });
+  var refM = ref12 || L[0], mesesM = Math.max(1, obj_mesesEntre(refM.id, ult.id));
+  return { O: O, hoy: hoy, meta: meta, iniId: iniId, iniV: iniV, metaId: metaId, deberia: deberia, dif: hoy - deberia,
+    falta: meta - hoy, pct: meta > 0 ? Math.max(0, Math.min(100, hoy / meta * 100)) : 0, ritmo: (meta - hoy) / restantes,
+    media: L.length > 1 ? (hoy - obj_valor(refM, O.base)) / mesesM : null, mediaMeses: mesesM, logrado: hoy >= meta, vencido: ult.id >= metaId };
+}
+function obj_mesTxt(id) { var p = String(id).split('-'); return PH_MES3[parseInt(p[1], 10) - 1] + ' ' + p[0]; }
+function obj_htmlCaja(emp, L) {
+  var adm = (typeof getRol !== 'function' || getRol() === 'admin');
+  var caja = 'background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:10px 10px 8px;margin-bottom:10px;';
+  var C = obj_calc(emp, L);
+  if (!C) return adm ? '<div onclick="obj_abrir()" style="' + caja + 'text-align:center;cursor:pointer;font-size:12.5px;font-weight:700;color:#5b8dee;">🎯 Fijar un objetivo de patrimonio</div>' : '';
+  var fmtE = function(v) { return fmtGlobal(Math.round(v)) + ' €'; };
+  var margen = Math.max(500, C.meta * 0.0025), estado, col;
+  if (C.logrado) { estado = '¡Objetivo conseguido!'; col = 'var(--accent-green)'; }
+  else if (C.dif >= margen) { estado = 'vas ' + fmtE(C.dif) + ' por delante del camino'; col = 'var(--accent-green)'; }
+  else if (C.dif <= -margen) { estado = 'vas ' + fmtE(-C.dif) + ' por detrás del camino'; col = '#e0a23a'; }
+  else { estado = 'vas en el camino'; col = 'var(--accent-green)'; }
+  var k = function(t, v, c) { return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:6px 3px;text-align:center;"><div style="font-size:9.5px;color:var(--text-secondary);letter-spacing:.4px;">' + t + '</div><div style="font-size:13.5px;font-weight:700;color:' + (c || 'var(--silver-bright)') + ';white-space:nowrap;">' + v + '</div></div>'; };
+  var h = '<div style="' + caja + '">'
+    + '<div style="display:flex;justify-content:center;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);text-align:center;">'
+    + '🎯 OBJETIVO · ' + fmtE(C.meta) + ' EN ' + obj_mesTxt(C.metaId).toUpperCase() + (C.O.base === 'sinacc' ? ' · SIN ACCIONES' : '')
+    + (adm ? ' <span onclick="obj_abrir()" style="color:#5b8dee;font-size:14px;cursor:pointer;">✎</span>' : '') + '</div>'
+    + '<div style="height:10px;border-radius:5px;background:rgba(255,255,255,0.08);overflow:hidden;margin:8px 0 4px;"><div style="height:100%;width:' + C.pct.toFixed(1) + '%;background:' + (C.dif <= -margen && !C.logrado ? '#e0a23a' : PH_ORO) + ';"></div></div>'
+    + '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;">Llevas el <b style="color:var(--silver-bright);">' + fmtGlobal(Math.floor(C.pct)) + ' %</b>' + (C.falta > 0 ? ' · te faltan <b style="color:var(--silver-bright);">' + fmtE(C.falta) + '</b>' : '') + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;">'
+    + k('HOY', fmtE(C.hoy)) + k('DEBERÍAS LLEVAR', fmtE(C.deberia))
+    + k('RITMO NECESARIO', C.falta > 0 ? (C.vencido ? 'plazo vencido' : '+' + fmtE(C.ritmo).replace(' €', ' €/mes')) : '—', C.falta > 0 ? '#e0a23a' : '')
+    + '</div><div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:7px;line-height:1.4;">Desde que lo fijaste, <b style="color:' + col + ';">' + estado + '</b>'
+    + (C.media !== null ? '. Tu media de los últimos ' + C.mediaMeses + ' meses: <b style="color:' + (C.media >= 0 ? 'var(--accent-green)' : '#e57373') + ';">' + (C.media >= 0 ? '+' : '−') + fmtE(Math.abs(C.media)).replace(' €', ' €/mes') + '</b>' : '') + '</div>';
+  h += obj_grafico(emp, L, C) + '</div>';
+  return h;
+}
+function obj_grafico(emp, L, C) {
+  var W = 340, H = 150, pl = 52, pr = 12, pt = 14, pb = 22, iw = W - pl - pr, ih = H - pt - pb;
+  var t0 = L[0].id, span = Math.max(1, obj_mesesEntre(t0, C.metaId));
+  var X = function(id) { return pl + iw * Math.max(0, obj_mesesEntre(t0, id)) / span; };
+  var vals = L.map(function(r) { return obj_valor(r, C.O.base); }).concat([C.meta, C.iniV]);
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), pad = (mx - mn) * 0.12 || mx * 0.02 || 1; mn -= pad; mx += pad;
+  var Y = function(v) { return pt + ih - ih * (v - mn) / (mx - mn); };
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;margin-top:8px;" role="img" aria-label="Evolución del patrimonio y camino al objetivo">';
+  for (var g = 0; g <= 3; g++) { var v = mn + (mx - mn) * g / 3, y = Y(v); s += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y + '" y2="' + y + '" stroke="rgba(255,255,255,0.07)"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" text-anchor="end" font-size="8.5" fill="#96a8c8">' + fmtGlobal(Math.round(v / 1000) * 1000) + '</text>'; }
+  var fiable = PH_FIABLE_DESDE[emp] || '';
+  for (var i = 1; i < L.length; i++) {
+    var a = L[i - 1], b = L[i];
+    s += '<line x1="' + X(a.id) + '" y1="' + Y(obj_valor(a, C.O.base)) + '" x2="' + X(b.id) + '" y2="' + Y(obj_valor(b, C.O.base)) + '" stroke="' + (fiable && String(a.id) < fiable ? PH_GRIS : '#c8d4e8') + '" stroke-width="2" stroke-linecap="round"/>';
+  }
+  s += '<line x1="' + X(C.iniId) + '" y1="' + Y(C.iniV) + '" x2="' + X(C.metaId) + '" y2="' + Y(C.meta) + '" stroke="' + PH_ORO + '" stroke-width="2" stroke-dasharray="5 4"/>';
+  var ult = L[L.length - 1];
+  s += '<circle cx="' + X(ult.id) + '" cy="' + Y(C.hoy) + '" r="4.5" fill="#3987e5" stroke="#0e1520" stroke-width="2"/>'
+    + '<circle cx="' + X(C.metaId) + '" cy="' + Y(C.meta) + '" r="4.5" fill="' + PH_ORO + '" stroke="#0e1520" stroke-width="2"/>'
+    + '<text x="' + (X(C.metaId) - 2) + '" y="' + (Y(C.meta) + 15) + '" font-size="9.5" fill="' + PH_ORO + '" text-anchor="end">meta ' + fmtGlobal(Math.round(C.meta)) + '</text>'
+    + '<text x="' + Math.max(pl + 24, Math.min(W - pr - 40, X(ult.id))) + '" y="' + Math.min(H - pb - 3, Y(C.hoy) + 15) + '" font-size="9" fill="#dfe6f3" text-anchor="middle">hoy ' + fmtGlobal(Math.round(C.hoy)) + '</text>';
+  var ej = [t0, C.metaId], my = parseInt(t0.slice(0, 4), 10) + 1;
+  while (my + '-01' < C.metaId && ej.length < 6) { if (obj_mesesEntre(t0, my + '-01') > span * 0.12 && obj_mesesEntre(my + '-01', C.metaId) > span * 0.12) ej.push(my + '-01'); my++; }
+  ej.forEach(function(id) { var p = id.split('-'); s += '<text x="' + X(id) + '" y="' + (H - 6) + '" font-size="8.5" fill="#96a8c8" text-anchor="middle">' + (p[1] === '01' && id !== t0 && id !== C.metaId ? p[0] : PH_MES3[parseInt(p[1], 10) - 1] + ' ' + p[0].slice(2)) + '</text>'; });
+  s += '</svg><div style="display:flex;justify-content:center;flex-wrap:wrap;gap:12px;font-size:10.5px;color:var(--text-secondary);margin-top:2px;">'
+    + '<span><span style="display:inline-block;width:14px;border-top:2px solid #c8d4e8;vertical-align:middle;margin-right:4px;"></span>Patrimonio' + (L.some(function(r) { return fiable && String(r.id) < fiable; }) ? ' (gris: aproximado)' : '') + '</span>'
+    + '<span><span style="display:inline-block;width:14px;border-top:2px dashed ' + PH_ORO + ';vertical-align:middle;margin-right:4px;"></span>Camino al objetivo</span></div>'
+    + '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:3px;">Cada Cierre del mes añade un punto: por encima de la línea dorada vas por delante; por debajo, por detrás.</div>';
+  return s;
+}
+function obj_abrir() {
+  if (bloqueaSiViewer('Cambiar el objetivo de patrimonio')) return;
+  var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
+  var O = obj_de(emp);
+  var prev = document.getElementById('obj-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'obj-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var inp = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:15px;padding:10px 12px;box-sizing:border-box;text-align:center;text-align-last:center;';
+  var lbl = 'font-size:11px;color:var(--text-secondary);margin:12px 0 4px;letter-spacing:.5px;text-align:center;';
+  var bt = 'width:100%;border-radius:12px;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:11px;cursor:pointer;margin-top:8px;';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;box-sizing:border-box;">'
+    + '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);text-align:center;">🎯 OBJETIVO DE PATRIMONIO · ' + (emp === 'patricio' ? 'PATRICIO' : 'PATRIMER') + '</div>'
+    + '<div style="' + lbl + '">IMPORTE QUE QUIERES ALCANZAR (€)</div><input id="obj-importe" type="text" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (O ? fmtGlobal(numES(O.importe)) : '') + '" style="' + inp + '">'
+    + '<div style="' + lbl + '">¿PARA CUÁNDO?</div><input id="obj-fecha" type="date" value="' + (O ? sib_esc(O.fecha) : '') + '" style="' + inp + '-webkit-appearance:none;appearance:none;">'
+    + '<div style="' + lbl + '">¿QUÉ CUENTA?</div><select id="obj-base" style="' + inp + '"><option value="todo"' + (!O || O.base !== 'sinacc' ? ' selected' : '') + '>Todo el patrimonio</option><option value="sinacc"' + (O && O.base === 'sinacc' ? ' selected' : '') + '>Sin acciones (sin la bolsa)</option></select>'
+    + '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;line-height:1.4;">El camino empieza en tu última foto del Histórico' + (O ? '. Si cambias el importe o la fecha, vuelve a empezar desde la última foto.' : '.') + '</div>'
+    + '<button onclick="obj_guardar()" style="' + bt + 'background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;color:#fff;margin-top:14px;">GUARDAR</button>'
+    + (O ? '<button onclick="obj_quitar()" style="' + bt + 'background:transparent;border:1px solid rgba(229,115,115,.5);color:#e57373;">QUITAR OBJETIVO</button>' : '')
+    + '<button onclick="document.getElementById(\'obj-capa\').remove()" style="' + bt + 'background:var(--navy-mid);border:1px solid var(--border);color:var(--silver-dim);">CANCELAR</button></div>';
+  document.body.appendChild(capa);
+}
+function obj_guardar() {
+  if (bloqueaSiViewer('Cambiar el objetivo de patrimonio')) return;
+  var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
+  var imp = parseFmtGlobal(document.getElementById('obj-importe').value) || 0, fecha = document.getElementById('obj-fecha').value, base = document.getElementById('obj-base').value;
+  if (!(imp > 0) || !fecha) { avisar('Pon el importe y la fecha.'); return; }
+  var L = fin_patHist_load(emp).filter(function(r) { return r && !r.deleted; }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
+  var ult = L[L.length - 1];
+  if (!ult) { avisar('Primero haz una foto del mes en el Histórico de patrimonio (botón ＋).'); return; }
+  if (String(fecha).slice(0, 7) <= ult.id) { avisar('La fecha tiene que ser posterior a tu última foto (' + obj_mesTxt(ult.id) + ').'); return; }
+  var todos = obj_load(), O = todos[emp] || {}, cambia = !obj_de(emp) || numES(O.importe) !== imp || O.fecha !== fecha || (O.base || 'todo') !== base;
+  O.importe = imp; O.fecha = fecha; O.base = base; delete O.deleted;
+  if (cambia) { O.inicioId = ult.id; O.inicioValor = Math.round(obj_valor(ult, base) * 100) / 100; }
+  O.updatedAt = new Date().toISOString(); todos[emp] = O;
+  localStorage.setItem('fin:objetivo_patrimonio', JSON.stringify(todos));
+  var c = document.getElementById('obj-capa'); if (c) c.remove();
+  fin_patHist_render();
+}
+function obj_quitar() {
+  showConfirm('🎯', '¿Quitar el objetivo?', 'Se borra el objetivo de esta empresa. Puedes volver a fijarlo cuando quieras.', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Quitar', cls: 'r', fn: function() {
+      var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
+      var todos = obj_load(); if (todos[emp]) { todos[emp].deleted = true; todos[emp].updatedAt = new Date().toISOString(); }
+      localStorage.setItem('fin:objetivo_patrimonio', JSON.stringify(todos));
+      var c = document.getElementById('obj-capa'); if (c) c.remove();
+      fin_patHist_render();
+    } }
+  ]);
+}
+
 function fin_patHist_grafico(ordenada) {
   var el = document.getElementById('fin-pathist-graf'); if (!el) return;
   var L = (ordenada || []).filter(function(x) { return x && !x.deleted; });
@@ -23241,7 +23731,9 @@ function fin_patHist_grafico(ordenada) {
   var idx12 = -1; var ref12 = (function() { var r = L[n - 1]; var y = parseInt(r.id.slice(0, 4), 10) - 1; return y + r.id.slice(4); })();
   L.forEach(function(r, i) { if (r.id <= ref12) idx12 = i; });
   var chip = function(t, a, b) { if (b === undefined || b === null || !b) return ''; var d = a - b; return '<div style="flex:1;min-width:0;background:rgba(255,255,255,0.04);border-radius:10px;padding:6px 4px;text-align:center;"><div style="font-size:9.5px;color:var(--text-secondary);letter-spacing:.5px;">' + t + '</div><div style="font-size:13px;font-weight:700;white-space:nowrap;color:' + (d >= 0 ? '#4caf82' : '#e57373') + ';">' + (d >= 0 ? '+' : '') + _phK(d) + ' €</div><div style="font-size:10px;color:var(--text-secondary);">' + (d >= 0 ? '+' : '') + (d / b * 100).toFixed(1).replace('.', ',') + ' %</div></div>'; };
-  var h = '<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;">'
+  var h = ''; // 11/11/2026 (I7): objetivo de patrimonio arriba del todo
+  try { var _empObj = fin_emp(); h += obj_htmlCaja(_empObj === 'empresa' ? 'patrimer' : _empObj, L); } catch (eObj) { console.warn('Objetivo:', eObj.message); }
+  h += '<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;">'
     + ['Todo', 'Solo financiero'].map(function(t, i) { var act = (i === 1) === _phSoloFin; return '<span onclick="_phSoloFin=' + (i === 1) + ';fin_patHist_render()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid ' + (act ? '#5b8dee' : 'var(--border)') + ';color:' + (act ? '#5b8dee' : 'var(--text-secondary)') + ';">' + t + '</span>'; }).join('') + '</div>'
     + '<div style="display:flex;justify-content:center;gap:6px;margin:-2px 0 8px;">' // 02/11/2026: con / sin acciones (acciones + fondos + planes)
     + ['Con acciones', 'Sin acciones'].map(function(t, i) { var act = (i === 1) === _phSinAcc; return '<span onclick="_phSinAcc=' + (i === 1) + ';fin_patHist_render()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid ' + (act ? '#5b8dee' : 'var(--border)') + ';color:' + (act ? '#5b8dee' : 'var(--text-secondary)') + ';">' + t + '</span>'; }).join('')
@@ -25682,7 +26174,6 @@ var SIB_TITULAR = { patrimer: 'Patrimer Levante, S.L.', empresa: 'Patrimer Levan
 var sib_idx = null, sib_anio = null, _sibModo = null;
 function sib_hoy() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
 function sib_ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
-function sib_fechaCorta(ymd) { var p = String(ymd || '').split('-'); return p.length < 3 ? '—' : parseInt(p[2], 10) + ' ' + SIB_MES3[parseInt(p[1], 10) - 1]; }
 function sib_fechaLarga(ymd) { var p = String(ymd || '').slice(0, 10).split('-'); return p.length < 3 ? '—' : p[2] + '/' + p[1] + '/' + p[0]; }
 function sib_esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function sib_num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
@@ -26180,6 +26671,7 @@ function sib_editarGastos() {
 
 function pend_render() {
   try { agenda_render(); } catch (eAg) { console.warn('Agenda:', eAg.message); } // 12/10/2026
+  try { tes_renderInicio(); } catch (eTs) { console.warn('Tesorería (Inicio):', eTs.message); } // 11/11/2026
   var card = document.getElementById('pend-card');
   var body = document.getElementById('pend-body');
   var contador = document.getElementById('pend-contador');
@@ -26547,6 +27039,8 @@ window._refreshCurrentModule = function(key) {
     'fin:acciones_cuenta:patricio': 'finanzas',
     'fin:acciones_dca': 'finanzas', // 18/10/2026
     'fin:igc_patrimer': 'finanzas', // 08/11/2026
+    'fin:tesoreria_manual': 'finanzas', // 11/11/2026
+    'fin:objetivo_patrimonio': 'finanzas', // 11/11/2026
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
@@ -29154,9 +29648,6 @@ function renta_renderCapital() {
 function renta_getGastos() {
   return JSON.parse(localStorage.getItem('renta:gastos:' + renta_anio) || '[]');
 }
-function renta_saveGastos(arr) {
-  localStorage.setItem('renta:gastos:' + renta_anio, JSON.stringify(arr));
-}
 function renta_renderGastos() {
   // 08/11/2026 (Patry): RESUMEN de los gastos de los pisos, agrupados por piso.
   // Se apuntan en la ficha de cada piso (o aquí, eligiendo el piso).
@@ -29404,32 +29895,7 @@ function rgas_ordenarGuardar() {
   if (typeof showToast === 'function') showToast('✓ ' + n + ' gasto(s) pasados a su piso', 'success');
 }
 
-// PUNTO 167 (14/09/2026): compartir la foto/factura de un gasto a
-// WhatsApp/correo con el archivo real adjunto.
-function renta_compartirGasto(idx) {
-  var arr = renta_getGastos();
-  var g = arr[idx];
-  if (!g || !g.fotoUrl) return;
-  compartirArchivoDrive(g.fotoUrl, g.concepto || 'gasto');
-}
 
-// PUNTO 173 (14/09/2026): mismo fallo que en nóminas (ver comentario en
-// renta_borrarNomina) — borrar un gasto tampoco pedía confirmación.
-function renta_borrarGasto(idx) {
-  if (bloqueaSiViewer('Borrar un gasto')) return;
-  var arr = renta_getGastos();
-  var g = arr[idx];
-  showConfirm('🗑️', '¿Borrar este gasto?', (g ? g.concepto + ' · ' + fmtGlobal(g.importe) + ' €' : '') + ' — esta acción no se puede deshacer.', [
-    { label: 'Cancelar', cls: 'c', fn: function () {} },
-    { label: 'Borrar', cls: 'r', fn: function () {
-      var arr2 = renta_getGastos();
-      arr2.splice(idx, 1);
-      renta_saveGastos(arr2);
-      renta_renderGastos();
-      renta_calcPrevision();
-    } }
-  ]);
-}
 
 function renta_abrirModalGasto(tipo, opts) {
   // 08/11/2026: el mismo formulario desde Renta y desde la ficha de un piso;
