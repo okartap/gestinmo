@@ -2076,6 +2076,7 @@ const DATA_KEYS = [
   'fin:tesoreria_manual', // 11/11/2026: cobros y pagos previstos apuntados a mano (tesorería)
   'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
   'inmuebles:incidencias', 'contratos:actas', // 11/11/2026: incidencias por piso y actas de entrada/salida
+  'patricio:emergencia', // 12/11/2026: "Si me pasa algo"
   'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
@@ -2297,7 +2298,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261111_13';
+const BUILD_ID = '261112_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -4274,6 +4275,8 @@ window.cargarTradingOkarStats = async function() {
       <div class="pin-key del" onclick="pinDel()">⌫</div>
     </div>
   </div>
+  <!-- 12/11/2026 (Patry): 🆘 Si me pasa algo — solo en el aparato de Patricio, sin PIN -->
+  <div id="emg-pin-btn" onclick="emg_abrir(true)" style="display:none;width:100%;max-width:320px;margin-top:18px;border:1px solid rgba(224,156,58,.6);background:rgba(224,156,58,.1);border-radius:12px;text-align:center;font-family:'Rajdhani',sans-serif;font-weight:700;padding:11px;color:#f0c27a;letter-spacing:.8px;font-size:14px;cursor:pointer;box-sizing:border-box;">🆘 SI ME PASA ALGO</div>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -4564,6 +4567,7 @@ pulsar el botón, sin tener que elegir ninguna empresa primero. -->
     </div>
     <!-- 11/11/2026 (I1): resumen de la previsión de tesorería (mes más bajo) -->
     <div class="chart-card" id="tes-inicio" style="margin-bottom:16px;display:none;"></div>
+    <div class="chart-card" id="emg-inicio" style="margin-bottom:16px;display:none;"></div>
     <!-- 11/11/2026 (I6): resumen mensual (días 1–10, tras el Cierre del mes) -->
     <div class="chart-card" id="res-inicio" style="margin-bottom:16px;display:none;"></div>
 
@@ -8184,6 +8188,7 @@ const BACKUP_KEYS = [
   'fin:tesoreria_manual', // 11/11/2026: cobros y pagos previstos apuntados a mano (tesorería)
   'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
   'inmuebles:incidencias', 'contratos:actas', // 11/11/2026: incidencias por piso y actas de entrada/salida
+  'patricio:emergencia', // 12/11/2026: "Si me pasa algo"
   'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
@@ -19696,6 +19701,7 @@ async function pinVerify() {
 
 function loginEntrar(key) {
   saveUsuario(key);
+  try { emg_marcarDispositivo(key); } catch (eEm) {} // 12/11/2026
   document.getElementById('login-screen').classList.add('hidden');
   aplicarRol();
   // PUNTO 238 (04/10/2026): entrada de Mercedes al registro y, si su aparato
@@ -19730,6 +19736,7 @@ function loginEntrar(key) {
 
 function cerrarSesion() {
   clearUsuario();
+  try { emg_pinBtn(); } catch (eEm) {} // 12/11/2026
   clearProfile();
   document.body.removeAttribute('data-profile');
   document.body.classList.remove('profiled');
@@ -24149,7 +24156,7 @@ function inf_datosEmp(emp, fecha) {
   window._finEmpForzada = emp;
   try {
     var cue = fin_visibles('fin:cuentas').map(function(c) { return { t: [c.entidad || FIN_CUENTA_LABEL[c.cuenta] || '', c.nombre || ''].filter(Boolean).join(' · ') || 'Cuenta', v: R(c.saldo) }; });
-    var fon = fin_visibles('fin:fondos').map(function(f) { return { t: f.nombre || 'Fondo', v: R(f.valor), s: f.esPlanPensiones ? 'plan de pensiones' : '' }; });
+    var fon = fin_visibles('fin:fondos').map(function(f) { return { t: f.nombre || 'Fondo', v: R(f.valor), s: f.esPlanPensiones ? 'plan de pensiones' : '', g: f.gestora || '' }; });
     var acc = [], origen = {};
     fin_accSimpleLoad().forEach(function(a) { if (!a || a.deleted) return; if (a.origenTicker) origen[a.origenTicker] = true; acc.push({ t: a.nombre || a.ticker || 'Acción', v: R(a.valorActual) }); });
     var pos = {};
@@ -26647,6 +26654,7 @@ function pend_calcular() {
       } catch (ePP) {}
       // 11/11/2026 (Patry, idea I2 opción B): en diciembre, lo que aún se puede hacer por la Renta.
       try { var _ppDic = renta_avisoDiciembre(new Date()); if (_ppDic) items.push(_ppDic); } catch (ePD) {}
+      try { var _emgP = emg_avisoPend(); if (_emgP) items.push(_emgP); } catch (eEP) {} // 12/11/2026
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
     }
   } catch (e) {}
@@ -27062,6 +27070,242 @@ function inc_irA(ref) {
   }, 250);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 12/11/2026 (Patry): 🆘 SI ME PASA ALGO
+// Para que la familia sepa todo lo que tiene Patricio. Se abre SIN PIN desde
+// la pantalla del PIN, pero solo en un aparato donde el último usuario de la
+// app ha sido Patricio (marca local 'app:emerg_dispositivo', no se sincroniza;
+// se quita cuando entra Mercedes). En el móvil de Mercedes no sale.
+// "Lo que tengo" sale solo de la app (sin la cartera de trading en demo).
+// Seguros, contactos, claves, cosas fuera de la app e indicaciones los rellena
+// Patricio: 'patricio:emergencia' (se sincroniza). En el código no va ningún
+// dato personal (el repositorio es público): todo eso vive en los datos.
+// Clave en sobre: pendiente de decidir (de momento se abre sin clave).
+// ═══════════════════════════════════════════════════════════════════════
+var EMG_KEY = 'patricio:emergencia', EMG_DISP = 'app:emerg_dispositivo';
+var _emgDesdePin = false;
+function emg_load() { var d = {}; try { d = JSON.parse(localStorage.getItem(EMG_KEY) || '{}') || {}; } catch (e) {} d.seguros = Array.isArray(d.seguros) ? d.seguros : []; d.contactos = Array.isArray(d.contactos) ? d.contactos : []; return d; }
+function emg_save(d) { d.updatedAt = new Date().toISOString(); localStorage.setItem(EMG_KEY, JSON.stringify(d)); }
+function emg_esDispositivo() { try { return localStorage.getItem(EMG_DISP) === '1'; } catch (e) { return false; } }
+function emg_marcarDispositivo(key) { try { if (key === 'patricio') localStorage.setItem(EMG_DISP, '1'); else if (key === 'mercedes') localStorage.removeItem(EMG_DISP); } catch (e) {} emg_pinBtn(); }
+function emg_pinBtn() { var b = document.getElementById('emg-pin-btn'); if (b) b.style.display = emg_esDispositivo() ? 'block' : 'none'; }
+function emg_esAdmin() { return !_emgDesdePin && typeof getRol === 'function' && getRol() === 'admin'; }
+function emg_diasDesde(f) { if (!f) return null; var d = new Date(String(f).slice(0, 10) + 'T12:00:00'); return isNaN(d) ? null : Math.floor((Date.now() - d.getTime()) / 86400000); }
+// Todo lo que tiene, a partir de los datos de la app (mismo cálculo que el informe de patrimonio).
+function emg_bienes() {
+  var P = inf_datosEmp('patricio', 'hoy'), S = null; try { S = inf_datosEmp('patrimer', 'hoy'); } catch (e) {}
+  var B = [];
+  var add = function(k, tit, x, nota) { if (x && x.items && x.items.length) B.push({ k: k, t: tit, total: x.total, items: x.items, nota: nota || '' }); };
+  add('cue', 'Bancos y cuentas', P.bloques.cue, 'Cada banco da el saldo y los números de cuenta a los herederos.');
+  add('fon', 'Fondos y planes de pensiones', P.bloques.fon, 'Los planes de pensiones tienen beneficiarios propios: se reclaman a la gestora.');
+  // Acciones: también las que no tienen cotización ahora (aquí no hacen falta importes).
+  var accL = [], vistos = {};
+  window._finEmpForzada = 'patricio';
+  try {
+    fin_accSimpleLoad().forEach(function(a) { if (!a || a.deleted) return; var n = a.nombre || a.ticker || 'Acción'; if (a.origenTicker) vistos[a.origenTicker] = true; if (!vistos['n:' + n]) { vistos['n:' + n] = true; accL.push({ t: n }); } });
+    var pos = {}, nom = {};
+    fin_visibles('fin:acciones').forEach(function(op) { var t = op.ticker; if (!t) return; pos[t] = pos[t] || 0; nom[t] = op.nombre || nom[t]; if (op.tipo === 'compra') pos[t] += numES(op.cantidad); else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad); else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones); });
+    Object.keys(pos).forEach(function(t) { var n = FIN_NOMBRES[t] || nom[t] || t; if (pos[t] > 0.000001 && !vistos[t] && !vistos['n:' + n]) { vistos['n:' + n] = true; accL.push({ t: n }); } });
+  } catch (e) {} finally { window._finEmpForzada = null; }
+  if (accL.length) B.push({ k: 'acc', t: 'Acciones', total: 0, items: accL, nota: 'Están en las cuentas de broker de "Bancos y cuentas".' });
+  add('urb', 'Urbanitae (préstamos a proyectos inmobiliarios)', P.bloques.urb, 'Se cobran solos al vencer cada proyecto, en la cuenta de Urbanitae.');
+  add('inm', 'Pisos a mi nombre', P.bloques.inm, 'Escrituras, contratos e inquilinos de cada piso: en esta app (empresa Patricio).');
+  var total = B.reduce(function(s, b) { return s + b.total; }, 0);
+  var soc = null;
+  if (S) { var ts = ['inm', 'cue', 'fon', 'acc', 'urb'].reduce(function(s, k) { return s + ((S.bloques[k] && S.bloques[k].total) || 0); }, 0); if (ts > 0) soc = { total: Math.round(ts * 100) / 100, items: [{ t: 'Inmuebles de la sociedad', v: S.bloques.inm.total, s: S.bloques.inm.items.length + ' inmuebles' }, { t: 'Cuentas, fondos, acciones y Urbanitae', v: Math.round((ts - S.bloques.inm.total) * 100) / 100 }] }; }
+  return { bloques: B, total: Math.round(total * 100) / 100, soc: soc };
+}
+var EMG_PASOS = [
+  ['Certificado de últimas voluntades', 'Dice si hay testamento y ante qué notario. Se pide en el Ministerio de Justicia a partir de 15 días hábiles tras el fallecimiento.'],
+  ['Certificado de contratos de seguros de cobertura de fallecimiento', 'Lista todos los seguros de vida. Se pide a la vez que el anterior.'],
+  ['Seguros ligados a hipotecas', 'Avisar a la aseguradora con el certificado de defunción ANTES de seguir pagando cuotas, y pedir al banco el certificado de deuda cancelada.'],
+  ['Notario y asesor', 'Llamar al notario del testamento y al asesor (empresa y Renta). Están en "A quién llamar".'],
+  ['Bancos y brokers', 'Avisar a cada entidad de "Dónde tengo cosas" con el certificado de defunción: bloquean y luego entregan a los herederos.'],
+  ['Impuesto de sucesiones', 'Plazo de 6 meses desde el fallecimiento (se puede pedir prórroga en los 5 primeros).']
+];
+function emg_abrir(desdePin) {
+  _emgDesdePin = !!desdePin;
+  var prev = document.getElementById('emg-capa'); if (prev) prev.remove();
+  var capa = document.createElement('div'); capa.id = 'emg-capa';
+  capa.style.cssText = 'position:fixed;inset:0;background:var(--navy-deep,#0b1220);z-index:10050;overflow:auto;-webkit-overflow-scrolling:touch;';
+  document.body.appendChild(capa); emg_pintar();
+}
+function emg_cerrar() { var c = document.getElementById('emg-capa'); if (c) c.remove(); _emgDesdePin = false; try { emg_renderInicio(); } catch (e) {} }
+function emg_pintar() {
+  var capa = document.getElementById('emg-capa'); if (!capa) return;
+  var sc = capa.scrollTop, D = emg_load(), adm = emg_esAdmin(), Bn;
+  try { Bn = emg_bienes(); } catch (e) { console.warn('Emergencia:', e.message); Bn = { bloques: [], total: 0, soc: null }; }
+  var box = 'background:var(--navy-card);border:1px solid var(--border);border-radius:14px;padding:13px;margin-bottom:12px;';
+  var tit = function(t, extra) { return '<div style="display:flex;justify-content:center;align-items:center;gap:8px;font-family:\'Rajdhani\',sans-serif;font-size:13.5px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);margin-bottom:8px;text-align:center;">' + t + (extra || '') + '</div>'; };
+  var ed = function(fn) { return adm ? ' <span onclick="' + fn + '" style="color:#5b8dee;cursor:pointer;font-size:15px;">✎</span>' : ''; };
+  var add = function(fn, txt) { return adm ? '<div onclick="' + fn + '" style="text-align:center;border:1px solid rgba(91,141,238,.5);background:rgba(91,141,238,.1);border-radius:10px;padding:8px;font-size:12.5px;font-weight:700;color:#8fb0f5;cursor:pointer;margin-bottom:8px;">＋ ' + txt + '</div>' : ''; };
+  var vacio = function(t) { return '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:4px 0;">' + t + '</div>'; };
+  var texto = function(t) { return '<div style="font-size:13px;color:var(--silver-bright);white-space:pre-wrap;line-height:1.45;">' + sib_esc(t) + '</div>'; };
+  var det = function(titulo, total, cuerpo) { return '<details style="border-bottom:1px solid rgba(255,255,255,.06);"><summary style="list-style:none;display:flex;justify-content:space-between;gap:8px;padding:9px 0;cursor:pointer;font-size:13px;font-weight:700;color:var(--silver-bright);"><span>▸ ' + titulo + '</span></summary><div style="padding:0 0 8px 12px;">' + cuerpo + '</div></details>'; };
+  var fila = function(t, v, s) { return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);"><span style="color:var(--silver-dim);">' + sib_esc(t) + (s ? '<span style="display:block;font-size:10.5px;color:var(--text-secondary);">' + sib_esc(s) + '</span>' : '') + '</span></div>'; };
+  var dias = emg_diasDesde(D.revisado);
+  var h = '<div style="max-width:560px;margin:0 auto;padding:18px 16px 40px;box-sizing:border-box;">'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:19px;font-weight:700;letter-spacing:1.5px;color:var(--silver-bright);">🆘 SI ME PASA ALGO</div>'
+    + '<div style="text-align:center;font-size:12px;color:var(--text-secondary);margin:3px 0 14px;">Patricio Gómez García' + (D.revisado ? ' · revisado el ' + rinf_fecha(D.revisado) : ' · sin revisar todavía') + '</div>';
+  if (adm) h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin:-6px 0 12px;line-height:1.4;">Esto es lo que verá tu familia desde tu teléfono, sin PIN.<br>Solo tú puedes cambiarlo (✎ y ＋).</div>';
+  // 1 · Qué hacer primero
+  h += '<div style="' + box + '">' + tit('1 · QUÉ HACER PRIMERO') + EMG_PASOS.map(function(p, i) { return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;color:var(--silver-dim);line-height:1.4;"><b style="color:var(--silver-bright);">' + (i + 1) + '. ' + p[0] + '</b><br>' + p[1] + '</div>'; }).join('') + '</div>';
+  // 2 · Lo que tengo
+  h += '<div style="' + box + '">' + tit('2 · DÓNDE TENGO COSAS') + '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin:-2px 0 6px;">Con quién hay que hablar. Sin importes: cada entidad os dirá lo que hay.</div>';
+  Bn.bloques.forEach(function(b) { h += det(b.t + ' (' + b.items.length + ')', null, b.items.map(function(x) { return fila(x.t, null, emg_sub(b.k, x)); }).join('') + (b.nota ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:5px;">' + b.nota + '</div>' : '')); });
+  if (Bn.soc) h += det('Patrimer Levante, S.L. (la sociedad)', null, '<div style="font-size:12.5px;color:var(--silver-dim);line-height:1.4;">La sociedad tiene sus propios inmuebles, cuentas e inversiones. Lo lleva el asesor de la empresa (ver "A quién llamar"). Todo el detalle está en esta app, en la empresa Patrimer.</div>');
+  h += det('Fuera de la app', null, (D.fuera ? texto(D.fuera) : vacio(adm ? 'Préstamos que te deben, cajas de seguridad, cuentas fuera, objetos de valor…' : 'Nada apuntado.')) + (adm ? '<div onclick="emg_editarTexto(\'fuera\')" style="text-align:center;font-size:12px;color:#5b8dee;cursor:pointer;padding:6px;">✎ Editar</div>' : ''));
+  h += '</div>';
+  // 3 · Seguros de vida
+  var Sg = D.seguros.filter(function(s) { return s && !s.deleted; });
+  h += '<div style="' + box + '">' + tit('3 · SEGUROS DE VIDA') + add('emg_editarItem(\'seguros\')', 'Añadir seguro');
+  h += Sg.length ? Sg.map(function(s) { return emg_htmlItem('seguros', s, [s.compania, s.poliza ? 'póliza ' + s.poliza : '', s.telefono ? '📞 ' + s.telefono : ''], [s.capital ? 'Capital: ' + s.capital : '', s.beneficiarios ? 'Beneficiarios: ' + s.beneficiarios : ''], s.notas); }).join('') : vacio(adm ? 'Añade el seguro de la hipoteca y el de vida.' : 'Nada apuntado.');
+  h += '</div>';
+  // 4 · A quién llamar
+  var Ct = D.contactos.filter(function(c) { return c && !c.deleted; });
+  h += '<div style="' + box + '">' + tit('4 · A QUIÉN LLAMAR') + add('emg_editarItem(\'contactos\')', 'Añadir contacto');
+  h += Ct.length ? Ct.map(function(c) { return emg_htmlItem('contactos', c, [c.rol, c.telefono ? '📞 ' + c.telefono : ''], [], c.notas); }).join('') : vacio(adm ? 'Asesor, gestora de seguros, notario, bancos…' : 'Nada apuntado.');
+  h += '</div>';
+  // 5 · Claves
+  h += '<div style="' + box + '">' + tit('5 · DÓNDE ESTÁN LAS CLAVES', ed('emg_editarTexto(\'claves\')')) + (D.claves ? texto(D.claves) : vacio(adm ? 'Pon solo DÓNDE están (un sobre, un gestor de contraseñas…). Nunca escribas aquí una clave.' : 'Nada apuntado.')) + '</div>';
+  // 6 · Indicaciones
+  h += '<div style="' + box + '">' + tit('6 · MIS INDICACIONES', ed('emg_editarTexto(\'indicaciones\')'));
+  h += D.indicaciones ? '<div style="font-size:13px;color:var(--silver-bright);white-space:pre-wrap;line-height:1.45;background:rgba(255,255,255,.03);border-left:3px solid #d4af37;padding:8px 10px;border-radius:6px;">' + sib_esc(D.indicaciones) + '</div>' : vacio('Nada apuntado.');
+  if (D.indicaciones && D.testamentoPend) h += '<div style="font-size:12px;color:#e0a23a;text-align:center;margin-top:7px;">⚠️ Pendiente de incluir en el testamento' + (adm ? ' · <span onclick="emg_testamentoHecho()" style="color:#5b8dee;cursor:pointer;">ya está</span>' : '') + '</div>';
+  h += '</div>';
+  var btn = 'width:100%;border-radius:12px;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:12px;cursor:pointer;margin-top:8px;';
+  h += '<button onclick="emg_pdf()" style="' + btn + 'background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;color:#fff;">📤 GUARDAR EN PDF</button>';
+  if (adm) h += '<label style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:12.5px;color:var(--silver-dim);margin:10px 0 2px;cursor:pointer;"><input type="checkbox" onchange="emg_verMercedes(this.checked)"' + (D.verMercedes ? ' checked' : '') + '> Mercedes también puede verlo en su app (con su PIN)</label>';
+  if (adm) h += '<button onclick="emg_revisado()" style="' + btn + 'background:rgba(63,174,127,.12);border:1px solid rgba(63,174,127,.5);color:var(--silver-bright);">✓ LO HE REVISADO HOY' + (dias != null ? ' (hace ' + dias + ' día' + (dias === 1 ? '' : 's') + ')' : '') + '</button>';
+  h += '<button onclick="emg_cerrar()" style="' + btn + 'background:var(--navy-mid);border:1px solid var(--border);color:var(--silver-dim);">CERRAR</button></div>';
+  capa.innerHTML = h; capa.scrollTop = sc;
+}
+// Línea pequeña de cada cosa, sin importes (12/11/2026: Patry no quiere cifras aquí).
+function emg_sub(k, x) {
+  if (k === 'fon') return [x.g ? 'gestora: ' + x.g : '', x.s].filter(Boolean).join(' · ');
+  if (k === 'acc') return x.s && /acc\.$/.test(x.s) ? '' : (x.s || '');
+  if (k === 'inm') return /alquilado/.test(x.s || '') ? 'alquilado (ver contratos en la app)' : '';
+  return '';
+}
+function emg_htmlItem(lista, x, l1, l2, notas) {
+  var adm = emg_esAdmin();
+  var a = l1.filter(Boolean).map(sib_esc).join(' · '), b = l2.filter(Boolean).map(sib_esc).join(' · ');
+  return '<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
+    + (adm ? '<span onclick="emg_editarItem(\'' + lista + '\',\'' + x.id + '\')" style="color:#5b8dee;cursor:pointer;padding-top:1px;">✎</span>' : '')
+    + '<div style="flex:1;font-size:13px;color:var(--silver-bright);"><b>' + sib_esc(x.nombre || '') + '</b>'
+    + (a ? '<div style="font-size:12px;color:var(--silver-dim);margin-top:2px;">' + a + '</div>' : '')
+    + (b ? '<div style="font-size:12px;color:var(--silver-dim);">' + b + '</div>' : '')
+    + (notas ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:3px;white-space:pre-wrap;">' + sib_esc(notas) + '</div>' : '') + '</div>'
+    + (adm ? '<span onclick="emg_borrarItem(\'' + lista + '\',\'' + x.id + '\')" style="color:#e57373;cursor:pointer;padding-top:1px;">✕</span>' : '') + '</div>';
+}
+var EMG_CAMPOS = {
+  seguros: [['nombre', 'QUÉ SEGURO', 'Ej.: Seguro de vida de la hipoteca'], ['compania', 'COMPAÑÍA', ''], ['poliza', 'Nº DE PÓLIZA', ''], ['telefono', 'TELÉFONO DE SINIESTROS', ''], ['capital', 'CAPITAL ASEGURADO', 'Ej.: toda la deuda de la hipoteca / 100.000 €'], ['beneficiarios', 'BENEFICIARIOS', ''], ['notas', 'QUÉ HAY QUE HACER', 'Ej.: avisar con el certificado de defunción antes de pagar más cuotas', 1]],
+  contactos: [['nombre', 'NOMBRE', ''], ['rol', 'QUÉ ES', 'Ej.: asesor (empresa y Renta), notario, gestora de seguros…'], ['telefono', 'TELÉFONO', ''], ['notas', 'NOTAS', '', 1]]
+};
+function emg_editarItem(lista, id) {
+  if (!emg_esAdmin()) return;
+  var D = emg_load(), x = id ? D[lista].filter(function(z) { return z && z.id === id; })[0] : null; x = x || {};
+  var capa = document.createElement('div'); capa.id = 'emg-form';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  var inp = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:9px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:9px 10px;box-sizing:border-box;';
+  var h = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:18px 16px 28px;width:100%;max-width:520px;box-sizing:border-box;max-height:90vh;overflow:auto;">'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">' + (lista === 'seguros' ? '🛡️ SEGURO DE VIDA' : '📞 CONTACTO') + '</div>';
+  EMG_CAMPOS[lista].forEach(function(c) {
+    h += '<div style="font-size:11px;color:var(--text-secondary);margin:12px 0 5px;text-align:center;font-weight:700;letter-spacing:.6px;">' + c[1] + '</div>'
+      + (c[3] ? '<textarea id="emg-f-' + c[0] + '" rows="3" placeholder="' + sib_esc(c[2]) + '" style="' + inp + 'resize:vertical;">' + sib_esc(x[c[0]] || '') + '</textarea>' : '<input id="emg-f-' + c[0] + '" placeholder="' + sib_esc(c[2]) + '" value="' + sib_esc(x[c[0]] || '') + '" style="' + inp + 'text-align:center;">');
+  });
+  h += '<button onclick="emg_guardarItem(\'' + lista + '\',\'' + (x.id || '') + '\')" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:16px;">GUARDAR</button>'
+    + '<button onclick="document.getElementById(\'emg-form\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button></div>';
+  capa.innerHTML = h; document.body.appendChild(capa);
+}
+function emg_guardarItem(lista, id) {
+  if (!emg_esAdmin()) return;
+  var D = emg_load(), x = id ? D[lista].filter(function(z) { return z && z.id === id; })[0] : null;
+  if (!x) { x = { id: 'emg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) }; D[lista].push(x); }
+  EMG_CAMPOS[lista].forEach(function(c) { var e = document.getElementById('emg-f-' + c[0]); if (e) x[c[0]] = e.value.trim(); });
+  if (!x.nombre) { avisar('Pon al menos el nombre.'); if (!id) D[lista].pop(); return; }
+  x.updatedAt = new Date().toISOString(); emg_save(D);
+  var f = document.getElementById('emg-form'); if (f) f.remove(); emg_pintar();
+}
+function emg_borrarItem(lista, id) {
+  if (!emg_esAdmin()) return;
+  showConfirm('🗑️', '¿Quitar este apunte?', '', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Quitar', cls: 'r', fn: function() { var D = emg_load(); D[lista] = D[lista].filter(function(z) { return z && z.id !== id; }); emg_save(D); emg_pintar(); } }
+  ]);
+}
+var EMG_TEXTOS = { fuera: ['📦 Fuera de la app', 'Lo que tienes y la app no conoce: préstamos que te deben, cajas de seguridad, cuentas fuera, objetos de valor…'], claves: ['🔑 Dónde están las claves', 'Solo DÓNDE están (un sobre en la notaría, un gestor de contraseñas…). Nunca escribas aquí una clave ni un PIN.'], indicaciones: ['✍️ Mis indicaciones', 'Lo que quieres que sepa tu familia.'] };
+function emg_editarTexto(campo) {
+  if (!emg_esAdmin()) return;
+  var D = emg_load(), T = EMG_TEXTOS[campo];
+  var capa = document.createElement('div'); capa.id = 'emg-form';
+  capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;';
+  capa.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:18px 16px 28px;width:100%;max-width:520px;box-sizing:border-box;">'
+    + '<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">' + T[0].toUpperCase() + '</div>'
+    + '<div style="font-size:12px;color:var(--text-secondary);text-align:center;margin:6px 0 10px;line-height:1.4;">' + T[1] + '</div>'
+    + '<textarea id="emg-f-txt" rows="7" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:10px;box-sizing:border-box;resize:vertical;">' + sib_esc(D[campo] || '') + '</textarea>'
+    + (campo === 'indicaciones' ? '<label style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:12.5px;color:var(--silver-dim);margin-top:8px;"><input type="checkbox" id="emg-f-test"' + (D.testamentoPend || !D.indicaciones ? ' checked' : '') + '> Marcar "Pendiente de incluir en el testamento"</label>' : '')
+    + '<button onclick="emg_guardarTexto(\'' + campo + '\')" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:14px;">GUARDAR</button>'
+    + '<button onclick="document.getElementById(\'emg-form\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button></div>';
+  document.body.appendChild(capa);
+}
+function emg_guardarTexto(campo) {
+  if (!emg_esAdmin()) return;
+  var D = emg_load(), e = document.getElementById('emg-f-txt'); D[campo] = e ? e.value.trim() : '';
+  if (campo === 'indicaciones') { var t = document.getElementById('emg-f-test'); D.testamentoPend = !!(t && t.checked); }
+  emg_save(D); var f = document.getElementById('emg-form'); if (f) f.remove(); emg_pintar();
+}
+function emg_verMercedes(v) { if (!emg_esAdmin()) return; var D = emg_load(); D.verMercedes = !!v; emg_save(D); }
+function emg_testamentoHecho() { if (!emg_esAdmin()) return; var D = emg_load(); D.testamentoPend = false; emg_save(D); emg_pintar(); }
+function emg_revisado() { if (!emg_esAdmin()) return; var D = emg_load(); D.revisado = _fechaHoyLocal(); emg_save(D); emg_pintar(); try { pend_render(); } catch (e) {} if (typeof showToast === 'function') showToast('✓ Revisado', 'success'); }
+// Tarjeta pequeña en Inicio (solo Patricio, en su perfil).
+function emg_renderInicio() {
+  var el = document.getElementById('emg-inicio'); if (!el) return;
+  var emp = localStorage.getItem('patrimer:empresa') || 'patrimer';
+  var _rol = typeof getRol === 'function' ? getRol() : null, D0 = emg_load();
+  var _ver = (_rol === 'admin' && emp === 'patricio') || (_rol === 'viewer' && D0.verMercedes);
+  if (!_ver) { el.style.display = 'none'; return; }
+  if (_rol === 'viewer') { el.style.display = 'block'; el.innerHTML = '<div onclick="emg_abrir(false)" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"><div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">🆘 SI LE PASA ALGO A PATRICIO</div><div style="font-size:12px;color:var(--text-secondary);">ver →</div></div>'; return; }
+  var D = D0, dias = emg_diasDesde(D.revisado), n = D.seguros.filter(function(s) { return s && !s.deleted; }).length + D.contactos.filter(function(c) { return c && !c.deleted; }).length;
+  el.style.display = 'block';
+  el.innerHTML = '<div onclick="emg_abrir(false)" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"><div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">🆘 SI ME PASA ALGO</div><div style="font-size:12px;color:' + (dias == null || dias > 182 ? '#e0a23a' : 'var(--text-secondary)') + ';">' + (dias == null ? (n ? 'sin revisar' : 'sin rellenar') : 'revisado hace ' + dias + ' día' + (dias === 1 ? '' : 's')) + ' →</div></div>';
+}
+// Aviso en Pendientes: cada 6 meses (o si nunca se ha revisado).
+function emg_avisoPend() {
+  if (typeof getRol !== 'function' || getRol() !== 'admin') return null;
+  var D = emg_load(), dias = emg_diasDesde(D.revisado);
+  if (dias != null && dias <= 182) return null;
+  return { icon: '🆘', t: dias == null ? 'Rellena el "Si me pasa algo"' : 'Revisa el "Si me pasa algo" (hace ' + dias + ' días)', s: 'Seguros, contactos, dónde están las claves y tus indicaciones · Inicio de Patricio', accion: 'emergencia', empresa: 'patricio' };
+}
+function emg_pdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) { avisar('No se ha podido cargar el generador de PDF. Comprueba la conexión y vuelve a intentarlo.'); return; }
+  var D = emg_load(), Bn = emg_bienes();
+  var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210, M = 16, y = 18;
+  var limpio = function(s) { return String(s == null ? '' : s).replace(/−/g, '-').replace(/[^ -ÿ€·\n]/g, '').replace(/[ \t]+/g, ' ').trim(); };
+  var hueco = function(h) { if (y + h > 280) { doc.addPage(); y = 18; } };
+  var titulo = function(t) { hueco(14); y += 3; doc.setFillColor(28, 40, 72); doc.rect(M, y - 5, W - 2 * M, 7.5, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(255, 255, 255); doc.text(limpio(t), M + 2.5, y); y += 8; doc.setTextColor(30, 30, 30); };
+  var linea = function(t, b, sz) { doc.setFont('helvetica', b ? 'bold' : 'normal'); doc.setFontSize(sz || 9.5); var ls = doc.splitTextToSize(limpio(t), W - 2 * M - 4); hueco(ls.length * 4.6 + 1); doc.text(ls, M + 2, y); y += ls.length * 4.6 + 1; };
+  var fila = function(t, v, b) { doc.setFont('helvetica', b ? 'bold' : 'normal'); doc.setFontSize(9.5); var ls = doc.splitTextToSize(limpio(t), W - 2 * M - 40); hueco(ls.length * 4.6 + 1); doc.text(ls, M + 2, y); if (v != null) doc.text(fmtGlobal(v) + ' €', W - M - 2, y, { align: 'right' }); y += ls.length * 4.6 + 1; };
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.text('Si me pasa algo', W / 2, y, { align: 'center' }); y += 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(95, 95, 95); doc.text(limpio('Patricio Gómez García · a ' + new Date().toLocaleDateString('es-ES') + (D.revisado ? ' · revisado el ' + rinf_fecha(D.revisado) : '')), W / 2, y, { align: 'center' }); y += 4; doc.setTextColor(30, 30, 30);
+  titulo('1 · QUÉ HACER PRIMERO'); EMG_PASOS.forEach(function(p, i) { linea((i + 1) + '. ' + p[0], true); linea(p[1]); });
+  titulo('2 · DÓNDE TENGO COSAS (con quién hay que hablar)');
+  Bn.bloques.forEach(function(b) { fila(b.t, null, true); b.items.forEach(function(x) { var sb = emg_sub(b.k, x); fila('   ' + x.t + (sb ? ' (' + sb + ')' : ''), null); }); if (b.nota) linea('   ' + b.nota, false, 8.5); y += 1; });
+  if (Bn.soc) { fila('Patrimer Levante, S.L. (la sociedad)', null, true); linea('   Lo lleva el asesor de la empresa. Todo el detalle en la app, empresa Patrimer.', false, 8.5); }
+  if (D.fuera) { fila('Fuera de la app', null, true); linea(D.fuera); }
+  var Sg = D.seguros.filter(function(s) { return s && !s.deleted; });
+  titulo('3 · SEGUROS DE VIDA'); if (!Sg.length) linea('Nada apuntado.');
+  Sg.forEach(function(s) { linea(s.nombre, true); linea([s.compania, s.poliza ? 'póliza ' + s.poliza : '', s.telefono ? 'tel. ' + s.telefono : ''].filter(Boolean).join(' · ')); if (s.capital || s.beneficiarios) linea([s.capital ? 'Capital: ' + s.capital : '', s.beneficiarios ? 'Beneficiarios: ' + s.beneficiarios : ''].filter(Boolean).join(' · ')); if (s.notas) linea(s.notas); y += 1; });
+  var Ct = D.contactos.filter(function(c) { return c && !c.deleted; });
+  titulo('4 · A QUIÉN LLAMAR'); if (!Ct.length) linea('Nada apuntado.');
+  Ct.forEach(function(c) { linea(c.nombre + (c.rol ? ' · ' + c.rol : '') + (c.telefono ? ' · tel. ' + c.telefono : ''), true); if (c.notas) linea(c.notas); });
+  titulo('5 · DÓNDE ESTÁN LAS CLAVES'); linea(D.claves || 'Nada apuntado.');
+  titulo('6 · MIS INDICACIONES'); linea(D.indicaciones || 'Nada apuntado.'); if (D.indicaciones && D.testamentoPend) linea('(Pendiente de incluir en el testamento)', false, 8.5);
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text('GestInmo - documento privado', W / 2, 290, { align: 'center' });
+  rinf_entregar(doc.output('blob'), 'Si_me_pasa_algo_' + _fechaHoyLocal() + '.pdf', 'application/pdf');
+}
+window.addEventListener('load', function() { setTimeout(emg_pinBtn, 50); });
+
 function sib_irInmueble(idx, anio) {
   showModule('inmuebles');
   setTimeout(function() {
@@ -27338,6 +27582,7 @@ function pend_render() {
   try { agenda_render(); } catch (eAg) { console.warn('Agenda:', eAg.message); } // 12/10/2026
   try { tes_renderInicio(); } catch (eTs) { console.warn('Tesorería (Inicio):', eTs.message); } // 11/11/2026
   try { res_renderInicio(); } catch (eRs) { console.warn('Resumen mensual (Inicio):', eRs.message); } // 11/11/2026
+  try { emg_renderInicio(); } catch (eEm) { console.warn('Si me pasa algo (Inicio):', eEm.message); } // 12/11/2026
   var card = document.getElementById('pend-card');
   var body = document.getElementById('pend-body');
   var contador = document.getElementById('pend-contador');
@@ -27438,6 +27683,8 @@ function pend_gestionar(i) {
     rgas_ordenarAbrir(); // 08/11/2026
   } else if (it.accion === 'ppconf') {
     fin_ppConfirmar(it.fondoId, it.anio); // 08/11/2026
+  } else if (it.accion === 'emergencia') {
+    emg_abrir(false); // 12/11/2026
   } else if (it.accion === 'ppdic') {
     fin_ppConfirmar(it.fondoId, it.anio, true); // 11/11/2026 (I2)
   } else if (it.accion === 'intereses') {
@@ -27712,6 +27959,7 @@ window._refreshCurrentModule = function(key) {
     'fin:tesoreria_manual': 'finanzas', // 11/11/2026
     'fin:objetivo_patrimonio': 'finanzas', // 11/11/2026
     'inmuebles:incidencias': 'inmuebles', 'contratos:actas': 'contratos', // 11/11/2026
+    'patricio:emergencia': 'finanzas', // 12/11/2026
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
