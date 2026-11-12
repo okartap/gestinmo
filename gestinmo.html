@@ -2298,7 +2298,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261112_02';
+const BUILD_ID = '261112_03';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -27265,10 +27265,11 @@ function emg_renderInicio() {
   var _rol = typeof getRol === 'function' ? getRol() : null, D0 = emg_load();
   var _ver = (_rol === 'admin' && emp === 'patricio') || (_rol === 'viewer' && D0.verMercedes);
   if (!_ver) { el.style.display = 'none'; return; }
-  if (_rol === 'viewer') { el.style.display = 'block'; el.innerHTML = '<div onclick="emg_abrir(false)" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"><div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">🆘 SI LE PASA ALGO A PATRICIO</div><div style="font-size:12px;color:var(--text-secondary);">ver →</div></div>'; return; }
+  if (_rol === 'viewer') { el.style.display = 'block'; el.innerHTML = '<div onclick="emg_abrir(false)" style="text-align:center;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">🆘 SI LE PASA ALGO A PATRICIO</div>'; return; }
   var D = D0, dias = emg_diasDesde(D.revisado), n = D.seguros.filter(function(s) { return s && !s.deleted; }).length + D.contactos.filter(function(c) { return c && !c.deleted; }).length;
   el.style.display = 'block';
-  el.innerHTML = '<div onclick="emg_abrir(false)" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"><div style="font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">🆘 SI ME PASA ALGO</div><div style="font-size:12px;color:' + (dias == null || dias > 182 ? '#e0a23a' : 'var(--text-secondary)') + ';">' + (dias == null ? (n ? 'sin revisar' : 'sin rellenar') : 'revisado hace ' + dias + ' día' + (dias === 1 ? '' : 's')) + ' →</div></div>';
+  // 12/11/2026 (Patry): centrado y sin los días; el recordatorio va en Pendientes cada 6 meses.
+  el.innerHTML = '<div onclick="emg_abrir(false)" style="text-align:center;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--silver-bright);">🆘 SI ME PASA ALGO</div>';
 }
 // Aviso en Pendientes: cada 6 meses (o si nunca se ha revisado).
 function emg_avisoPend() {
