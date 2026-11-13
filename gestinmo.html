@@ -2077,6 +2077,7 @@ const DATA_KEYS = [
   'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
   'inmuebles:incidencias', 'contratos:actas', // 11/11/2026: incidencias por piso y actas de entrada/salida
   'patricio:emergencia', // 12/11/2026: "Si me pasa algo"
+  'fin:prestamos:patricio', 'fin:prestamos:patrimer', // 13/11/2026: préstamos que he dado
   'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales (alquiler+comunidad por
   // inmueble y mes) y seguro/IBI anual por inmueble — alimentan solos la
@@ -2298,7 +2299,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261112_03';
+const BUILD_ID = '261113_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -2922,7 +2923,7 @@ function _esListaPorIdClave(key) {
   // desde el primer día (nunca ha vivido sin este blindaje) — cada
   // documento ya nace con un id propio (ver inmdoc_guardar), igual que
   // Clientes/Documentos.
-  return key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:certificados' || key === 'fin:divcal_ajustes' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs' || key === 'fin:tesoreria_manual' || key === 'inmuebles:incidencias' || key === 'contratos:actas';
+  return key === 'fin:prestamos:patricio' || key === 'fin:prestamos:patrimer' || key === 'clientes:lista' || key === 'documentos:lista' || key === 'fin:patrimonio_financiero:patricio' || key === 'kurra:movimientos' || key === 'ingresos:otros:patricio' || key === 'inmuebles:documentos' || key === 'inmuebles:administradores' || key === 'trading:capital_inicial' || key === 'renta:dividendos_manuales' || key === 'renta:certificados' || key === 'fin:divcal_ajustes' || key === 'renta:intereses_cuenta' || key === 'fin:caja_movs' || key === 'fin:tesoreria_manual' || key === 'inmuebles:incidencias' || key === 'contratos:actas';
 }
 
 // PUNTO 160 (10/09/2026): los 3 Históricos de Facturación nunca tienen dos
@@ -6713,6 +6714,20 @@ no interferir con él. Ver det_padronAbrirBaja()/det_padronConfirmarBaja(). -->
     </div>
     </div>
   </div>
+  <!-- 13/11/2026 (Patry): préstamos que he dado -->
+  <div class="fin-section" id="fin-prestamos-section" style="display:none;">
+    <div class="fin-section-header">
+      <button class="fin-collapse-btn" style="margin-right:auto;" id="fin-prestamos-chev" onclick="fin_toggleSeccion('prestamos')">&#9660;</button>
+      <div class="fin-section-title">🤝 Préstamos que he dado</div>
+      <button class="fin-add-btn" onclick="prs_nuevo()">&#xFF0B;</button>
+    </div>
+    <div id="fin-prestamos-body">
+    <div id="fin-prestamos-lista"></div>
+    <div class="fin-total-row" id="fin-prestamos-total" style="display:none;justify-content:center;padding:14px 4px 4px;">
+      <span id="fin-prestamos-total-val" style="color:var(--accent-green);font-weight:700;font-size:17px;">-</span>
+    </div>
+    </div>
+  </div>
   <!-- PUNTO 92 (05/09/2026): Histórico de patrimonio (Liquidez/Invertido/
   Inmobiliario/Total), mensual, con snapshot manual — solo Patrimer y
   Patricio (ver fin_patHist_render, más abajo en el archivo). -->
@@ -8189,6 +8204,7 @@ const BACKUP_KEYS = [
   'fin:objetivo_patrimonio', // 11/11/2026: objetivo de patrimonio (Patricio y Patrimer)
   'inmuebles:incidencias', 'contratos:actas', // 11/11/2026: incidencias por piso y actas de entrada/salida
   'patricio:emergencia', // 12/11/2026: "Si me pasa algo"
+  'fin:prestamos:patricio', 'fin:prestamos:patrimer', // 13/11/2026: préstamos que he dado
   'app:fix_ctr_viv01_dup_v1', // 11/11/2026: contrato duplicado en VIV01 borrado
   // PUNTO 97 (05/09/2026): alquileres mensuales y seguro/IBI por inmueble.
   'inmuebles:alquileres_mensuales','inmuebles:seguro_ibi',
@@ -20336,7 +20352,7 @@ function fin_renderUltimaActualizacion() {
 // pediste. El estado (plegada/desplegada) se guarda en el dispositivo
 // (no se sincroniza entre Patricio/Mercedes ni entre dispositivos) para
 // que la próxima vez que abras Finanzas se quede como lo dejaste.
-var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'pathist', 'tesoreria', 'finper', 'trading'];
+var FIN_SECCIONES_COLAPSABLES = ['cuentas', 'acciones', 'fondos', 'urbanitae', 'prestamos', 'pathist', 'tesoreria', 'finper', 'trading'];
 // 11/11/2026 (Patry): al abrir la app, TODAS las secciones empiezan
 // cerradas. Mientras la app siga abierta se respeta lo que abras o cierres
 // (aunque cambies de pantalla); al cerrarla del todo, vuelven a cerradas.
@@ -20380,6 +20396,7 @@ function fin_render() {
   fin_renderFondos();
   fin_renderAcciones();
   fin_renderUrbanitae();
+  try { prs_render(); } catch (ePrs) { console.warn('Préstamos:', ePrs.message); } // 13/11/2026
   fin_patHist_render();
   try { tes_render(); } catch (eTes) { console.warn('Tesorería:', eTes.message); } // 11/11/2026 (I1)
   finper_render();
@@ -23006,9 +23023,10 @@ function fin_borrarUrbanitae(idx) {
 }
 
 // --- PATRIMONIO ---
-var FIN_REP_COL = { Financiero: '#5b8dee', Inmuebles: '#199e70', Cuentas: '#3987e5', Fondos: '#d95926', Acciones: '#c98500', Urbanitae: '#d55181' };
-function fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmuebles) {
-  var fin = cuentas + fondos + acciones + urbanitae, tot = fin + inmuebles;
+var FIN_REP_COL = { Financiero: '#5b8dee', Inmuebles: '#199e70', Cuentas: '#3987e5', Fondos: '#d95926', Acciones: '#c98500', Urbanitae: '#d55181', 'Préstamos': '#4fb3a9' };
+function fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmuebles, prestamos) {
+  prestamos = prestamos || 0; // 13/11/2026
+  var fin = cuentas + fondos + acciones + urbanitae + prestamos, tot = fin + inmuebles;
   var pc = function(a, t) { return t > 0 ? (a / t * 100).toFixed(2).replace('.', ',') + ' %' : '—'; };
   var barra = function(partes, alto) {
     var vis = partes.filter(function(p) { return p[1] > 0; });
@@ -23023,7 +23041,7 @@ function fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmuebles) {
       + '<div style="display:flex;justify-content:space-between;gap:10px;">' + lado('Financiero', fin, tot, false) + lado('Inmuebles', inmuebles, tot, true) + '</div>'
       + '<div style="font-size:10.5px;color:var(--text-secondary);text-align:center;margin-top:12px;">Dentro del financiero</div>';
   }
-  var items = [['Cuentas', cuentas], ['Fondos', fondos], ['Acciones', acciones], ['Urbanitae', urbanitae]].filter(function(x) { return x[1] > 0; });
+  var items = [['Cuentas', cuentas], ['Fondos', fondos], ['Acciones', acciones], ['Urbanitae', urbanitae], ['Préstamos', prestamos]].filter(function(x) { return x[1] > 0; });
   items.sort(function(a, b) { return b[1] - a[1]; }); // de mayor a menor
   h += barra(items, 12);
   h += items.map(function(x) {
@@ -23034,6 +23052,202 @@ function fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmuebles) {
   }).join('');
   return h;
 }
+// ═══════════════════════════════════════════════════════════════════════
+// 13/11/2026 (Patry): 🤝 PRÉSTAMOS QUE HE DADO (Finanzas, por empresa)
+// Datos: 'fin:prestamos:<empresa>' (lista por id, se sincroniza). En el código
+// no va ningún dato del préstamo (repositorio público): todo lo mete Patry.
+// Interés simple diario (base 365) sobre el capital que queda por devolver,
+// desde la fecha del préstamo hasta hoy o hasta que el capital llega a 0.
+// Las devoluciones se apuntan como "capital" o "intereses" (con retención
+// opcional). Decisiones de Patry (13/11/2026): no se prevén devoluciones en
+// la tesorería; las devoluciones son de capital y los intereses van al final.
+// Se nota en: patrimonio (capital pendiente), Cierre del mes (línea "Préstamos
+// concedidos"), informe de patrimonio, Renta (intereses cobrados, solo
+// Patricio), 🆘 y Pendientes (cancelar la hipoteca de garantía).
+// ═══════════════════════════════════════════════════════════════════════
+var _prsAbierto = {};
+function prs_load() { return fin_load('fin:prestamos'); }
+function prs_save(l) { fin_save('fin:prestamos', l); }
+function prs_n(v) { return Math.round((parseFloat(v) || 0) * 100) / 100; }
+function prs_dias(a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000); }
+// Estado calculado de un préstamo a una fecha (por defecto hoy).
+function prs_calc(p, hasta) {
+  hasta = hasta || _fechaHoyLocal();
+  var cap = prs_n(p.capital), movs = (p.movs || []).filter(function(m) { return m && !m.deleted && m.fecha; }).slice().sort(function(a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
+  var tasa = (parseFloat(p.interes) || 0) / 100, desde = p.fecha, pend = cap, dev = 0, devuelto = 0, cobrInt = 0, retInt = 0, tramos = [], finCap = null;
+  movs.forEach(function(m) {
+    if (m.tipo === 'intereses') { cobrInt += prs_n(m.importe); retInt += prs_n(m.retencion); return; }
+    if (m.fecha > hasta) return;
+    if (desde && pend > 0 && m.fecha > desde) { var d = prs_dias(desde, m.fecha), i = pend * tasa * d / 365; dev += prs_n(i); tramos.push({ base: pend, desde: desde, hasta: m.fecha, dias: d, interes: prs_n(i) }); desde = m.fecha; }
+    pend = prs_n(pend - prs_n(m.importe)); devuelto += prs_n(m.importe);
+    if (pend <= 0.005 && !finCap) finCap = m.fecha;
+  });
+  if (desde && pend > 0.005 && hasta > desde) { var d2 = prs_dias(desde, hasta), i2 = pend * tasa * d2 / 365; dev += prs_n(i2); tramos.push({ base: pend, desde: desde, hasta: hasta, dias: d2, interes: prs_n(i2), abierto: true }); }
+  pend = Math.max(0, pend);
+  var intPend = Math.max(0, prs_n(dev - cobrInt));
+  return { capital: cap, devuelto: prs_n(devuelto), pendiente: prs_n(pend), devengado: prs_n(dev), cobrado: prs_n(cobrInt), retencion: prs_n(retInt), intPend: intPend,
+    debe: prs_n(pend + intPend), diario: prs_n(pend * tasa / 365), tramos: tramos, movs: movs, finCap: finCap,
+    liquidado: pend <= 0.005 && (intPend <= 0.5 || !!p.liquidado) };
+}
+// Capital pendiente de los préstamos de la empresa activa (para el patrimonio).
+function prs_capitalPendiente() { var t = 0; try { prs_load().forEach(function(p) { if (p && !p.deleted) t += prs_calc(p).pendiente; }); } catch (e) {} return prs_n(t); }
+// Intereses cobrados por Patricio en un año (para la Renta y el informe del asesor).
+function prs_interesesAnio(anio) {
+  var out = []; window._finEmpForzada = 'patricio';
+  try { prs_load().forEach(function(p) { if (!p || p.deleted) return; (p.movs || []).forEach(function(m) { if (m && !m.deleted && m.tipo === 'intereses' && String(m.fecha || '').slice(0, 4) === String(anio)) out.push({ mes: String(m.fecha).slice(0, 7), fecha: m.fecha, entidad: 'Préstamo a ' + (p.deudor || '') + (p.etiqueta ? ' (' + p.etiqueta + ')' : ''), bruto: prs_n(m.importe), retencion: prs_n(m.retencion) }); }); }); } catch (e) {} finally { window._finEmpForzada = null; }
+  return out;
+}
+function prs_render() {
+  var sec = document.getElementById('fin-prestamos-section'), cont = document.getElementById('fin-prestamos-lista'); if (!sec || !cont) return;
+  var L = prs_load().filter(function(p) { return p && !p.deleted; }), adm = getRol() === 'admin';
+  if (!L.length && !adm) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  var act = [], liq = [];
+  L.forEach(function(p) { var c = prs_calc(p); (c.liquidado ? liq : act).push({ p: p, c: c }); });
+  var h = '';
+  if (!L.length) h += '<div style="font-size:12.5px;color:var(--text-secondary);text-align:center;padding:10px 0;">Sin préstamos. Pulsa ＋ para apuntar uno.</div>';
+  act.forEach(function(x) { h += prs_htmlTarjeta(x.p, x.c, adm); });
+  if (liq.length) {
+    h += '<details style="margin-top:6px;"><summary style="list-style:none;text-align:center;font-size:12.5px;color:var(--text-secondary);cursor:pointer;padding:6px;">▸ Liquidados (' + liq.length + ')</summary>';
+    liq.forEach(function(x) { h += prs_htmlTarjeta(x.p, x.c, adm); });
+    h += '</details>';
+  }
+  cont.innerHTML = h;
+  var tot = act.reduce(function(s, x) { return s + x.c.pendiente; }, 0), te = document.getElementById('fin-prestamos-total'), tv = document.getElementById('fin-prestamos-total-val');
+  if (te && tv) { te.style.display = tot > 0 ? 'flex' : 'none'; tv.textContent = 'Capital por cobrar: ' + fin_fmt(tot); }
+}
+function prs_htmlTarjeta(p, c, adm) {
+  var pct = c.capital > 0 ? Math.min(100, Math.round(c.devuelto / c.capital * 100)) : 0, ab = !!_prsAbierto[p.id];
+  var kp = function(t, v, col) { return '<div style="background:rgba(255,255,255,.04);border-radius:9px;padding:6px 3px;text-align:center;"><div style="font-size:9.5px;color:var(--text-secondary);letter-spacing:.4px;">' + t + '</div><b style="font-size:13.5px;' + (col ? 'color:' + col + ';' : '') + '">' + fin_fmt(v) + '</b></div>'; };
+  var b = 'border:1px solid rgba(91,141,238,.5);border-radius:9px;padding:7px;text-align:center;font-size:12px;font-weight:700;color:#8fb0f5;cursor:pointer;';
+  var h = '<div style="background:var(--navy-card);border:1px solid var(--border);border-radius:12px;padding:11px;margin-bottom:10px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;">' + (adm ? '<span onclick="prs_editar(\'' + p.id + '\')" style="color:#5b8dee;cursor:pointer;">✎</span>' : '')
+    + '<div style="flex:1;font-size:13.5px;font-weight:700;color:var(--silver-bright);">🤝 ' + sib_esc(p.deudor || '') + (p.etiqueta ? ' · ' + sib_esc(p.etiqueta) : '') + '</div>'
+    + '<span style="font-size:11px;color:' + (c.liquidado ? 'var(--accent-green)' : '#e0a23a') + ';">' + (c.liquidado ? 'liquidado ✓' : 'en curso') + '</span>'
+    + (adm ? '<span onclick="prs_borrar(\'' + p.id + '\')" style="color:#e57373;cursor:pointer;">✕</span>' : '') + '</div>'
+    + '<div style="font-size:11.5px;color:var(--text-secondary);margin-top:2px;">' + fin_fmt(c.capital) + ' el ' + rinf_fecha(p.fecha) + ' · ' + String(p.interes || 0).replace('.', ',') + ' % anual' + (p.garantias ? ' · ' + sib_esc(p.garantias) : '') + '</div>';
+  if (!c.liquidado) {
+    h += '<div style="height:7px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin:9px 0 3px;"><i style="display:block;height:100%;width:' + pct + '%;background:var(--accent-green);"></i></div>'
+      + '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;">Devuelto ' + fin_fmt(c.devuelto) + ' de ' + fin_fmt(c.capital) + ' (' + pct + ' %)</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px;">' + kp('FALTA CAPITAL', c.pendiente) + kp('INTERESES HOY', c.intPend, '#d4af37') + kp('TE DEBE HOY', c.debe) + '</div>'
+      + (c.pendiente > 0 ? '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:6px;">+' + fin_fmt(c.diario) + ' al día de intereses</div>' : '<div style="font-size:11.5px;color:#e0a23a;text-align:center;margin-top:6px;">Capital devuelto · faltan los intereses</div>');
+  } else {
+    h += '<div style="font-size:11.5px;color:var(--text-secondary);margin-top:4px;">Devuelto el ' + rinf_fecha(c.finCap || '') + ' · intereses cobrados ' + fin_fmt(c.cobrado) + (c.retencion ? ' (retenido ' + fin_fmt(c.retencion) + ')' : '') + '</div>';
+  }
+  h += '<div style="display:grid;grid-template-columns:' + (adm ? '1fr 1fr' : '1fr') + ';gap:6px;margin-top:9px;">' + (adm ? '<div onclick="prs_movNuevo(\'' + p.id + '\')" style="' + b + '">＋ Devolución</div>' : '') + '<div onclick="_prsAbierto[\'' + p.id + '\']=!_prsAbierto[\'' + p.id + '\'];prs_render()" style="' + b + '">' + (ab ? 'Ocultar detalle' : 'Ver detalle') + '</div></div>';
+  if (ab) h += prs_htmlDetalle(p, c, adm);
+  return h + '</div>';
+}
+function prs_htmlDetalle(p, c, adm) {
+  var r = function(a, b, cc, col, acc) { return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;">' + (acc && adm ? '<span onclick="prs_movEditar(\'' + p.id + '\',\'' + acc + '\')" style="color:#5b8dee;cursor:pointer;">✎</span>' : (adm ? '<span style="width:12px;"></span>' : '')) + '<span style="flex:1;color:var(--silver-dim);">' + a + '</span><span style="width:84px;text-align:right;' + (col ? 'color:' + col + ';' : '') + '">' + b + '</span><span style="width:84px;text-align:right;">' + cc + '</span>' + (acc && adm ? '<span onclick="prs_movBorrar(\'' + p.id + '\',\'' + acc + '\')" style="color:#e57373;cursor:pointer;">✕</span>' : (adm ? '<span style="width:10px;"></span>' : '')) + '</div>'; };
+  var h = '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">'
+    + r('<b style="font-size:10.5px;">FECHA</b>', '<b style="font-size:10.5px;">IMPORTE</b>', '<b style="font-size:10.5px;">QUEDA</b>');
+  var queda = c.capital;
+  h += r(rinf_fecha(p.fecha) + ' · préstamo', fin_fmt(c.capital), fin_fmt(queda));
+  c.movs.forEach(function(m) {
+    if (m.tipo === 'intereses') { h += r(rinf_fecha(m.fecha) + ' · intereses' + (prs_n(m.retencion) ? ' (ret. ' + fin_fmt(m.retencion) + ')' : ''), '+' + fin_fmt(m.importe), '', '#d4af37', m.id); return; }
+    queda = prs_n(queda - prs_n(m.importe)); h += r(rinf_fecha(m.fecha) + ' · devolución', '−' + fin_fmt(m.importe), fin_fmt(Math.max(0, queda)), 'var(--accent-green)', m.id);
+  });
+  if (c.tramos.length) h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:7px;line-height:1.5;">Intereses por tramos:<br>' + c.tramos.map(function(t) { return fin_fmt(t.base) + ' × ' + t.dias + ' días = ' + fin_fmt(t.interes) + (t.abierto ? ' (hasta hoy)' : ''); }).join('<br>') + '<br><b style="color:var(--silver-bright);">Total ' + fin_fmt(c.devengado) + (c.cobrado ? ' · cobrado ' + fin_fmt(c.cobrado) : '') + '</b></div>';
+  if (p.notas) h += '<div style="font-size:12px;color:var(--silver-dim);margin-top:7px;white-space:pre-wrap;">' + sib_esc(p.notas) + '</div>';
+  if (p.docUrl) h += '<div style="text-align:center;margin-top:6px;"><a href="' + sib_esc(p.docUrl) + '" target="_blank" style="font-size:12px;color:#5b8dee;">📄 Contrato / escritura</a></div>';
+  if (/hipoteca/i.test(p.garantias || '') && c.pendiente <= 0.005) h += '<div style="font-size:12px;text-align:center;margin-top:7px;color:' + (p.hipotecaCancelada ? 'var(--accent-green)' : '#e0a23a') + ';">' + (p.hipotecaCancelada ? '✓ Hipoteca de garantía cancelada' : '⚠️ Falta cancelar la hipoteca de garantía en notario y registro' + (adm ? ' · <span onclick="prs_hipCancelada(\'' + p.id + '\')" style="color:#5b8dee;cursor:pointer;">ya está</span>' : '')) + '</div>';
+  if (p.empresa === 'patrimer' || (localStorage.getItem('patrimer:empresa') || 'patrimer') === 'patrimer') { if (c.cobrado) h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:6px;">Intereses de la sociedad: van al Impuesto de Sociedades (MJA).</div>'; }
+  else h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:6px;">La Renta cuenta los intereses cuando los apuntas como cobrados.</div>';
+  return h + '</div>';
+}
+var _prsEd = null;
+function prs_capa(html) { var prev = document.getElementById('prs-capa'); if (prev) prev.remove(); var c = document.createElement('div'); c.id = 'prs-capa'; c.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10060;display:flex;align-items:flex-end;justify-content:center;'; c.innerHTML = '<div style="background:var(--navy-dark);border-radius:20px 20px 0 0;padding:18px 16px 28px;width:100%;max-width:520px;box-sizing:border-box;max-height:92vh;overflow:auto;">' + html + '</div>'; document.body.appendChild(c); }
+function prs_cerrarCapa() { var c = document.getElementById('prs-capa'); if (c) c.remove(); }
+var PRS_INP = 'width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:9px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:14px;padding:9px 10px;box-sizing:border-box;text-align:center;';
+function prs_lbl(t) { return '<div style="font-size:11px;color:var(--text-secondary);margin:12px 0 5px;text-align:center;font-weight:700;letter-spacing:.6px;">' + t + '</div>'; }
+function prs_botones(fnG) { return '<button onclick="' + fnG + '" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:16px;">GUARDAR</button><button onclick="prs_cerrarCapa()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button>'; }
+function prs_nuevo() { prs_editar(''); }
+function prs_editar(id) {
+  if (bloqueaSiViewer('Apuntar un préstamo')) return;
+  var p = id ? prs_load().filter(function(x) { return x && x.id === id; })[0] : null; p = p || {};
+  var v = function(k) { return sib_esc(p[k] == null ? '' : p[k]); };
+  prs_capa('<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">🤝 ' + (id ? 'PRÉSTAMO' : 'NUEVO PRÉSTAMO') + '</div>'
+    + prs_lbl('A QUIÉN') + '<input id="prs-deudor" value="' + v('deudor') + '" style="' + PRS_INP + '">'
+    + prs_lbl('NOMBRE CORTO (opcional, ej.: Lorca)') + '<input id="prs-etiqueta" value="' + v('etiqueta') + '" style="' + PRS_INP + '">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div>' + prs_lbl('CAPITAL PRESTADO') + '<input id="prs-capital" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (p.capital ? fmtGlobal(prs_n(p.capital)) : '') + '" style="' + PRS_INP + '"></div><div>' + prs_lbl('FECHA') + '<input id="prs-fecha" type="date" value="' + v('fecha') + '" style="' + PRS_INP + '-webkit-appearance:none;appearance:none;"></div></div>'
+    + prs_lbl('INTERÉS ANUAL (%)') + '<input id="prs-interes" inputmode="decimal" value="' + (p.interes != null && p.interes !== '' ? String(p.interes).replace('.', ',') : '') + '" style="' + PRS_INP + '">'
+    + prs_lbl('GARANTÍAS') + '<input id="prs-garantias" placeholder="Ej.: hipoteca sobre el inmueble + garantía personal" value="' + v('garantias') + '" style="' + PRS_INP + '">'
+    + prs_lbl('ENLACE AL CONTRATO (Drive, opcional)') + '<input id="prs-doc" value="' + v('docUrl') + '" style="' + PRS_INP + '">'
+    + prs_lbl('NOTAS') + '<textarea id="prs-notas" rows="3" style="' + PRS_INP + 'text-align:left;resize:vertical;">' + v('notas') + '</textarea>'
+    + prs_botones('prs_guardar(\'' + (p.id || '') + '\')'));
+}
+function prs_guardar(id) {
+  if (bloqueaSiViewer('Apuntar un préstamo')) return;
+  var g = function(k) { var e = document.getElementById(k); return e ? e.value.trim() : ''; };
+  var deudor = g('prs-deudor'), cap = parseFmtGlobal(g('prs-capital')) || 0, fecha = g('prs-fecha'), it = parseFloat(g('prs-interes').replace(',', '.'));
+  if (!deudor || !(cap > 0) || !fecha) { avisar('Pon a quién, el capital y la fecha.'); return; }
+  var l = prs_load(), p = id ? l.filter(function(x) { return x && x.id === id; })[0] : null;
+  if (!p) { p = { id: 'prs_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), movs: [], creado: new Date().toISOString() }; l.push(p); }
+  p.deudor = deudor; p.etiqueta = g('prs-etiqueta'); p.capital = cap; p.fecha = fecha; p.interes = isNaN(it) ? 0 : it; p.garantias = g('prs-garantias'); p.docUrl = g('prs-doc'); p.notas = g('prs-notas');
+  p.updatedAt = new Date().toISOString(); prs_save(l); prs_cerrarCapa(); prs_refrescar();
+}
+function prs_borrar(id) {
+  if (bloqueaSiViewer('Borrar un préstamo')) return;
+  showConfirm('🗑️', '¿Borrar el préstamo?', 'Se borra con todas sus devoluciones.', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Borrar', cls: 'r', fn: function() { var l = prs_load(), p = l.filter(function(x) { return x && x.id === id; })[0]; if (!p) return; p.deleted = true; p.updatedAt = new Date().toISOString(); prs_save(l); prs_refrescar(); } }
+  ]);
+}
+function prs_movNuevo(pid) { prs_movEditar(pid, ''); }
+function prs_movEditar(pid, mid) {
+  if (bloqueaSiViewer('Apuntar una devolución')) return;
+  var p = prs_load().filter(function(x) { return x && x.id === pid; })[0]; if (!p) return;
+  var m = mid ? (p.movs || []).filter(function(x) { return x && x.id === mid; })[0] : null; m = m || { tipo: 'capital', fecha: _fechaHoyLocal() };
+  _prsEd = { pid: pid, mid: mid, tipo: m.tipo || 'capital' };
+  var seg = function(k, t) { return '<span onclick="_prsEd.tipo=\'' + k + '\';prs_segPintar()" id="prs-seg-' + k + '" style="font-size:13px;padding:7px 14px;border-radius:9px;border:1px solid var(--border);cursor:pointer;">' + t + '</span>'; };
+  prs_capa('<div style="text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:var(--silver-bright);">' + (mid ? '✎ MOVIMIENTO' : '＋ APUNTAR DEVOLUCIÓN') + '</div>'
+    + '<div style="font-size:12px;color:var(--text-secondary);text-align:center;margin-top:4px;">' + sib_esc(p.deudor) + (p.etiqueta ? ' · ' + sib_esc(p.etiqueta) : '') + '</div>'
+    + prs_lbl('FECHA') + '<input id="prs-m-fecha" type="date" value="' + sib_esc(m.fecha || '') + '" style="' + PRS_INP + '-webkit-appearance:none;appearance:none;">'
+    + prs_lbl('IMPORTE') + '<input id="prs-m-imp" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (m.importe ? fmtGlobal(prs_n(m.importe)) : '') + '" style="' + PRS_INP + '">'
+    + prs_lbl('¿QUÉ ES?') + '<div style="display:flex;justify-content:center;gap:8px;">' + seg('capital', 'Capital') + seg('intereses', 'Intereses') + '</div>'
+    + '<div id="prs-m-retbox">' + prs_lbl('RETENCIÓN (si te la han practicado)') + '<input id="prs-m-ret" inputmode="decimal" onfocus="focusInputEl(this)" onblur="fmtInputEl(this)" value="' + (m.retencion ? fmtGlobal(prs_n(m.retencion)) : '') + '" style="' + PRS_INP + '"></div>'
+    + prs_botones('prs_movGuardar()'));
+  prs_segPintar();
+}
+function prs_segPintar() {
+  ['capital', 'intereses'].forEach(function(k) { var e = document.getElementById('prs-seg-' + k); if (!e) return; var on = _prsEd && _prsEd.tipo === k; e.style.borderColor = on ? '#5b8dee' : 'var(--border)'; e.style.background = on ? 'rgba(91,141,238,.15)' : 'transparent'; e.style.color = on ? 'var(--silver-bright)' : 'var(--text-secondary)'; });
+  var rb = document.getElementById('prs-m-retbox'); if (rb) rb.style.display = _prsEd && _prsEd.tipo === 'intereses' ? 'block' : 'none';
+}
+function prs_movGuardar() {
+  if (bloqueaSiViewer('Apuntar una devolución') || !_prsEd) return;
+  var f = (document.getElementById('prs-m-fecha') || {}).value, imp = parseFmtGlobal((document.getElementById('prs-m-imp') || {}).value) || 0, ret = parseFmtGlobal((document.getElementById('prs-m-ret') || {}).value) || 0;
+  if (!f || !(imp > 0)) { avisar('Pon la fecha y el importe.'); return; }
+  var l = prs_load(), p = l.filter(function(x) { return x && x.id === _prsEd.pid; })[0]; if (!p) return;
+  p.movs = p.movs || [];
+  if (_prsEd.tipo === 'capital') {
+    var otros = prs_calc({ capital: p.capital, fecha: p.fecha, interes: p.interes, movs: p.movs.filter(function(x) { return x && x.id !== _prsEd.mid; }) });
+    if (imp > otros.pendiente + 0.005) { avisar('Esa devolución (' + fin_fmt(imp) + ') es mayor que el capital que queda (' + fin_fmt(otros.pendiente) + '). Si incluye intereses, apunta esa parte como "Intereses".'); return; }
+  }
+  var m = _prsEd.mid ? p.movs.filter(function(x) { return x && x.id === _prsEd.mid; })[0] : null;
+  if (!m) { m = { id: 'pm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4) }; p.movs.push(m); }
+  m.fecha = f; m.importe = imp; m.tipo = _prsEd.tipo; m.retencion = _prsEd.tipo === 'intereses' ? ret : 0; m.updatedAt = new Date().toISOString();
+  p.updatedAt = m.updatedAt; prs_save(l); prs_cerrarCapa(); _prsAbierto[p.id] = true; prs_refrescar();
+}
+function prs_movBorrar(pid, mid) {
+  if (bloqueaSiViewer('Borrar una devolución')) return;
+  showConfirm('🗑️', '¿Borrar este movimiento?', '', [
+    { label: 'Cancelar', cls: 'c', fn: function() {} },
+    { label: 'Borrar', cls: 'r', fn: function() { var l = prs_load(), p = l.filter(function(x) { return x && x.id === pid; })[0]; if (!p) return; p.movs = (p.movs || []).filter(function(x) { return x && x.id !== mid; }); p.updatedAt = new Date().toISOString(); prs_save(l); prs_refrescar(); } }
+  ]);
+}
+function prs_hipCancelada(id) { if (bloqueaSiViewer('Marcar la hipoteca')) return; var l = prs_load(), p = l.filter(function(x) { return x && x.id === id; })[0]; if (!p) return; p.hipotecaCancelada = new Date().toISOString(); p.updatedAt = p.hipotecaCancelada; prs_save(l); prs_refrescar(); }
+function prs_refrescar() { prs_render(); try { fin_calcPatrimonio(); } catch (e) {} try { pend_render(); } catch (e) {} }
+// Pendientes: hipoteca de garantía por cancelar (por empresa).
+function prs_avisosPend() {
+  var out = [];
+  ['patricio', 'patrimer'].forEach(function(emp) {
+    window._finEmpForzada = emp;
+    try { prs_load().forEach(function(p) { if (!p || p.deleted || p.hipotecaCancelada || !/hipoteca/i.test(p.garantias || '')) return; var c = prs_calc(p); if (c.pendiente <= 0.005) out.push({ icon: '🏛️', t: 'Cancela la hipoteca de garantía del préstamo a ' + (p.deudor || ''), s: 'Ya ha devuelto todo el capital · notario y registro · Finanzas → Préstamos', accion: 'prestamo', empresa: emp }); }); } catch (e) {} finally { window._finEmpForzada = null; }
+  });
+  return out;
+}
+
 function fin_calcPatrimonio() {
   // PUNTO 165 (22/09/2026): totales calculados con fin_visibles() — la lista
   // sin los elementos "tachados" (borrados) — para no seguir sumando algo
@@ -23099,7 +23313,8 @@ function fin_calcPatrimonio() {
   // ("Patrimonio total") vuelve a ser solo lo de esta empresa (sin IGC) — el
   // 33% de Industrias se muestra aparte, como una fila más (no en pequeño),
   // con su propia suma "Total+IGC".
-  var total = cuentas + fondos + acciones + urbanitae + inmob.total;
+  var prestamos = prs_capitalPendiente(); // 13/11/2026: capital que me deben (préstamos que he dado)
+  var total = cuentas + fondos + acciones + urbanitae + prestamos + inmob.total;
   var el = document.getElementById('fin-patrimonio-total');
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
   var rowsEl = document.getElementById('fin-patrimonio-rows');
@@ -23107,7 +23322,7 @@ function fin_calcPatrimonio() {
     // 08/11/2026 (Patry, opción C + B): en vez de la lista, dos barras de
     // reparto — Financiero / Inmuebles y, debajo, los apartados financieros
     // de mayor a menor (barra + lista con % sobre lo financiero).
-    rowsEl.innerHTML = fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmob.total) +
+    rowsEl.innerHTML = fin_repartoHtml(cuentas, fondos, acciones, urbanitae, inmob.total, prestamos) +
       (empresaActivaFin === 'patrimer' ? fin_igcFilaHtml(total, igc) : '');
   }
   var notaEl = document.getElementById('fin-patrimonio-nota');
@@ -23440,6 +23655,8 @@ function fin_patHist_desglose(ov) {
     if (c) _linea(c, _nombreClave(c)).invertido += v;
     else _linea(SIN, 'Sin banco asignado').invertido += v;
   });
+  // 13/11/2026: lo que me deben de préstamos, como una línea más (invertido).
+  try { var _prsCap = prs_capitalPendiente(); if (_prsCap > 0) _linea('prestamos', '🤝 Préstamos concedidos').invertido += _prsCap; } catch (ePrs) {}
   // Orden: Caixa, MyInvestor, Trade Republic, resto, "sin asignar" al final.
   var pref = ['caixa', 'myinvestor', 'traderepublic'];
   orden.sort(function(a, b) {
@@ -24139,7 +24356,7 @@ function res_htmlLista(emp) {
 // mercado actual" (o al precio de compra si no lo tienen, y se avisa).
 // Nunca incluye DNI ni números de cuenta.
 // ═══════════════════════════════════════════════════════════════════════
-var _infSel = { quien: 'patricio', fecha: 'hoy', inc: { inm: true, cue: true, fon: true, acc: true, urb: true, det: false } };
+var _infSel = { quien: 'patricio', fecha: 'hoy', inc: { inm: true, cue: true, fon: true, acc: true, urb: true, pre: true, det: false } };
 function inf_datosEmp(emp, fecha) {
   var R = function(v) { return Math.round((numES(v) || 0) * 100) / 100; };
   var D = { emp: emp, nombre: emp === 'patricio' ? 'Patricio Gómez García' : 'Patrimer Levante, S.L.', bloques: {} };
@@ -24178,10 +24395,12 @@ function inf_datosEmp(emp, fecha) {
   });
   var tot = function(a) { return Math.round(a.reduce(function(s, x) { return s + x.v; }, 0) * 100) / 100; };
   var ord = function(a) { return a.sort(function(x, y) { return y.v - x.v; }); };
-  D.bloques = { inm: { total: tot(inm), items: inm, conCompra: conCompra }, cue: { total: tot(cue), items: ord(cue) }, fon: { total: tot(fon), items: ord(fon) }, acc: { total: tot(acc), items: ord(acc) }, urb: { total: tot(urb), items: ord(urb) } };
+  // 13/11/2026: préstamos que he dado (capital que queda por devolver).
+  var pre = []; window._finEmpForzada = emp; try { prs_load().forEach(function(p) { if (!p || p.deleted) return; var c = prs_calc(p); if (c.pendiente > 0) pre.push({ t: 'Préstamo a ' + (p.deudor || '') + (p.etiqueta ? ' (' + p.etiqueta + ')' : ''), v: c.pendiente, s: 'capital por devolver' }); }); } catch (e) {} finally { window._finEmpForzada = null; }
+  D.bloques = { inm: { total: tot(inm), items: inm, conCompra: conCompra }, cue: { total: tot(cue), items: ord(cue) }, fon: { total: tot(fon), items: ord(fon) }, acc: { total: tot(acc), items: ord(acc) }, urb: { total: tot(urb), items: ord(urb) }, pre: { total: tot(pre), items: pre } };
   return D;
 }
-var INF_TIT = { inm: 'Inmuebles', cue: 'Cuentas y liquidez', fon: 'Fondos y planes', acc: 'Acciones', urb: 'Urbanitae' };
+var INF_TIT = { inm: 'Inmuebles', cue: 'Cuentas y liquidez', fon: 'Fondos y planes', acc: 'Acciones', urb: 'Urbanitae', pre: 'Préstamos concedidos' };
 function inf_abrir() {
   var emp = fin_emp(); if (emp === 'empresa') emp = 'patrimer';
   var puedeP = (typeof usuarioPuedeEmpresa !== 'function' || usuarioPuedeEmpresa('patricio'));
@@ -24201,7 +24420,7 @@ function inf_pintar() {
   h += lbl('¿DE QUIÉN?') + fila(puedeP ? [chip(S.quien === 'patricio', 'Patricio', "_infSel.quien='patricio';inf_pintar()"), chip(S.quien === 'patrimer', 'Patrimer', "_infSel.quien='patrimer';inf_pintar()"), chip(S.quien === 'ambos', 'Los dos', "_infSel.quien='ambos';inf_pintar()")] : [chip(true, 'Patrimer', '')]);
   h += lbl('¿A QUÉ FECHA?') + fila([chip(S.fecha === 'hoy', 'Hoy', "_infSel.fecha='hoy';inf_pintar()"), chip(S.fecha === 'foto', 'Última foto del mes', "_infSel.fecha='foto';inf_pintar()")]);
   if (S.fecha === 'hoy') {
-    h += lbl('¿QUÉ INCLUYE?') + fila(['inm', 'cue', 'fon', 'acc', 'urb'].map(function(k) { return chip(S.inc[k], INF_TIT[k], "_infSel.inc." + k + "=!_infSel.inc." + k + ";inf_pintar()"); }).concat([chip(S.inc.det, 'Detalle de cada partida', "_infSel.inc.det=!_infSel.inc.det;inf_pintar()")]));
+    h += lbl('¿QUÉ INCLUYE?') + fila(['inm', 'cue', 'fon', 'acc', 'urb', 'pre'].map(function(k) { return chip(S.inc[k], INF_TIT[k], "_infSel.inc." + k + "=!_infSel.inc." + k + ";inf_pintar()"); }).concat([chip(S.inc.det, 'Detalle de cada partida', "_infSel.inc.det=!_infSel.inc.det;inf_pintar()")]));
   } else h += '<div style="font-size:11.5px;color:var(--text-secondary);text-align:center;line-height:1.4;">Con la foto del mes solo hay totales por bloque (sin el detalle de cada partida).</div>';
   h += '<button onclick="inf_pdf()" style="width:100%;background:linear-gradient(135deg,#1a4a8a,#2d6fd4);border:none;border-radius:12px;color:#fff;font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;padding:13px;cursor:pointer;margin-top:14px;">📤 GENERAR Y COMPARTIR</button>'
     + '<button onclick="document.getElementById(\'inf-capa\').remove()" style="width:100%;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;color:var(--silver-dim);font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:700;padding:11px;cursor:pointer;margin-top:8px;">CANCELAR</button>'
@@ -24214,7 +24433,7 @@ function inf_pdf() {
   var emps = S.quien === 'ambos' ? ['patricio', 'patrimer'] : [S.quien];
   var datos = emps.map(function(e) { return inf_datosEmp(e, S.fecha); }).filter(Boolean);
   if (!datos.length) { avisar('No hay ninguna foto del mes todavía.'); return; }
-  var claves = S.fecha === 'foto' ? ['inm', 'cue', 'acc', 'urb'] : ['inm', 'cue', 'fon', 'acc', 'urb'].filter(function(k) { return S.inc[k]; });
+  var claves = S.fecha === 'foto' ? ['inm', 'cue', 'acc', 'urb'] : ['inm', 'cue', 'fon', 'acc', 'urb', 'pre'].filter(function(k) { return S.inc[k]; });
   if (!claves.length) { avisar('Elige al menos un bloque.'); return; }
   var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), W = 210, M = 16, y = 20;
   var limpio = function(s) { return String(s == null ? '' : s).replace(/−/g, '-').replace(/[^ -ÿ€·]/g, '').replace(/\s+/g, ' ').trim(); };
@@ -24236,7 +24455,7 @@ function inf_pdf() {
     var B = D.bloques, totalEmp = 0;
     if (datos.length > 1) { y += 3; hueco(10); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(limpio(D.nombre), M, y + 2); y += 7; }
     titulo('RESUMEN');
-    claves.forEach(function(k) { var b = B[k]; if (!b) return; totalEmp += b.total; fila(b.txt || INF_TIT[k] + (k === 'inm' && b.items.length ? ' (' + b.items.length + ')' : ''), eur(b.total)); });
+    claves.forEach(function(k) { var b = B[k]; if (!b || (k === 'pre' && !b.items.length)) return; totalEmp += b.total; fila(b.txt || INF_TIT[k] + (k === 'inm' && b.items.length ? ' (' + b.items.length + ')' : ''), eur(b.total)); });
     fila('TOTAL', eur(totalEmp), '', true); granTotal += totalEmp;
     if (!D.foto && S.inc.det) {
       claves.forEach(function(k) {
@@ -26655,6 +26874,7 @@ function pend_calcular() {
       // 11/11/2026 (Patry, idea I2 opción B): en diciembre, lo que aún se puede hacer por la Renta.
       try { var _ppDic = renta_avisoDiciembre(new Date()); if (_ppDic) items.push(_ppDic); } catch (ePD) {}
       try { var _emgP = emg_avisoPend(); if (_emgP) items.push(_emgP); } catch (eEP) {} // 12/11/2026
+      try { prs_avisosPend().forEach(function(x) { items.push(x); }); } catch (ePA) {} // 13/11/2026
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
     }
   } catch (e) {}
@@ -27109,6 +27329,10 @@ function emg_bienes() {
   } catch (e) {} finally { window._finEmpForzada = null; }
   if (accL.length) B.push({ k: 'acc', t: 'Acciones', total: 0, items: accL, nota: 'Están en las cuentas de broker de "Bancos y cuentas".' });
   add('urb', 'Urbanitae (préstamos a proyectos inmobiliarios)', P.bloques.urb, 'Se cobran solos al vencer cada proyecto, en la cuenta de Urbanitae.');
+  // 13/11/2026: préstamos que he dado y aún no están liquidados.
+  var preL = []; window._finEmpForzada = 'patricio';
+  try { prs_load().forEach(function(p) { if (!p || p.deleted) return; if (prs_calc(p).liquidado) return; preL.push({ t: (p.deudor || '') + (p.etiqueta ? ' (' + p.etiqueta + ')' : ''), s: p.garantias || '' }); }); } catch (e) {} finally { window._finEmpForzada = null; }
+  if (preL.length) B.push({ k: 'pre', t: 'Dinero que me deben (préstamos)', total: 0, items: preL, nota: 'Contrato y detalle de devoluciones en la app: Finanzas → Préstamos que he dado (empresa Patricio). Los intereses se cobran al final.' });
   add('inm', 'Pisos a mi nombre', P.bloques.inm, 'Escrituras, contratos e inquilinos de cada piso: en esta app (empresa Patricio).');
   var total = B.reduce(function(s, b) { return s + b.total; }, 0);
   var soc = null;
@@ -27185,6 +27409,7 @@ function emg_sub(k, x) {
   if (k === 'fon') return [x.g ? 'gestora: ' + x.g : '', x.s].filter(Boolean).join(' · ');
   if (k === 'acc') return x.s && /acc\.$/.test(x.s) ? '' : (x.s || '');
   if (k === 'inm') return /alquilado/.test(x.s || '') ? 'alquilado (ver contratos en la app)' : '';
+  if (k === 'pre') return x.s ? 'garantía: ' + x.s : '';
   return '';
 }
 function emg_htmlItem(lista, x, l1, l2, notas) {
@@ -27684,6 +27909,8 @@ function pend_gestionar(i) {
     rgas_ordenarAbrir(); // 08/11/2026
   } else if (it.accion === 'ppconf') {
     fin_ppConfirmar(it.fondoId, it.anio); // 08/11/2026
+  } else if (it.accion === 'prestamo') {
+    try { localStorage.setItem('patrimer:empresa', it.empresa || 'patricio'); } catch (e) {} showModule('finanzas'); setTimeout(function() { var s = document.getElementById('fin-prestamos-section'); if (s) { if (fin_seccionColapsada('prestamos')) fin_toggleSeccion('prestamos'); s.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, 300); // 13/11/2026
   } else if (it.accion === 'emergencia') {
     emg_abrir(false); // 12/11/2026
   } else if (it.accion === 'ppdic') {
@@ -27961,6 +28188,7 @@ window._refreshCurrentModule = function(key) {
     'fin:objetivo_patrimonio': 'finanzas', // 11/11/2026
     'inmuebles:incidencias': 'inmuebles', 'contratos:actas': 'contratos', // 11/11/2026
     'patricio:emergencia': 'finanzas', // 12/11/2026
+    'fin:prestamos:patricio': 'finanzas', 'fin:prestamos:patrimer': 'finanzas', // 13/11/2026
     'inmuebles:alquileres_mensuales': 'renta',
     'inmuebles:seguro_ibi': 'renta',
     // PUNTO 166 (14/09/2026): documentos por inmueble — vive en la pantalla
@@ -31541,6 +31769,8 @@ function renta_calcPrevisionDatos(proy) {
   try { rint_delAnio(renta_anio).forEach(function(x) { capInt += parseFloat(x.bruto) || 0; retInt += parseFloat(x.retencion) || 0; }); } catch (e) {}
   var capSave = 0;
   try { capSave = fin_saveTotalAnio(renta_anio).total; } catch (e) {}
+  // 13/11/2026: + intereses cobrados de préstamos que ha dado Patricio.
+  try { prs_interesesAnio(renta_anio).forEach(function(x) { capInt += x.bruto; retInt += x.retencion; }); } catch (e) {}
   var capitalMobiliario = capFinanzas + capManual + capInt + capSave;
 
   if (brutoTrabajo === 0 && ingresoAlquilerTotal === 0 && capitalMobiliario === 0 && imputacionTotal === 0) return { sinDatos: true };
@@ -31780,7 +32010,7 @@ function rinf_datos(anio) {
   D.gastosAlquiler = rinf_num(D.gastos.filter(function(g) { return g.nota === 'Gasto del alquiler'; }).reduce(function(s, g) { return s + g.importe; }, 0));
 
   // 4. Capital mobiliario
-  D.intereses = (typeof rint_delAnio === 'function' ? rint_delAnio(anio) : []).slice()
+  D.intereses = (typeof rint_delAnio === 'function' ? rint_delAnio(anio) : []).concat(typeof prs_interesesAnio === 'function' ? prs_interesesAnio(anio) : []) // 13/11/2026: + préstamos
     .sort(function(a, b) { return String(b.mes).localeCompare(String(a.mes)); })
     .map(function(x) { return { fecha: x.mes, entidad: x.entidad || '', bruto: rinf_num(x.bruto), ret: rinf_num(x.retencion) }; });
   D.dividendos = [];
