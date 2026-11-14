@@ -17,7 +17,7 @@
 // Subir un número aquí (v1 → v2...) SOLO hace falta si algún día se quiere
 // forzar a limpiar cachés antiguas de golpe; para el uso normal, con
 // sustituir el archivo de la app es suficiente, esto se auto-gestiona solo.
-const CACHE_NAME = 'patrimer-shell-v1';
+const CACHE_NAME = 'patrimer-shell-v2'; // 14/11/2026: iconos sin esquinas blancas
 
 // Archivos que se intentan guardar de entrada. Se listan varios nombres
 // posibles del archivo principal porque no sabemos con qué nombre exacto
