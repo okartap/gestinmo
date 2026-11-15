@@ -2299,7 +2299,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261115_02';
+const BUILD_ID = '261115_04';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -26772,6 +26772,7 @@ function pend_calcular() {
       // 11/11/2026 (Patry, idea I2 opción B): en diciembre, lo que aún se puede hacer por la Renta.
       try { var _ppDic = renta_avisoDiciembre(new Date()); if (_ppDic) items.push(_ppDic); } catch (ePD) {}
       try { var _emgP = emg_avisoPend(); if (_emgP) items.push(_emgP); } catch (eEP) {} // 12/11/2026
+      try { sib_avisosFechas().forEach(function(x) { items.push(x); }); } catch (eSF) {} // 15/11/2026
       try { prs_avisosPend().forEach(function(x) { items.push(x); }); } catch (ePA) {} // 13/11/2026
       // 15/11/2026 (D3): contratos activos cuyo arrendador no es el dueño del piso (un aviso agrupado).
       try { var _iprA = pend_inmPorRef(), _malA = [];
@@ -27450,6 +27451,31 @@ function sib_irInmueble(idx, anio) {
   }, 250);
 }
 
+// 15/11/2026 (Patry): avisos de fechas que faltan, uno por dato, que llevan al
+// sitio exacto (ficha del piso → Gastos → ventana del Seguro o del IBI).
+// · Seguro: piso con prima apuntada (último año con prima) y sin "Fecha de renovación".
+// · IBI: piso con recibo del año en curso y sin "Fecha de cargo".
+function sib_avisosFechas() {
+  if (typeof getRol !== 'function' || getRol() !== 'admin') return [];
+  var out = [], regs = inm_seguroIbiLoad(), anio = new Date().getFullYear();
+  loadInmuebles().forEach(function(inm, idx) {
+    if (!inm || inm.deleted || inm.estado === 'vendido') return;
+    var emp = normEmpresa(String(inm.propietario || 'patrimer').toLowerCase()), nom = inm.ref || 'inmueble';
+    var mis = regs.filter(function(r) { return r && !r.deleted && inm_recEs(r, idx); });
+    var conPrima = mis.filter(function(r) { return numES(r.seguro) > 0; }).sort(function(a, b) { return b.anio - a.anio; })[0];
+    if (conPrima && !(inm.seguro && inm.seguro.renovacion)) out.push({ icon: '🛡️', t: 'Falta la fecha de renovación del seguro de ' + nom, s: 'Ficha → Gastos → Seguro · viene en la póliza o en el recibo', accion: 'seg_fecha', idx: idx, anio: anio, empresa: emp });
+    var ibiAct = mis.filter(function(r) { return parseInt(r.anio, 10) === anio && numES(r.ibi) > 0; })[0];
+    if (ibiAct && !mis.some(function(r) { return parseInt(r.anio, 10) === anio && r.ibiFecha; })) out.push({ icon: '🏛️', t: 'Falta la fecha de cargo del IBI ' + anio + ' de ' + nom, s: 'Ficha → Gastos → IBI ' + anio + ' · viene en el recibo o en el banco', accion: 'ibi_fecha', idx: idx, anio: anio, empresa: emp });
+  });
+  return out;
+}
+// Abre la ficha del piso en Gastos y, encima, la ventana del Seguro o del IBI.
+function sib_irDato(idx, anio, que) {
+  try { var inm = loadInmuebles()[idx]; if (inm) localStorage.setItem('patrimer:empresa', normEmpresa(String(inm.propietario || 'patrimer').toLowerCase())); } catch (e) {}
+  sib_irInmueble(idx, anio);
+  setTimeout(function() { sib_idx = idx; if (anio) sib_anio = anio; if (que === 'seguro') sib_editarSeguro(); else sib_editarIbi(); }, 650);
+}
+
 // ── AGENDA "PRÓXIMOS 90 DÍAS" (Inicio) ───────────────────────────────────
 var _agendaItems = [], _agendaAbierta = false, _agendaTodo = false, AGENDA_DIAS = 90, AGENDA_VISIBLES = 8;
 function agenda_calcular() {
@@ -27803,6 +27829,8 @@ function pend_gestionar(i) {
     showModule('contratos'); // 13/10/2026: aviso de contratos incompletos
   } else if (it.accion === 'cee') {
     cee_irInmueble(it.idx); // 22/10/2026 (C1)
+  } else if (it.accion === 'seg_fecha' || it.accion === 'ibi_fecha') {
+    sib_irDato(it.idx, it.anio, it.accion === 'seg_fecha' ? 'seguro' : 'ibi'); // 15/11/2026: directo al dato que falta
   } else if (it.accion === 'vc') {
     sib_irInmueble(it.idx, it.anio); // 12/10/2026: ficha del inmueble → Gastos
   } else if (it.accion === 'registro') {
@@ -31910,6 +31938,7 @@ function rinf_datos(anio) {
     if (pd) { o.reduccion = pd.pctRed ? Math.round(pd.pctRed * 100) + ' %' : '—'; o.gastosDed = rinf_num(pd.gastos); o.amort = rinf_num(pd.amort); o.imputacion = rinf_num(pd.imputacion); o.dias = pd.diasAlq; o.diasProp = pd.diasProp; o.rendNeto = rinf_num(pd.rendNeto); }
     else o.gastosDed = rinf_num(o.comunidad + o.seguroDed + o.ibiDed + o.otrosDed);
     o.ibiFecha = _ibiFechaAct[o.ref] || '';
+    o.segRenov = (idx >= 0 && todos[idx] && todos[idx].seguro && todos[idx].seguro.renovacion) || ''; // 15/11/2026: fecha de renovación del seguro (ficha → Seguro)
     var a = _segAnt[o.ref] || { seguro: 0, ibi: 0, ibiFecha: '' }, comAnt = 0;
     alq.forEach(function(r) { if (r && !r.deleted && idx >= 0 && inm_recEs(r, idx) && r.mes && parseInt(r.mes.slice(0, 4), 10) === anio - 1) comAnt += rinf_num(r.comunidad); });
     o.ant = { seguro: rinf_num(a.seguro), ibi: rinf_num(a.ibi), ibiFecha: a.ibiFecha || '', comunidad: rinf_num(comAnt) };
@@ -32155,7 +32184,7 @@ function renta_informePDF() {
       tabla([{ t: 'Ingresos', w: 30, a: 'r', k: 'ingreso', fmt: E }, { t: 'Comunidad', w: 26, a: 'r', k: 'comunidad', fmt: E }, { t: 'Seguro deducible', w: 34, a: 'r', k: 'seguro', fmt: _sd('seguro', 'seguroDed') },
         { t: 'IBI deducible', w: 34, a: 'r', k: 'ibi', fmt: _sd('ibi', 'ibiDed') }, { t: 'Amortización 3 %', w: 28, a: 'r', k: 'amort', fmt: function(v) { return v ? E(v) : '—'; } }, { t: 'Total deducible', w: 30, a: 'r', k: 'gastosDed', fmt: function(v, f) { return E((f.gastosDed || 0) + (f.amort || 0)); } }], [o]);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8); doc.setTextColor(95, 95, 95);
-      txt('Para comprobar · ' + D.anio + ': seguro ' + E(o.seguro) + ' (sin fecha guardada) · IBI ' + E(o.ibi) + (o.ibiFecha ? ' pagado el ' + rinf_fecha(o.ibiFecha) : '') + ' · comunidad ' + E(o.comunidad) + '   |   ' + (D.anio - 1) + ': seguro ' + E(o.ant.seguro) + ' · IBI ' + E(o.ant.ibi) + (o.ant.ibiFecha ? ' pagado el ' + rinf_fecha(o.ant.ibiFecha) : '') + ' · comunidad ' + E(o.ant.comunidad), M, y - 0.5); y += 5;
+      txt('Para comprobar · ' + D.anio + ': seguro ' + E(o.seguro) + (o.segRenov ? ' (renueva el ' + rinf_fecha(o.segRenov).slice(0, 5) + ')' : ' (sin fecha de renovación)') + ' · IBI ' + E(o.ibi) + (o.ibiFecha ? ' pagado el ' + rinf_fecha(o.ibiFecha) : '') + ' · comunidad ' + E(o.comunidad) + '   |   ' + (D.anio - 1) + ': seguro ' + E(o.ant.seguro) + ' · IBI ' + E(o.ant.ibi) + (o.ant.ibiFecha ? ' pagado el ' + rinf_fecha(o.ant.ibiFecha) : '') + ' · comunidad ' + E(o.ant.comunidad), M, y - 0.5); y += 5;
       doc.setTextColor(30, 30, 30);
     });
     nota('Lo deducible es lo mismo que calcula la previsión de la Renta en la app: seguro, IBI y "otros" de la ficha en proporción a los días alquilados; la amortización (3 %), solo por esos días. "Total deducible" incluye también los gastos con factura de ese piso (apartado 3). Entre paréntesis, el importe pagado en el año.');
@@ -32276,10 +32305,10 @@ function renta_informeExcel() {
     hoja('Resumen', res, [62, 16, 16]);
     hoja('Trabajo', [['Mes', 'Bruto', 'Retención IRPF', 'Cuota autónomo']].concat(D.trabajo.map(function(n) { return [n.mes, n.bruto, n.ret, n.ss]; }))
       .concat([['Total', rinf_num(D.trabajoTot.bruto), rinf_num(D.trabajoTot.ret), rinf_num(D.trabajoTot.ss)]]), [18, 14, 16, 16]);
-    hoja('Inmuebles', [['Ref.', 'Dirección', 'Ref. catastral', 'Inquilino', 'DNI/NIE', 'Inicio contrato', 'Reducción', 'Meses cobrados', 'Días alquilado', 'Días propiedad', 'Ingresos', 'Comunidad', 'Seguro pagado', 'Seguro deducible', 'IBI pagado', 'Fecha IBI', 'IBI deducible', 'Amortización 3 %', 'Total gastos deducibles', 'Seguro año anterior', 'IBI año anterior', 'Fecha IBI año anterior', 'Comunidad año anterior', 'Valor catastral', 'V. catastral construcción']]
-      .concat(D.inmuebles.map(function(o) { return [o.ref, o.dir, o.catastral, o.inquilino, o.dni, rinf_fecha(o.inicio), o.reduccion, o.meses, o.dias || '', o.diasProp || '', rinf_num(o.ingreso), rinf_num(o.comunidad), rinf_num(o.seguro), o.seguroDed, rinf_num(o.ibi), o.ibiFecha ? rinf_fecha(o.ibiFecha) : '', o.ibiDed, o.amort, o.gastosDed, o.ant.seguro, o.ant.ibi, o.ant.ibiFecha ? rinf_fecha(o.ant.ibiFecha) : '', o.ant.comunidad, o.vcTotal || '', o.vcConstruccion || '']; }))
-      .concat([['Total', '', '', '', '', '', '', '', '', '', rinf_num(D.inmTot.ingreso), rinf_num(D.inmTot.comunidad), rinf_num(D.inmTot.seguro), D.inmTot.seguroDed, rinf_num(D.inmTot.ibi), '', D.inmTot.ibiDed, rinf_num(D.inmTot.amort), D.inmTot.gastosDed, '', '', '', '', '', '']]),
-      [10, 28, 22, 28, 12, 13, 10, 9, 9, 9, 12, 11, 11, 11, 10, 11, 10, 13, 14, 12, 12, 12, 12, 13, 16]);
+    hoja('Inmuebles', [['Ref.', 'Dirección', 'Ref. catastral', 'Inquilino', 'DNI/NIE', 'Inicio contrato', 'Reducción', 'Meses cobrados', 'Días alquilado', 'Días propiedad', 'Ingresos', 'Comunidad', 'Seguro pagado', 'Renovación seguro', 'Seguro deducible', 'IBI pagado', 'Fecha IBI', 'IBI deducible', 'Amortización 3 %', 'Total gastos deducibles', 'Seguro año anterior', 'IBI año anterior', 'Fecha IBI año anterior', 'Comunidad año anterior', 'Valor catastral', 'V. catastral construcción']]
+      .concat(D.inmuebles.map(function(o) { return [o.ref, o.dir, o.catastral, o.inquilino, o.dni, rinf_fecha(o.inicio), o.reduccion, o.meses, o.dias || '', o.diasProp || '', rinf_num(o.ingreso), rinf_num(o.comunidad), rinf_num(o.seguro), o.segRenov ? rinf_fecha(o.segRenov) : '', o.seguroDed, rinf_num(o.ibi), o.ibiFecha ? rinf_fecha(o.ibiFecha) : '', o.ibiDed, o.amort, o.gastosDed, o.ant.seguro, o.ant.ibi, o.ant.ibiFecha ? rinf_fecha(o.ant.ibiFecha) : '', o.ant.comunidad, o.vcTotal || '', o.vcConstruccion || '']; }))
+      .concat([['Total', '', '', '', '', '', '', '', '', '', rinf_num(D.inmTot.ingreso), rinf_num(D.inmTot.comunidad), rinf_num(D.inmTot.seguro), '', D.inmTot.seguroDed, rinf_num(D.inmTot.ibi), '', D.inmTot.ibiDed, rinf_num(D.inmTot.amort), D.inmTot.gastosDed, '', '', '', '', '', '']]),
+      [10, 28, 22, 28, 12, 13, 10, 9, 9, 9, 12, 11, 11, 12, 11, 10, 11, 10, 13, 14, 12, 12, 12, 12, 13, 16]);
     hoja('Gastos', [['Fecha', 'Concepto', 'Categoría', 'Importe', 'Cuenta como', 'Factura']]
       .concat(D.gastos.map(function(g) { return [rinf_fecha(g.fecha), g.concepto, g.cat, g.importe, g.nota, g.enlace]; }))
       .concat([['', 'Total gastos del alquiler', '', rinf_num(D.gastosAlquiler), '', '']]), [12, 40, 22, 12, 24, 14], 5);
