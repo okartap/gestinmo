@@ -2299,7 +2299,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261114_02';
+const BUILD_ID = '261115_01';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -8583,6 +8583,11 @@ function showModule(name) {
   }
   // Refrescar dashboard al volver al inicio
   if (name === 'inicio' && typeof dash_render === 'function') {
+    // 15/11/2026: las aportaciones automáticas pendientes se suman también al
+    // abrir Inicio (antes solo al entrar en Finanzas), para que el patrimonio
+    // de Inicio y el de Finanzas coincidan siempre. Misma función y mismas
+    // protecciones (solo admin, con la nube activa, una vez por fecha).
+    try { if (typeof fin_dcaAutoAplicar === 'function') fin_dcaAutoAplicar(); } catch (eDca) {}
     dash_render();
   }
 }
@@ -23248,73 +23253,51 @@ function prs_avisosPend() {
   return out;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 15/11/2026 (Patry): CÁLCULO ÚNICO DEL PATRIMONIO. Antes había 4 copias de
+// la fórmula (Finanzas, Inicio, foto del Histórico/Cierre del mes y panel
+// "Mi patrimonio") y al añadir algo (los préstamos, 13/11) una se quedó sin
+// actualizar: Inicio salía 17.000 € por debajo. Ahora todas leen de aquí.
+// emp: 'patricio' | 'patrimer' (por defecto la empresa activa).
+// Cotización de cada acción: la de memoria (Finanzas) y, si no está, la
+// guardada en 'fin:cotizaciones' (así Inicio no depende de haber abierto antes
+// Finanzas).
+// ═══════════════════════════════════════════════════════════════════════
+function fin_patrimonioCalc(emp) {
+  emp = emp || localStorage.getItem('patrimer:empresa') || 'patrimer';
+  var prev = window._finEmpForzada; window._finEmpForzada = emp;
+  try {
+    var cuentas = fin_visibles('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
+    var fondos = fin_visibles('fin:fondos').reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
+    var cache = {}; try { cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}') || {}; } catch (e) {}
+    var simples = fin_accSimpleLoad(), origen = {}, acciones = 0;
+    simples.forEach(function(sx) { if (!sx || sx.deleted) return; acciones += parseFloat(sx.valorActual) || 0; if (sx.origenTicker) origen[sx.origenTicker] = true; });
+    var pos = {};
+    fin_visibles('fin:acciones').forEach(function(op) {
+      var t = op.ticker; if (!t || origen[t]) return;
+      if (!pos[t]) pos[t] = 0;
+      if (op.tipo === 'compra') pos[t] += parseFloat(op.cantidad) || 0;
+      else if (op.tipo === 'venta') pos[t] -= parseFloat(op.cantidad) || 0;
+      else if (op.tipo === 'scrip') pos[t] += parseFloat(op.scripAcciones) || 0;
+    });
+    Object.keys(pos).forEach(function(t) {
+      if (pos[t] <= 0) return;
+      var cot = _finCotizaciones[t] || (cache[t] ? parseFloat(cache[t].precio) : null);
+      if (cot) acciones += cot * pos[t];
+    });
+    var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) { return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0)); }, 0);
+    var prestamos = prs_capitalPendiente();
+    var inmob = inm_patrimonioInmobiliario(emp);
+    var financiero = cuentas + fondos + acciones + urbanitae + prestamos;
+    return { emp: emp, cuentas: cuentas, fondos: fondos, acciones: acciones, urbanitae: urbanitae, prestamos: prestamos,
+      inmob: inmob, financiero: financiero, total: financiero + inmob.total, igc: emp === 'patrimer' ? fin_igcValor() : 0 };
+  } finally { window._finEmpForzada = prev; }
+}
 function fin_calcPatrimonio() {
-  // PUNTO 165 (22/09/2026): totales calculados con fin_visibles() — la lista
-  // sin los elementos "tachados" (borrados) — para no seguir sumando algo
-  // que ya se ha borrado en cualquier aparato.
-  var cuentas = fin_visibles('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
-  var fondos = fin_visibles('fin:fondos').reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
-  // BLINDAJE DE DATOS: recalcular acciones desde los datos reales (igual
-  // que Cuentas y Fondos), no leyendo el texto ya pintado en pantalla —
-  // si se vendía toda una posición, ese texto se quedaba con el último
-  // valor no-cero (la fila se ocultaba pero nadie lo borraba), y el
-  // Patrimonio financiero total seguía sumando un valor fantasma.
-  // PUNTO 148 (08/09/2026): las posiciones en modo simple no se calculan con
-  // la cotización — su "Valor actual" ya es un número fijo que se edita a
-  // mano, así que se suma directamente. Si una posición simple viene de
-  // convertir una detallada, su ticker original se salta abajo para no
-  // contarla dos veces.
-  var simplesPatr = fin_accSimpleLoad();
-  var tickersOrigenSimplePatr = {};
-  var acciones = 0;
-  for (var sp = 0; sp < simplesPatr.length; sp++) {
-    if (simplesPatr[sp].deleted) continue; // PUNTO 165 (22/09/2026): posición simple borrada, se salta
-    acciones += parseFloat(simplesPatr[sp].valorActual) || 0;
-    if (simplesPatr[sp].origenTicker) tickersOrigenSimplePatr[simplesPatr[sp].origenTicker] = true;
-  }
-  var opsAcc = fin_visibles('fin:acciones');
-  var posAcc = {};
-  for (var i = 0; i < opsAcc.length; i++) {
-    var op = opsAcc[i];
-    var t = op.ticker;
-    if (tickersOrigenSimplePatr[t]) continue;
-    if (!posAcc[t]) posAcc[t] = 0;
-    if (op.tipo === 'compra') posAcc[t] += parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'venta') posAcc[t] -= parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'scrip') posAcc[t] += parseFloat(op.scripAcciones) || 0;
-  }
-  Object.keys(posAcc).forEach(function(tk) {
-    if (posAcc[tk] <= 0) return;
-    var cot = _finCotizaciones[tk] || null;
-    if (cot) acciones += cot * posAcc[tk];
-  });
-  // PUNTO 89 (03/09/2026): solo el CAPITAL invertido en proyectos "En curso"
-  // cuenta aquí — criterio conservador, igual que el resto de la app: el
-  // interés previsto no es un dato garantizado hasta que de verdad se cobra.
-  // Un proyecto "Cobrado" deja de sumar aquí (ese dinero ya está, o debería
-  // estar, contado como parte de una cuenta normal).
-  var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) {
-    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
-  }, 0);
-  // PUNTO 41 (25/08/2026): se suma el patrimonio inmobiliario (valor de
-  // mercado actual de los inmuebles de esta empresa) al total.
+  // 15/11/2026: el cálculo vive en fin_patrimonioCalc() (único para toda la app).
   var empresaActivaFin = localStorage.getItem('patrimer:empresa') || 'patrimer';
-  var inmob = inm_patrimonioInmobiliario(empresaActivaFin);
-  // PUNTO 47 (25/08/2026): Patrimer tiene el 33% de Industrias (IGC), así que
-  // ese 33% también es patrimonio suyo. No hay datos de Industrias dentro de
-  // esta app (sus inmuebles/activos no están dados de alta aquí), así que
-  // esto NO se calcula solo — es un importe fijo que Patry confirma y
-  // actualiza a mano cuando cambie (como ya hace con las cotizaciones).
-  // 08/11/2026 (privacidad): el importe ya NO va escrito en el código (el
-  // repositorio es público); se guarda como dato ('fin:igc_patrimer') y se
-  // edita con el ✎ de la fila "33 % IGC" (solo admin).
-  var igc = (empresaActivaFin === 'patrimer') ? fin_igcValor() : 0;
-  // AJUSTE 25/08/2026 (noche): a petición de Patry, el número grande de arriba
-  // ("Patrimonio total") vuelve a ser solo lo de esta empresa (sin IGC) — el
-  // 33% de Industrias se muestra aparte, como una fila más (no en pequeño),
-  // con su propia suma "Total+IGC".
-  var prestamos = prs_capitalPendiente(); // 13/11/2026: capital que me deben (préstamos que he dado)
-  var total = cuentas + fondos + acciones + urbanitae + prestamos + inmob.total;
+  var P = fin_patrimonioCalc(empresaActivaFin);
+  var cuentas = P.cuentas, fondos = P.fondos, acciones = P.acciones, urbanitae = P.urbanitae, prestamos = P.prestamos, inmob = P.inmob, igc = P.igc, total = P.total;
   var el = document.getElementById('fin-patrimonio-total');
   if (el) el.textContent = total > 0 ? fin_fmt(total) : '-';
   var rowsEl = document.getElementById('fin-patrimonio-rows');
@@ -23424,48 +23407,14 @@ function fin_patHist_nombreMes(id) {
 // Calcula Liquidez/Invertido/Inmobiliario de la empresa activa AHORA MISMO
 // (los saldos tal y como estén en pantalla en el momento de pulsar "＋").
 function fin_patHist_calcularActual() {
-  var emp = fin_emp();
-  // PUNTO 165 (22/09/2026): totales calculados con fin_visibles() — sin los
-  // elementos "tachados" (borrados) — mismo motivo que fin_calcPatrimonio.
-  var cuentas = fin_visibles('fin:cuentas').reduce(function(s, c) { return s + numES(c.saldo); }, 0);
-  var fondos = fin_visibles('fin:fondos').reduce(function(s, f) { return s + numES(f.valor); }, 0);
-  var opsAcc = fin_visibles('fin:acciones');
-  // PUNTO 148 (08/09/2026): mismo criterio que fin_calcPatrimonio — las
-  // posiciones en modo simple suman su "Valor actual" directo, y su ticker
-  // de origen (si venían de una detallada) se salta para no duplicar.
-  var simplesHist = fin_accSimpleLoad();
-  var tickersOrigenSimpleHist = {};
-  var acciones = 0;
-  for (var sh = 0; sh < simplesHist.length; sh++) {
-    if (simplesHist[sh].deleted) continue; // PUNTO 165 (22/09/2026): posición simple borrada, se salta
-    acciones += numES(simplesHist[sh].valorActual);
-    if (simplesHist[sh].origenTicker) tickersOrigenSimpleHist[simplesHist[sh].origenTicker] = true;
-  }
-  var posAcc = {};
-  for (var i = 0; i < opsAcc.length; i++) {
-    var op = opsAcc[i];
-    var t = op.ticker;
-    if (tickersOrigenSimpleHist[t]) continue;
-    if (!posAcc[t]) posAcc[t] = 0;
-    if (op.tipo === 'compra') posAcc[t] += numES(op.cantidad);
-    else if (op.tipo === 'venta') posAcc[t] -= numES(op.cantidad);
-    else if (op.tipo === 'scrip') posAcc[t] += numES(op.scripAcciones);
-  }
-  Object.keys(posAcc).forEach(function(tk) {
-    if (posAcc[tk] <= 0) return;
-    var cot = _finCotizaciones[tk] || null;
-    if (cot) acciones += cot * posAcc[tk];
-  });
-  var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) {
-    return s + (u.estado === 'cobrado' ? 0 : numES(u.capital));
-  }, 0);
-  var inmob = inm_patrimonioInmobiliario(emp);
+  // 15/11/2026: del cálculo único (fin_patrimonioCalc); los préstamos cuentan como invertido.
+  var P = fin_patrimonioCalc(fin_emp());
   return {
-    liquidez: cuentas,
-    invertido: fondos + acciones + urbanitae,
-    inmobiliario: inmob.total,
-    inmobSinValor: inmob.sinValor,
-    inmobRefsSinValor: inmob.refsSinValor
+    liquidez: P.cuentas,
+    invertido: P.fondos + P.acciones + P.urbanitae + P.prestamos,
+    inmobiliario: P.inmob.total,
+    inmobSinValor: P.inmob.sinValor,
+    inmobRefsSinValor: P.inmob.refsSinValor
   };
 }
 function fin_patHist_editarNota(id) {
@@ -24946,12 +24895,18 @@ function finperdash_render() {
   // panel no los sumaba y no cuadraba con la tarjeta de Inicio.
   var urbInv = fin_visibles('fin:urbanitae').reduce(function(s, u) { return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0)); }, 0);
   var caixaInv = inv.caixa || 0;
+  // 15/11/2026: los totales salen del cálculo único (fin_patrimonioCalc) para
+  // cuadrar al céntimo con Finanzas e Inicio; aquí solo se reparte por cuenta.
+  var _PF = fin_patrimonioCalc('patricio');
+  var preInv = _PF.prestamos;
   var totalLiq = caixa + efectivo + myLiq + trLiq;
-  var totalInv = myInv + trInv + urbInv + caixaInv;
-  var totalFinanciero = totalLiq + totalInv;
+  var totalInv = myInv + trInv + urbInv + caixaInv + preInv;
+  var otrosFin = Math.round((_PF.financiero - totalLiq - totalInv) * 100) / 100; // cuentas u otros valores sin cuenta asignada
+  if (Math.abs(otrosFin) < 0.01) otrosFin = 0;
+  var totalFinanciero = _PF.financiero;
   var pctLiq = totalFinanciero > 0 ? (totalLiq / totalFinanciero * 100) : 0;
-  var pctInv = totalFinanciero > 0 ? (totalInv / totalFinanciero * 100) : 0;
-  var totalInmobiliario = patrim_valorInmobiliarioActual('patricio');
+  var pctInv = totalFinanciero > 0 ? ((totalInv + otrosFin) / totalFinanciero * 100) : 0;
+  var totalInmobiliario = _PF.inmob.total; // 15/11/2026: mismo criterio que Finanzas (valor de mercado o, si falta, precio de compra)
   var patrimonioTotal = totalInmobiliario + totalFinanciero;
   var pctInmob = patrimonioTotal > 0 ? (totalInmobiliario / patrimonioTotal * 100) : 0;
   var pctFin = patrimonioTotal > 0 ? (totalFinanciero / patrimonioTotal * 100) : 0;
@@ -24981,11 +24936,13 @@ function finperdash_render() {
   html += fila('Trade Republic · Invertido', fin_fmt(trInv));
   html += fila('Trade Republic · Total', fin_fmt(trTotal), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
   if (urbInv > 0) html += fila('Urbanitae · Invertido', fin_fmt(urbInv), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true });
+  if (preInv > 0) html += fila('Préstamos · Por cobrar', fin_fmt(preInv), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true }); // 15/11/2026
+  if (otrosFin) html += fila('Otras cuentas y valores', fin_fmt(otrosFin), { bold: true, colorVal: 'var(--accent-blue)', borderTop: true }); // 15/11/2026
   html += '</div>';
   // Bloque totales financiero
   html += '<div class="fin-section" style="padding:0;overflow:hidden;margin-top:10px;background:rgba(76,175,130,.08);">';
   html += fila('TOTAL LIQUIDEZ', fin_fmt(totalLiq), { bold: true, colorVal: '#4caf82' });
-  html += fila('TOTAL INVERTIDO', fin_fmt(totalInv), { bold: true, colorVal: '#4caf82', borderTop: true });
+  html += fila('TOTAL INVERTIDO', fin_fmt(totalInv + otrosFin), { bold: true, colorVal: '#4caf82', borderTop: true });
   html += fila('% Liquidez / % Invertido', pctLiq.toFixed(0) + '% / ' + pctInv.toFixed(0) + '%', { fsVal: '13px', colorVal: 'var(--silver-bright)', borderTop: true });
   html += '</div>';
   // Bloque patrimonio total (inmobiliario + financiero)
@@ -26313,50 +26270,10 @@ function dash_render() {
     elPrevS.className = 'kpi-s ' + (pctPrev>=0?'up':'dn');
   }
 
-  // ── Patrimonio financiero — calcular directamente desde localStorage ──
-  // PUNTO 165 (22/09/2026): fin_visibles() — sin los elementos "tachados"
-  // (borrados) — para no seguir sumando algo ya borrado en cualquier aparato.
-  var cuentas = fin_visibles('fin:cuentas').reduce(function(s,c){return s+(parseFloat(c.saldo)||0);},0);
-  var fondos = fin_visibles('fin:fondos').reduce(function(s,f){return s+(parseFloat(f.valor)||0);},0);
-  var _ops = fin_visibles('fin:acciones');
-  var _cotiz = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}');
-  // PUNTO 228 (02/10/2026) — BUG: Inicio no sumaba las acciones en "modo
-  // simple" (sí lo hacía Finanzas). Mismo criterio que fin_calcPatrimonio:
-  // se suma su valor actual y se salta su ticker de origen para no duplicar.
-  var _simplesDash = (typeof fin_accSimpleLoad === 'function') ? fin_accSimpleLoad() : [];
-  var _origenDash = {}, _accSimpleDash = 0;
-  _simplesDash.forEach(function(sx) { if (!sx || sx.deleted) return; _accSimpleDash += parseFloat(sx.valorActual) || 0; if (sx.origenTicker) _origenDash[sx.origenTicker] = true; });
-  var _pos = {};
-  for (var _i = 0; _i < _ops.length; _i++) {
-    var _op = _ops[_i]; var _t = _op.ticker;
-    if (_origenDash[_t]) continue;
-    if (!_pos[_t]) _pos[_t] = { num: 0, coste: 0 };
-    if (_op.tipo === 'compra') { _pos[_t].num += parseFloat(_op.cantidad)||0; _pos[_t].coste += (parseFloat(_op.cantidad)||0)*(parseFloat(_op.precio)||0); }
-    else if (_op.tipo === 'venta') { _pos[_t].num -= parseFloat(_op.cantidad)||0; }
-    else if (_op.tipo === 'scrip') { _pos[_t].num += parseFloat(_op.scripAcciones)||0; }
-  }
-  var acciones = _accSimpleDash;
-  var _tks = Object.keys(_pos);
-  for (var _j = 0; _j < _tks.length; _j++) {
-    var _p = _pos[_tks[_j]]; if (_p.num <= 0) continue;
-    var _cot = _cotiz[_tks[_j]] ? _cotiz[_tks[_j]].precio : null;
-    if (_cot) acciones += _cot * _p.num;
-  }
-  // PUNTO 89 (03/09/2026): mismo criterio que en Finanzas — solo el capital
-  // de los proyectos de Urbanitae "En curso" cuenta aquí (ver comentario
-  // junto a fin_calcPatrimonio()).
-  var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) {
-    return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0));
-  }, 0);
-  // PUNTO 41 (25/08/2026): se suma el patrimonio inmobiliario, igual que en Finanzas.
+  // ── Patrimonio — 15/11/2026: copia del cálculo único de Finanzas (fin_patrimonioCalc) ──
   var _empActivaPat = localStorage.getItem('patrimer:empresa') || 'patrimer';
-  var _inmobDash = inm_patrimonioInmobiliario(_empActivaPat);
-  // PUNTO 47 (25/08/2026): mismo 33% de Industrias (IGC) que en Finanzas —
-  // importe fijo, ver comentario junto a PATRIMONIO_IGC_PATRIMER en fin_render().
-  var _igcDash = (_empActivaPat === 'patrimer') ? fin_igcValor() : 0; // 08/11/2026: dato guardado, no en el código
-  // AJUSTE 25/08/2026 (noche): igual que en Finanzas — el número grande ya no
-  // incluye el IGC, se muestra aparte como fila "Total+IGC".
-  var total = cuentas + fondos + acciones + urbanitae + _inmobDash.total;
+  var _PD = fin_patrimonioCalc(_empActivaPat);
+  var _inmobDash = _PD.inmob, _igcDash = _PD.igc, total = _PD.total;
   var dPat = document.getElementById('dash-patrimonio-total'); if (dPat) dPat.textContent = total > 0 ? fin_fmt(total) : '—'; // PUNTO 228: con decimales
   var dPatI = document.getElementById('dash-pat-inmuebles'); if (dPatI) dPatI.textContent = _inmobDash.total > 0 ? fin_fmtSinSimbolo(_inmobDash.total) : '—';
   var dPatIgcRow = document.getElementById('dash-pat-igc-row');
@@ -26368,7 +26285,7 @@ function dash_render() {
   // PUNTO 89 (03/09/2026): Urbanitae se suma también aquí, dentro de
   // "Financiero" — en Inicio no hay sitio para desglosarlo aparte (a
   // diferencia de Finanzas, que sí tiene su propia fila).
-  var _financiero = cuentas + acciones + fondos + urbanitae;
+  var _financiero = _PD.financiero; // 15/11/2026: incluye préstamos, igual que Finanzas
   var dPatFin = document.getElementById('dash-pat-financiero'); if (dPatFin) dPatFin.textContent = _financiero > 0 ? fin_fmtSinSimbolo(_financiero) : '—';
   // PUNTO 72 (28/08/2026): "Cuentas + Fondos", misma liquidez para inversión
   // que en Finanzas — ver comentario junto a fin_calcPatrimonio().
@@ -26379,7 +26296,7 @@ function dash_render() {
   // de sobra en la fila, así que esta sí vuelve a mostrar decimales
   // (fin_fmtSinSimbolo) — las otras 3 filas de la tarjeta siguen en entero,
   // que es donde de verdad hacía falta el ahorro de espacio.
-  if (dPatLiq) dPatLiq.textContent = (_empActivaPat === 'patrimer') ? fin_fmtSinSimbolo(cuentas + fondos) : '—';
+  if (dPatLiq) dPatLiq.textContent = (_empActivaPat === 'patrimer') ? fin_fmtSinSimbolo(_PD.cuentas + _PD.fondos) : '—'; // 15/11/2026
 
   // ── Gráfica mensual del dashboard ────────────────────────────────
   dash_buildChart(year, facturasDash);
