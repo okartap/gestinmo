@@ -2299,7 +2299,7 @@ window.addEventListener('online', _flushOutbox);
 // desaparezca en silencio. También muestra la versión del archivo que está
 // ejecutando ese aparato en ese momento, para poder descartar que un
 // aparato esté sirviendo una copia vieja guardada en caché.
-const BUILD_ID = '261115_01';
+const BUILD_ID = '261115_02';
 window.BUILD_ID = BUILD_ID;
 let _authOk = null; // null = comprobando todavía, true/false = resultado ya conocido
 let _authError = '';
@@ -8670,12 +8670,11 @@ function inm_patrimonioInmobiliario(empresa) {
   // número, para no tener que adivinar de qué inmuebles se trata.
   var refsSinValor = [], refsUsandoCompra = [];
   deEstaEmpresa.forEach(function(inm) {
-    var valorMercado = parseFloat(inm.precioActual) || 0;
+    var valorMercado = numES(inm.precioActual) || 0; // 15/11/2026: misma lectura que inm_valorPiso
     // PUNTO 62 (27/08/2026): si no hay "valor de mercado actual", se usa el
     // "Precio de compra" como respaldo — mejor una estimación con el coste
     // real que dejar el inmueble totalmente fuera del Patrimonio Total.
-    var precioCompra = parseFloat(inm.precio) || 0;
-    var valor = valorMercado > 0 ? valorMercado : precioCompra;
+    var valor = inm_valorPiso(inm); // 15/11/2026 (D4)
     if (valor > 0) {
       total += valor;
       contados++;
@@ -15837,9 +15836,9 @@ function renderAnalisis(){
     var costeTotalRep = 0, valorActualRep = 0;
     for (var ir = 0; ir < todosInmRep.length; ir++) {
       var inmRep = todosInmRep[ir];
-      if ((inmRep.propietario || '').toLowerCase() !== 'patricio' || inmRep.estado === 'vendido') continue;
+      if (normEmpresa(inmRep.propietario || 'patrimer') !== 'patricio' || inmRep.estado === 'vendido') continue; // 15/11/2026: misma regla de empresa que el patrimonio
       costeTotalRep += inm_costeTotalInversion(inmRep);
-      valorActualRep += parseFloat(inmRep.precioActual) || 0;
+      valorActualRep += inm_valorPiso(inmRep); // 15/11/2026 (D4): mercado o, si falta, compra (igual que el patrimonio)
     }
     var diferenciaRep = valorActualRep - costeTotalRep;
     var elCosteVal = document.getElementById('kpi-coste-val');
@@ -18411,38 +18410,10 @@ function fin_loadEmpresa(base, empresa) {
     return JSON.parse(raw || '[]').filter(function(it) { return it && !it.deleted; });
   } catch (e) { return []; }
 }
-function fin_totalCuentasEmpresa(empresa) {
-  return fin_loadEmpresa('fin:cuentas', empresa).reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
-}
-function fin_totalFondosEmpresa(empresa) {
-  return fin_loadEmpresa('fin:fondos', empresa).reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
-}
-function fin_totalAccionesEmpresa(empresa) {
-  var total = 0;
-  var tickersOrigenSimple = {};
-  var simples = fin_loadEmpresa('fin:acciones_simple', empresa);
-  for (var s = 0; s < simples.length; s++) {
-    total += parseFloat(simples[s].valorActual) || 0;
-    if (simples[s].origenTicker) tickersOrigenSimple[simples[s].origenTicker] = true;
-  }
-  var ops = fin_loadEmpresa('fin:acciones', empresa);
-  var pos = {};
-  for (var i = 0; i < ops.length; i++) {
-    var op = ops[i];
-    var t = op.ticker;
-    if (tickersOrigenSimple[t]) continue;
-    if (!pos[t]) pos[t] = 0;
-    if (op.tipo === 'compra') pos[t] += parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'venta') pos[t] -= parseFloat(op.cantidad) || 0;
-    else if (op.tipo === 'scrip') pos[t] += parseFloat(op.scripAcciones) || 0;
-  }
-  Object.keys(pos).forEach(function(tk) {
-    if (pos[tk] <= 0) return;
-    var cot = _finCotizaciones[tk] || null;
-    if (cot) total += cot * pos[tk];
-  });
-  return total;
-}
+// 15/11/2026 (D6): Estudios → Financiación lee del cálculo único (antes copia propia que no quitaba lo borrado).
+function fin_totalCuentasEmpresa(empresa) { return fin_patrimonioCalc(empresa).cuentas; }
+function fin_totalFondosEmpresa(empresa) { return fin_patrimonioCalc(empresa).fondos; }
+function fin_totalAccionesEmpresa(empresa) { return fin_accValorEmp(empresa); }
 
 // ── PESTAÑA FINANCIACIÓN ───────────────────────────────────────────────
 // AJUSTE 2/3/4 (21/09/2026), rediseño completo decidido con Patry a partir
@@ -23254,6 +23225,51 @@ function prs_avisosPend() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// 15/11/2026 (Patry, revisión de datos repetidos D2/D4/D6): piezas únicas.
+// Antes cada pantalla repetía estas cuentas a su manera (11 copias de las
+// posiciones de acciones, varias de Urbanitae y del valor de cada piso).
+// ═══════════════════════════════════════════════════════════════════════
+// Cotización de una acción: la de memoria y, si no hay, la última guardada.
+function fin_accCot(t) {
+  if (_finCotizaciones[t]) return _finCotizaciones[t];
+  try { var c = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}') || {}; if (c[t] && parseFloat(c[t].precio)) return parseFloat(c[t].precio); } catch (e) {}
+  return null;
+}
+// Posiciones de la empresa activa (o la forzada con _finEmpForzada): acciones
+// en cartera por ticker (compras − ventas + scrip), sin lo borrado y sin los
+// tickers que se llevan en modo simple. También devuelve las acciones simples.
+function fin_accPosiciones() {
+  var simples = fin_accSimpleLoad().filter(function(x) { return x && !x.deleted; }), origen = {}, pos = {};
+  simples.forEach(function(x) { if (x.origenTicker) origen[x.origenTicker] = true; });
+  fin_visibles('fin:acciones').forEach(function(op) {
+    var t = op.ticker; if (!t || origen[t]) return;
+    if (!pos[t]) pos[t] = 0;
+    if (op.tipo === 'compra') pos[t] += numES(op.cantidad);
+    else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad);
+    else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones);
+  });
+  Object.keys(pos).forEach(function(t) { if (!(pos[t] > 0.000001)) delete pos[t]; });
+  return { pos: pos, origen: origen, simples: simples };
+}
+// Valor total de las acciones de una empresa.
+function fin_accValorEmp(emp) {
+  var prev = window._finEmpForzada; if (emp) window._finEmpForzada = emp;
+  try {
+    var A = fin_accPosiciones(), total = 0;
+    A.simples.forEach(function(x) { total += numES(x.valorActual) || 0; });
+    Object.keys(A.pos).forEach(function(t) { var c = fin_accCot(t); if (c) total += c * A.pos[t]; });
+    return total;
+  } finally { window._finEmpForzada = prev; }
+}
+// Capital de Urbanitae aún no cobrado de una empresa.
+function fin_urbPendiente(emp) {
+  var prev = window._finEmpForzada; if (emp) window._finEmpForzada = emp;
+  try { return fin_visibles('fin:urbanitae').reduce(function(s, u) { return s + (u.estado === 'cobrado' ? 0 : (numES(u.capital) || 0)); }, 0); }
+  finally { window._finEmpForzada = prev; }
+}
+// Valor de un piso: el de mercado de la ficha y, si no hay, el precio de compra.
+function inm_valorPiso(inm) { var vm = numES(inm && inm.precioActual) || 0; return vm > 0 ? vm : (numES(inm && inm.precio) || 0); }
+// ═══════════════════════════════════════════════════════════════════════
 // 15/11/2026 (Patry): CÁLCULO ÚNICO DEL PATRIMONIO. Antes había 4 copias de
 // la fórmula (Finanzas, Inicio, foto del Histórico/Cierre del mes y panel
 // "Mi patrimonio") y al añadir algo (los préstamos, 13/11) una se quedó sin
@@ -23269,23 +23285,8 @@ function fin_patrimonioCalc(emp) {
   try {
     var cuentas = fin_visibles('fin:cuentas').reduce(function(s, c) { return s + (parseFloat(c.saldo) || 0); }, 0);
     var fondos = fin_visibles('fin:fondos').reduce(function(s, f) { return s + (parseFloat(f.valor) || 0); }, 0);
-    var cache = {}; try { cache = JSON.parse(localStorage.getItem('fin:cotizaciones') || '{}') || {}; } catch (e) {}
-    var simples = fin_accSimpleLoad(), origen = {}, acciones = 0;
-    simples.forEach(function(sx) { if (!sx || sx.deleted) return; acciones += parseFloat(sx.valorActual) || 0; if (sx.origenTicker) origen[sx.origenTicker] = true; });
-    var pos = {};
-    fin_visibles('fin:acciones').forEach(function(op) {
-      var t = op.ticker; if (!t || origen[t]) return;
-      if (!pos[t]) pos[t] = 0;
-      if (op.tipo === 'compra') pos[t] += parseFloat(op.cantidad) || 0;
-      else if (op.tipo === 'venta') pos[t] -= parseFloat(op.cantidad) || 0;
-      else if (op.tipo === 'scrip') pos[t] += parseFloat(op.scripAcciones) || 0;
-    });
-    Object.keys(pos).forEach(function(t) {
-      if (pos[t] <= 0) return;
-      var cot = _finCotizaciones[t] || (cache[t] ? parseFloat(cache[t].precio) : null);
-      if (cot) acciones += cot * pos[t];
-    });
-    var urbanitae = fin_visibles('fin:urbanitae').reduce(function(s, u) { return s + (u.estado === 'cobrado' ? 0 : (parseFloat(u.capital) || 0)); }, 0);
+    var acciones = fin_accValorEmp(emp); // D2
+    var urbanitae = fin_urbPendiente(emp); // D6
     var prestamos = prs_capitalPendiente();
     var inmob = inm_patrimonioInmobiliario(emp);
     var financiero = cuentas + fondos + acciones + urbanitae + prestamos;
@@ -23585,18 +23586,10 @@ function fin_patHist_desglose(ov) {
     if (c) _linea(c, _nombreClave(c)).invertido += v;
     else _linea(SIN, 'Sin banco asignado').invertido += v;
   });
-  var pos = {};
-  fin_visibles('fin:acciones').forEach(function(op) {
-    var t = op.ticker;
-    if (!t || origenSimple[t]) return;
-    if (!pos[t]) pos[t] = 0;
-    if (op.tipo === 'compra') pos[t] += numES(op.cantidad);
-    else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad);
-    else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones);
-  });
+  var pos = fin_accPosiciones().pos; // 15/11/2026 (D2): posiciones únicas
   Object.keys(pos).forEach(function(t) {
     if (pos[t] <= 0) return;
-    var cot = (t in _ovT) ? _ovT[t] : (_finCotizaciones[t] || null);
+    var cot = (t in _ovT) ? _ovT[t] : fin_accCot(t);
     if (!cot) return;
     var v = cot * pos[t];
     mercado += v;
@@ -23742,19 +23735,10 @@ function cierre_abrir() {
   if (emp !== 'patrimer' && emp !== 'patricio') { avisar('El cierre del mes es para Patrimer y Patricio.'); return; }
   var hoy = new Date(), dia1 = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-01';
   var cuentas = fin_visibles('fin:cuentas'), fondos = fin_visibles('fin:fondos');
-  var simples = fin_accSimpleLoad().filter(function(x) { return x && !x.deleted; });
-  var origen = {}; simples.forEach(function(x) { if (x.origenTicker) origen[x.origenTicker] = true; });
-  var pos = {};
-  fin_visibles('fin:acciones').forEach(function(o) {
-    if (!o || origen[o.ticker]) return;
-    if (!pos[o.ticker]) pos[o.ticker] = 0;
-    if (o.tipo === 'compra') pos[o.ticker] += numES(o.cantidad);
-    else if (o.tipo === 'venta') pos[o.ticker] -= numES(o.cantidad);
-    else if (o.tipo === 'scrip') pos[o.ticker] += numES(o.scripAcciones);
-  });
+  var _AP = fin_accPosiciones(), simples = _AP.simples, pos = _AP.pos; // 15/11/2026 (D2)
   var tickers = Object.keys(pos).filter(function(t) { return pos[t] > 0.000001; }).sort();
   var ins = fin_patHist_calcularActual();
-  var urb = fin_visibles('fin:urbanitae').reduce(function(s2, u) { return s2 + (u.estado === 'cobrado' ? 0 : numES(u.capital)); }, 0);
+  var urb = fin_urbPendiente(); // 15/11/2026 (D6)
   _cierre = { emp: emp, cuentas: cuentas, fondos: fondos, simples: simples, tickers: tickers, pos: pos, urb: urb, inm: ins.inmobiliario };
   var est = 'width:118px;flex-shrink:0;background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:15px;font-weight:700;padding:6px 8px;text-align:right;box-sizing:border-box;';
   var fila = function(nombre, sub, id, valor, soloLectura) {
@@ -24158,16 +24142,17 @@ function res_datos(emp, id) {
     var intr = 0; try { (JSON.parse(localStorage.getItem('renta:intereses_cuenta') || '[]') || []).forEach(function(i) { if (i && !i.deleted && i.mes === X) intr += (numES(i.bruto) || 0) - (numES(i.retencion) || 0); }); } catch (e) {}
     add('Intereses de la cuenta (netos)', intr);
   } else {
-    var alqC = 0, nC = 0, mesFin = X + '-31';
+    var alqC = 0, nC = 0, mesFin = X + '-31', _ipr = pend_inmPorRef();
     try { (JSON.parse(localStorage.getItem('contratos:lista') || '[]') || []).forEach(function(c) {
-      if (!c || c.deleted || !refsEmp[c.ref] || String(c.tipo || '').indexOf('rustica') === 0) return;
+      if (!c || c.deleted || pend_empresaContrato(c, _ipr) !== emp || String(c.tipo || '').indexOf('rustica') === 0) return; // 15/11/2026 (D3): misma regla que Tesorería y Pendientes
       if (c.inicio && c.inicio > mesFin) return;
       if (c.estado !== 'activo' && (!c.fin || c.fin < X + '-01')) return;
       var r = numES(c.renta) || 0; if (r > 0) { alqC += r; nC++; }
     }); } catch (e) {}
     add('Alquileres según contratos (' + nC + ')', alqC);
   }
-  var divs = 0; try { (JSON.parse(localStorage.getItem('fin:acciones:' + emp) || '[]') || []).forEach(function(o) { if (o && !o.deleted && o.tipo === 'dividendo' && String(o.fecha || '').slice(0, 7) === X) divs += numES(o.divImporte) || 0; }); } catch (e) {}
+  // 15/11/2026 (Patry, D5): el scrip cuenta como dividendo (igual que en Inicio); misma valoración (div_valorOp).
+  var divs = 0; try { (JSON.parse(localStorage.getItem('fin:acciones:' + emp) || '[]') || []).forEach(function(o) { if (o && !o.deleted && (o.tipo === 'dividendo' || o.tipo === 'scrip') && String(o.fecha || '').slice(0, 7) === X) divs += div_valorOp(o) || 0; }); } catch (e) {}
   add('Dividendos', divs);
   var gastos = 0; try { rgas_load(parseInt(X.slice(0, 4), 10)).forEach(function(g) { if (!g || g.deleted || g.enFicha || g.categoria === RENTA_CAT_GASTO_VENTA || String(g.fecha || '').slice(0, 7) !== X) return; if (refsEmp[g.ref] || (emp === 'patricio' && (g.ref === RGAS_VARIOS || !g.ref))) gastos += numES(g.importe) || 0; }); } catch (e) {}
   add('Gastos de los pisos apuntados', -gastos);
@@ -24323,21 +24308,16 @@ function inf_datosEmp(emp, fecha) {
   try {
     var cue = fin_visibles('fin:cuentas').map(function(c) { return { t: [c.entidad || FIN_CUENTA_LABEL[c.cuenta] || '', c.nombre || ''].filter(Boolean).join(' · ') || 'Cuenta', v: R(c.saldo) }; });
     var fon = fin_visibles('fin:fondos').map(function(f) { return { t: f.nombre || 'Fondo', v: R(f.valor), s: f.esPlanPensiones ? 'plan de pensiones' : '', g: f.gestora || '' }; });
-    var acc = [], origen = {};
-    fin_accSimpleLoad().forEach(function(a) { if (!a || a.deleted) return; if (a.origenTicker) origen[a.origenTicker] = true; acc.push({ t: a.nombre || a.ticker || 'Acción', v: R(a.valorActual) }); });
-    var pos = {};
-    fin_visibles('fin:acciones').forEach(function(op) {
-      var t = op.ticker; if (!t || origen[t]) return; pos[t] = pos[t] || 0;
-      if (op.tipo === 'compra') pos[t] += numES(op.cantidad); else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad); else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones);
-    });
-    Object.keys(pos).forEach(function(t) { if (pos[t] > 0.000001 && _finCotizaciones[t]) acc.push({ t: FIN_NOMBRES[t] || t, v: R(_finCotizaciones[t] * pos[t]), s: fmtGlobal(pos[t].toFixed(pos[t] % 1 ? 4 : 0)) + ' acc.' }); });
+    var acc = [], _AP = fin_accPosiciones(), pos = _AP.pos; // 15/11/2026 (D2)
+    _AP.simples.forEach(function(a) { acc.push({ t: a.nombre || a.ticker || 'Acción', v: R(a.valorActual) }); });
+    Object.keys(pos).forEach(function(t) { var _c = fin_accCot(t); if (pos[t] > 0.000001 && _c) acc.push({ t: FIN_NOMBRES[t] || t, v: R(_c * pos[t]), s: fmtGlobal(pos[t].toFixed(pos[t] % 1 ? 4 : 0)) + ' acc.' }); });
     var urb = fin_visibles('fin:urbanitae').filter(function(u) { return u.estado !== 'cobrado'; }).map(function(u) { return { t: u.nombre || 'Proyecto', v: R(u.capital) }; });
   } finally { window._finEmpForzada = null; }
   var inm = [], conCompra = 0;
   loadInmuebles().forEach(function(i) {
     if (!i || i.deleted || i.estado === 'vendido' || normEmpresa(String(i.propietario || 'patrimer').toLowerCase()) !== emp) return;
-    var vm = numES(i.precioActual) || 0, pc = numES(i.precio) || 0;
-    if (!(vm > 0) && !(pc > 0)) return;
+    var vm = numES(i.precioActual) || 0, pc = numES(i.precio) || 0; // 15/11/2026 (D4): misma regla que inm_valorPiso
+    if (!(inm_valorPiso(i) > 0)) return;
     if (!(vm > 0)) conCompra++;
     var dir = String(i.direccionCalle || i.direccion || '').split(',')[0];
     inm.push({ t: (i.ref || '') + (dir ? ' · ' + dir : ''), v: R(vm > 0 ? vm : pc), s: (vm > 0 ? '' : 'precio de compra') + (i.estado === 'alquilado' && numES(i.renta) > 0 ? (vm > 0 ? '' : ' · ') + 'alquilado' : ''), m2: i.m2, renta: numES(i.renta) || 0 });
@@ -24807,17 +24787,7 @@ function finper_render() {
 // ═══════════════════════════════════════════════════════════════════════
 // Mismo cálculo que la tarjeta "Patrim. Inmo." de Inicio (punto 100.5/101):
 // suma del valor actual de los inmuebles NO vendidos de ese propietario.
-function patrim_valorInmobiliarioActual(propietario) {
-  var todos = [];
-  try { todos = JSON.parse(localStorage.getItem('inmuebles:lista') || '[]'); } catch (e) { todos = []; }
-  var total = 0;
-  for (var i = 0; i < todos.length; i++) {
-    var inm = todos[i];
-    if ((inm.propietario || '').toLowerCase() !== propietario || inm.estado === 'vendido') continue;
-    total += parseFloat(inm.precioActual) || 0;
-  }
-  return total;
-}
+// 15/11/2026: patrim_valorInmobiliarioActual eliminada (sin uso; el valor de cada piso sale de inm_valorPiso).
 // Busca en Cuentas (Patricio) el saldo de la cuenta cuyo nombre contiene el
 // texto indicado (sin mayúsculas/acentos ni espacios de más) — así "Caixa",
 // "CaixaBank" o "CAIXA BANK" encajan todos igual.
@@ -26498,6 +26468,17 @@ function notas_render() {
 // TODAS las empresas (a petición de Patry), cada uno con la etiqueta y el
 // color de la empresa a la que pertenece. Empresa de un contrato: la del
 // propietario de su inmueble (por ref); si no, por el texto del arrendador.
+// 15/11/2026 (Patry, D3): empresa que figura como ARRENDADOR en el texto del contrato.
+// Regla de Patry: solo el dueño del piso puede alquilarlo, así que debe coincidir
+// con el propietario del inmueble; si no, es un error de datos (aviso en Pendientes).
+function ctr_empresaArrendador(c) {
+  var arr = String((c && c.arrendador) || '').toLowerCase();
+  if (!arr) return '';
+  if (arr.indexOf('patrimer') !== -1 || arr.indexOf('b-73110009') !== -1) return 'patrimer';
+  if (arr.indexOf('industrias') !== -1 || arr.indexOf('igc') !== -1) return 'industrias';
+  if (arr.indexOf('patricio') !== -1) return 'patricio';
+  return '';
+}
 function pend_empresaContrato(c, inmPorRef) {
   if (c && c.ref && inmPorRef[c.ref] && inmPorRef[c.ref].propietario) {
     return normEmpresa(String(inmPorRef[c.ref].propietario).toLowerCase());
@@ -26792,6 +26773,15 @@ function pend_calcular() {
       try { var _ppDic = renta_avisoDiciembre(new Date()); if (_ppDic) items.push(_ppDic); } catch (ePD) {}
       try { var _emgP = emg_avisoPend(); if (_emgP) items.push(_emgP); } catch (eEP) {} // 12/11/2026
       try { prs_avisosPend().forEach(function(x) { items.push(x); }); } catch (ePA) {} // 13/11/2026
+      // 15/11/2026 (D3): contratos activos cuyo arrendador no es el dueño del piso (un aviso agrupado).
+      try { var _iprA = pend_inmPorRef(), _malA = [];
+        (JSON.parse(localStorage.getItem('contratos:lista') || '[]') || []).forEach(function(c) {
+          if (!c || c.deleted || c.estado !== 'activo' || !c.ref || !_iprA[c.ref]) return;
+          var dueno = normEmpresa(String(_iprA[c.ref].propietario || 'patrimer').toLowerCase()), arr = ctr_empresaArrendador(c);
+          if (arr && dueno && arr !== dueno) _malA.push(c.ref + ' (' + (c.inqNombre || 'contrato') + ')');
+        });
+        if (_malA.length) items.push({ icon: '⚠️', t: _malA.length === 1 ? 'Un contrato tiene un arrendador que no es el dueño del piso' : _malA.length + ' contratos tienen un arrendador que no es el dueño del piso', s: _malA.join(' · ') + ' · revisa el arrendador del contrato o el propietario del piso', accion: 'contratos_lista' });
+      } catch (eAD) {}
       if (pRenta.alquileres) items.push({ icon: '📋', t: 'Renta: faltan los cobros de ' + pRenta.alquileres.mes.toLowerCase() + ' (' + pRenta.alquileres.faltan + ' de ' + pRenta.alquileres.total + ' inmuebles)', s: 'Renta Patricio → Cobros mensuales → "Guardar este mes"', accion: 'renta_datos', bloque: 'bloque-alqmen', empresa: 'patricio' });
     }
   } catch (e) {}
@@ -27239,10 +27229,10 @@ function emg_bienes() {
   var accL = [], vistos = {};
   window._finEmpForzada = 'patricio';
   try {
-    fin_accSimpleLoad().forEach(function(a) { if (!a || a.deleted) return; var n = a.nombre || a.ticker || 'Acción'; if (a.origenTicker) vistos[a.origenTicker] = true; if (!vistos['n:' + n]) { vistos['n:' + n] = true; accL.push({ t: n }); } });
-    var pos = {}, nom = {};
-    fin_visibles('fin:acciones').forEach(function(op) { var t = op.ticker; if (!t) return; pos[t] = pos[t] || 0; nom[t] = op.nombre || nom[t]; if (op.tipo === 'compra') pos[t] += numES(op.cantidad); else if (op.tipo === 'venta') pos[t] -= numES(op.cantidad); else if (op.tipo === 'scrip') pos[t] += numES(op.scripAcciones); });
-    Object.keys(pos).forEach(function(t) { var n = FIN_NOMBRES[t] || nom[t] || t; if (pos[t] > 0.000001 && !vistos[t] && !vistos['n:' + n]) { vistos['n:' + n] = true; accL.push({ t: n }); } });
+    var _AP = fin_accPosiciones(); // 15/11/2026 (D2)
+    _AP.simples.forEach(function(a) { var n = a.nombre || a.ticker || 'Acción'; if (!vistos['n:' + n]) { vistos['n:' + n] = true; accL.push({ t: n }); } });
+    var _nom = {}; fin_visibles('fin:acciones').forEach(function(op) { if (op.ticker && op.nombre) _nom[op.ticker] = op.nombre; });
+    Object.keys(_AP.pos).forEach(function(t) { var n = FIN_NOMBRES[t] || _nom[t] || t; if (!vistos['n:' + n]) { vistos['n:' + n] = true; accL.push({ t: n }); } });
   } catch (e) {} finally { window._finEmpForzada = null; }
   if (accL.length) B.push({ k: 'acc', t: 'Acciones', total: 0, items: accL, nota: 'Están en las cuentas de broker de "Bancos y cuentas".' });
   add('urb', 'Urbanitae (préstamos a proyectos inmobiliarios)', P.bloques.urb, 'Se cobran solos al vencer cada proyecto, en la cuenta de Urbanitae.');
@@ -31659,16 +31649,17 @@ function renta_calcPrevisionDatos(proy) {
     var gastosPiso = gastoAsignado + o2.comunidad + (o2.segibi + o2.otros) * fAlq;
     var rendNeto = o2.ingreso - gastosPiso - amorAnual;
     if (diasAlq === 0 && o2.ingreso === 0) rendNeto = 0;
-    if (d.tipo === 'vivienda' && rendNeto > 0) {
+    var _pctRedPiso = 0; // 15/11/2026 (D1): se guarda para el informe del asesor
+    if (d.tipo === 'vivienda') {
       var _refInm = inmX.ref;
       var _ctrV = _ctrsRenta.filter(function(c) { return c.ref === _refInm && c.estado === 'activo'; })[0];
-      var _pctRed = (_ctrV && _ctrV.inicio && _ctrV.inicio < '2023-05-26') ? 0.60 : 0.50;
-      rendNeto = rendNeto * (1 - _pctRed);
+      _pctRedPiso = (_ctrV && _ctrV.inicio && _ctrV.inicio < '2023-05-26') ? 0.60 : 0.50;
+      if (rendNeto > 0) rendNeto = rendNeto * (1 - _pctRedPiso);
     }
     baseAlquilerTotal += rendNeto;
     var imput = renta_imputacionPiso(inmX, idx, renta_anio, diasProp - diasAlq);
     imputacionTotal += imput;
-    pisosDet.push({ idx: idx, ref: inmX.ref, diasProp: diasProp, diasAlq: diasAlq, gastos: gastosPiso, amort: amorAnual, imputacion: imput, rendNeto: rendNeto });
+    pisosDet.push({ idx: idx, ref: inmX.ref, diasProp: diasProp, diasAlq: diasAlq, gastos: gastosPiso, amort: amorAnual, imputacion: imput, rendNeto: rendNeto, pctRed: _pctRedPiso });
   }
 
   // Capital mobiliario: dividendos de Finanzas (bruto, retención 19%) +
@@ -31900,8 +31891,32 @@ function rinf_datos(anio) {
     if (o.ingreso > 0 || o.comunidad > 0 || o.seguro > 0 || o.ibi > 0 || o.imputacion > 0) D.inmuebles.push(o);
   });
   D.inmuebles.forEach(function(o) { ['ingreso', 'comunidad', 'seguro', 'ibi'].forEach(function(k) { o[k] = rinf_num(o[k]); }); });
-  D.inmTot = D.inmuebles.reduce(function(t, o) { t.ingreso += o.ingreso; t.comunidad += o.comunidad; t.seguro += o.seguro; t.ibi += o.ibi; t.amort += o.amort; return t; }, { ingreso: 0, comunidad: 0, seguro: 0, ibi: 0, amort: 0 });
-  ['ingreso', 'comunidad', 'seguro', 'ibi', 'amort'].forEach(function(k) { D.inmTot[k] = rinf_num(D.inmTot[k]); });
+  // 15/11/2026 (Patry, revisión D1): lo deducible sale de la MISMA previsión de
+  // la Renta (renta_calcPrevisionDatos), para que el asesor vea exactamente lo
+  // que calcula la app: seguro, IBI y otros por días alquilados, amortización
+  // e imputación. Al lado se dejan los importes del año (y del anterior, con la
+  // fecha del IBI si está apuntada) para poder comprobarlo.
+  var _P = null, _anioAntes = renta_anio;
+  try { renta_anio = anio; _P = renta_calcPrevisionDatos(); } catch (eP) { _P = null; } finally { renta_anio = _anioAntes; }
+  var _pdPorRef = {}; ((_P && _P.pisos) || []).forEach(function(x) { if (x && x.ref) _pdPorRef[x.ref] = x; });
+  var _segAnt = {}; segibi.forEach(function(r) { if (!r || r.deleted || parseInt(r.anio, 10) !== anio - 1) return; var k = r.inmuebleRef || ''; if (!k) return; _segAnt[k] = _segAnt[k] || { seguro: 0, ibi: 0, ibiFecha: '' }; _segAnt[k].seguro += rinf_num(r.seguro); _segAnt[k].ibi += rinf_num(r.ibi); if (r.ibiFecha) _segAnt[k].ibiFecha = r.ibiFecha; });
+  var _ibiFechaAct = {}; segibi.forEach(function(r) { if (r && !r.deleted && parseInt(r.anio, 10) === anio && r.ibiFecha && r.inmuebleRef) _ibiFechaAct[r.inmuebleRef] = r.ibiFecha; });
+  D.inmuebles.forEach(function(o) {
+    var idx = -1; todos.forEach(function(i, k) { if (i && i.ref === o.ref) idx = k; });
+    var pd = _pdPorRef[o.ref];
+    var f = pd && pd.diasProp > 0 ? (pd.diasAlq / pd.diasProp) : 1;
+    o.fAlq = f;
+    o.seguroDed = rinf_num(o.seguro * f); o.ibiDed = rinf_num(o.ibi * f); o.otrosDed = rinf_num((o.otrosFicha || 0) * f);
+    if (pd) { o.reduccion = pd.pctRed ? Math.round(pd.pctRed * 100) + ' %' : '—'; o.gastosDed = rinf_num(pd.gastos); o.amort = rinf_num(pd.amort); o.imputacion = rinf_num(pd.imputacion); o.dias = pd.diasAlq; o.diasProp = pd.diasProp; o.rendNeto = rinf_num(pd.rendNeto); }
+    else o.gastosDed = rinf_num(o.comunidad + o.seguroDed + o.ibiDed + o.otrosDed);
+    o.ibiFecha = _ibiFechaAct[o.ref] || '';
+    var a = _segAnt[o.ref] || { seguro: 0, ibi: 0, ibiFecha: '' }, comAnt = 0;
+    alq.forEach(function(r) { if (r && !r.deleted && idx >= 0 && inm_recEs(r, idx) && r.mes && parseInt(r.mes.slice(0, 4), 10) === anio - 1) comAnt += rinf_num(r.comunidad); });
+    o.ant = { seguro: rinf_num(a.seguro), ibi: rinf_num(a.ibi), ibiFecha: a.ibiFecha || '', comunidad: rinf_num(comAnt) };
+  });
+  D.imputacion = (_P && !_P.sinDatos) ? rinf_num(_P.imputacion) : rinf_num(D.inmuebles.reduce(function(t, o) { return t + (o.imputacion || 0); }, 0)); // 15/11/2026: el total de la previsión (sin diferencias de redondeo)
+  D.inmTot = D.inmuebles.reduce(function(t, o) { t.ingreso += o.ingreso; t.comunidad += o.comunidad; t.seguro += o.seguro; t.ibi += o.ibi; t.amort += o.amort; t.seguroDed += o.seguroDed; t.ibiDed += o.ibiDed; t.gastosDed += o.gastosDed; t.rendNeto += (o.rendNeto || 0); return t; }, { ingreso: 0, comunidad: 0, seguro: 0, ibi: 0, amort: 0, seguroDed: 0, ibiDed: 0, gastosDed: 0, rendNeto: 0 });
+  ['ingreso', 'comunidad', 'seguro', 'ibi', 'amort', 'seguroDed', 'ibiDed', 'gastosDed', 'rendNeto'].forEach(function(k) { D.inmTot[k] = rinf_num(D.inmTot[k]); });
 
   // 3. Gastos (con enlace a la factura). Se marca cuáles cuentan como gasto del
   // alquiler, igual que la previsión (sin duplicar comunidad / seguro / IBI que
@@ -31910,7 +31925,6 @@ function rinf_datos(anio) {
   var haySI = D.inmuebles.some(function(o) { return o.seguro > 0 || o.ibi > 0; });
   // 08/11/2026: cada gasto con su piso; fuera los de pisos que no son de Patricio.
   var _refsPat = {}; todos.forEach(function(i) { if (i && (i.propietario || '').toLowerCase() === 'patricio' && i.ref) _refsPat[i.ref] = true; });
-  D.imputacion = rinf_num(D.inmuebles.reduce(function(t, o) { return t + (o.imputacion || 0); }, 0));
   D.gastos = rinf_json('renta:gastos:' + anio, []).filter(function(g) { return g && !g.deleted && (!g.ref || g.ref === RGAS_VARIOS || _refsPat[g.ref]); })
     .sort(function(a, b) { return String(b.fecha || '').localeCompare(String(a.fecha || '')); })
     .map(function(g) {
@@ -32102,11 +32116,12 @@ function renta_informePDF() {
 
   // Resumen
   titulo('RESUMEN');
-  var rentNeto = D.inmTot.ingreso - D.inmTot.comunidad - D.inmTot.seguro - D.inmTot.ibi - D.inmTot.amort - D.gastosAlquiler;
+  // 15/11/2026 (D1): gastos deducibles = los de la previsión de la Renta (por días alquilados; incluye los gastos con factura de cada piso).
+  var rentNeto = D.inmTot.ingreso - D.inmTot.gastosDed - D.inmTot.amort;
   var res = [
     { c: 'Rendimientos del trabajo (bruto)', v: E(D.trabajoTot.bruto), r: E(D.trabajoTot.ret) },
     { c: 'Alquileres: ingresos del año', v: E(D.inmTot.ingreso), r: '' },
-    { c: 'Alquileres: gastos (comunidad, seguro, IBI, otros, amortización)', v: E(-(D.inmTot.comunidad + D.inmTot.seguro + D.inmTot.ibi + D.inmTot.amort + D.gastosAlquiler)), r: '' },
+    { c: 'Alquileres: gastos deducibles (por días alquilados) y amortización', v: E(-(D.inmTot.gastosDed + D.inmTot.amort)), r: '' },
     { c: 'Alquileres: rendimiento neto (antes de reducción)', v: E(rentNeto), r: '' },
     { c: 'Imputación de rentas (pisos vacíos, 2 % del valor catastral)', v: E(D.imputacion || 0), r: '' }, // 08/11/2026
     { c: 'Capital mobiliario (intereses, dividendos, Saveback)', v: E(D.capTot.bruto), r: E(D.capTot.ret) }
@@ -32133,10 +32148,17 @@ function renta_informePDF() {
       txt('Inicio del contrato: ' + (o.inicio ? rinf_fecha(o.inicio) : '—') + '     Reducción por vivienda aplicable: ' + o.reduccion + '     Meses cobrados: ' + o.meses, M, y); y += 3.8;
       txt('Valor catastral: ' + (o.vcTotal ? E(o.vcTotal) : '—') + '     Valor catastral de la construcción: ' + (o.vcConstruccion ? E(o.vcConstruccion) : '—'), M, y); y += 4.5; // 12/10/2026
       doc.setTextColor(30, 30, 30);
-      tabla([{ t: 'Ingresos', w: 36.4, a: 'r', k: 'ingreso', fmt: E }, { t: 'Comunidad', w: 36.4, a: 'r', k: 'comunidad', fmt: E }, { t: 'Seguro', w: 36.4, a: 'r', k: 'seguro', fmt: E },
-        { t: 'IBI', w: 36.4, a: 'r', k: 'ibi', fmt: E }, { t: 'Amortización 3 %', w: 36.4, a: 'r', k: 'amort', fmt: function(v) { return v ? E(v) : '—'; } }], [o]);
+      // 15/11/2026 (D1): lo deducible (igual que la previsión de la Renta) y, al lado, el importe del año para comprobarlo.
+      var _pr = o.diasProp ? (o.dias + ' de ' + o.diasProp + ' días alquilado') : '';
+      doc.setTextColor(70, 70, 70); txt('Días alquilado: ' + (_pr || '—') + (o.fAlq < 0.999 ? '  (seguro, IBI y otros se deducen en esa proporción)' : ''), M, y); y += 4.2; doc.setTextColor(30, 30, 30);
+      var _sd = function(k, kd) { return function(v, f) { return f[kd] !== f[k] ? E(f[kd]) + ' (de ' + E(f[k]) + ')' : E(f[k]); }; };
+      tabla([{ t: 'Ingresos', w: 30, a: 'r', k: 'ingreso', fmt: E }, { t: 'Comunidad', w: 26, a: 'r', k: 'comunidad', fmt: E }, { t: 'Seguro deducible', w: 34, a: 'r', k: 'seguro', fmt: _sd('seguro', 'seguroDed') },
+        { t: 'IBI deducible', w: 34, a: 'r', k: 'ibi', fmt: _sd('ibi', 'ibiDed') }, { t: 'Amortización 3 %', w: 28, a: 'r', k: 'amort', fmt: function(v) { return v ? E(v) : '—'; } }, { t: 'Total deducible', w: 30, a: 'r', k: 'gastosDed', fmt: function(v, f) { return E((f.gastosDed || 0) + (f.amort || 0)); } }], [o]);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8); doc.setTextColor(95, 95, 95);
+      txt('Para comprobar · ' + D.anio + ': seguro ' + E(o.seguro) + ' (sin fecha guardada) · IBI ' + E(o.ibi) + (o.ibiFecha ? ' pagado el ' + rinf_fecha(o.ibiFecha) : '') + ' · comunidad ' + E(o.comunidad) + '   |   ' + (D.anio - 1) + ': seguro ' + E(o.ant.seguro) + ' · IBI ' + E(o.ant.ibi) + (o.ant.ibiFecha ? ' pagado el ' + rinf_fecha(o.ant.ibiFecha) : '') + ' · comunidad ' + E(o.ant.comunidad), M, y - 0.5); y += 5;
+      doc.setTextColor(30, 30, 30);
     });
-    nota('Amortización: solo aparece si en Renta se ha puesto la base amortizable del inmueble. Los "otros gastos" del alquiler (apartado 3) son comunes y no están repartidos por inmueble.');
+    nota('Lo deducible es lo mismo que calcula la previsión de la Renta en la app: seguro, IBI y "otros" de la ficha en proporción a los días alquilados; la amortización (3 %), solo por esos días. "Total deducible" incluye también los gastos con factura de ese piso (apartado 3). Entre paréntesis, el importe pagado en el año.');
   } else vacio('Sin alquileres apuntados este año.');
 
   // 3. Gastos
@@ -32240,11 +32262,11 @@ function renta_informeExcel() {
       }
       X.utils.book_append_sheet(wb, ws, nombre);
     };
-    var rentNeto = D.inmTot.ingreso - D.inmTot.comunidad - D.inmTot.seguro - D.inmTot.ibi - D.inmTot.amort - D.gastosAlquiler;
+    var rentNeto = D.inmTot.ingreso - D.inmTot.gastosDed - D.inmTot.amort; // 15/11/2026 (D1)
     var res = [['Renta ' + D.anio + ' — Patricio Gómez García', '', ''], ['Concepto', 'Importe', 'Retenciones'],
       ['Rendimientos del trabajo (bruto)', D.trabajoTot.bruto, D.trabajoTot.ret],
       ['Alquileres: ingresos del año', D.inmTot.ingreso, ''],
-      ['Alquileres: gastos (comunidad, seguro, IBI, otros, amortización)', -(D.inmTot.comunidad + D.inmTot.seguro + D.inmTot.ibi + D.inmTot.amort + D.gastosAlquiler), ''],
+      ['Alquileres: gastos deducibles (por días alquilados) y amortización', -(D.inmTot.gastosDed + D.inmTot.amort), ''],
       ['Alquileres: rendimiento neto (antes de reducción)', rinf_num(rentNeto), ''],
       ['Imputación de rentas (pisos vacíos, 2 % del valor catastral)', rinf_num(D.imputacion || 0), ''], // 08/11/2026
       ['Capital mobiliario (intereses, dividendos, Saveback)', rinf_num(D.capTot.bruto), rinf_num(D.capTot.ret)]];
@@ -32254,10 +32276,10 @@ function renta_informeExcel() {
     hoja('Resumen', res, [62, 16, 16]);
     hoja('Trabajo', [['Mes', 'Bruto', 'Retención IRPF', 'Cuota autónomo']].concat(D.trabajo.map(function(n) { return [n.mes, n.bruto, n.ret, n.ss]; }))
       .concat([['Total', rinf_num(D.trabajoTot.bruto), rinf_num(D.trabajoTot.ret), rinf_num(D.trabajoTot.ss)]]), [18, 14, 16, 16]);
-    hoja('Inmuebles', [['Ref.', 'Dirección', 'Ref. catastral', 'Inquilino', 'DNI/NIE', 'Inicio contrato', 'Reducción', 'Meses cobrados', 'Ingresos', 'Comunidad', 'Seguro', 'IBI', 'Amortización 3 %', 'Valor catastral', 'V. catastral construcción']]
-      .concat(D.inmuebles.map(function(o) { return [o.ref, o.dir, o.catastral, o.inquilino, o.dni, rinf_fecha(o.inicio), o.reduccion, o.meses, rinf_num(o.ingreso), rinf_num(o.comunidad), rinf_num(o.seguro), rinf_num(o.ibi), o.amort, o.vcTotal || '', o.vcConstruccion || '']; }))
-      .concat([['Total', '', '', '', '', '', '', '', rinf_num(D.inmTot.ingreso), rinf_num(D.inmTot.comunidad), rinf_num(D.inmTot.seguro), rinf_num(D.inmTot.ibi), rinf_num(D.inmTot.amort), '', '']]),
-      [10, 28, 22, 28, 12, 13, 10, 9, 12, 11, 10, 10, 13, 13, 16]);
+    hoja('Inmuebles', [['Ref.', 'Dirección', 'Ref. catastral', 'Inquilino', 'DNI/NIE', 'Inicio contrato', 'Reducción', 'Meses cobrados', 'Días alquilado', 'Días propiedad', 'Ingresos', 'Comunidad', 'Seguro pagado', 'Seguro deducible', 'IBI pagado', 'Fecha IBI', 'IBI deducible', 'Amortización 3 %', 'Total gastos deducibles', 'Seguro año anterior', 'IBI año anterior', 'Fecha IBI año anterior', 'Comunidad año anterior', 'Valor catastral', 'V. catastral construcción']]
+      .concat(D.inmuebles.map(function(o) { return [o.ref, o.dir, o.catastral, o.inquilino, o.dni, rinf_fecha(o.inicio), o.reduccion, o.meses, o.dias || '', o.diasProp || '', rinf_num(o.ingreso), rinf_num(o.comunidad), rinf_num(o.seguro), o.seguroDed, rinf_num(o.ibi), o.ibiFecha ? rinf_fecha(o.ibiFecha) : '', o.ibiDed, o.amort, o.gastosDed, o.ant.seguro, o.ant.ibi, o.ant.ibiFecha ? rinf_fecha(o.ant.ibiFecha) : '', o.ant.comunidad, o.vcTotal || '', o.vcConstruccion || '']; }))
+      .concat([['Total', '', '', '', '', '', '', '', '', '', rinf_num(D.inmTot.ingreso), rinf_num(D.inmTot.comunidad), rinf_num(D.inmTot.seguro), D.inmTot.seguroDed, rinf_num(D.inmTot.ibi), '', D.inmTot.ibiDed, rinf_num(D.inmTot.amort), D.inmTot.gastosDed, '', '', '', '', '', '']]),
+      [10, 28, 22, 28, 12, 13, 10, 9, 9, 9, 12, 11, 11, 11, 10, 11, 10, 13, 14, 12, 12, 12, 12, 13, 16]);
     hoja('Gastos', [['Fecha', 'Concepto', 'Categoría', 'Importe', 'Cuenta como', 'Factura']]
       .concat(D.gastos.map(function(g) { return [rinf_fecha(g.fecha), g.concepto, g.cat, g.importe, g.nota, g.enlace]; }))
       .concat([['', 'Total gastos del alquiler', '', rinf_num(D.gastosAlquiler), '', '']]), [12, 40, 22, 12, 24, 14], 5);
