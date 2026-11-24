@@ -7708,6 +7708,7 @@ con editar/borrar en cada línea. -->
         <option value="Gestoría">Gestoría / Asesoría</option>
         <option value="Suministros">Suministros</option>
         <option value="Otros">Otros</option>
+        <option value="Mobiliario / electrodomésticos">Mobiliario / electrodomésticos (se amortiza 10 % al año)</option>
         <option value="Gasto de venta de inmueble">Gasto de venta de inmueble (no resta del alquiler)</option>
       </select>
     </div>
@@ -30751,26 +30752,28 @@ function renta_renderGastos() {
   pisos.forEach(function(p) {
     var ref = p.inm.ref, lista = rgas_delPiso(ref, Y);
     var r = sib_registro(p.idx, Y) || {}, antes = numES(r.otros) || 0;
-    var sub = lista.reduce(function(s, g) { return s + numES(g.importe); }, 0) + antes;
-    if (!lista.length && !(antes > 0)) return;
+    var mobAnt = rgas_muebles(Y, ref).filter(function(x) { return x.anio < Y; }); // 24/11/2026
+    var sub = lista.reduce(function(s, g) { return s + rgas_deducible(g, Y); }, 0) + antes + mobAnt.reduce(function(s, x) { return s + x.amort; }, 0);
+    if (!lista.length && !(antes > 0) && !mobAnt.length) return;
     var vac = !!vacio[ref];
     if (!vac) total += sub;
     html += '<div style="' + grp + 'color:' + (vac ? 'var(--text-secondary)' : 'var(--accent-green)') + ';"><span>' + sib_esc(rgas_nombrePiso(ref)) + '</span><span>' + fmtGlobal(sub) + ' €</span></div>';
     lista.forEach(function(g) { html += rgas_filaHtml(g, Y); });
+    mobAnt.forEach(function(x) { html += rgas_filaHtml(x.g, x.anio, { anioRenta: Y }); });
     if (antes > 0) html += '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;opacity:.7;font-style:italic;"><span style="color:var(--text-secondary);width:40px;font-size:11.5px;">' + Y + '</span><span style="flex:1;">Total apuntado antes <span style="font-size:10.5px;">(ficha del piso)</span></span><span style="font-weight:700;white-space:nowrap;">' + fmtGlobal(antes) + ' €</span></div>';
     if (vac) html += '<div style="font-size:11.5px;color:var(--accent-amber);background:rgba(224,156,58,.08);border:1px solid rgba(224,156,58,.35);border-radius:9px;padding:7px 9px;margin:6px 0;text-align:center;">Vacío en ' + Y + ': sus gastos y su amortización no restan. Se declara la imputación de rentas.</div>';
   });
   // Varios pisos
   var varios = gastos.filter(function(g) { return g.ref === RGAS_VARIOS && g.categoria !== RENTA_CAT_GASTO_VENTA; });
   if (varios.length) {
-    var sv = varios.reduce(function(s, g) { return s + numES(g.importe); }, 0); total += sv;
+    var sv = varios.reduce(function(s, g) { return s + rgas_deducible(g, Y); }, 0); total += sv;
     html += '<div style="' + grp + 'color:var(--accent-green);"><span>Varios pisos</span><span>' + fmtGlobal(sv) + ' €</span></div>';
-    varios.forEach(function(g) { html += rgas_filaHtml(g, Y, { sub: (g.categoria || '') + ' · se reparte entre los pisos alquilados' }); });
+    varios.forEach(function(g) { html += rgas_filaHtml(g, Y, { sub: (rgas_esMueble(g) ? rgas_subMueble(g, Y) : (g.categoria || '')) + ' · se reparte entre los pisos alquilados' }); });
   }
   // Antiguos sin piso (hasta que se ordenen)
   var sp = gastos.filter(function(g) { return !g.ref && g.categoria !== RENTA_CAT_GASTO_VENTA; });
   if (sp.length) {
-    var ss = sp.reduce(function(s, g) { return s + numES(g.importe); }, 0); total += ss;
+    var ss = sp.reduce(function(s, g) { return s + rgas_deducible(g, Y); }, 0); total += ss;
     html += '<div style="' + grp + 'color:var(--accent-amber);"><span>Sin piso (por ordenar)</span><span>' + fmtGlobal(ss) + ' €</span></div>';
     sp.forEach(function(g) { html += rgas_filaHtml(g, Y); });
   }
@@ -30839,7 +30842,7 @@ function rgas_filaHtml(g, anio, o) {
   return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;' + (o.gris ? 'opacity:.6;' : '') + '">'
     + (adm ? '<span onclick="rgas_editar(' + anio + ',\'' + id + '\')" style="color:#5b8dee;font-size:14px;width:18px;text-align:center;cursor:pointer;flex-shrink:0;">✎</span>' : '')
     + '<span style="color:var(--text-secondary);width:40px;font-size:11.5px;flex-shrink:0;">' + rgas_fecha(g.fecha) + '</span>'
-    + '<span style="flex:1;min-width:0;color:var(--silver-bright);">' + sib_esc(g.concepto || '') + foto + '<span style="display:block;color:var(--text-secondary);font-size:10.5px;">' + sib_esc(o.sub || g.categoria || '') + '</span></span>'
+    + '<span style="flex:1;min-width:0;color:var(--silver-bright);">' + sib_esc(g.concepto || '') + foto + '<span style="display:block;color:var(--text-secondary);font-size:10.5px;">' + sib_esc(o.sub || (rgas_esMueble(g) ? rgas_subMueble(g, o.anioRenta || anio) : (g.categoria || ''))) + '</span></span>'
     + '<span style="font-weight:700;white-space:nowrap;color:var(--silver-bright);">' + fmtGlobal(numES(g.importe)) + ' €</span>'
     + (adm ? '<span onclick="rgas_borrar(' + anio + ',\'' + id + '\')" style="color:#e57373;font-size:13px;width:18px;text-align:center;cursor:pointer;flex-shrink:0;">✕</span>' : '')
     + '</div>';
@@ -30876,9 +30879,11 @@ function rgas_htmlFicha(inm, idx, anio) {
   var lista = rgas_delPiso(inm.ref, anio);
   var r = sib_registro(idx, anio) || {};
   var antes = numES(r.otros) || 0;
+  var mobAntF = rgas_muebles(anio, inm.ref).filter(function(x) { return x.anio < anio; }); // 24/11/2026: mobiliario de años anteriores
   var h = '<div style="' + caja + '"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--silver-bright);">🧾 OTROS GASTOS ' + anio + '</div>'
-    + '<span style="font-size:12px;color:var(--text-secondary);font-weight:600;">' + (lista.length + (antes > 0 ? 1 : 0)) + '</span></div>';
+    + '<span style="font-size:12px;color:var(--text-secondary);font-weight:600;">' + (lista.length + mobAntF.length + (antes > 0 ? 1 : 0)) + '</span></div>';
   lista.forEach(function(g) { h += rgas_filaHtml(g, anio); });
+  mobAntF.forEach(function(x) { h += rgas_filaHtml(x.g, x.anio, { anioRenta: anio }); });
   if (antes > 0) {
     h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;opacity:.7;font-style:italic;">'
       + (rgas_esAdmin() ? '<span onclick="sib_editarGastos()" style="color:#5b8dee;font-size:14px;width:18px;text-align:center;cursor:pointer;">✎</span>' : '')
@@ -30888,7 +30893,7 @@ function rgas_htmlFicha(inm, idx, anio) {
       + (rgas_esAdmin() ? '<span onclick="rgas_quitarAntes(' + idx + ',' + anio + ')" style="color:#e57373;font-size:13px;width:18px;text-align:center;cursor:pointer;">✕</span>' : '')
       + '</div>';
   }
-  if (!lista.length && !(antes > 0)) h += '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:4px 0 6px;">Sin gastos apuntados en ' + anio + '.</div>';
+  if (!lista.length && !(antes > 0) && !mobAntF.length) h += '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:4px 0 6px;">Sin gastos apuntados en ' + anio + '.</div>';
   if (rgas_esAdmin()) h += '<button onclick="rgas_nuevo(\'' + String(inm.ref || '').replace(/'/g, "\\'") + '\',' + anio + ')" style="width:100%;background:rgba(91,141,238,.12);border:1px solid rgba(91,141,238,.5);border-radius:10px;color:var(--silver-bright);font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;padding:9px;cursor:pointer;margin-top:10px;">+ Añadir gasto</button>';
   if ((inm.propietario || '').toLowerCase() === 'patricio') h += '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">Estos gastos son los que usa la Renta (solo por los días alquilados).</div>';
   return h + '</div>';
@@ -31426,6 +31431,40 @@ var RENTA_MESES_NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio',
 // 02/11/2026: factor de cada mes sobre la nómina base (calendario fijo de Patry)
 var RENTA_NOM_FACTOR = [1, 1, 2, 1, 1, 1, 2, 1, 1.5, 1, 1, 1.5];
 var RENTA_CAT_GASTO_VENTA = 'Gasto de venta de inmueble';
+// 24/11/2026 (Patry): MOBILIARIO / ELECTRODOMÉSTICOS (frigo, lavadora, sofá…).
+// No se deduce entero el año de compra: se amortiza un 10 % al año desde la
+// fecha de compra durante 10 años (el primer y el último año, por días). En la
+// Renta cuenta solo por los días alquilados, como el resto de gastos del piso.
+var RENTA_CAT_MOBILIARIO = 'Mobiliario / electrodomésticos';
+var RENTA_MOB_PCT = 0.10;
+// Amortización de un mueble en un año (año completo, antes de los días alquilados).
+function rgas_amortMueble(g, anio) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec((g && g.fecha) || ''); if (!m) return 0;
+  var imp = numES(g.importe) || 0; if (imp <= 0) return 0;
+  var ini = new Date(+m[1], +m[2] - 1, +m[3], 12), fin = new Date(+m[1] + 10, +m[2] - 1, +m[3], 12);
+  var a0 = new Date(anio, 0, 1, 12), a1 = new Date(anio + 1, 0, 1, 12);
+  var desde = ini > a0 ? ini : a0, hasta = fin < a1 ? fin : a1;
+  var dias = Math.round((hasta - desde) / 86400000); if (dias <= 0) return 0;
+  return imp * RENTA_MOB_PCT * dias / renta_diasDelAnio(anio);
+}
+// Muebles que amortizan en un año: comprados ese año o en los 10 anteriores.
+// ref: un piso, RGAS_VARIOS, '' (sin piso) o null (todos).
+function rgas_muebles(anio, ref) {
+  var res = [];
+  for (var a = anio - 10; a <= anio; a++) rgas_load(a).forEach(function(g) {
+    if (!g || g.deleted || g.categoria !== RENTA_CAT_MOBILIARIO) return;
+    if (ref !== null && ref !== undefined && (g.ref || '') !== ref) return;
+    var am = rgas_amortMueble(g, anio); if (am > 0) res.push({ anio: a, g: g, amort: am });
+  });
+  return res;
+}
+function rgas_esMueble(g) { return !!g && g.categoria === RENTA_CAT_MOBILIARIO; }
+// Lo que cuenta en la Renta del año (mueble → su amortización; resto → importe).
+function rgas_deducible(g, anio) { return rgas_esMueble(g) ? rgas_amortMueble(g, anio) : (numES(g.importe) || 0); }
+function rgas_subMueble(g, anio) {
+  var a = parseInt(String(g.fecha || '').slice(0, 4), 10) || anio;
+  return '🪑 Mobiliario' + (a < anio ? ' comprado en ' + a : '') + ' · se amortiza 10 %/año · en ' + anio + ' cuenta ' + fmtGlobal(rgas_amortMueble(g, anio)) + ' €';
+}
 // ── 08/11/2026: REVISIÓN DE LA RENTA CON PATRY (comparada con su Renta 2025) ──
 // Escala general del IRPF: estatal + autonómica de la Región de Murcia, ya
 // sumadas (tipo total de cada tramo).
@@ -31629,6 +31668,7 @@ function renta_calcPrevisionDatos(proy) {
     if (!gx || gx.deleted || gx.enFicha) continue; // enFicha: comunidad/IBI/seguro ya contados en la ficha
     var cat = gx.categoria || '';
     if (cat === RENTA_CAT_GASTO_VENTA) continue;
+    if (cat === RENTA_CAT_MOBILIARIO) continue; // 24/11/2026: se suma abajo, amortizado
     var refG = gx.ref || '';
     if (refG && refG !== RGAS_VARIOS) {
       var ixG = -1;
@@ -31640,6 +31680,15 @@ function renta_calcPrevisionDatos(proy) {
     if (!refG && haySegIbi && (cat === 'IBI' || cat === 'Seguro')) continue;
     gastosDeducibles += parseFloat(gx.importe) || 0;
   }
+  // 24/11/2026: mobiliario (este año y los 10 anteriores) → 10 % anual.
+  rgas_muebles(renta_anio, null).forEach(function(x) {
+    var refM = x.g.ref || '';
+    if (refM && refM !== RGAS_VARIOS) {
+      for (var mj = 0; mj < inmPatricio.length; mj++) { if ((todosInm[inmPatricio[mj]] || {}).ref === refM) { porInm[inmPatricio[mj]].otros += x.amort; porInm[inmPatricio[mj]].mob = (porInm[inmPatricio[mj]].mob || 0) + x.amort; break; } }
+      return;
+    }
+    gastosDeducibles += x.amort;
+  });
 
   // PUNTO 210: reducción por alquiler de vivienda sobre el rendimiento NETO
   // (60% contratos anteriores al 26/05/2023, 50% el resto).
@@ -31959,15 +32008,23 @@ function rinf_datos(anio) {
     .map(function(g) {
       var cat = g.categoria || '', nota = 'Gasto del alquiler';
       if (cat === RENTA_CAT_GASTO_VENTA) nota = 'Gasto de la venta';
+      else if (cat === RENTA_CAT_MOBILIARIO) nota = 'Mobiliario: cuenta ' + fmtGlobal(rgas_amortMueble(g, anio)) + ' € (10 %/año)'; // 24/11/2026
       else if (g.enFicha) nota = 'Ya incluido por inmueble'; // 08/11/2026
       else if (hayCom && cat === 'Comunidad') nota = 'Ya incluido por inmueble';
       else if (haySI && (cat === 'IBI' || cat === 'Seguro')) nota = 'Ya incluido por inmueble';
       var pre = g.ref ? (g.ref === RGAS_VARIOS ? 'Varios pisos · ' : g.ref + ' · ') : '';
-      return { fecha: g.fecha || '', concepto: pre + (g.concepto || ''), cat: cat, importe: rinf_num(g.importe), nota: nota, enlace: g.fotoUrl || '' };
+      return { fecha: g.fecha || '', concepto: pre + (g.concepto || ''), cat: cat, importe: rinf_num(g.importe), nota: nota, enlace: g.fotoUrl || '', deduce: cat === RENTA_CAT_MOBILIARIO ? rinf_num(rgas_amortMueble(g, anio)) : null };
     });
+  // 24/11/2026: mobiliario de años anteriores que sigue amortizando este año.
+  rgas_muebles(anio, null).forEach(function(x) {
+    var g = x.g; if (x.anio >= anio || (g.ref && g.ref !== RGAS_VARIOS && !_refsPat[g.ref])) return;
+    var pre = g.ref ? (g.ref === RGAS_VARIOS ? 'Varios pisos · ' : g.ref + ' · ') : '';
+    D.gastos.push({ fecha: g.fecha || '', concepto: pre + (g.concepto || '') + ' (comprado en ' + x.anio + ')', cat: RENTA_CAT_MOBILIARIO, importe: rinf_num(g.importe), nota: 'Mobiliario: cuenta ' + fmtGlobal(x.amort) + ' € (10 %/año)', enlace: g.fotoUrl || '', deduce: rinf_num(x.amort) });
+  });
   // 08/11/2026: "Otros gastos" apuntados en la ficha sin detalle (total del año).
   D.inmuebles.forEach(function(o) { if (o.otrosFicha > 0) D.gastos.push({ fecha: '', concepto: o.ref + ' · Otros gastos de la ficha (total del año, sin detalle)', cat: 'Otros', importe: rinf_num(o.otrosFicha), nota: 'Gasto del alquiler', enlace: '' }); });
-  D.gastosAlquiler = rinf_num(D.gastos.filter(function(g) { return g.nota === 'Gasto del alquiler'; }).reduce(function(s, g) { return s + g.importe; }, 0));
+  D.gastosAlquiler = rinf_num(D.gastos.filter(function(g) { return g.nota === 'Gasto del alquiler'; }).reduce(function(s, g) { return s + g.importe; }, 0)
+    + D.gastos.reduce(function(s, g) { return s + (g.deduce || 0); }, 0)); // 24/11/2026: + amortización del mobiliario
 
   // 4. Capital mobiliario
   D.intereses = (typeof rint_delAnio === 'function' ? rint_delAnio(anio) : []).concat(typeof prs_interesesAnio === 'function' ? prs_interesesAnio(anio) : []) // 13/11/2026: + préstamos
