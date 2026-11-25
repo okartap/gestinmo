@@ -18415,6 +18415,10 @@ function fin_loadEmpresa(base, empresa) {
 function fin_totalCuentasEmpresa(empresa) { return fin_patrimonioCalc(empresa).cuentas; }
 function fin_totalFondosEmpresa(empresa) { return fin_patrimonioCalc(empresa).fondos; }
 function fin_totalAccionesEmpresa(empresa) { return fin_accValorEmp(empresa); }
+// 25/11/2026 (Patry): valor de los planes de pensiones de una empresa. No es
+// dinero disponible (no se rescata cuando se quiere), así que la Calculadora →
+// Financiación lo resta de "Fondos". Sigue sumando en el Patrimonio total.
+function fin_ppValorEmp(empresa) { return fin_loadEmpresa('fin:fondos', empresa).reduce(function(s, f) { return s + (f.esPlanPensiones ? (parseFloat(f.valor) || 0) : 0); }, 0); }
 
 // ── PESTAÑA FINANCIACIÓN ───────────────────────────────────────────────
 // AJUSTE 2/3/4 (21/09/2026), rediseño completo decidido con Patry a partir
@@ -18495,9 +18499,11 @@ function cal_finRender() {
   var puedePatricio = usuarioPuedeEmpresa('patricio');
 
   var ccPatrimer = fin_totalCuentasEmpresa('patrimer');
-  var fondosPatrimer = fin_totalFondosEmpresa('patrimer');
+  // 25/11/2026: sin planes de pensiones (no son liquidez).
+  var ppPatrimer = fin_ppValorEmp('patrimer'), ppPatricio = puedePatricio ? fin_ppValorEmp('patricio') : 0;
+  var fondosPatrimer = fin_totalFondosEmpresa('patrimer') - ppPatrimer;
   var ccPatricio = puedePatricio ? fin_totalCuentasEmpresa('patricio') : 0;
-  var fondosAccPatricio = puedePatricio ? (fin_totalFondosEmpresa('patricio') + fin_totalAccionesEmpresa('patricio')) : 0;
+  var fondosAccPatricio = puedePatricio ? (fin_totalFondosEmpresa('patricio') - ppPatricio + fin_totalAccionesEmpresa('patricio')) : 0;
 
   // AJUSTE 4: las 2 casillas por estudio (finSelPatrimer/finSelPatricio) son
   // independientes entre sí y de "empresa" — un estudio puede restar de las
@@ -18519,6 +18525,8 @@ function cal_finRender() {
     '</div>';
     html += cal_finFilaEmpresa('PATRIMER', calcPatrimer);
     if (puedePatricio) html += cal_finFilaEmpresa('PATRICIO', calcPatricio);
+    var ppTot = ppPatrimer + ppPatricio;
+    if (ppTot > 0) html += '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;">No incluye el plan de pensiones (' + fin_fmt(ppTot) + '): no es rescatable.</div>';
     tablaEl.innerHTML = html;
   }
 
